@@ -146,6 +146,7 @@ Inspect the generated inventories:
 
 ```bash
 find .claude/commands/opsx -maxdepth 1 -type f -name '*.md' -print
+find .claude/skills -maxdepth 1 -type d -name 'openspec-*' -print
 find .agents/skills -maxdepth 1 -type d -name 'openspec-*' -print
 ```
 

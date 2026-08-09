@@ -2,16 +2,17 @@
 
 ## Scope and State
 
-This report reviews OpenSpec change `bootstrap-openspec-foundation` after all
-apply tasks. It evaluates the two delta specs and the approved design. It is
-implementation evidence, not the separate OpenSpec verify action and not
-authorization to sync or archive.
+This report began as implementation evidence after all apply tasks. The formal
+verification addendum below independently evaluates the two delta specs, the
+approved design, the task evidence, and the active GitHub delivery records. It
+does not authorize pull-request readiness, delivery, sync, or archive.
 
 - Schema: `spec-driven`
 - Strict validation: passed
 - Scenario coverage: 19 of 19 scenarios have implementation evidence
 - Design decisions reviewed: 5 of 5
-- Archival readiness: blocked by the separate verify action and undelivered draft PR #5
+- Formal verification: passed on 2026-08-09; pending owner acceptance
+- Archival readiness: blocked by undelivered draft PR #5
 
 ## Command Evidence
 
@@ -30,6 +31,29 @@ authorization to sync or archive.
 
 No repository-provided formatter, Markdown linter, package test runner, or
 build target exists. No additional project command was skipped.
+
+## Formal Verification Addendum
+
+| Dimension | Result |
+|---|---|
+| Completeness | 14 of 14 tasks complete; 11 of 11 requirements and 19 of 19 scenarios mapped to evidence |
+| Correctness | Strict validation, configured instructions, workflow selection, generated inventories, provenance, documentation, and GitHub linkage independently rechecked |
+| Coherence | All five design decisions followed; generated ownership, product configuration, contributor guidance, and recovery behavior remain consistent |
+
+The formal verify action also ran the standing code review. It found no
+critical implementation issue. Two objective documentation drifts were fixed:
+
+- The contributor discovery commands now enumerate generated Claude skills in
+  addition to Claude commands and Codex skills.
+- The M1 implementation-plan progress statement now reflects completed apply
+  and verification work and identifies delivery, sync, and archive as pending.
+
+The previous PR review's tool-allowlist concern does not require a generated
+file change. [Claude Code documents `allowed-tools`](https://code.claude.com/docs/en/slash-commands#pre-approve-tools-for-a-skill)
+as pre-approving listed tools without making the list exclusive; other tools
+remain subject to normal permission settings. Manually broadening
+OpenSpec-generated files would expand unattended permissions and violate their
+ownership boundary.
 
 ## Scenario Coverage
 
@@ -102,6 +126,10 @@ build target exists. No additional project command was skipped.
   Local startup diagnostics still proved discovery of six project skills and
   six legacy commands before authentication. Authenticate and repeat only if a
   future review requires model invocation rather than local discovery.
+- PR #5 has no CI status checks because the repository does not yet provide a
+  validation workflow or test runner. Required validation automation is owned
+  by later foundation milestones; the equivalent dependency-free checks were
+  run locally for this verification.
 
 ### Suggestions
 
@@ -121,7 +149,8 @@ build target exists. No additional project command was skipped.
 ## Conclusion
 
 The implemented repository-local foundation conforms to both delta specs and
-the approved design within the reviewed scope. There are no implementation
-defects requiring correction in this batch. Apply is complete, but the change
-is not ready for sync or archive until the separate OpenSpec verify action and
-pull-request delivery requirements are satisfied.
+the approved design within the reviewed scope. Formal verification found no
+critical issue and the objective documentation corrections pass the affected
+checks. The change is ready for owner verification acceptance and pull-request
+delivery review. It is not ready for sync or archive until PR #5 is delivered
+and the repository's delivery gates are satisfied.
