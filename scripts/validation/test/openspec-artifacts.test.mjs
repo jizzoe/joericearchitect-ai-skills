@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -60,6 +61,9 @@ test("validator CLI exits nonzero for an invalid fixture", () => {
 });
 
 test("M3-C1 change satisfies the artifact quality rules", () => {
-  const result = validateChange(path.join(repoRoot, "openspec/changes/establish-openspec-quality-rules"));
+  const activePath = path.join(repoRoot, "openspec/changes/establish-openspec-quality-rules");
+  const archivePath = path.join(repoRoot, "openspec/changes/archive/2026-08-09-establish-openspec-quality-rules");
+  const changePath = fs.existsSync(activePath) ? activePath : archivePath;
+  const result = validateChange(changePath);
   assert.equal(result.valid, true, JSON.stringify(result.issues, null, 2));
 });
