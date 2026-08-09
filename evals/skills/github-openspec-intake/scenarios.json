@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "trigger-create-issue",
+      "prompt": "Create or reuse a GitHub issue for this OpenSpec change.",
+      "expectedSkill": "github-issue-authoring"
+    },
+    {
+      "id": "trigger-issue-to-openspec",
+      "prompt": "Connect issue #77 to an OpenSpec change with tracking metadata.",
+      "expectedSkill": "github-issue-to-openspec"
+    },
+    {
+      "id": "non-trigger-general-github-question",
+      "prompt": "Explain what GitHub Issues are.",
+      "expectedSkill": null
+    },
+    {
+      "id": "missing-information",
+      "prompt": "Create an OpenSpec change from this issue without an issue number or URL.",
+      "expectedOutcome": "fail-locally"
+    },
+    {
+      "id": "api-failure",
+      "prompt": "Create an issue when gh returns a nonzero status.",
+      "expectedOutcome": "structured-failure"
+    }
+  ]
+}
