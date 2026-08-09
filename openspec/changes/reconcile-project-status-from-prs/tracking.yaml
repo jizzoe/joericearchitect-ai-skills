@@ -1,0 +1,21 @@
+schema_version: 1
+openspec:
+  change: reconcile-project-status-from-prs
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 41
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/41
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - scripts/github/lib/pr-status-sync.mjs
+      - scripts/github/reconcile-pr-project-status.mjs
+      - scripts/github/test/pr-status-sync.test.mjs
+      - .github/workflows/project-status-sync.yml
+      - skills/base/project-pr-status-sync/
+      - evals/workflows/project-pr-status-sync/
+      - openspec/changes/reconcile-project-status-from-prs/
+

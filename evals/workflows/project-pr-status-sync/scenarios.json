@@ -1,0 +1,37 @@
+[
+  {
+    "name": "draft-opened-remains-in-progress",
+    "event": "opened",
+    "expected": "In Progress"
+  },
+  {
+    "name": "ready-for-review-enters-review",
+    "event": "ready_for_review",
+    "expected": "In Review"
+  },
+  {
+    "name": "converted-to-draft-returns-in-progress",
+    "event": "converted_to_draft",
+    "expected": "In Progress"
+  },
+  {
+    "name": "merged-default-branch-defers-to-built-in-completion",
+    "event": "closed",
+    "merged": true,
+    "expected": null
+  },
+  {
+    "name": "closed-unmerged-returns-in-progress",
+    "event": "closed",
+    "merged": false,
+    "expected": "In Progress"
+  },
+  {
+    "name": "untrusted-pull-request-is-audit-only",
+    "event": "ready_for_review",
+    "eventName": "pull_request_target",
+    "fork": true,
+    "expectedAction": "audit-only"
+  }
+]
+

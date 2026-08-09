@@ -1,0 +1,20 @@
+name: Project Status Sync
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, converted_to_draft, closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node scripts/github/reconcile-pr-project-status.mjs --config config/sdd-github.json --event "$GITHUB_EVENT_PATH" --event-name "$GITHUB_EVENT_NAME" --observed-project evals/workflows/project-pr-status-sync/observed-project.json
+

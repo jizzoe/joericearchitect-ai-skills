@@ -1,0 +1,14 @@
+{
+  "fields": [
+    {
+      "id": "status-field",
+      "name": "Status",
+      "options": [
+        { "id": "progress-id", "name": "In Progress" },
+        { "id": "review-id", "name": "In Review" },
+        { "id": "done-id", "name": "Done" }
+      ]
+    }
+  ]
+}
+
