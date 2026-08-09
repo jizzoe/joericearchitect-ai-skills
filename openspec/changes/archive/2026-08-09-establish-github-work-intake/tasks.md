@@ -50,6 +50,6 @@
   - Depends on: 4.1
   - Evidence: verification report maps tasks, requirements, scenarios, design decisions, security controls, recovery paths, portability claims, and known limitations to current evidence.
 
-- [ ] 4.3 Deliver, Sync, and Archive through separate authorized checkpoints.
+- [x] 4.3 Deliver, Sync, and Archive through separate authorized checkpoints.
   - Depends on: 4.2
   - Evidence: implementation PR closes issue #15 and reaches `Done`; Sync PR updates living specs; Archive PR preserves the completed change and active change list is empty.
