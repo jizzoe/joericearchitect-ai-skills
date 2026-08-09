@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "ruleSets": {
+    "proposal": {
+      "requiredSections": ["Why", "What Changes", "Non-Goals", "Impact", "Reuse Plan"],
+      "requiredTerms": ["scope", "compatibility", "security"],
+      "issueLinkage": {
+        "ruleId": "proposal.issue_linkage",
+        "requiresAny": ["https://github.com/", "Approved no-issue exception"]
+      }
+    },
+    "spec": {
+      "requirementHeading": "### Requirement:",
+      "scenarioHeading": "#### Scenario:",
+      "normativeTerms": ["SHALL", "MUST"],
+      "scenarioTerms": ["WHEN", "THEN"]
+    },
+    "design": {
+      "requiredSections": [
+        "Context",
+        "Goals / Non-Goals",
+        "Decisions",
+        "Verification Strategy",
+        "Attribution and Licensing",
+        "Recovery",
+        "Reuse Plan"
+      ],
+      "requiredTerms": ["security", "portability", "recovery", "attribution"]
+    },
+    "tasks": {
+      "taskPattern": "^- \\[[ x]\\] [0-9]+\\.[0-9]+ .+",
+      "requiredMetadata": ["Depends on:", "Evidence:"]
+    },
+    "fixtures": {
+      "sampleChangePath": "evals/openspec-artifact-quality/fixtures/sample-change"
+    },
+    "schemaSufficiency": {
+      "requiresStandardOpenSpecValidation": true,
+      "customSchemaRequired": false
+    }
+  }
+}
