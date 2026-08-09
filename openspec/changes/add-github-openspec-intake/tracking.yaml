@@ -1,0 +1,22 @@
+schema_version: 1
+openspec:
+  change: add-github-openspec-intake
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 29
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/29
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - scripts/github/
+      - skills/base/github-issue-authoring/
+      - skills/base/github-issue-to-openspec/
+      - .claude/skills/github-issue-authoring/
+      - .claude/skills/github-issue-to-openspec/
+      - .agents/skills/github-issue-authoring/
+      - .agents/skills/github-issue-to-openspec/
+      - evals/skills/github-openspec-intake/
+      - openspec/changes/add-github-openspec-intake/
