@@ -11,8 +11,9 @@ does not authorize pull-request readiness, delivery, sync, or archive.
 - Strict validation: passed
 - Scenario coverage: 19 of 19 scenarios have implementation evidence
 - Design decisions reviewed: 5 of 5
-- Formal verification: passed on 2026-08-09; pending owner acceptance
-- Archival readiness: blocked by undelivered draft PR #5
+- Formal verification: passed and accepted by the owner on 2026-08-09
+- Delivery state at verification: PR #5 ready for review, open, and unmerged;
+  archival readiness blocked by undelivered PR #5
 
 ## Command Evidence
 
@@ -116,7 +117,7 @@ ownership boundary.
 
 - Task 5.3 was incomplete at the initial review. It is resolved by the
   [issue #2 evidence comment](https://github.com/jizzoe/joericearchitect-ai-skills/issues/2#issuecomment-5230092221), explicit M2/M3 deferrals, and
-  [draft PR #5](https://github.com/jizzoe/joericearchitect-ai-skills/pull/5),
+  [PR #5](https://github.com/jizzoe/joericearchitect-ai-skills/pull/5),
   which supersedes closed, unmerged PR #3 and formally closes issue #2 when
   merged to `main`.
 
@@ -151,6 +152,7 @@ ownership boundary.
 The implemented repository-local foundation conforms to both delta specs and
 the approved design within the reviewed scope. Formal verification found no
 critical issue and the objective documentation corrections pass the affected
-checks. The change is ready for owner verification acceptance and pull-request
-delivery review. It is not ready for sync or archive until PR #5 is delivered
-and the repository's delivery gates are satisfied.
+checks. At this verification checkpoint, the owner has accepted the result and
+the change is ready for pull-request delivery. It is not ready for sync or
+archive until PR #5 is delivered and the repository's delivery gates are
+satisfied.

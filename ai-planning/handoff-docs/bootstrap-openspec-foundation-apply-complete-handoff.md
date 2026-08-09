@@ -13,6 +13,8 @@ PR #3 was closed unmerged and superseded by
 which targets `main` from `feature/2-bootstrap-openspec` and formally closes
 issue #2 when merged. References to PR #3 in completed-activity sections below
 are historical; current verification and delivery decisions SHALL use PR #5.
+Formal verification subsequently passed, the owner accepted its documented
+warnings and limitations, and PR #5 moved from draft to ready for review.
 
 ## Purpose
 

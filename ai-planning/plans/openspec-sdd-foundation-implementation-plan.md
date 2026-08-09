@@ -345,10 +345,10 @@ M2 and M3 may proceed in parallel after M1, but M4 requires both. M4-C2 and M5-C
 
 ## 6. Milestone 1: Tool and OpenSpec Bootstrap
 
-Progress: Implementation and formal OpenSpec verification are complete. Draft
-PR #5 targets `main` from `feature/2-bootstrap-openspec` and formally closes
-issue #2 when merged. Owner verification acceptance, pull-request readiness,
-and delivery remain pending; sync and archive have not started.
+Progress checkpoint (2026-08-09): implementation and formal OpenSpec
+verification are complete and accepted by the owner. PR #5 targets `main` from
+`feature/2-bootstrap-openspec`, formally closes issue #2 when merged, and is
+ready for review. Delivery is the next gate; sync and archive have not started.
 
 ### Outcome
 
