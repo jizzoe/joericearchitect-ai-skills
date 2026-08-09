@@ -114,11 +114,11 @@
   - Depends on: 5.1, 5.2
   - Evidence: strict OpenSpec validation, focused tests, evals, link checks or documented substitutes, secret-pattern scan, scope review, attribution review, portability review, and requirements/scenario mapping pass.
 
-- [ ] 5.4 Obtain owner authorization and run the disposable end-to-end rehearsal.
+- [x] 5.4 Obtain owner authorization and run the disposable end-to-end rehearsal.
   - Depends on: 5.3
   - Evidence: disposable `[SDD test]` issue, Project updates, lifecycle PRs, Sync, Archive, objective correction, human pause, idempotent resume, external mutation boundary, branch cleanup, and preserved audit evidence are recorded without secrets.
 
-- [ ] 5.5 Complete formal OpenSpec Verify for M1-C2.
+- [x] 5.5 Complete formal OpenSpec Verify for M1-C2.
   - Depends on: 5.4
   - Evidence: verification report maps every task, requirement, scenario, design decision, security control, recovery path, portability claim, eval, and known limitation to current evidence.
 
