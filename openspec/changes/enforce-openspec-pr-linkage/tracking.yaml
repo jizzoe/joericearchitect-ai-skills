@@ -1,0 +1,21 @@
+schema_version: 1
+openspec:
+  change: enforce-openspec-pr-linkage
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 37
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/37
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - scripts/validation/validate-pr-contract.mjs
+      - scripts/validation/validate-openspec-linkage.mjs
+      - scripts/validation/test/pr-linkage.test.mjs
+      - .github/workflows/openspec-validate.yml
+      - .github/workflows/openspec-linkage.yml
+      - skills/base/github-pr-linkage/
+      - evals/skills/github-pr-linkage/
+      - openspec/changes/enforce-openspec-pr-linkage/
