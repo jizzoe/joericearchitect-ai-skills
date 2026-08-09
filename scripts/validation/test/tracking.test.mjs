@@ -88,7 +88,10 @@ test("CLI exits nonzero for invalid tracking", () => {
 });
 
 test("M3-C2 tracking metadata validates", () => {
-  const result = readTrackingFile(path.join(repoRoot, "openspec/changes/add-openspec-change-tracking/tracking.yaml"), {
+  const activePath = path.join(repoRoot, "openspec/changes/add-openspec-change-tracking/tracking.yaml");
+  const archivePath = path.join(repoRoot, "openspec/changes/archive/2026-08-09-add-openspec-change-tracking/tracking.yaml");
+  const trackingPath = fs.existsSync(activePath) ? activePath : archivePath;
+  const result = readTrackingFile(trackingPath, {
     expectedChange: "add-openspec-change-tracking"
   });
   assert.equal(result.validation.valid, true, JSON.stringify(result.validation.issues, null, 2));
