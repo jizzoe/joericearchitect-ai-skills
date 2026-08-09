@@ -608,3 +608,48 @@ scorecard and findings, then stop for my acceptance decision.
 Do not put issue numbers, branch names, or pull-request numbers in the reusable
 skill. Those facts change per delivery and must be resolved from current Git,
 GitHub, and OpenSpec state.
+
+## 9. Deliver M1-C1 Through Squash Merge
+
+### Intended Outcome
+
+Perform a final read-only delivery audit, then use the repository's accepted
+squash-merge policy to deliver the verified change. Prove the resulting pull
+request, issue, branch, and `main` state without treating delivery as OpenSpec
+Sync or Archive authorization.
+
+### Prompt
+
+```text
+Perform the final pre-merge audit of PR #5.
+
+Verify that it targets `main`, is mergeable, formally closes issue #2, contains
+the accepted OpenSpec verification evidence, and has no new blocking review
+findings.
+
+If the audit passes, squash-merge PR #5 using this commit title:
+
+Bootstrap OpenSpec for Claude and Codex (#5)
+
+Verify that PR #5 is merged, issue #2 closes, the remote feature branch is
+deleted, and `main` contains the squash commit.
+
+Do not sync or archive the OpenSpec change and do not mutate Project state.
+Stop after reporting the delivery evidence.
+```
+
+### Expected Stopping Point
+
+PR #5 is squash-merged to `main`, issue #2 is closed by its formal relationship,
+the remote topic branch is deleted, and the local repository can identify the
+resulting squash commit. Project state, living specs, and the active OpenSpec
+change remain untouched.
+
+### Learning Notes
+
+- Re-audit the current PR head immediately before merge because verification
+  evidence can become stale after another push.
+- Delivery proves code integration and issue closure. It does not itself sync
+  delta specs or archive the OpenSpec change.
+- Post-merge evidence must inspect the resulting GitHub and Git state rather
+  than inferring success from the merge command's exit status alone.
