@@ -1,0 +1,15 @@
+schema_version: 1
+openspec:
+  change: add-report-export-review
+github:
+  repository: example/bookkeeping-assistant
+  issue: 42
+  issue_url: https://github.com/example/bookkeeping-assistant/issues/42
+  project_owner: example
+  project_number: 7
+implementation_repositories:
+  - repository: example/bookkeeping-assistant
+    default_branch: main
+    paths:
+      - openspec/changes/add-report-export-review/
+review_notes: local-only fixture metadata
