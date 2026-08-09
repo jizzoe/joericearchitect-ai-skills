@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jizzoe/joericearchitect-ai-skills/schemas/openspec-tracking-v1.schema.json",
+  "title": "OpenSpec Change Tracking v1",
+  "type": "object",
+  "required": ["schema_version", "openspec", "github", "implementation_repositories"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "openspec": {
+      "type": "object",
+      "required": ["change"],
+      "properties": {
+        "change": { "type": "string", "minLength": 1 }
+      }
+    },
+    "github": {
+      "type": "object",
+      "required": ["repository", "issue", "issue_url", "project_owner", "project_number"],
+      "properties": {
+        "repository": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+        "issue": { "type": "integer", "minimum": 1 },
+        "issue_url": { "type": "string", "format": "uri" },
+        "project_owner": { "type": "string", "minLength": 1 },
+        "project_number": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "implementation_repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["repository", "default_branch", "paths"],
+        "properties": {
+          "repository": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+          "default_branch": { "type": "string", "minLength": 1 },
+          "paths": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

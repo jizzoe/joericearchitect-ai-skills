@@ -1,0 +1,19 @@
+schema_version: 1
+openspec:
+  change: add-openspec-change-tracking
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 25
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/25
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - schemas/openspec-tracking-v1.schema.json
+      - scripts/validation/lib/tracking.mjs
+      - scripts/validation/validate-tracking.mjs
+      - scripts/validation/test/tracking.test.mjs
+      - scripts/validation/fixtures/tracking/
+      - openspec/changes/add-openspec-change-tracking/
