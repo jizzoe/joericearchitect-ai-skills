@@ -52,7 +52,7 @@ As of 2026-08-08:
 | npm | Installed: `11.19.0` |
 | OpenSpec CLI | Installed: `1.8.0` |
 | OpenSpec initialized | Complete at repository root for Claude and Codex using OpenSpec `1.8.0` and the standard `spec-driven` schema |
-| Installed OpenSpec workflows | `propose`, `explore`, `apply`, `update`, `sync`, and `archive`; separate `verify` action remains an M1 configuration task |
+| Installed OpenSpec workflows | Exact custom selection generated for Claude and Codex: `explore`, `propose`, `apply`, `verify`, `sync`, and `archive` |
 | GitHub CLI | Installed and authenticated as `jizzoe` with Project access |
 | GitHub issue forms | Not present |
 | GitHub Project | Public user Project `AI Skills Development`, number `1`: https://github.com/users/jizzoe/projects/1 |
@@ -345,7 +345,10 @@ M2 and M3 may proceed in parallel after M1, but M4 requires both. M4-C2 and M5-C
 
 ## 6. Milestone 1: Tool and OpenSpec Bootstrap
 
-Progress: OpenSpec initialization and core Claude/Codex workflow generation are complete. Project context, artifact rules, the separate verification action, first issue/change linkage, and assistant discovery checks remain.
+Progress: OpenSpec initialization, the exact Claude/Codex workflow selection,
+manual roadmap/issue linkage, and the first planning package are complete.
+Project context, artifact rules, contributor documentation, and final assistant
+discovery/verification checks remain for apply.
 
 ### Outcome
 
@@ -920,19 +923,19 @@ Status: **Resolved**
 - At Milestone 7, make OpenSpec validation and issue/change/PR linkage required checks on the default branch.
 - Keep full lifecycle reconciliation non-blocking but visible until it has additional operating history.
 
-## 18. First Execution Step
+## 18. Next Execution Step
 
-Completed bootstrap prerequisites:
+Completed bootstrap and proposal work:
 
 - GitHub CLI authentication and Project access verified.
 - Existing assistant/OpenSpec files inventoried.
 - OpenSpec initialized with the core profile for Claude and Codex.
+- Repository-owner decisions recorded.
+- Roadmap issue #1 and M1-C1 issue #2 created and related.
+- Exact six-action workflow generated for Claude and Codex.
+- Proposal, delta specs, design, and tasks generated and strictly validated.
 
-With the repository-owner decisions recorded:
-
-1. Create the roadmap issue and M1-C1 bootstrap feature issue manually.
-2. Add `verify` to the minimal workflow selection.
-3. Create M1-C1 with `$openspec-propose` in Codex or `/opsx:propose` in Claude Code using the semantic change name `bootstrap-openspec-foundation`.
-4. Review the proposal, specs, design, dependency plan, and tasks before applying the change.
-
-No other milestone should begin until the bootstrap proposal is reviewed and OpenSpec-generated file ownership is understood.
+Review the `bootstrap-openspec-foundation` planning package. After a separate
+explicit apply request, begin implementation at task 2.1. No other milestone
+should begin until M1-C1 passes its exit gate and OpenSpec-generated file
+ownership is understood.

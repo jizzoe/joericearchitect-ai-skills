@@ -45,13 +45,18 @@ Use the remaining research documents when implementing a related asset. Do not i
 - OpenSpec CLI version: `1.8.0`.
 - Initialized successfully at the repository root for Claude and Codex.
 - Schema: `spec-driven`.
-- No active OpenSpec changes exist. `openspec list --json` returns an empty change list.
+- Active OpenSpec change: `bootstrap-openspec-foundation`. Its proposal, two
+  delta specs, design, and tasks are complete, and strict validation passes.
+  Three bootstrap tasks are complete; implementation has not been applied.
 - `openspec/config.yaml` is still the generated commented scaffold. Product context, artifact rules, and operation guidance have not been populated.
 - Claude integration exists under `.claude/`.
 - Codex integration exists under `.agents/skills/`.
-- Generated workflows: `propose`, `explore`, `apply`, `update`, `sync`, and `archive`.
-- A separate `verify` workflow is not installed. Adding it without enabling incremental artifact commands remains M1 work.
-- `openspec config list --json` currently reports global profile `custom` with the six core workflows, even though project initialization used `--profile core`. The generated workflow set is correct. Do not reset global OpenSpec configuration merely to change the profile label.
+- Generated workflows: `explore`, `propose`, `apply`, `verify`, `sync`, and
+  `archive` for Claude and Codex. The deselected `update` workflow was removed.
+- `openspec config list --json` reports global profile `custom` with the exact
+  approved workflow selection. OpenSpec warns that the custom profile omits
+  core workflow `update`; this is intentional. Do not reset the global profile
+  merely to remove the warning or change the profile label.
 - OpenSpec telemetry displayed its default anonymous-usage notice. No decision was made about opting out; ask before changing the user's global telemetry setting.
 
 Initialization first succeeded for Claude but failed to create `.agents` because the workspace sandbox denied that protected path. Re-running `openspec init --tools claude,codex --profile core --no-animation` with elevated filesystem permission completed Codex setup. This was a sandbox issue, not an OpenSpec configuration defect.
@@ -72,9 +77,13 @@ GitHub Project created during this session:
 - Visibility: public
 - URL: https://github.com/users/jizzoe/projects/1
 - Description: `Plan and track reusable AI skills, OpenSpec changes, issues, pull requests, and SDD automation.`
-- The Project had no items when created.
+- The Project still has no items because its default three statuses are not the
+  required SDD status model; issue placement and label backfill are deferred to
+  M2.
 - Required custom fields, the five-status Kanban model, views, auto-add rules, and Project automation have not been configured.
-- No GitHub issues, roadmap issue, milestones, labels, issue forms, or pull requests were created in this session.
+- Roadmap issue #1 and M1-C1 issue #2 are open. Issue #2 is a native sub-issue
+  of #1. Managed labels, milestones, issue forms, and pull requests do not yet
+  exist.
 
 Local `gh` authentication is separate from GitHub Actions Project authentication. The repository owner selected a personal Project-capable token stored as the Actions secret `PROJECT_TOKEN`; token creation and configuration can wait until Actions require Project write access.
 
@@ -107,21 +116,15 @@ Formal findings and decisions are already captured in the linked planning docume
 
 ## Immediate Next Work
 
-The next implementation unit is `M1-C1`, semantic OpenSpec change `bootstrap-openspec-foundation`.
+Review the complete planning package under
+`openspec/changes/bootstrap-openspec-foundation/`. Resolve any requested
+artifact changes before implementation. Do not invoke apply until the
+repository owner issues a new explicit implementation request.
 
-Before creating it:
-
-1. Read the handoff and linked requirements/plans.
-2. Inspect `git status`; preserve existing changes.
-3. Confirm the three resolved repository-owner decisions in the implementation plan: personal `PROJECT_TOKEN`, disposable live-test issues in this repository, and required validation/linkage checks after hardening.
-4. Create the roadmap issue `Establish OpenSpec SDD foundation` and the `[M1-C1] Bootstrap OpenSpec for Claude and Codex` feature issue manually. GitHub lifecycle automation does not exist yet.
-5. Add the issues to Project `1` manually if Project fields are sufficient; otherwise record linkage and backfill during M2/M4.
-6. Add the separate verification workflow to the minimal OpenSpec workflow selection without enabling incremental artifact commands.
-7. Invoke `$openspec-propose` in Codex or `/opsx:propose` in Claude Code for `bootstrap-openspec-foundation`.
-8. The proposal prompt must reference the requirements, implementation plan, and dependency plan and must state planning-only scope.
-9. Review all generated artifacts before invoking apply. Do not combine proposal creation and implementation in one request.
-
-M1-C1 should include stable task IDs and manual dependency annotations from the start, even though automated enforcement is not implemented until M6-C1.
+When approved, use the apply workflow for `bootstrap-openspec-foundation` and
+start at task 2.1. Preserve all existing uncommitted work and the current
+`ai-planning/prompts/skill-ideas.txt` content/history. Project placement and
+managed-label backfill remain M2 work.
 
 ## Guiding Principles
 
