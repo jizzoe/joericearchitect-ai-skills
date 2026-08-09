@@ -1,0 +1,29 @@
+we are going to start building skills.  throughout these prompts, i will say skills or assets.  what i mean skills, workflows,
+hooks, agents, and other types of ai assets.
+
+first thing i want to do is deside on a skills repo fokder structure theb build a set of base skills that specific
+ skills can build on top of.
+
+ i want you to do 3 things.  either in parallel or sequentially, whichever you think best
+
+ 1) search public docs for latest and create a doc listinb all the built-in skills for claude qnd codex.
+    - So we can leverage those acatend not dupli
+    - then compare the 2.  What assets are covered by both and can be used in ai-agnostic skills.
+    - what is covered by 1 and not the other
+
+2) lo= ok through all the repos under /Users/joerice/git/public-repos/sdlc-skills.  add a document that
+   - for each repo
+     + summarize the repo and and the skills and other ai types in them
+     + things that are strong that we can take from them.
+     + weaknesses we can avoid
+     + list of skills that it would be useful to copy to our base set of skills.
+     + level of completeness and maturitu and development activity.  does it look like a prototype or pet project or     ?
+     + security & guardrails
+   - then synthesize what you found across all repo.
+     + best practices, and a suggested directory structure recommedndation for our repo
+     + any other insights across the repos
+
+ 3) research best prsctices fpr building ai assistant assets tha work across claude and codex
+    - also give a current state on the open ai iniativ
+
+put these in seperate docs under ai-planning/research

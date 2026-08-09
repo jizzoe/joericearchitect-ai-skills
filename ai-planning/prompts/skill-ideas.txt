@@ -1,0 +1,2 @@
+- spec workflows
+- skill creation skills should have prompt injection surface areas detection
