@@ -319,10 +319,15 @@ This first implementation SHALL build reusable interfaces and configuration boun
 
 ## 5. Delivery Structure
 
-The foundation will be delivered through seven milestones and ten primary issues/OpenSpec changes.
+The foundation will be delivered through seven milestones and eleven primary
+issues/OpenSpec changes. M1-C2 adds bounded autonomous execution as an explicit
+prerequisite for unattended delivery of the remaining changes.
 
 ```text
-M1 Bootstrap
+M1-C1 Bootstrap
+  |
+  v
+M1-C2 Bounded autonomous execution
   |
   +--> M2 GitHub intake
   |
@@ -341,14 +346,18 @@ M1 Bootstrap
       M7 Verification and hardening
 ```
 
-M2 and M3 may proceed in parallel after M1, but M4 requires both. M4-C2 and M5-C1 may proceed in parallel after M4-C1 stabilizes the shared GitHub interfaces. The full dependency graph and parallel-work windows are defined in the [dependency plan](openspec-sdd-foundation-dependency-plan.md).
+M2 and M3 may proceed in parallel after M1-C2, but M4 requires both. M4-C2
+and M5-C1 may proceed in parallel after M4-C1 stabilizes the shared GitHub
+interfaces. The full dependency graph and parallel-work windows are defined in
+the [dependency plan](openspec-sdd-foundation-dependency-plan.md).
 
 ## 6. Milestone 1: Tool and OpenSpec Bootstrap
 
-Progress checkpoint (2026-08-09): implementation and formal OpenSpec
-verification are complete and accepted by the owner. PR #5 targets `main` from
-`feature/2-bootstrap-openspec`, formally closes issue #2 when merged, and is
-ready for review. Delivery is the next gate; sync and archive have not started.
+Progress checkpoint (2026-08-09): M1-C1 is complete. Implementation PR #5,
+Sync PR #6, and Archive PR #7 are merged. Issue #2 is closed and `Done` in
+`AI Skills Development`. The living specs are valid, the change is archived at
+`openspec/changes/archive/2026-08-09-bootstrap-openspec-foundation/`, and
+OpenSpec reports no active changes.
 
 ### Outcome
 
@@ -363,8 +372,9 @@ The first issue and links will be created manually because issue forms, tracking
 | ID | Issue | OpenSpec change |
 |---|---|---|
 | M1-C1 | Bootstrap OpenSpec for Claude and Codex | `bootstrap-openspec-foundation` |
+| M1-C2 | Enable bounded autonomous SDD execution | `enable-bounded-autonomous-sdd-execution` |
 
-### Work
+### M1-C1 Work
 
 1. Create the roadmap issue `Establish OpenSpec SDD foundation` manually.
 2. Create the bootstrap feature issue manually and link it to the roadmap issue.
@@ -378,7 +388,19 @@ The first issue and links will be created manually because issue forms, tracking
 10. Verify generated OpenSpec workflow discovery in both assistants.
 11. Document update and recovery commands.
 
-### Expected Files
+### M1-C2 Work
+
+1. Complete the executable setup in the [Goal autonomy prerequisites plan](codex-goal-autonomy-prerequisites-implementation-plan.md).
+2. Create the M1-C2 issue and OpenSpec change with reciprocal linkage.
+3. Specify bounded authorization, automated planning review, iterative
+   implementation, objective correction, human-pause, and recovery behavior.
+4. Implement the generic runner and OpenSpec lifecycle adapter from one
+   assistant-neutral canonical source.
+5. Add deterministic tests, evals, security review, and Claude/Codex plus
+   alternate-repository portability evidence.
+6. Pass the disposable end-to-end rehearsal before unattended M2-M7 work.
+
+### Expected M1-C1 Files
 
 ```text
 openspec/config.yaml
@@ -391,7 +413,11 @@ AGENTS.md or OpenSpec-managed equivalent
 
 Exact generated paths will follow OpenSpec `1.8.0`; the implementation will verify rather than assume them.
 
-### Verification
+M1-C2 expected assets and ownership boundaries are defined in the
+[bounded autonomous SDD execution plan](bounded-autonomous-sdd-execution-implementation-plan.md)
+and will be finalized by its approved OpenSpec design.
+
+### M1-C1 Verification
 
 - `openspec --version` reports the recorded version.
 - OpenSpec initialization completes without deleting user-authored content.
@@ -401,9 +427,25 @@ Exact generated paths will follow OpenSpec `1.8.0`; the implementation will veri
 - The bootstrap design identifies reusable OpenSpec setup behavior and isolates this product's context in configuration.
 - Setup and recovery are documented.
 
+### M1-C2 Verification
+
+- Ordinary Codex sessions retain their existing approval behavior.
+- A named Goal-profile run completes routine authorized transitions without
+  human prompts while preserving the workspace sandbox.
+- Every OpenSpec action and implementation batch runs its applicable
+  validation, independent review, correction, and evidence loop.
+- Human judgment, destructive actions, credentials, governance changes,
+  dependency ambiguity, and repeated failure still pause safely.
+- Checkpoints resume idempotently after interruption or partial failure.
+- The generic runner works through both Claude and Codex and passes a second
+  repository fixture without product-specific constants.
+
 ### Exit Gate
 
-Do not begin automated integration until the generated files and update behavior are understood and committed as an intentional bootstrap change.
+M1-C1 has passed its exit gate. Before unattended M2-M7 execution, M1-C2 must
+implement and validate the authorization, iterative review/correction,
+checkpoint, recovery, and human-pause behavior defined in the
+[bounded autonomous SDD execution plan](bounded-autonomous-sdd-execution-implementation-plan.md).
 
 ## 7. Milestone 2: GitHub Work Intake and Kanban
 
@@ -817,17 +859,20 @@ Create work in this sequence:
 | Order | Milestone | Issue | OpenSpec change | Depends on |
 |---:|---:|---|---|---|
 | 1 | M1-C1 | Bootstrap OpenSpec for Claude and Codex | `bootstrap-openspec-foundation` | Manual bootstrap |
-| 2 | M2-C1 | Establish GitHub issue intake and Kanban | `establish-github-work-intake` | M1-C1 |
-| 3 | M3-C1 | Establish OpenSpec artifact quality rules | `establish-openspec-quality-rules` | M1-C1 |
-| 4 | M3-C2 | Add versioned OpenSpec change tracking | `add-openspec-change-tracking` | M3-C1 |
-| 5 | M4-C1 | Add GitHub issue authoring and OpenSpec intake | `add-github-openspec-intake` | M2-C1, M3-C2 |
-| 6 | M4-C2 | Synchronize OpenSpec and GitHub lifecycle | `add-openspec-github-lifecycle-sync` | M4-C1 |
-| 7 | M5-C1 | Enforce OpenSpec and PR linkage | `enforce-openspec-pr-linkage` | M4-C1, M3-C2 |
-| 8 | M5-C2 | Reconcile Project status from pull requests | `reconcile-project-status-from-prs` | M4-C2, M5-C1 |
-| 9 | M6-C1 | Add dependency-aware project work selection | `add-dependency-aware-work-selection` | M5-C2 |
-| 10 | M7-C1 | Verify and harden the SDD foundation | `verify-sdd-foundation` | All prior changes |
+| 2 | M1-C2 | Enable bounded autonomous SDD execution | `enable-bounded-autonomous-sdd-execution` | M1-C1 |
+| 3 | M2-C1 | Establish GitHub issue intake and Kanban | `establish-github-work-intake` | M1-C2 |
+| 4 | M3-C1 | Establish OpenSpec artifact quality rules | `establish-openspec-quality-rules` | M1-C2 |
+| 5 | M3-C2 | Add versioned OpenSpec change tracking | `add-openspec-change-tracking` | M3-C1 |
+| 6 | M4-C1 | Add GitHub issue authoring and OpenSpec intake | `add-github-openspec-intake` | M2-C1, M3-C2 |
+| 7 | M4-C2 | Synchronize OpenSpec and GitHub lifecycle | `add-openspec-github-lifecycle-sync` | M4-C1 |
+| 8 | M5-C1 | Enforce OpenSpec and PR linkage | `enforce-openspec-pr-linkage` | M4-C1, M3-C2 |
+| 9 | M5-C2 | Reconcile Project status from pull requests | `reconcile-project-status-from-prs` | M4-C2, M5-C1 |
+| 10 | M6-C1 | Add dependency-aware project work selection | `add-dependency-aware-work-selection` | M5-C2 |
+| 11 | M7-C1 | Verify and harden the SDD foundation | `verify-sdd-foundation` | All prior changes |
 
-The roadmap issue `Establish OpenSpec SDD foundation` will be the parent issue for these ten issues. Hard dependencies and safe parallel-work windows are defined in the [dependency plan](openspec-sdd-foundation-dependency-plan.md).
+The roadmap issue `Establish OpenSpec SDD foundation` will be the parent issue
+for these eleven issues. Hard dependencies and safe parallel-work windows are
+defined in the [dependency plan](openspec-sdd-foundation-dependency-plan.md).
 
 ## 14. Definition of Ready
 
@@ -877,7 +922,7 @@ An issue may move to `Done` when:
 | Ambiguous active change | Explicit session selection and switch workflow; never infer from modification time |
 | Reusable assets become product-coupled | Mandatory Reuse Plan, configurable repository collection, alternate-product fixture, and hard-coded-value checks |
 | Premature bookkeeping scope expansion | Test only generic multi-repository portability; defer bookkeeping domain behavior to that product's own specs |
-| Too much initial process | Seven outcome milestones, ten vertical changes, no per-checkbox issues, standard schema first |
+| Too much initial process | Seven outcome milestones, eleven vertical changes, no per-checkbox issues, standard schema first |
 | Checks block bootstrap | Advisory checks until representative tests pass |
 | Third-party supply-chain risk | Minimize dependencies, pin Actions by SHA, document licenses and provenance |
 
@@ -923,9 +968,25 @@ Status: **Resolved**
 - At Milestone 7, make OpenSpec validation and issue/change/PR linkage required checks on the default branch.
 - Keep full lifecycle reconciliation non-blocking but visible until it has additional operating history.
 
+### USER-005: Bounded Autonomous Goal Execution
+
+Status: **Resolved**
+
+- Use a named `goal` Codex profile so ordinary sessions retain their existing
+  approval behavior.
+- Keep `workspace-write` and `on-request`; route eligible escalations to
+  Auto-review rather than using unrestricted access.
+- Permit one explicit bounded Goal authorization to cover expected lifecycle
+  transitions only after objective planning, implementation, review, delivery,
+  Sync, and Archive gates pass.
+- Work in small batches and automatically correct objective scoped defects.
+- Pause for human judgment, destructive or unexpected actions, credentials,
+  governance changes, dependency ambiguity, or repeated uncorrectable failure.
+- Implement the reusable policy through M1-C2 before unattended M2-M7 work.
+
 ## 18. Next Execution Step
 
-Completed bootstrap and proposal work:
+Completed M1-C1 work:
 
 - GitHub CLI authentication and Project access verified.
 - Existing assistant/OpenSpec files inventoried.
@@ -934,8 +995,13 @@ Completed bootstrap and proposal work:
 - Roadmap issue #1 and M1-C1 issue #2 created and related.
 - Exact six-action workflow generated for Claude and Codex.
 - Proposal, delta specs, design, and tasks generated and strictly validated.
+- Implementation PR #5 merged and issue #2 closed.
+- Living-spec Sync PR #6 merged.
+- Archive PR #7 merged and `bootstrap-openspec-foundation` removed from the
+  active change list.
 
-Review the `bootstrap-openspec-foundation` planning package. After a separate
-explicit apply request, begin implementation at task 2.1. No other milestone
-should begin until M1-C1 passes its exit gate and OpenSpec-generated file
-ownership is understood.
+Next, complete the owner-only prerequisites in the
+[Codex Goal autonomy prerequisites plan](codex-goal-autonomy-prerequisites-implementation-plan.md),
+then create issue M1-C2 and use OpenSpec Propose for
+`enable-bounded-autonomous-sdd-execution`. Do not begin unattended M2-M7 work
+until M1-C2 passes its disposable end-to-end rehearsal and exit gate.
