@@ -895,34 +895,30 @@ Status: **Resolved**
 
 ### USER-002: Project Token
 
-Recommendation:
+Status: **Resolved**
 
-- Start with a user Project-capable token stored as the Actions secret `PROJECT_TOKEN`.
+- Use a user Project-capable token stored as the Actions secret `PROJECT_TOKEN`.
 - Use the narrowest supported permissions.
 - Prefer a fine-grained token if it supports the required user-Project mutations; otherwise use the documented classic `project` plus required repository scope.
 - Replace it with a GitHub App if the project moves into an organization.
 
-Decision needed: approve this temporary personal-token model or require a GitHub App from the start.
-
 ### USER-003: First Live Automation Test
 
-Recommendation:
+Status: **Resolved**
 
 - Use disposable `[SDD test]` issues in this repository.
 - Preserve closed issues as an audit trail.
+- Store transient local test logs and scratch output under `.sdd-test-output/`, which is excluded from Git.
+- Keep deterministic fixtures and durable test assets version controlled under `evals/` or the applicable test directory.
 - Ask for authorization immediately before the first external mutation.
-
-Decision needed: approve testing in this repository or require a separate test repository.
 
 ### USER-004: Required Merge Checks
 
-Recommendation:
+Status: **Resolved**
 
 - Run checks as advisory through Milestones 1-6.
 - At Milestone 7, make OpenSpec validation and issue/change/PR linkage required checks on the default branch.
 - Keep full lifecycle reconciliation non-blocking but visible until it has additional operating history.
-
-Decision needed: approve required checks after hardening, or keep all checks advisory for this solo-maintained repository.
 
 ## 18. First Execution Step
 
@@ -932,7 +928,7 @@ Completed bootstrap prerequisites:
 - Existing assistant/OpenSpec files inventoried.
 - OpenSpec initialized with the core profile for Claude and Codex.
 
-After the remaining three user decisions are recorded:
+With the repository-owner decisions recorded:
 
 1. Create the roadmap issue and M1-C1 bootstrap feature issue manually.
 2. Add `verify` to the minimal workflow selection.

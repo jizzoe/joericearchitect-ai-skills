@@ -76,7 +76,7 @@ GitHub Project created during this session:
 - Required custom fields, the five-status Kanban model, views, auto-add rules, and Project automation have not been configured.
 - No GitHub issues, roadmap issue, milestones, labels, issue forms, or pull requests were created in this session.
 
-Local `gh` authentication is separate from GitHub Actions Project authentication. The `PROJECT_TOKEN`/GitHub App decision in the implementation plan remains unresolved.
+Local `gh` authentication is separate from GitHub Actions Project authentication. The repository owner selected a personal Project-capable token stored as the Actions secret `PROJECT_TOKEN`; token creation and configuration can wait until Actions require Project write access.
 
 ## Activities Completed in This Conversation
 
@@ -113,7 +113,7 @@ Before creating it:
 
 1. Read the handoff and linked requirements/plans.
 2. Inspect `git status`; preserve existing changes.
-3. Confirm the three unresolved user decisions in the implementation plan or record explicit deferral where they do not block M1-C1.
+3. Confirm the three resolved repository-owner decisions in the implementation plan: personal `PROJECT_TOKEN`, disposable live-test issues in this repository, and required validation/linkage checks after hardening.
 4. Create the roadmap issue `Establish OpenSpec SDD foundation` and the `[M1-C1] Bootstrap OpenSpec for Claude and Codex` feature issue manually. GitHub lifecycle automation does not exist yet.
 5. Add the issues to Project `1` manually if Project fields are sufficient; otherwise record linkage and backfill during M2/M4.
 6. Add the separate verification workflow to the minimal OpenSpec workflow selection without enabling incremental artifact commands.

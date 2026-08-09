@@ -25,3 +25,6 @@ replay_pid*
 
 # JetBrains IDE metadata
 .idea/
+
+# Transient local SDD automation test output
+.sdd-test-output/
