@@ -122,7 +122,7 @@
   - Depends on: 5.4
   - Evidence: verification report maps every task, requirement, scenario, design decision, security control, recovery path, portability claim, eval, and known limitation to current evidence.
 
-- [ ] 5.6 Prepare PR #9 for delivery only after verification acceptance.
+- [x] 5.6 Prepare PR #9 for delivery only after verification acceptance.
   - Depends on: 5.5
   - Evidence: PR #9 targets `main`, contains accepted verification evidence, formally changes from `Related to #8` to `Closes #8` only when merge means completion, and remains draft until the owner accepts verification.
 
