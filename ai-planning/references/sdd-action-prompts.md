@@ -489,3 +489,34 @@ objective implementation evidence before any external closeout mutation.
 - No implementation defect requires correction. Task 5.3 remains a critical
   lifecycle gap because issue evidence and pull-request preparation are not yet
   complete; sync and archive therefore remain premature.
+
+## 7. Apply Batch 4: External Evidence and PR Preparation
+
+### Intended Outcome
+
+Complete task 5.3 by publishing reviewed implementation evidence to the
+bootstrap issue and preparing a draft pull request, while leaving issue state,
+Project state, sync, archive, and delivery completion unchanged.
+
+### Learning Notes
+
+- External evidence should link to committed, pushed artifacts. Posting branch
+  links before the files exist remotely would create evidence that reviewers
+  cannot inspect.
+- A draft pull request is preparation for review, not delivery. Apply can be
+  complete while verification, review, merge, issue closure, spec sync, and
+  archival remain distinct later actions.
+- Expected external mutations may proceed under explicit batch authorization,
+  but their exact scope and non-mutations should still be previewed.
+
+### Observations
+
+- Commit `44b188e` published the reviewed Batch 1-3 files to
+  `feature/seed-ai-skills`, enabling stable branch links from GitHub records.
+- Draft PR #3 links issue #2 and the OpenSpec change and explicitly remains
+  pending the separate verify action and delivery review.
+- Issue #2 now links the proposal, delta specs, design, tasks, verification
+  report, contributor guide, and draft PR. The comment records M2 and M3
+  deferrals without copying their authoritative requirements.
+- The issue remains open and the PR remains draft. No Project fields, labels,
+  telemetry, global workflow selection, living specs, or archive state changed.

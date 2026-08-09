@@ -71,9 +71,9 @@
 - [x] 5.2 Review the implementation against both delta specs and the design, including security, attribution, recovery, maintainability, and Claude/Codex portability.
   - Depends on: 4.2, 4.3, 4.4, 5.1
   - Parallel with: none
-  - Evidence: `verification-report.md` maps all 19 delta-spec scenarios and all five design decisions to files and executed commands; it reviews security, attribution, recovery, maintainability, and portability and records the incomplete task 5.3 as critical, the Claude login limitation as a warning, later validation automation as a suggestion, and all known gaps.
+  - Evidence: `verification-report.md` maps all 19 delta-spec scenarios and all five design decisions to files and executed commands; it reviews security, attribution, recovery, maintainability, and portability and records the initially incomplete task 5.3 as a resolved critical finding, the Claude login limitation as a warning, later validation automation as a suggestion, and all known gaps.
 
-- [ ] 5.3 Update the M1-C1 issue with final evidence and deferred M2/M3 backfill, then prepare the change for pull-request review without syncing or archiving before delivery.
+- [x] 5.3 Update the M1-C1 issue with final evidence and deferred M2/M3 backfill, then prepare the change for pull-request review without syncing or archiving before delivery.
   - Depends on: 5.2
   - Parallel with: none
-  - Evidence: issue #2 links the reviewed artifacts and verification evidence; Project/label/tracking deferrals are explicit; no premature archive or delivery claim exists.
+  - Evidence: [issue #2 evidence comment](https://github.com/jizzoe/joericearchitect-ai-skills/issues/2#issuecomment-5230092221) links the reviewed artifacts, verification evidence, explicit M2/M3 deferrals, and [draft PR #3](https://github.com/jizzoe/joericearchitect-ai-skills/pull/3). The issue remains open, the PR remains draft, and no Project mutation, sync, archive, or delivery claim occurred.
