@@ -126,6 +126,6 @@
   - Depends on: 5.5
   - Evidence: PR #9 targets `main`, contains accepted verification evidence, formally changes from `Related to #8` to `Closes #8` only when merge means completion, and remains draft until the owner accepts verification.
 
-- [ ] 5.7 Deliver, Sync, and Archive through separate authorized checkpoints.
+- [x] 5.7 Deliver, Sync, and Archive through separate authorized checkpoints.
   - Depends on: 5.6
   - Evidence: implementation PR merge closes issue #8 and Project reaches `Done`; Sync PR proves living specs reflect deltas and repeat Sync is a no-op; Archive PR preserves the full change bundle and active change list is empty.
