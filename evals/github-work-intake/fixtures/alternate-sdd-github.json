@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "repository": {
+    "owner": "example-owner",
+    "name": "example-product",
+    "defaultBranch": "trunk"
+  },
+  "project": {
+    "owner": "example-org",
+    "ownerType": "organization",
+    "number": 7,
+    "title": "Example Product Work",
+    "url": "https://github.com/orgs/example-org/projects/7"
+  },
+  "statusField": {
+    "name": "Status",
+    "options": ["Backlog", "Ready", "In Progress", "In Review", "Done"]
+  },
+  "managedLabels": [
+    {
+      "name": "type:feature",
+      "description": "Feature request",
+      "color": "1D76DB"
+    },
+    {
+      "name": "type:bug",
+      "description": "Bug report",
+      "color": "D73A4A"
+    },
+    {
+      "name": "sdd",
+      "description": "OpenSpec SDD lifecycle work",
+      "color": "5319E7"
+    }
+  ],
+  "managedIssueBlockMarkers": {
+    "start": "<!-- sdd-managed:start -->",
+    "end": "<!-- sdd-managed:end -->"
+  }
+}

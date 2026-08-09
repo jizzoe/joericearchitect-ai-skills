@@ -1,0 +1,61 @@
+name: Bug
+description: Report a defect in repository behavior, tooling, or workflow.
+title: "[Bug] "
+labels:
+  - type:bug
+  - sdd
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide deterministic steps, commands, or fixture inputs.
+      placeholder: "1. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Who or what is affected, and how severe is it?
+    validations:
+      required: true
+  - type: dropdown
+    id: openspec-impact
+    attributes:
+      label: OpenSpec impact
+      description: Does fixing this change observable behavior?
+      options:
+        - Yes, behavior changes
+        - No, implementation-only fix
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      description: What tests, evals, reviews, or manual checks should prove the fix?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Logs, links, screenshots, or suspected cause.
+    validations:
+      required: false

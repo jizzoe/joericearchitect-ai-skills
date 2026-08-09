@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: OpenSpec SDD workflow
+    url: https://github.com/jizzoe/joericearchitect-ai-skills/blob/main/docs/sdd-workflow.md
+    about: Review the repository SDD workflow before filing broad process changes.

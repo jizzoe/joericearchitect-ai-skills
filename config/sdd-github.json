@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "repository": {
+    "owner": "jizzoe",
+    "name": "joericearchitect-ai-skills",
+    "defaultBranch": "main"
+  },
+  "project": {
+    "owner": "jizzoe",
+    "ownerType": "user",
+    "number": 1,
+    "title": "AI Skills Development",
+    "url": "https://github.com/users/jizzoe/projects/1"
+  },
+  "statusField": {
+    "name": "Status",
+    "options": ["Backlog", "Ready", "In Progress", "In Review", "Done"]
+  },
+  "managedLabels": [
+    {
+      "name": "type:feature",
+      "description": "Feature or enhancement request managed by the SDD intake flow",
+      "color": "1D76DB"
+    },
+    {
+      "name": "type:bug",
+      "description": "Bug or defect report managed by the SDD intake flow",
+      "color": "D73A4A"
+    },
+    {
+      "name": "sdd",
+      "description": "Work item participates in the OpenSpec SDD lifecycle",
+      "color": "5319E7"
+    },
+    {
+      "name": "test:automation",
+      "description": "Disposable automation or lifecycle verification record",
+      "color": "BFDADC"
+    }
+  ],
+  "managedIssueBlockMarkers": {
+    "start": "<!-- sdd-managed:start -->",
+    "end": "<!-- sdd-managed:end -->"
+  }
+}
