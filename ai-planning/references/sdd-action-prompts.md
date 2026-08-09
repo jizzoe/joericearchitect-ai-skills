@@ -580,3 +580,31 @@ open, and sync/archive remain untouched pending repository-owner review.
   report is useful input but cannot verify itself.
 - A successful verify result still leaves PR review, merge, issue closure,
   living-spec sync, and archive as distinct lifecycle actions.
+
+### Reusable Concise Verify Prompt
+
+Use this form after the repository has a standard action-context and
+authorization policy. The selected skill owns the verification procedure; the
+prompt supplies the change, requires current delivery-state discovery, and
+sets the authorization boundary.
+
+```text
+Run `openspec-verify-change` for `<change-name>`.
+
+Discover and use the current formally linked issue, branch, and pull request as
+delivery evidence. Report any discrepancy or stale relationship before making
+corrections.
+
+Apply the repository's standing verification and code-review policy. Correct
+objective, narrowly scoped defects and rerun affected checks, but obtain my
+approval before judgment-based changes, scope or behavior changes, destructive
+actions, or unexpected external mutations.
+
+Verification only. Do not change pull-request readiness, merge, close issues,
+sync specs, archive the change, or mutate Project state. Report the verification
+scorecard and findings, then stop for my acceptance decision.
+```
+
+Do not put issue numbers, branch names, or pull-request numbers in the reusable
+skill. Those facts change per delivery and must be resolved from current Git,
+GitHub, and OpenSpec state.
