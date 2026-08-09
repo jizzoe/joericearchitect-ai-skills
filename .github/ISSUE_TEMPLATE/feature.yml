@@ -1,0 +1,62 @@
+name: Feature
+description: Propose a new capability or behavior change.
+title: "[Feature] "
+labels:
+  - type:feature
+  - sdd
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem or opportunity does this address?
+      placeholder: Describe the current limitation and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: desired-outcome
+    attributes:
+      label: Desired outcome
+      description: What observable behavior should exist when this is done?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is in scope and what is explicitly out of scope?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List verifiable outcomes.
+      placeholder: "- ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: openspec-impact
+    attributes:
+      label: OpenSpec impact
+      description: Does this require an OpenSpec change?
+      options:
+        - Yes, behavior changes
+        - No, docs/tooling only
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      description: What tests, evals, reviews, or manual checks should prove this?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links, constraints, risks, or related work.
+    validations:
+      required: false
