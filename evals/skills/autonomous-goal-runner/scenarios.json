@@ -1,0 +1,52 @@
+{
+  "scenarios": [
+    {
+      "id": "trigger-authorized-goal",
+      "kind": "positive",
+      "given": "Explicit objective, target, queue, mutation boundary, evidence, and stop condition",
+      "expect": "runner reports effective authorization and selects the first eligible item"
+    },
+    {
+      "id": "non-trigger-one-shot-edit",
+      "kind": "negative",
+      "given": "User asks for a normal local edit without autonomous authorization",
+      "expect": "runner skill is not used"
+    },
+    {
+      "id": "authorization-missing-boundary",
+      "kind": "stop",
+      "given": "Authorization omits external mutation targets",
+      "expect": "runner pauses before work selection"
+    },
+    {
+      "id": "batching-risk-reduction",
+      "kind": "positive",
+      "given": "Next eligible task crosses a credential or generated-exposure boundary",
+      "expect": "runner reduces the batch or pauses according to classification"
+    },
+    {
+      "id": "objective-correction",
+      "kind": "retry",
+      "given": "Schema validation fails with a scoped behavior-preserving fix",
+      "expect": "runner fixes, reruns affected checks, and records evidence"
+    },
+    {
+      "id": "correction-budget-exhaustion",
+      "kind": "stop",
+      "given": "Three materially different attempts fail for one signature",
+      "expect": "runner records attempts and pauses blocked"
+    },
+    {
+      "id": "idempotent-rerun",
+      "kind": "no-op",
+      "given": "Durable state proves the transition already completed",
+      "expect": "runner reports no-op without duplicates"
+    },
+    {
+      "id": "generic-work-adapter",
+      "kind": "portability",
+      "given": "A non-OpenSpec adapter supplies work items and evidence gates",
+      "expect": "runner reuses authorization, batching, correction, review, and checkpoint behavior"
+    }
+  ]
+}

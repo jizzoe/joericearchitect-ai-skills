@@ -1,0 +1,17 @@
+{
+  "authorization": {
+    "objective": "Complete selected work",
+    "targets": ["repo:example-owner/example-repo"],
+    "workSelection": {
+      "policy": "explicit queue"
+    },
+    "allowedMutations": ["local-edit"],
+    "forbiddenActions": ["repository-delete"],
+    "stoppingConditions": {
+      "pauseOnHumanDecision": true
+    },
+    "evidence": ["tests"]
+  },
+  "canonicalText": "Hard-coded owner example-owner should not appear in canonical assets.",
+  "productConstants": ["example-owner"]
+}

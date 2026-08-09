@@ -1,0 +1,6 @@
+{
+  "reason": "deterministic-test",
+  "behaviorPreserving": true,
+  "materiallyDifferentAttempts": 3,
+  "resolved": false
+}

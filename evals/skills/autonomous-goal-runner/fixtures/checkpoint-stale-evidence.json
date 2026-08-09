@@ -1,0 +1,12 @@
+{
+  "steps": [
+    {
+      "id": "verify",
+      "status": "complete",
+      "evidence": {
+        "present": true,
+        "current": false
+      }
+    }
+  ]
+}

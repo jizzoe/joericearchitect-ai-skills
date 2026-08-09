@@ -1,0 +1,52 @@
+{
+  "scenarios": [
+    {
+      "id": "planning-review-passes",
+      "kind": "complete",
+      "gate": "propose",
+      "expect": "Apply may proceed only when authorization permits it"
+    },
+    {
+      "id": "generated-propose-planning-only",
+      "kind": "stop",
+      "gate": "propose",
+      "expect": "Generated Propose stops after planning artifacts outside delivered bounded authorization"
+    },
+    {
+      "id": "apply-batching",
+      "kind": "complete",
+      "gate": "apply",
+      "expect": "Dependency-valid batch completes after validations and reviews pass"
+    },
+    {
+      "id": "verify-missing-evidence",
+      "kind": "incomplete",
+      "gate": "verify",
+      "expect": "Verify pauses when scenario or task evidence is absent"
+    },
+    {
+      "id": "delivery-partial-mutation",
+      "kind": "ambiguous",
+      "gate": "delivery",
+      "expect": "Lifecycle reconciles exact targets or pauses before mutation"
+    },
+    {
+      "id": "sync-repeat-no-op",
+      "kind": "no-op",
+      "gate": "sync",
+      "expect": "Repeat Sync reports no-op when living specs already reflect deltas"
+    },
+    {
+      "id": "archive-content-preserving",
+      "kind": "complete",
+      "gate": "archive",
+      "expect": "Archive proceeds only after content-preserving move evidence"
+    },
+    {
+      "id": "stale-evidence",
+      "kind": "stop",
+      "gate": "any",
+      "expect": "Lifecycle reruns or pauses before using stale evidence"
+    }
+  ]
+}
