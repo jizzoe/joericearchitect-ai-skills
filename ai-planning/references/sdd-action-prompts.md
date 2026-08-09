@@ -520,3 +520,62 @@ Project state, sync, archive, and delivery completion unchanged.
   deferrals without copying their authoritative requirements.
 - The issue remains open and the PR remains draft. No Project fields, labels,
   telemetry, global workflow selection, living specs, or archive state changed.
+
+## 8. Verify M1-C1 After Apply Completion
+
+### Intended Outcome
+
+Independently verify the completed apply work against the current OpenSpec
+tasks, delta specs, and design before changing pull-request readiness, syncing
+living specs, or archiving the change.
+
+### Prompt
+
+```text
+Resume M1-C1 from the apply-complete checkpoint for OpenSpec change
+`bootstrap-openspec-foundation`.
+
+First read:
+- `ai-planning/handoff-docs/bootstrap-openspec-foundation-apply-complete-handoff.md`
+- the requirements, implementation plan, and dependency plan linked there
+- every current change artifact returned by OpenSpec verify instructions
+
+Use the `openspec-verify-change` skill. Reinspect the working tree, branch and
+remote state, issue #2, draft PR #3, OpenSpec status, and strict validation.
+Preserve concurrent work and treat disk, Git, OpenSpec, and GitHub as the
+current sources of truth rather than relying on the previous conversation.
+
+Independently verify:
+- all 14 apply tasks and their evidence
+- every requirement and scenario in both delta specs
+- adherence to all design decisions
+- security, attribution, recovery, maintainability, and portability
+- exact Claude/Codex lifecycle parity and generated provenance
+- documentation links and stale-discovery recovery
+- the accuracy of `verification-report.md`
+
+Run the standing automatic code review after verification. Correct objective,
+narrowly scoped defects and rerun affected checks. Request my approval before
+any fix that requires human judgment, changes approved scope or behavior, or
+mutates unexpected external state.
+
+This is verification only. Do not invoke apply unless a correction is later
+authorized. Do not sync specs, archive the change, mark PR #3 ready, merge it,
+close issue #2, or mutate Project state. Report critical issues, warnings,
+suggestions, known limitations, and archival readiness, then stop for my
+review.
+```
+
+### Expected Stopping Point
+
+Verification reports whether the implementation matches the change artifacts
+and whether any defect blocks delivery. PR #3 remains draft, issue #2 remains
+open, and sync/archive remain untouched pending repository-owner review.
+
+### Learning Notes
+
+- Apply completion authorizes verification, not delivery or archival.
+- Verification must independently inspect current evidence; the implementation
+  report is useful input but cannot verify itself.
+- A successful verify result still leaves PR review, merge, issue closure,
+  living-spec sync, and archive as distinct lifecycle actions.
