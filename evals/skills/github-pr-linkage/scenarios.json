@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "valid-pr-linkage",
+      "expectedOutcome": "pass"
+    },
+    {
+      "id": "missing-issue-link",
+      "expectedOutcome": "corrective-failure"
+    },
+    {
+      "id": "missing-openspec-change",
+      "expectedOutcome": "corrective-failure"
+    },
+    {
+      "id": "untrusted-fork-read-only",
+      "expectedOutcome": "no-project-token"
+    }
+  ]
+}
