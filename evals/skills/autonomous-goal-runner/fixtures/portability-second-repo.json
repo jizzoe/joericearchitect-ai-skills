@@ -1,0 +1,24 @@
+{
+  "repository": {
+    "owner": "second-owner",
+    "name": "second-repo",
+    "defaultBranch": "trunk"
+  },
+  "project": {
+    "owner": "second-owner",
+    "title": "Second Project"
+  },
+  "authorization": {
+    "objective": "Complete selected portable work",
+    "targets": ["repo:second-owner/second-repo", "project:Second Project"],
+    "workSelection": {
+      "policy": "lowest configured sequence with dependencies complete"
+    },
+    "allowedMutations": ["local-edit", "pull-request-update"],
+    "forbiddenActions": ["repository-delete", "force-push", "secret-rotation"],
+    "stoppingConditions": {
+      "pauseOnHumanDecision": true
+    },
+    "evidence": ["tests", "review", "checkpoint"]
+  }
+}

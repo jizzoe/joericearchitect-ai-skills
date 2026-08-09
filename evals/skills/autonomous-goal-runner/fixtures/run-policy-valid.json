@@ -1,0 +1,22 @@
+{
+  "now": "2026-08-09T20:00:00.000Z",
+  "authorization": {
+    "objective": "Complete the approved lifecycle for selected work",
+    "targets": ["repo:example-owner/example-repo", "project:Example Project"],
+    "workSelection": {
+      "policy": "lowest eligible sequence after hard dependencies pass"
+    },
+    "allowedMutations": ["local-edit", "branch-create", "pull-request-update"],
+    "forbiddenActions": ["repository-delete", "force-push", "secret-rotation"],
+    "stoppingConditions": {
+      "expiresAt": "2026-08-10T20:00:00.000Z",
+      "pauseOnHumanDecision": true
+    },
+    "expiresAt": "2026-08-10T20:00:00.000Z",
+    "evidence": ["tests", "validation", "review"]
+  },
+  "runtime": {
+    "permissionGaps": []
+  },
+  "canonicalText": "Reusable policy with configured repository values."
+}

@@ -1,0 +1,14 @@
+{
+  "authorization": {
+    "objective": "Complete selected work",
+    "workSelection": {
+      "policy": "explicit queue"
+    },
+    "allowedMutations": ["local-edit"],
+    "forbiddenActions": ["repository-delete"],
+    "stoppingConditions": {
+      "pauseOnHumanDecision": true
+    },
+    "evidence": ["tests"]
+  }
+}

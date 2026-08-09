@@ -1,0 +1,17 @@
+{
+  "now": "2026-08-09T20:00:00.000Z",
+  "authorization": {
+    "objective": "Complete selected work",
+    "targets": ["repo:example-owner/example-repo"],
+    "workSelection": {
+      "policy": "explicit queue"
+    },
+    "allowedMutations": ["local-edit"],
+    "forbiddenActions": ["repository-delete"],
+    "stoppingConditions": {
+      "pauseOnHumanDecision": true
+    },
+    "expiresAt": "2026-08-08T20:00:00.000Z",
+    "evidence": ["tests"]
+  }
+}

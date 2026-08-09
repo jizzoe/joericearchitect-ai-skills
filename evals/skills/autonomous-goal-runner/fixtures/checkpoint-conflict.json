@@ -1,0 +1,13 @@
+{
+  "steps": [
+    {
+      "id": "delivery",
+      "status": "pending",
+      "durableConflict": true,
+      "evidence": {
+        "present": true,
+        "current": true
+      }
+    }
+  ]
+}

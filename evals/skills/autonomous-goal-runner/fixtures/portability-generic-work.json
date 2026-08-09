@@ -1,0 +1,16 @@
+{
+  "adapter": {
+    "type": "generic-work",
+    "workItems": [
+      {
+        "id": "generic-1",
+        "dependencies": [],
+        "validations": ["fixture-validation"],
+        "evidence": ["review-note"]
+      }
+    ],
+    "transitions": ["select", "apply", "verify"],
+    "pauseRules": ["material-decision", "credential", "destructive-action"]
+  },
+  "expect": "bounded execution behavior does not require OpenSpec-specific artifacts"
+}

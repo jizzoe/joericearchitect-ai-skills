@@ -1,0 +1,15 @@
+{
+  "authorization": {
+    "objective": "Complete selected work",
+    "targets": ["repo:example-owner/example-repo"],
+    "workSelection": {
+      "policy": "explicit queue"
+    },
+    "allowedMutations": ["local-edit", "force-push"],
+    "forbiddenActions": ["force-push", "repository-delete"],
+    "stoppingConditions": {
+      "pauseOnHumanDecision": true
+    },
+    "evidence": ["tests"]
+  }
+}
