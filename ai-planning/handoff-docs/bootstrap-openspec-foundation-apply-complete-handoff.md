@@ -5,6 +5,15 @@ Checkpoint status: Apply complete; separate OpenSpec verification is next
 OpenSpec change: `bootstrap-openspec-foundation`
 Planning ID: `M1-C1`
 
+## Post-Handoff Delivery Migration
+
+After this checkpoint was written, the repository adopted GitHub Flow. Draft
+PR #3 was closed unmerged and superseded by
+[draft PR #5](https://github.com/jizzoe/joericearchitect-ai-skills/pull/5),
+which targets `main` from `feature/2-bootstrap-openspec` and formally closes
+issue #2 when merged. References to PR #3 in completed-activity sections below
+are historical; current verification and delivery decisions SHALL use PR #5.
+
 ## Purpose
 
 Provide a durable checkpoint for a new session after implementation of the
@@ -69,15 +78,18 @@ decision needs its rationale or source comparison.
 - Workspace:
   `/Users/joerice/git/joericearchitect/joericearchitect-ai-skills`
 - GitHub repository: `jizzoe/joericearchitect-ai-skills`
-- Branch: `feature/seed-ai-skills`
+- Branch at this checkpoint: `feature/seed-ai-skills`
+- Current delivery branch: `feature/2-bootstrap-openspec`
 - Base branch: `main`
 - Apply-complete baseline commit captured before this handoff:
   `8e1415793f5ca3b1fec9777317d3c6417297cd06`
 - Local and remote branches were synchronized at this checkpoint: zero commits
   ahead and zero behind.
 - The worktree was clean before this handoff was created.
-- Draft pull request:
-  https://github.com/jizzoe/joericearchitect-ai-skills/pull/3
+- Current draft pull request:
+  https://github.com/jizzoe/joericearchitect-ai-skills/pull/5
+- Historical PR #3 was closed unmerged after PR #5 was verified to contain the
+  same M1-C1 commit set and diff.
 
 Git identity now resolves globally as:
 
@@ -139,10 +151,10 @@ and M3 deferrals and states that sync and archive have not occurred.
 
 ### Pull Request
 
-- Draft PR #3: `[M1-C1] Bootstrap OpenSpec for Claude and Codex`
-- URL: https://github.com/jizzoe/joericearchitect-ai-skills/pull/3
+- Draft PR #5: `[M1-C1] Bootstrap OpenSpec for Claude and Codex`
+- URL: https://github.com/jizzoe/joericearchitect-ai-skills/pull/5
 - State: open, draft
-- Head: `feature/seed-ai-skills`
+- Head: `feature/2-bootstrap-openspec`
 - Base: `main`
 - Apply-complete PR head captured before this handoff:
   `8e1415793f5ca3b1fec9777317d3c6417297cd06`
@@ -227,7 +239,8 @@ manual bootstrap and no credential value belongs in repository files.
 ### Grouped Apply Batch 4: External Evidence and PR Preparation
 
 - Added issue #2 evidence and explicit M2/M3 deferrals.
-- Created and pushed draft PR #3.
+- Created and pushed draft PR #3, which was later closed unmerged and
+  superseded by equivalent draft PR #5 for GitHub Flow compliance.
 - Completed all 14 apply tasks without syncing or archiving.
 
 ## Files and Artifacts Produced
@@ -267,7 +280,7 @@ edit those generated contents manually.
   credential, branch, or unrelated product-domain constant.
 - All 19 delta-spec scenarios and five design decisions have mapped evidence.
 - Issue-linked branch artifacts resolve remotely.
-- Issue #2 remains open and PR #3 remains draft.
+- Issue #2 remains open and replacement PR #5 remains draft.
 
 ## Decisions Made
 
@@ -341,7 +354,7 @@ edit those generated contents manually.
 
 1. Start a new session and re-read this checkpoint and the current change
    artifacts from disk.
-2. Reinspect Git, OpenSpec, issue #2, and draft PR #3. Preserve any concurrent
+2. Reinspect Git, OpenSpec, issue #2, and draft PR #5. Preserve any concurrent
    changes.
 3. Invoke the `openspec-verify-change` skill for
    `bootstrap-openspec-foundation`.
@@ -370,7 +383,7 @@ The exact recommended prompt for the next session is stored under
   is explicitly authorized.
 - Do not sync delta specs into living specs before delivery review.
 - Do not archive the change.
-- Do not mark PR #3 ready, merge it, or close issue #2 in the verification
+- Do not mark PR #5 ready, merge it, or close issue #2 in the verification
   session.
 - Do not add M1 records to Project 1 using temporary statuses or labels.
 - Do not create `tracking.json` before M3 owns the contract.

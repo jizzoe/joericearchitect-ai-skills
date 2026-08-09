@@ -513,8 +513,9 @@ Project state, sync, archive, and delivery completion unchanged.
 
 - Commit `44b188e` published the reviewed Batch 1-3 files to
   `feature/seed-ai-skills`, enabling stable branch links from GitHub records.
-- Draft PR #3 links issue #2 and the OpenSpec change and explicitly remains
-  pending the separate verify action and delivery review.
+- At this checkpoint, draft PR #3 linked issue #2 and the OpenSpec change and
+  explicitly remained pending the separate verify action and delivery review.
+  It was later closed unmerged and superseded by draft PR #5 targeting `main`.
 - Issue #2 now links the proposal, delta specs, design, tasks, verification
   report, contributor guide, and draft PR. The comment records M2 and M3
   deferrals without copying their authoritative requirements.
@@ -541,7 +542,7 @@ First read:
 - every current change artifact returned by OpenSpec verify instructions
 
 Use the `openspec-verify-change` skill. Reinspect the working tree, branch and
-remote state, issue #2, draft PR #3, OpenSpec status, and strict validation.
+remote state, issue #2, draft PR #5, OpenSpec status, and strict validation.
 Preserve concurrent work and treat disk, Git, OpenSpec, and GitHub as the
 current sources of truth rather than relying on the previous conversation.
 
@@ -560,7 +561,7 @@ any fix that requires human judgment, changes approved scope or behavior, or
 mutates unexpected external state.
 
 This is verification only. Do not invoke apply unless a correction is later
-authorized. Do not sync specs, archive the change, mark PR #3 ready, merge it,
+authorized. Do not sync specs, archive the change, mark PR #5 ready, merge it,
 close issue #2, or mutate Project state. Report critical issues, warnings,
 suggestions, known limitations, and archival readiness, then stop for my
 review.
@@ -569,7 +570,7 @@ review.
 ### Expected Stopping Point
 
 Verification reports whether the implementation matches the change artifacts
-and whether any defect blocks delivery. PR #3 remains draft, issue #2 remains
+and whether any defect blocks delivery. PR #5 remains draft, issue #2 remains
 open, and sync/archive remain untouched pending repository-owner review.
 
 ### Learning Notes

@@ -11,7 +11,7 @@ authorization to sync or archive.
 - Strict validation: passed
 - Scenario coverage: 19 of 19 scenarios have implementation evidence
 - Design decisions reviewed: 5 of 5
-- Archival readiness: blocked by the separate verify action and undelivered draft PR #3
+- Archival readiness: blocked by the separate verify action and undelivered draft PR #5
 
 ## Command Evidence
 
@@ -92,7 +92,9 @@ build target exists. No additional project command was skipped.
 
 - Task 5.3 was incomplete at the initial review. It is resolved by the
   [issue #2 evidence comment](https://github.com/jizzoe/joericearchitect-ai-skills/issues/2#issuecomment-5230092221), explicit M2/M3 deferrals, and
-  [draft PR #3](https://github.com/jizzoe/joericearchitect-ai-skills/pull/3).
+  [draft PR #5](https://github.com/jizzoe/joericearchitect-ai-skills/pull/5),
+  which supersedes closed, unmerged PR #3 and formally closes issue #2 when
+  merged to `main`.
 
 ### Warnings
 

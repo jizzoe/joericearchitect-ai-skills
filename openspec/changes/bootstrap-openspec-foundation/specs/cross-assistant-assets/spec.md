@@ -58,4 +58,3 @@ discover newly generated workflow files.
 #### Scenario: A workflow was generated during an active assistant session
 - **WHEN** the active assistant does not immediately expose the new workflow
 - **THEN** the contributor is directed to reload or restart discovery before diagnosing the generated files as invalid
-

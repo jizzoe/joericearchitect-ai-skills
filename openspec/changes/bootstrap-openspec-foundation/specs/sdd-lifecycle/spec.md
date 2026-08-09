@@ -76,4 +76,3 @@ automated tracking metadata is not yet available.
 #### Scenario: Bootstrap artifacts are reviewed
 - **WHEN** a reviewer opens the bootstrap proposal
 - **THEN** the reviewer can navigate to the primary issue and its roadmap parent
-
