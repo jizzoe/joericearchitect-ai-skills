@@ -1,0 +1,21 @@
+schema_version: 1
+openspec:
+  change: add-openspec-github-lifecycle-sync
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 33
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/33
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - scripts/github/lib/lifecycle.mjs
+      - scripts/github/set-project-status.mjs
+      - scripts/github/audit-lifecycle.mjs
+      - scripts/github/test/lifecycle-sync.test.mjs
+      - skills/base/openspec-github-sync/
+      - workflows/openspec-github-lifecycle/
+      - evals/workflows/openspec-github-lifecycle/
+      - openspec/changes/add-openspec-github-lifecycle-sync/

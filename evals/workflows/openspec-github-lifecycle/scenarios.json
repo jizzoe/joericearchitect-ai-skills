@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "propose-reviewed-ready",
+      "event": "propose-reviewed",
+      "expectedStatus": "Ready"
+    },
+    {
+      "id": "apply-started-in-progress",
+      "event": "apply-started",
+      "expectedStatus": "In Progress"
+    },
+    {
+      "id": "missing-project-field",
+      "expectedOutcome": "fail-safely"
+    },
+    {
+      "id": "repair-without-authorization",
+      "expectedOutcome": "authorization-required"
+    },
+    {
+      "id": "authorized-repair",
+      "expectedOutcome": "plan-repair"
+    }
+  ]
+}
