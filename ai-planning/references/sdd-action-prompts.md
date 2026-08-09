@@ -350,3 +350,142 @@ and later work remain untouched.
   inventories, strict OpenSpec validity, and absence of repository owner,
   Project-number, or credential patterns. Task 3.1 is complete, progress is 6
   of 14, and README remains reserved for task 3.2.
+
+## 4. Apply Batch 1: Contributor Entry Point and Static Integration Evidence
+
+### Intended Outcome
+
+Complete tasks 3.2, 4.1, and 4.2 as one reviewable batch: add the concise
+README entry point, verify exact cross-assistant workflow parity, and verify
+generated provenance and preservation boundaries without editing generated
+workflow contents.
+
+### Learning Notes
+
+- Apply batches may group dependency-complete tasks when their combined scope
+  remains easy to review. Each task still needs its own evidence and is checked
+  immediately after that evidence succeeds.
+- Verification tasks can be implementation work even when they do not create
+  product files. Their output establishes whether observable requirements are
+  true and prevents a generator's success message from becoming the only
+  evidence.
+- Generated ownership is a boundary: OpenSpec-managed commands and skills are
+  inspected in this batch, while changes to them remain the generator's job.
+
+### Observations
+
+- The README now describes the Claude/Codex asset scope and links to the
+  focused SDD guide without repeating its operating procedure.
+- Normalized Claude command, Claude skill, and Codex skill inventories each
+  contain exactly `apply`, `archive`, `explore`, `propose`, `sync`, and
+  `verify`. No incremental or deselected action was present.
+- Every generated Claude and Codex skill retains its available MIT license,
+  OpenSpec author, and generator 1.8.0 metadata. Claude commands retain their
+  OpenSpec name and workflow-category markers; their generated format does not
+  expose separate license or generator fields.
+- Within generated integration paths, Git history shows that the bootstrap
+  commit replaced only `update` exposure with `verify`. The tracked
+  `ai-planning/prompts/skill-ideas.txt` is byte-identical to the parent commit.
+- `.claude/settings.local.json` is globally ignored, absent from both Git
+  trees, and was created after the bootstrap commit, so Git cannot prove a
+  pre-bootstrap content comparison. Its current SHA-256 value is recorded in
+  task 4.2 as the forward preservation baseline.
+
+### Batch Review Rule
+
+- After each implementation batch, automatically review the batch diff against
+  the approved proposal, delta specs, design, and tasks.
+- Automatically correct objective, narrowly scoped findings and rerun affected
+  checks before reporting the batch complete.
+- Request repository-owner approval only when a proposed correction requires
+  human judgment, changes approved scope or behavior, mutates external state,
+  or conflicts with an authoritative artifact.
+- Record material review findings and corrections here, while keeping
+  authoritative requirements and implementation decisions in their owning
+  artifacts.
+
+### Review Corrections
+
+- Added the omitted `explore` action to the README lifecycle summary.
+- Scoped the commit claim to generated integration paths so it does not imply
+  that the bootstrap commit changed only workflow exposure.
+- Replaced the unsupported claim that an ignored file was byte-identical across
+  commits with its observable Git status, creation time, and a forward hash.
+
+## 5. Apply Batch 2: Portability and Assistant Discovery
+
+### Intended Outcome
+
+Complete tasks 4.3 and 4.4 as one verification batch: evaluate reusable
+guidance against a second-product, multi-repository scenario and verify that
+fresh Claude and Codex sessions discover the generated lifecycle actions and
+have an actionable stale-discovery recovery path.
+
+### Learning Notes
+
+- Portability review separates reusable procedure from product-owned context.
+  Product-specific values are not defects when they remain in the repository's
+  configuration and documentation boundary rather than reusable logic.
+- File inventory proves generated assets exist; assistant startup evidence
+  proves the runtime actually scans the owning directories. Both are stronger
+  together than either check alone.
+- Authentication and local discovery are separate concerns. A CLI may discover
+  repository commands and skills during startup even when it cannot invoke a
+  remote model.
+
+### Observations
+
+- A hypothetical product with a different GitHub owner, Project, and multiple
+  implementation repositories can follow the guide without editing reusable
+  workflow logic. Repository paths are relative and mutable product values are
+  explicitly assigned to product-owned configuration.
+- Reusable documentation and generated integrations contain no embedded GitHub
+  owner, Project number, credential, branch, or product-domain constant. The
+  product purpose, boundary examples, and canonical asset paths in
+  `openspec/config.yaml` and `README.md` are intentional product context.
+- The active Codex session exposes all six generated OpenSpec skills. A fresh
+  Claude Code 2.1.220 startup loaded six project skills and six legacy project
+  commands and watched both generated directories.
+- Claude model invocation could not enumerate names because the local CLI was
+  not logged in. Startup diagnostics nevertheless confirmed local discovery
+  before authentication, and the exact on-disk inventories supplied the action
+  names without requiring a credential or external mutation.
+- The documented stale-discovery sequence is explicit: start a new session or
+  reload/restart, then verify the generated file, selected workflow profile,
+  and complete normalized inventory before declaring generation invalid.
+
+## 6. Apply Batch 3: Validation and Implementation Review
+
+### Intended Outcome
+
+Complete tasks 5.1 and 5.2 as one internal quality gate: run every available
+repository-local validation and map both delta specs and the approved design to
+objective implementation evidence before any external closeout mutation.
+
+### Learning Notes
+
+- Validation and review answer different questions. Deterministic checks prove
+  parseability, exact inventories, links, formatting, metadata, and secret
+  hygiene; qualitative review checks whether the evidence actually satisfies
+  each requirement, scenario, and design decision.
+- A verification report may find the implemented scope conformant while still
+  blocking archival on an incomplete lifecycle task. This prevents technical
+  success from being confused with delivery completion.
+- Missing repository tooling should be reported as an explicit limitation, not
+  replaced with an unapproved dependency or silently treated as a passing test.
+
+### Observations
+
+- OpenSpec status, strict validation, and instructions for every configured
+  artifact and operation succeeded. Exact workflow parity, provenance,
+  relative links, balanced code fences, whitespace, and credential scans also
+  passed.
+- The repository has no configured formatter, Markdown linter, package test
+  runner, or build target. The batch used dependency-free checks and records
+  later validation automation as a suggestion for the planned hardening work.
+- `verification-report.md` maps all 19 delta-spec scenarios and all five design
+  decisions to files and executed commands. Security, attribution, recovery,
+  maintainability, and Claude/Codex portability were reviewed separately.
+- No implementation defect requires correction. Task 5.3 remains a critical
+  lifecycle gap because issue evidence and pull-request preparation are not yet
+  complete; sync and archive therefore remain premature.
