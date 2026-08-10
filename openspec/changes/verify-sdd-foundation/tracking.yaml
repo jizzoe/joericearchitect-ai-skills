@@ -1,0 +1,20 @@
+schema_version: 1
+openspec:
+  change: verify-sdd-foundation
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 49
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/49
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - AGENTS.md
+      - THIRD_PARTY_NOTICES.md
+      - docs/sdd-foundation-operations.md
+      - evals/workflows/sdd-foundation/
+      - evals/fixtures/products/mobile-bookkeeping-multi-repo/
+      - openspec/changes/verify-sdd-foundation/
+

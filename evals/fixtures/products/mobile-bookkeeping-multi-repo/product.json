@@ -1,0 +1,20 @@
+{
+  "product": "Mobile Bookkeeping",
+  "repositories": [
+    {
+      "name": "mobile-bookkeeping-app",
+      "role": "application",
+      "paths": ["apps/mobile/", "packages/bookkeeping-core/"]
+    },
+    {
+      "name": "mobile-bookkeeping-infra",
+      "role": "infrastructure",
+      "paths": ["infra/", "ops/"]
+    }
+  ],
+  "project": {
+    "statuses": ["Backlog", "Ready", "In Progress", "In Review", "Done"],
+    "priorities": ["P0", "P1", "P2", "P3"]
+  }
+}
+
