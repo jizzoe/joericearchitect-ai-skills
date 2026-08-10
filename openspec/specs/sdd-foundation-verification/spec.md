@@ -32,7 +32,7 @@ of reusable global assets.
 
 #### Scenario: Global assets are scanned
 - **WHEN** reusable skills, workflows, scripts, specs, and docs are scanned
-- **THEN** they do not contain mobile-bookkeeping fixture constants
+- **THEN** they do not contain product-specific fixture constants
 
 ### Requirement: Operations and recovery are documented
 SDD foundation verification SHALL document setup, normal operation, recovery,
@@ -42,4 +42,3 @@ token rotation, and OpenSpec updates.
 - **WHEN** repository documentation is inspected
 - **THEN** setup, operation, recovery, token rotation, and OpenSpec update
   guidance are present
-
