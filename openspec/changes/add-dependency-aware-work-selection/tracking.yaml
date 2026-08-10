@@ -1,0 +1,24 @@
+schema_version: 1
+openspec:
+  change: add-dependency-aware-work-selection
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 45
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/45
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - scripts/github/lib/dependencies.mjs
+      - scripts/github/project-status.mjs
+      - scripts/github/select-next-work.mjs
+      - scripts/github/dependency-report.mjs
+      - scripts/github/test/dependencies.test.mjs
+      - scripts/github/test/work-selection.test.mjs
+      - workflows/openspec-github-lifecycle/references/work-selection.md
+      - skills/base/dependency-aware-work-selection/
+      - evals/workflows/openspec-github-lifecycle/dependency-selection/
+      - openspec/changes/add-dependency-aware-work-selection/
+

@@ -1,0 +1,6 @@
+[
+  { "change": "M5-C2", "status": "Done", "sequence": 502, "priority": "P2" },
+  { "change": "M6-C1", "status": "Ready", "sequence": 601, "priority": "P2", "blockedBy": ["M5-C2"], "sharedFiles": ["scripts/github/lib/dependencies.mjs"] },
+  { "change": "M7-C1", "status": "Ready", "sequence": 701, "priority": "P2", "blockedBy": ["M6-C1"], "sharedFiles": ["evals/workflows/openspec-github-lifecycle/"] }
+]
+
