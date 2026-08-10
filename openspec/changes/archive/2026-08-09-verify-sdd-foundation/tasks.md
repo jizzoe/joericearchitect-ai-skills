@@ -32,6 +32,6 @@
   - Depends on: 3.1
   - Evidence: verification report maps requirements, scenarios, design decisions, security controls, recovery paths, portability claims, known limitations, and remaining governance decisions to evidence.
 
-- [ ] 3.3 Deliver, Sync, and Archive through separate authorized checkpoints.
+- [x] 3.3 Deliver, Sync, and Archive through separate authorized checkpoints.
   - Depends on: 3.2
   - Evidence: implementation PR closes issue #49 and reaches `Done`; Sync PR updates living specs; Archive PR preserves the completed change and active change list is empty.
