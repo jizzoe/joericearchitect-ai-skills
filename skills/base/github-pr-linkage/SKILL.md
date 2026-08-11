@@ -1,3 +1,8 @@
+---
+name: github-pr-linkage
+description: Validate pull-request evidence that links GitHub work to an OpenSpec change. Use for read-only linkage review; do not alter pull requests, issues, or Project state.
+---
+
 # GitHub PR Linkage
 
 Use this skill when a pull request needs advisory validation for linked GitHub

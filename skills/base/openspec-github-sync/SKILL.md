@@ -1,3 +1,8 @@
+---
+name: openspec-github-sync
+description: Synchronize a linked OpenSpec change with its configured GitHub lifecycle records. Use for authorized lifecycle reconciliation; do not overwrite human-authored GitHub content or use unapproved credentials.
+---
+
 # OpenSpec GitHub Sync
 
 Use this skill when a linked OpenSpec change needs local GitHub lifecycle audit,

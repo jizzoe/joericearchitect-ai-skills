@@ -1,3 +1,8 @@
+---
+name: project-pr-status-sync
+description: Plan or audit configured GitHub Project status changes from pull-request lifecycle events. Use for trusted status reconciliation; do not expose Project credentials or mutate untrusted pull-request workflows.
+---
+
 # Project PR Status Sync
 
 Use this skill when reconciling GitHub Project status from pull request
@@ -29,4 +34,3 @@ Run:
 ```bash
 node --test scripts/github/test/pr-status-sync.test.mjs evals/workflows/project-pr-status-sync/run-fixtures.test.mjs
 ```
-

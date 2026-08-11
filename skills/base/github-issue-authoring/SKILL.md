@@ -1,3 +1,8 @@
+---
+name: github-issue-authoring
+description: Create or reuse a repository GitHub issue through the configured SDD intake flow. Use when issue tracking is required; do not mutate GitHub without explicit authorization.
+---
+
 # GitHub Issue Authoring
 
 Use this skill when a repository issue should be created or reused for SDD

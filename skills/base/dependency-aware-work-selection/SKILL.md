@@ -1,3 +1,8 @@
+---
+name: dependency-aware-work-selection
+description: Classify OpenSpec SDD work and recommend the next dependency-valid change from explicit repository evidence. Use for planning or triage; do not use it to switch changes or mutate GitHub state without authorization.
+---
+
 # Dependency-Aware Work Selection
 
 Use this skill to classify OpenSpec SDD work and recommend the next change from
@@ -12,4 +17,3 @@ Canonical scripts:
 
 The skill is read-only. It reports in-flight, actionable, blocked, parallel,
 and next work and never switches changes without an explicit target.
-
