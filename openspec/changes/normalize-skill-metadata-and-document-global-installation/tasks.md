@@ -58,4 +58,4 @@
 
 - [ ] 5.3 Complete formal Verify, implementation delivery, Sync, and Archive as separately authorized lifecycle checkpoints.
   - Depends on: 5.2.
-  - Evidence: Verify maps requirements and design decisions to tests and fixture evidence; the implementation PR links the issue and `OpenSpec change: normalize-skill-metadata-and-document-global-installation`; later Sync and Archive preserve the living-spec and history boundaries.
+  - Evidence: formal Verify found no implementation gaps; [#55](https://github.com/jizzoe/joericearchitect-ai-skills/issues/55) and implementation [PR #56](https://github.com/jizzoe/joericearchitect-ai-skills/pull/56) link `OpenSpec change: normalize-skill-metadata-and-document-global-installation`. Sync and Archive remain pending until the separately reviewed implementation delivery merges.
