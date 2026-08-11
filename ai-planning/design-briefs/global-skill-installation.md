@@ -154,7 +154,7 @@ fixture evidence confirms discovery and invocation; and
 ## Source Material
 
 - [Global skill installation research](../research/skill-installation/global-skill-installation-options.md)
-- [Global skill installation and SDD workspace implementation plan](../plans/global-skill-installation-and-sdd-workspace-bootstrap-implementation-plan.md)
+- [Global skill installation implementation plan](../plans/global-skill-installation-implementation-plan.md)
 - [OpenAI skill documentation](https://learn.chatgpt.com/docs/build-skills)
 - [GitHub CLI `gh skill install` manual](https://cli.github.com/manual/gh_skill_install)
 - [Claude Code skills documentation](https://code.claude.com/docs/en/slash-commands)
