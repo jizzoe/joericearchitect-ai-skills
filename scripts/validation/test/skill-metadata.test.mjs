@@ -40,6 +40,8 @@ test("dynamically discovers a newly added valid skill", () => {
 for (const [name, directory, frontmatter, ruleId] of [
   ["missing frontmatter", "missing-frontmatter", "# No frontmatter", "skill-metadata.frontmatter"],
   ["invalid frontmatter", "invalid-frontmatter", "---\nname invalid\n---", "skill-metadata.frontmatter"],
+  ["invalid YAML scalar", "invalid-yaml", "---\nname: invalid-yaml\ndescription: a: b\n---", "skill-metadata.frontmatter"],
+  ["unsupported quoted YAML scalar", "quoted-yaml", "---\nname: quoted-yaml\ndescription: \"Fixture skill\"\n---", "skill-metadata.frontmatter"],
   ["missing name", "missing-name", "---\ndescription: Fixture skill\n---", "skill-metadata.name-required"],
   ["missing description", "missing-description", "---\nname: missing-description\n---", "skill-metadata.description-required"],
   ["name mismatch", "actual-directory", "---\nname: different-directory\ndescription: Fixture skill\n---", "skill-metadata.directory-match"],

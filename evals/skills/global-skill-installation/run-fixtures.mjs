@@ -28,12 +28,6 @@ function expectSuccess(label, command, args) {
   return result;
 }
 
-function skillPath(agent) {
-  return agent === "claude-code"
-    ? path.join(home, ".claude", "skills", skillName, "SKILL.md")
-    : path.join(home, ".codex", "skills", skillName, "SKILL.md");
-}
-
 function install(agent) {
   return expectSuccess(`install for ${agent}`, "gh", [
     "skill", "install", source, "--from-local", "--all", "--agent", agent, "--scope", "user"
@@ -45,6 +39,27 @@ function list(agent) {
     "skill", "list", "--agent", agent, "--scope", "user", "--json", "skillName,agentHosts,path,scope,sourceURL,version,pinned"
   ]);
   return JSON.parse(result.stdout);
+}
+
+function listedSkill(agent) {
+  const installed = list(agent).find((item) => item.skillName === skillName);
+  assert.ok(installed, `${agent} should list the installed skill`);
+  assert.equal(installed.scope, "user");
+  assert.equal(typeof installed.path, "string");
+  return installed;
+}
+
+function listedSkillPath(installed) {
+  return path.resolve(installed.path, "SKILL.md");
+}
+
+function skillFilesUnder(directory) {
+  if (!fs.existsSync(directory)) return [];
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return skillFilesUnder(entryPath);
+    return entry.isFile() && entry.name === "SKILL.md" ? [entryPath] : [];
+  });
 }
 
 function version(command) {
@@ -59,23 +74,27 @@ function option(name) {
 
 function authenticatedInvocation(agent, fixturePath) {
   const isClaude = agent === "claude-code";
-  const installedSkill = isClaude
-    ? path.join(fixturePath, "skills", skillName)
-    : path.join(fixturePath, ".codex", "skills", skillName);
-  assert.equal(fs.existsSync(installedSkill), false, `${agent} fixture home already contains ${skillName}`);
+  const resolvedFixturePath = fs.realpathSync(fixturePath);
+  const resolvedHome = fs.realpathSync(os.homedir());
+  if (resolvedFixturePath === resolvedHome) {
+    return { status: "blocked", reason: `${agent} requires a disposable profile path, not the current user's HOME` };
+  }
 
   const fixtureEnv = { ...process.env };
   // Use the platform trust store for agent calls, not a caller's custom CA bundle.
   delete fixtureEnv.SSL_CERT_FILE;
   delete fixtureEnv.SSL_CERT_DIR;
   Object.assign(fixtureEnv, {
+    GH_CONFIG_DIR: path.join(resolvedFixturePath, ".config", "gh"),
     ...(isClaude
-      ? { CLAUDE_CONFIG_DIR: fixturePath }
-      : { HOME: fixturePath, CODEX_HOME: path.join(fixturePath, ".codex") })
+      ? { CLAUDE_CONFIG_DIR: resolvedFixturePath }
+      : { HOME: resolvedFixturePath, CODEX_HOME: path.join(resolvedFixturePath, ".codex") })
   });
   const workspace = path.join(tempRoot, `${agent} invocation workspace`);
   fs.mkdirSync(workspace, { recursive: true });
 
+  let installedSkillPath;
+  let installedByFixture = false;
   try {
     const auth = spawnSync(
       agent === "claude-code" ? "claude" : "codex",
@@ -97,13 +116,17 @@ function authenticatedInvocation(agent, fixturePath) {
     if (installResult.status !== 0) {
       return { status: "blocked", reason: `${agent} fixture installation failed` };
     }
+    installedByFixture = true;
     const listArgs = isClaude
       ? ["skill", "list", "--dir", path.join(fixturePath, "skills"), "--json", "skillName,path,scope,sourceURL,version,pinned"]
       : ["skill", "list", "--agent", agent, "--scope", "user", "--json", "skillName,path,scope,sourceURL,version,pinned"];
     const listed = spawnSync("gh", listArgs, { cwd: workspace, encoding: "utf8", env: fixtureEnv });
-    if (listed.status !== 0 || !JSON.parse(listed.stdout).some((item) => item.skillName === skillName)) {
+    if (listed.status !== 0) {
       return { status: "blocked", reason: `${agent} could not verify its installed skill with gh skill list` };
     }
+    const installed = JSON.parse(listed.stdout).find((item) => item.skillName === skillName);
+    if (!installed?.path) return { status: "blocked", reason: `${agent} could not find its fixture skill in gh skill list` };
+    installedSkillPath = path.resolve(installed.path);
 
     const invocation = agent === "claude-code"
       ? spawnSync("claude", [
@@ -129,7 +152,9 @@ function authenticatedInvocation(agent, fixturePath) {
       output: invocation.stdout.trim().replaceAll(/\s+/g, " ").slice(0, 240)
     };
   } finally {
-    fs.rmSync(installedSkill, { recursive: true, force: true });
+    if (installedByFixture && installedSkillPath) {
+      fs.rmSync(installedSkillPath, { recursive: true, force: true });
+    }
   }
 }
 
@@ -139,35 +164,35 @@ try {
 
   const discoveryOnly = expectSuccess("local-source skill discovery", "gh", ["skill", "install", source, "--from-local"]);
   assert.match(discoveryOnly.stdout, new RegExp(skillName));
-  assert.equal(fs.existsSync(path.join(home, ".claude")), false, "discovery must not mutate the fixture home");
+  assert.deepEqual(skillFilesUnder(home), [], "discovery must not install a skill in the fixture home");
 
   for (const agent of ["claude-code", "codex"]) {
     install(agent);
-    assert.equal(fs.existsSync(skillPath(agent)), true, `${agent} destination should contain SKILL.md`);
-    const installed = list(agent).find((item) => item.skillName === skillName);
-    assert.ok(installed, `${agent} should list the installed skill`);
-    assert.equal(installed.scope, "user");
-    assert.equal(path.resolve(installed.path, "SKILL.md"), path.resolve(skillPath(agent)));
+    const installed = listedSkill(agent);
+    const installedPath = listedSkillPath(installed);
+    assert.equal(fs.existsSync(installedPath), true, `${agent} destination should contain SKILL.md`);
 
     const rerun = run("gh", ["skill", "install", source, "--from-local", "--all", "--agent", agent, "--scope", "user"]);
     assert.notEqual(rerun.status, 0, `${agent} rerun must not silently overwrite an existing skill`);
 
-    const skillsDirectory = path.dirname(path.dirname(skillPath(agent)));
+    const skillsDirectory = path.dirname(installed.path);
     const updateCheck = run("gh", ["skill", "update", "--dry-run", "--dir", skillsDirectory]);
     assert.equal(updateCheck.status, 0, `${agent} update dry run must not mutate or fail`);
-    assert.equal(fs.existsSync(skillPath(agent)), true, `${agent} update dry run must preserve the installed skill`);
+    assert.equal(fs.existsSync(installedPath), true, `${agent} update dry run must preserve the installed skill`);
   }
 
   const conflictHome = path.join(tempRoot, "conflict home");
-  fs.mkdirSync(path.join(conflictHome, ".claude", "skills", skillName), { recursive: true });
-  fs.writeFileSync(path.join(conflictHome, ".claude", "skills", skillName, "SKILL.md"), "# User authored\n", "utf8");
-  const conflict = spawnSync("gh", ["skill", "install", source, "--from-local", "--all", "--agent", "claude-code", "--scope", "user"], {
+  const conflictSkillsDirectory = path.join(conflictHome, "skills");
+  const conflictSkillPath = path.join(conflictSkillsDirectory, skillName, "SKILL.md");
+  fs.mkdirSync(path.dirname(conflictSkillPath), { recursive: true });
+  fs.writeFileSync(conflictSkillPath, "# User authored\n", "utf8");
+  const conflict = spawnSync("gh", ["skill", "install", source, "--from-local", "--all", "--dir", conflictSkillsDirectory], {
     cwd: repoRoot,
     encoding: "utf8",
     env: { ...env, HOME: conflictHome, GH_CONFIG_DIR: path.join(conflictHome, ".config", "gh") }
   });
   assert.notEqual(conflict.status, 0, "user-authored destination conflict must not be overwritten");
-  assert.equal(fs.readFileSync(path.join(conflictHome, ".claude", "skills", skillName, "SKILL.md"), "utf8"), "# User authored\n");
+  assert.equal(fs.readFileSync(conflictSkillPath, "utf8"), "# User authored\n");
 
   const claudeConfigDir = option("--authenticated-claude-config-dir");
   const codexHome = option("--authenticated-codex-home");

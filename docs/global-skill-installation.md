@@ -132,6 +132,10 @@ does not use your global assistant directories or credentials. Run the
 documented per-agent invocation manually from an authenticated disposable
 profile before claiming the tested agent/version pair is supported.
 
+The optional authenticated invocation accepts only a pre-provisioned disposable
+profile path, never your normal `$HOME`. It isolates `gh` configuration and
+removes only the fixture skill that it installed in that disposable profile.
+
 ## Boundary
 
 `gh skill` is the initial installer for this repository. A custom installer is

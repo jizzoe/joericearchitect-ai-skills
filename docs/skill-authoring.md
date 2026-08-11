@@ -17,6 +17,11 @@ description: Describe what the skill does, when to use it, and when not to use i
 `description` must be non-empty and give an activation boundary. Do not add
 this metadata contract to generated OpenSpec files or unrelated Markdown.
 
+Use unquoted YAML plain scalars for both values. They may contain ordinary
+spaces, but not mapping syntax such as `: ` or comment syntax such as ` #`.
+Quoted, multiline, list, and nested YAML values are intentionally unsupported
+by the repository's deterministic validator.
+
 Validate canonical metadata before review:
 
 ```bash

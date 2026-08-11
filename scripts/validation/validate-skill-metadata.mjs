@@ -8,13 +8,15 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultSkillsRoot = path.resolve(__dirname, "../../skills/base");
 const namePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const plainScalarPattern = /^(?![-?:,[\]{}#&*!|>'"%@`])(?!.*:\s)(?!.*\s#)[^\t\r\n]+$/;
 
-function unquote(value) {
-  const trimmed = value.trim();
-  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
-    return trimmed.slice(1, -1);
+function parsePlainScalar(rawValue) {
+  const value = rawValue.trim();
+  if (!value) return { error: "empty YAML frontmatter value" };
+  if (!plainScalarPattern.test(value)) {
+    return { error: "value must be an unquoted YAML plain scalar without mapping or comment syntax" };
   }
-  return trimmed;
+  return { value };
 }
 
 function parseFrontmatter(text) {
@@ -35,9 +37,9 @@ function parseFrontmatter(text) {
     if (!match) return { error: `invalid YAML frontmatter line: ${line}` };
     const [, key, rawValue = ""] = match;
     if (fields.has(key)) return { error: `duplicate YAML frontmatter key: ${key}` };
-    const value = unquote(rawValue);
-    if (!value) return { error: `empty YAML frontmatter value: ${key}` };
-    fields.set(key, value);
+    const parsedValue = parsePlainScalar(rawValue);
+    if (parsedValue.error) return { error: `${parsedValue.error}: ${key}` };
+    fields.set(key, parsedValue.value);
   }
 
   return { fields };
