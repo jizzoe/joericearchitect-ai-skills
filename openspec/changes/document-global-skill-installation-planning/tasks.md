@@ -10,7 +10,8 @@
     change.
 - [x] 1.3 Validate the planning-only change and pull-request linkage.
   - Depends on: 1.2.
-  - Evidence: strict OpenSpec validation and the linkage validator pass.
+  - Evidence: strict OpenSpec validation and the linkage validator pass for
+    planning PR #53.
 
 ## 2. Boundary
 
