@@ -40,7 +40,7 @@
 
 - [ ] 4.2 Add disposable Claude-only, Codex-only, and dual-agent fixture flows that isolate user homes and capture source, scope, destination, discovery, and invocation evidence.
   - Depends on: 1.2, 4.1.
-  - Evidence: fixture reports record exact versions and redacted commands and reject the current user's `$HOME`; authenticated Claude Code and Codex invocation evidence remains pending from separately pre-provisioned disposable profiles.
+  - Evidence: the 2026-08-11 pre-provisioned disposable Codex profile passed installation, listing, discovery, invocation, and cleanup for `codex-cli 0.147.0`; the fixture rejects the current user's `$HOME`; authenticated Claude Code evidence remains pending from a separately pre-provisioned disposable profile.
 
 - [x] 4.3 Extend fixture coverage for preview/no mutation, idempotent rerun, user-authored destination conflict, listing/update verification, paths with spaces, and a second-product source-layout fixture.
   - Depends on: 4.2.
@@ -54,7 +54,7 @@
 
 - [x] 5.2 Run focused tests, documentation walkthrough fixtures, metadata validation, `openspec validate normalize-skill-metadata-and-document-global-installation --strict`, `openspec validate --all --strict`, and `git diff --check`.
   - Depends on: 5.1.
-  - Evidence: 2026-08-11 runs pass the metadata validator, 11 focused Node tests, offline fixture install/list/update checks, adapter-drift check, change validation, all-spec validation (13 passed, 0 failed), artifact validation, and `git diff --check`; authenticated disposable-profile invocation remains an explicit pending prerequisite rather than a release support claim.
+  - Evidence: 2026-08-11 runs pass the metadata validator, 11 focused Node tests, offline fixture install/list/update checks, adapter-drift check, change validation, all-spec validation (13 passed, 0 failed), artifact validation, `git diff --check`, and an authenticated disposable-profile Codex invocation; Claude Code invocation remains an explicit pending prerequisite rather than a release support claim.
 
 - [ ] 5.3 Complete formal Verify, implementation delivery, Sync, and Archive as separately authorized lifecycle checkpoints.
   - Depends on: 5.2.
