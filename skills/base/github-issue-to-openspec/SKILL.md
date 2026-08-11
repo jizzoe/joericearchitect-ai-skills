@@ -1,3 +1,8 @@
+---
+name: github-issue-to-openspec
+description: Link an existing GitHub issue to a local OpenSpec change and tracking metadata. Use after the issue is known; do not create partial tracking data or mutate GitHub without authorization.
+---
+
 # GitHub Issue To OpenSpec
 
 Use this skill when an existing GitHub issue should be connected to a local

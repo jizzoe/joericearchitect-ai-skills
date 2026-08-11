@@ -24,4 +24,6 @@ jobs:
         with:
           node-version: "20"
       - run: npm install -g @fission-ai/openspec@1.8.0
+      - run: node scripts/validation/validate-skill-metadata.mjs
+      - run: node --test scripts/validation/test/skill-metadata.test.mjs
       - run: openspec validate --all --strict

@@ -1,0 +1,21 @@
+schema_version: 1
+openspec:
+  change: normalize-skill-metadata-and-document-global-installation
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 55
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/55
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - .github/workflows/openspec-validate.yml
+      - docs/global-skill-installation.md
+      - docs/skill-authoring.md
+      - evals/skills/global-skill-installation/
+      - scripts/validation/validate-skill-metadata.mjs
+      - scripts/validation/test/skill-metadata.test.mjs
+      - skills/base/
+      - openspec/changes/normalize-skill-metadata-and-document-global-installation/
