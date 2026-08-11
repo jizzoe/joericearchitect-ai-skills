@@ -1,0 +1,15 @@
+schema_version: 1
+openspec:
+  change: plan-sdd-workspace-bootstrap
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 57
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/57
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - ai-planning/plans/sdd-workspace-bootstrap-implementation-plan.md
+      - openspec/changes/plan-sdd-workspace-bootstrap/
