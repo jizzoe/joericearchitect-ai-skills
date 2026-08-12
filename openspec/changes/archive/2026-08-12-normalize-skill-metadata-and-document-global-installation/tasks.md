@@ -56,6 +56,6 @@
   - Depends on: 5.1.
   - Evidence: 2026-08-11 runs pass the metadata validator, 11 focused Node tests, offline fixture install/list/update checks, adapter-drift check, change validation, all-spec validation (13 passed, 0 failed), artifact validation, `git diff --check`, and an authenticated disposable-profile Codex invocation; Claude Code invocation remains an explicit pending prerequisite rather than a release support claim.
 
-- [ ] 5.3 Complete formal Verify, implementation delivery, Sync, and Archive as separately authorized lifecycle checkpoints.
+- [x] 5.3 Complete formal Verify, implementation delivery, Sync, and Archive as separately authorized lifecycle checkpoints.
   - Depends on: 5.2.
-  - Evidence: formal Verify found no implementation gaps; [#55](https://github.com/jizzoe/joericearchitect-ai-skills/issues/55) and implementation [PR #56](https://github.com/jizzoe/joericearchitect-ai-skills/pull/56) link `OpenSpec change: normalize-skill-metadata-and-document-global-installation`. Sync and Archive remain pending until the separately reviewed implementation delivery merges.
+  - Evidence: formal verification found no implementation gaps; implementation [PR #56](https://github.com/jizzoe/joericearchitect-ai-skills/pull/56) and Sync [PR #65](https://github.com/jizzoe/joericearchitect-ai-skills/pull/65) are merged and link `OpenSpec change: normalize-skill-metadata-and-document-global-installation`; [#55](https://github.com/jizzoe/joericearchitect-ai-skills/issues/55) is closed and its configured Project item is `Done`; this archive checkpoint preserves the completed change history.
