@@ -9,8 +9,8 @@
   },
   "implementerSession": "implementer-session-1",
   "input": {
-    "baseCommit": "base-a",
-    "headCommit": "head-b",
+    "baseCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "headCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "diff": "diff --git a/file b/file",
     "openspecArtifacts": ["proposal.md", "design.md", "spec.md", "tasks.md"],
     "validationEvidence": ["node --test: pass", "openspec validate: pass"]
@@ -19,9 +19,9 @@
     "reviewer": { "type": "synthetic-isolated-reviewer", "identity": "reviewer-session-2" },
     "executionRef": "review-run-7",
     "invocationRef": "configured-reviewer --input immutable-package",
-    "reviewedBase": "base-a",
-    "reviewedHead": "head-b",
-    "inputManifest": "0e69af895eb4a8c951c0be209df4d6bf7651f5767f17ab504c5e948426b81f7c",
+    "reviewedBase": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "reviewedHead": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "inputManifest": "dea65a31383a81a63e44beb06c39340d23ffc710b86d8573157d51f2f941cee5",
     "timestamp": "2026-08-12T12:00:00.000Z",
     "findings": [],
     "dispositions": [],

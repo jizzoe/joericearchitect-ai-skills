@@ -20,24 +20,24 @@ test("blocker or high objective-fix finding requires an objective fix and rerevi
     { id: "blocker", severity: "blocker", classification: "objective-fix" },
     { id: "high", severity: "high", classification: "objective-fix" }
   ]) assert.equal(code(validate({ findings: [finding], finalStatus: "findings" })), "independent-review-findings-unresolved");
-  assert.equal(code(validate({ reviewedHead: "head-after-fix" })), "independent-review-evidence-stale-head");
+  assert.equal(code(validate({ reviewedHead: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" })), "independent-review-evidence-stale-head");
   assert.equal(code(validate({ inputManifest: "other-package" })), "independent-review-evidence-manifest-mismatch");
 });
 
 test("rejects self review, stale SHA, malformed or missing evidence, and unavailable reviewer", () => {
   assert.equal(code(prepareIndependentReview({ reviewer: fixture.reviewer, implementerSession: fixture.reviewer.identity, reviewInput: fixture.input })), "independent-review-self-review");
-  assert.equal(code(validate({ reviewedBase: "old-base" })), "independent-review-evidence-stale-head");
+  assert.equal(code(validate({ reviewedBase: "cccccccccccccccccccccccccccccccccccccccc" })), "independent-review-evidence-stale-head");
   assert.equal(code(validate({ reviewedBase: "" })), "independent-review-evidence-malformed");
   assert.equal(code(validate({ reviewedHead: "" })), "independent-review-evidence-malformed");
   assert.equal(code(validate({ executionRef: "" })), "independent-review-evidence-malformed");
-  assert.equal(code(validateIndependentReviewEvidence({ reviewer: fixture.reviewer, implementerSession: fixture.implementerSession, expectedBase: "base-a", expectedHead: "head-b", expectedReviewManifest: manifest })), "independent-review-evidence-malformed");
-  assert.equal(code(validateIndependentReviewEvidence({ reviewer: fixture.reviewer, implementerSession: fixture.implementerSession, expectedBase: "", expectedHead: "head-b", expectedReviewManifest: manifest, evidence: fixture.evidence })), "independent-review-input-incomplete");
-  assert.equal(code(validateIndependentReviewEvidence({ reviewer: fixture.reviewer, implementerSession: fixture.implementerSession, expectedBase: "base-a", expectedHead: "", expectedReviewManifest: manifest, evidence: fixture.evidence })), "independent-review-input-incomplete");
-  assert.equal(code(validateIndependentReviewEvidence({ reviewer: { ...fixture.reviewer, available: false }, implementerSession: fixture.implementerSession, expectedBase: "base-a", expectedHead: "head-b", expectedReviewManifest: manifest, evidence: fixture.evidence })), "independent-reviewer-unavailable");
+  assert.equal(code(validateIndependentReviewEvidence({ reviewer: fixture.reviewer, implementerSession: fixture.implementerSession, expectedBase: fixture.input.baseCommit, expectedHead: fixture.input.headCommit, expectedReviewManifest: manifest })), "independent-review-evidence-malformed");
+  assert.equal(code(validateIndependentReviewEvidence({ reviewer: fixture.reviewer, implementerSession: fixture.implementerSession, expectedBase: "", expectedHead: fixture.input.headCommit, expectedReviewManifest: manifest, evidence: fixture.evidence })), "independent-review-input-incomplete");
+  assert.equal(code(validateIndependentReviewEvidence({ reviewer: fixture.reviewer, implementerSession: fixture.implementerSession, expectedBase: fixture.input.baseCommit, expectedHead: "", expectedReviewManifest: manifest, evidence: fixture.evidence })), "independent-review-input-incomplete");
+  assert.equal(code(validateIndependentReviewEvidence({ reviewer: { ...fixture.reviewer, available: false }, implementerSession: fixture.implementerSession, expectedBase: fixture.input.baseCommit, expectedHead: fixture.input.headCommit, expectedReviewManifest: manifest, evidence: fixture.evidence })), "independent-reviewer-unavailable");
 });
 
 test("review evaluator is portable because all reviewer and commit values are inputs", () => {
-  const other = { ...fixture, reviewer: { ...fixture.reviewer, identity: "separate-reviewer" }, implementerSession: "other-implementer", input: { ...fixture.input, baseCommit: "other-base", headCommit: "other-head" } };
+  const other = { ...fixture, reviewer: { ...fixture.reviewer, identity: "separate-reviewer" }, implementerSession: "other-implementer", input: { ...fixture.input, baseCommit: "cccccccccccccccccccccccccccccccccccccccc", headCommit: "dddddddddddddddddddddddddddddddddddddddd" } };
   const otherManifest = immutableReviewManifest(other.input);
   const evidence = { ...fixture.evidence, reviewer: { type: other.reviewer.type, identity: other.reviewer.identity }, reviewedBase: other.input.baseCommit, reviewedHead: other.input.headCommit, inputManifest: otherManifest };
   assert.equal(prepareIndependentReview({ reviewer: other.reviewer, implementerSession: other.implementerSession, reviewInput: other.input }).allowed, true);

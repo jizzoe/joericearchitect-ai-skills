@@ -86,7 +86,8 @@ Give it only immutable base/head SHAs, accumulated diff, relevant OpenSpec
 artifacts, and current test/validation evidence, without the desired outcome.
 Record its type/identity, execution and invocation reference, reviewed SHAs,
 timestamp, findings and dispositions, and final status. Require the evidence
-to match the exact current head. After a behavior-preserving objective fix,
+to match the exact current head and a deterministic manifest recomputed from
+the immutable input package at the delivery boundary. After a behavior-preserving objective fix,
 rerun affected evidence and review the new head; stop after three materially
 different fixes for one failure signature or on a material decision. An
 unavailable, self, malformed, stale, wrong-head, mutable, blocker, or high

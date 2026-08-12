@@ -11,17 +11,17 @@ const authorization = {
   publicSourceScopes: ["https://docs.example.test/"]
 };
 const runtime = { permittedOperations: ["run-lifecycle-action", "read-source"] };
-const record = { entry: "first-change", kind: "pr", id: "42", repository: "owner/repository", baseBranch: "main", headCommit: "abc123" };
+const record = { entry: "first-change", kind: "pr", id: "42", repository: "owner/repository", baseBranch: "main", headCommit: "abc1234" };
 
 test("allows only a current exact derived pull request", () => {
   const result = checkOperationAuthorization({ authorization, runtime, request: {
-    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: "abc123", evidenceCurrent: true, recovery: "re-read PR and checkpoint"
+    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: "abc1234", evidenceCurrent: true, recovery: "re-read PR and checkpoint"
   } });
   assert.equal(result.allowed, true, JSON.stringify(result));
 });
 
 test("rejects a lookalike queue entry and stale head", () => {
-  for (const request of [{ selectedEntry: "other-change", headCommit: "abc123" }, { selectedEntry: "first-change", headCommit: "different" }, { selectedEntry: "first-change", headCommit: "" }]) {
+  for (const request of [{ selectedEntry: "other-change", headCommit: "abc1234" }, { selectedEntry: "first-change", headCommit: "different" }, { selectedEntry: "first-change", headCommit: "" }]) {
     const result = checkOperationAuthorization({ authorization, runtime, request: {
       profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", derivedRecord: record, evidenceCurrent: true, recovery: "recover", ...request
     } });
@@ -32,9 +32,9 @@ test("rejects a lookalike queue entry and stale head", () => {
 test("requires matching kinds for archive and merged-branch cleanup", () => {
   const base = { profile: "sdd-delivery", operation: "run-lifecycle-action", selectedEntry: "first-change", evidenceCurrent: true, recovery: "recover" };
   const change = { entry: "first-change", kind: "change", id: "first-change", repository: "owner/repository" };
-  const branch = { entry: "first-change", kind: "branch", id: "feature/first-change", repository: "owner/repository", baseBranch: "main", headCommit: "abc123" };
+  const branch = { entry: "first-change", kind: "branch", id: "feature/first-change", repository: "owner/repository", baseBranch: "main", headCommit: "abc1234" };
   assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "archive-change", target: "change:first-change", derivedRecord: change } }).allowed, true);
-  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "delete-merged-topic-branch", target: "branch:feature/first-change", derivedRecord: branch, headCommit: "abc123" } }).allowed, true);
+  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "delete-merged-topic-branch", target: "branch:feature/first-change", derivedRecord: branch, headCommit: "abc1234" } }).allowed, true);
 });
 
 test("preserves exact target authorization without derived declarations", () => {
@@ -62,14 +62,14 @@ test("checkpoint resumes first incomplete step and stops invalid linkage", () =>
 
 test("production-rapid delivery requires current independent review evidence", () => {
   const reviewer = { type: "fixture-reviewer", identity: "fresh-reviewer", available: true, nonInteractive: true, isolatedContext: true, readOnly: true };
-  const reviewInput = { baseCommit: "base", headCommit: "abc123", diff: "diff", openspecArtifacts: ["proposal"], validationEvidence: ["tests"] };
+  const reviewInput = { baseCommit: "aaaaaaa", headCommit: "abc1234", diff: "diff", openspecArtifacts: ["proposal"], validationEvidence: ["tests"] };
   assert.equal(prepareIndependentReview({ reviewer, implementerSession: "implementer", reviewInput }).allowed, true);
   const result = checkOperationAuthorization({ authorization, runtime, request: {
-    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: "abc123", baseCommit: "base", reviewInputManifest: immutableReviewManifest(reviewInput), evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer,
-    independentReviewEvidence: { reviewer: { type: "fixture-reviewer", identity: "fresh-reviewer" }, executionRef: "run", invocationRef: "fixture", reviewedBase: "base", reviewedHead: "abc123", inputManifest: immutableReviewManifest(reviewInput), timestamp: "2026-08-12T12:00:00.000Z", findings: [], dispositions: [], finalStatus: "clear" }
+    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: "abc1234", baseCommit: "aaaaaaa", independentReviewInput: reviewInput, evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer,
+    independentReviewEvidence: { reviewer: { type: "fixture-reviewer", identity: "fresh-reviewer" }, executionRef: "run", invocationRef: "fixture", reviewedBase: "aaaaaaa", reviewedHead: "abc1234", inputManifest: immutableReviewManifest(reviewInput), timestamp: "2026-08-12T12:00:00.000Z", findings: [], dispositions: [], finalStatus: "clear" }
   } });
   assert.equal(result.allowed, true, JSON.stringify(result));
   assert.equal(checkOperationAuthorization({ authorization, runtime, request: {
-    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: "abc123", evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, reviewInputManifest: immutableReviewManifest(reviewInput), independentReviewEvidence: { ...result.independentReviewEvidence }
-  } }).issues[0]?.code, "independent-review-input-incomplete");
+    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: "abc1234", baseCommit: "aaaaaaa", evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, independentReviewInput: { ...reviewInput, diff: "tampered" }, independentReviewEvidence: { reviewer: { type: "fixture-reviewer", identity: "fresh-reviewer" }, executionRef: "run", invocationRef: "fixture", reviewedBase: "aaaaaaa", reviewedHead: "abc1234", inputManifest: immutableReviewManifest(reviewInput), timestamp: "2026-08-12T12:00:00.000Z", findings: [], dispositions: [], finalStatus: "clear" }
+  } }).issues[0]?.code, "independent-review-evidence-manifest-mismatch");
 });

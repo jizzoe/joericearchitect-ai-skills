@@ -18,7 +18,8 @@ Before marking a pull request ready or merging, verify:
 - branch cleanup is authorized and targets the merged topic branch only
 - for `production-rapid`, independent-review evidence names a distinct
   non-interactive isolated read-only reviewer and the exact current base/head,
-  with no unresolved blocker or high objective-fix finding
+  with a manifest recomputed from the immutable review package and no unresolved
+  blocker or high objective-fix finding
 
 ## Issue and Project Gate
 

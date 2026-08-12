@@ -52,7 +52,8 @@ targets. Do not include token values or other secrets in authorization text.
    identity/type, execution and invocation references, reviewed SHAs, time,
    findings, dispositions, and status. Never accept self, malformed, stale, or
    wrong-head evidence, or a blocker/high objective-fix finding; GitHub review
-   publication is optional.
+   publication is optional. Recompute its deterministic input manifest at the
+   delivery boundary rather than trusting a caller-provided digest.
 8. Pause for material decisions, credential changes, destructive actions,
    unexpected external targets, durable-state conflicts, or persistent
    environment failures.
