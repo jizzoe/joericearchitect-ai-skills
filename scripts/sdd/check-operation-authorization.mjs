@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { operationVocabulary } from "../validation/validate-base-skill-contracts.mjs";
+import { inspectCheckpoint } from "./checkpoint.mjs";
 import { canonicalGitCommit, immutableReviewManifest, reviewInputMatchesGitDiff, validateIndependentReviewEvidence } from "./independent-review.mjs";
 
 export const profileOperations = {
@@ -14,7 +15,8 @@ const lifecycleActions = new Set(["sync-change", ...highImpactLifecycleActions])
 const lifecycleTargetPrefixes = {
   "merge-pr": "pr:",
   "archive-change": "change:",
-  "delete-merged-topic-branch": "branch:"
+  "delete-merged-topic-branch": "branch:",
+  "sync-change": "sync:"
 };
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
@@ -47,6 +49,7 @@ function derivedTargetMatches(authorization, request) {
   if (request.lifecycleAction === "merge-pr" && record.kind !== "pr") return false;
   if (request.lifecycleAction === "archive-change" && record.kind !== "change") return false;
   if (request.lifecycleAction === "delete-merged-topic-branch" && record.kind !== "branch") return false;
+  if (request.lifecycleAction === "sync-change" && record.kind !== "sync") return false;
   if (request.evidenceCurrent !== true && highImpactLifecycleActions.has(request.lifecycleAction)) return false;
   return true;
 }
@@ -118,6 +121,10 @@ export function checkOperationAuthorization(input) {
   const exactTarget = authorization.targets?.some((target) => targetMatches(target, request.target));
   const derivedTarget = derivedTargetMatches(authorization, request);
   const publicSource = publicSourceMatches(authorization, request);
+  if (lifecycleActions.has(request.lifecycleAction) && authorization.derivedTargets) {
+    const checkpoint = inspectCheckpoint(request.checkpoint ?? {});
+    if (checkpoint.classification === "human-decision" || checkpoint.classification === "stale-evidence") return fail("derived-checkpoint-not-valid", checkpoint.reason);
+  }
   if (lifecycleActions.has(request.lifecycleAction) && authorization.derivedTargets && !derivedTarget) return fail("derived-record-not-durable", request.target);
   if (!exactTarget && !derivedTarget && !publicSource) return fail("unauthorized-target", request.target);
   if (derivedTarget && !durableDerivedRecordMatches(request)) return fail("derived-record-not-durable", request.target);
