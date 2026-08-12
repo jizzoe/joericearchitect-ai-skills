@@ -32,13 +32,15 @@ The amended independent-review gate has deterministic clean, blocker/high,
 objective-fix rereview, self-review, stale-SHA, malformed/missing-evidence,
 unavailable-reviewer, portability, configured-reviewer attestation, canonical
 commit, Git-diff-provenance, and duplicate-durable-record coverage. Independent
-review `m1-attestation-rereview-2026-08-12T18:30:33Z` inspected the complete
+review `m1-attestation-rereview-2026-08-12T18:30:33Z` inspected the then-current complete
 immutable range `83da34f13a518941a9e66520f26be9f37ca28960..f0d787f1bb2ef20b5cbf28fc5b35709cb0073b26`,
-reported no findings, and returned `clear`.
+reported no findings, and returned `clear`. Subsequent commits require a fresh
+complete exact-head review record before Verify or delivery.
 
 ## Delivery Gate
 
-Formal local verification is complete. Issue
+Formal local verification remains pending a fresh complete exact-head
+independent-review record. Issue
 [#72](https://github.com/jizzoe/joericearchitect-ai-skills/issues/72) is the
 durably linked M-1 record. Before each remaining delivery transition, reread
 the issue, tracking metadata, branch head, pull request, and current evidence;

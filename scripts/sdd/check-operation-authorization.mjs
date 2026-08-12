@@ -51,6 +51,17 @@ function derivedTargetMatches(authorization, request) {
   return true;
 }
 
+function durableDerivedRecordMatches(request) {
+  const entry = request.checkpoint?.selectedEntry;
+  if (!entry || entry.name !== request.selectedEntry || !Array.isArray(entry.records)) return false;
+  const record = request.derivedRecord;
+  const matches = entry.records.filter((candidate) => candidate?.entry === record?.entry &&
+    candidate.kind === record?.kind && candidate.id === record?.id &&
+    candidate.repository === record?.repository && candidate.baseBranch === record?.baseBranch &&
+    candidate.headCommit === record?.headCommit);
+  return matches.length === 1;
+}
+
 function publicSourceMatches(authorization, request) {
   if (request.operation !== "read-source" || !nonEmpty(request.target)) return false;
   if (request.requiresAuthentication === true || request.privateSource === true || request.executesSource === true) return false;
@@ -104,6 +115,7 @@ export function checkOperationAuthorization(input) {
   const derivedTarget = derivedTargetMatches(authorization, request);
   const publicSource = publicSourceMatches(authorization, request);
   if (!exactTarget && !derivedTarget && !publicSource) return fail("unauthorized-target", request.target);
+  if (!exactTarget && derivedTarget && !durableDerivedRecordMatches(request)) return fail("derived-record-not-durable", request.target);
   if (authorizationExpired(authorization, input.now)) return fail("expired-authorization");
   if (runtime.permissionGaps?.length || (Array.isArray(runtime.permittedOperations) && !runtime.permittedOperations.includes(operation))) return fail("runtime-permission-gap", operation);
   if (request.adapter && !authorization.targets?.includes(`adapter:${request.adapter}`)) return fail("unauthorized-adapter", request.adapter);

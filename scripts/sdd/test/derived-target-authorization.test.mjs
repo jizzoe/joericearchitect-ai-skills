@@ -19,10 +19,11 @@ const baseSha = execFileSync("git", ["rev-parse", "HEAD~1"], { encoding: "utf8" 
 const headSha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 const accumulatedDiff = execFileSync("git", ["diff", "--no-ext-diff", "--no-textconv", "--binary", baseSha, headSha], { encoding: "utf8" });
 const record = { entry: "first-change", kind: "pr", id: "42", repository: "owner/repository", baseBranch: "main", headCommit: headSha };
+const derivedCheckpoint = { selectedEntry: { name: "first-change", records: [record] }, steps: [] };
 
 test("allows only a current exact derived pull request", () => {
   const result = checkOperationAuthorization({ authorization, runtime, config, request: {
-    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, evidenceCurrent: true, recovery: "re-read PR and checkpoint"
+    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, checkpoint: derivedCheckpoint, headCommit: headSha, evidenceCurrent: true, recovery: "re-read PR and checkpoint"
   } });
   assert.equal(result.allowed, true, JSON.stringify(result));
 });
@@ -30,7 +31,7 @@ test("allows only a current exact derived pull request", () => {
 test("rejects a lookalike queue entry and stale head", () => {
   for (const request of [{ selectedEntry: "other-change", headCommit: headSha }, { selectedEntry: "first-change", headCommit: "different" }, { selectedEntry: "first-change", headCommit: "" }]) {
     const result = checkOperationAuthorization({ authorization, runtime, request: {
-      profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", derivedRecord: record, evidenceCurrent: true, recovery: "recover", ...request
+      profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", derivedRecord: record, checkpoint: derivedCheckpoint, evidenceCurrent: true, recovery: "recover", ...request
     } });
     assert.equal(result.allowed, false);
   }
@@ -40,8 +41,8 @@ test("requires matching kinds for archive and merged-branch cleanup", () => {
   const base = { profile: "sdd-delivery", operation: "run-lifecycle-action", selectedEntry: "first-change", evidenceCurrent: true, recovery: "recover" };
   const change = { entry: "first-change", kind: "change", id: "first-change", repository: "owner/repository" };
   const branch = { entry: "first-change", kind: "branch", id: "feature/first-change", repository: "owner/repository", baseBranch: "main", headCommit: headSha };
-  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "archive-change", target: "change:first-change", derivedRecord: change } }).allowed, true);
-  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "delete-merged-topic-branch", target: "branch:feature/first-change", derivedRecord: branch, headCommit: headSha } }).allowed, true);
+  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "archive-change", target: "change:first-change", derivedRecord: change, checkpoint: { selectedEntry: { name: "first-change", records: [change] } } } }).allowed, true);
+  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "delete-merged-topic-branch", target: "branch:feature/first-change", derivedRecord: branch, checkpoint: { selectedEntry: { name: "first-change", records: [branch] } }, headCommit: headSha } }).allowed, true);
 });
 
 test("preserves exact target authorization without derived declarations", () => {
@@ -49,6 +50,7 @@ test("preserves exact target authorization without derived declarations", () => 
     profile: "research-read-only", operation: "read-source", target: "workspace:reports/source-record.md"
   } });
   assert.equal(result.allowed, true, JSON.stringify(result));
+  assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, evidenceCurrent: true, recovery: "recover" } }).issues[0]?.code, "derived-record-not-durable");
 });
 
 test("allows only explicitly public unauthenticated source reads", () => {
@@ -82,7 +84,7 @@ test("production-rapid delivery requires current independent review evidence", (
   assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: {
     profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, checkpoint, reviewRecordId: "review-1", independentReviewInput: { ...reviewInput, diff: "tampered" }, reviewRepositoryPath: repositoryPath, independentReviewEvidence: evidence
   } }).issues[0]?.code, "independent-review-diff-provenance-mismatch");
-  assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, evidenceCurrent: true, recovery: "recover", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, independentReviewInput: reviewInput, reviewRepositoryPath: repositoryPath, independentReviewEvidence: evidence } }).issues[0]?.code, "independent-review-evidence-not-durable");
+  assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, checkpoint: derivedCheckpoint, headCommit: headSha, baseCommit: baseSha, evidenceCurrent: true, recovery: "recover", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, independentReviewInput: reviewInput, reviewRepositoryPath: repositoryPath, independentReviewEvidence: evidence } }).issues[0]?.code, "independent-review-evidence-not-durable");
   const duplicateCheckpoint = { selectedEntry: { ...checkpoint.selectedEntry, reviewRecords: [...checkpoint.selectedEntry.reviewRecords, { ...checkpoint.selectedEntry.reviewRecords[0] }] }, steps: [] };
   assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, independentReviewInput: reviewInput, reviewRepositoryPath: repositoryPath, evidenceCurrent: true, recovery: "recover", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, checkpoint: duplicateCheckpoint, reviewRecordId: "review-1", independentReviewEvidence: evidence } }).issues[0]?.code, "independent-review-evidence-not-durable");
   assert.equal(checkOperationAuthorization({ authorization, runtime, config: { reviewRepositoryPath: "/wrong" }, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, independentReviewInput: reviewInput, reviewRepositoryPath: repositoryPath, evidenceCurrent: true, recovery: "recover", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, checkpoint, reviewRecordId: "review-1", independentReviewEvidence: evidence } }).issues[0]?.code, "independent-review-repository-mismatch");
