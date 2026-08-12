@@ -28,6 +28,34 @@ function targetMatches(authorized, requested) {
   return root.length > 0 && (target === root || target.startsWith(`${root}/`));
 }
 
+function derivedTargetMatches(authorization, request) {
+  const derived = authorization?.derivedTargets;
+  const entry = request?.selectedEntry;
+  const record = request?.derivedRecord;
+  if (!derived || !nonEmpty(entry) || !record || typeof record !== "object") return false;
+  if (!Array.isArray(derived.queue) || !derived.queue.includes(entry)) return false;
+  if (derived.selectedEntry !== entry || !nonEmpty(derived.repository)) return false;
+  if (!nonEmpty(record.kind) || !nonEmpty(record.id) || !nonEmpty(record.repository)) return false;
+  if (record.repository !== derived.repository || record.entry !== entry) return false;
+  if (request.target !== `${record.kind}:${record.id}`) return false;
+  if (record.kind === "branch" || record.kind === "pr") {
+    if (!nonEmpty(record.baseBranch) || !nonEmpty(record.headCommit)) return false;
+  }
+  if (request.lifecycleAction === "merge-pr" && record.kind !== "pr") return false;
+  if (request.lifecycleAction === "archive-change" && record.kind !== "change") return false;
+  if (request.lifecycleAction === "delete-merged-topic-branch" && record.kind !== "branch") return false;
+  if (request.evidenceCurrent !== true && highImpactLifecycleActions.has(request.lifecycleAction)) return false;
+  if (request.headCommit && request.headCommit !== record.headCommit) return false;
+  return true;
+}
+
+function publicSourceMatches(authorization, request) {
+  if (request.operation !== "read-source" || !nonEmpty(request.target)) return false;
+  if (request.requiresAuthentication === true || request.privateSource === true || request.executesSource === true) return false;
+  const scopes = authorization?.publicSourceScopes;
+  return Array.isArray(scopes) && scopes.some((scope) => nonEmpty(scope) && request.target.startsWith(scope));
+}
+
 function authorizationExpired(authorization, now) {
   const expiration = authorization?.expiresAt ?? authorization?.stoppingConditions?.expiresAt;
   if (!expiration) return false;
@@ -50,7 +78,10 @@ export function checkOperationAuthorization(input) {
   if (!operationVocabulary.has(operation)) return fail("unknown-operation", operation);
   if (!profileOperations[profile].has(operation)) return fail("operation-not-in-profile", operation);
   if (!authorization.allowedMutations?.includes(operation)) return fail("operation-not-authorized", operation);
-  if (!authorization.targets?.some((target) => targetMatches(target, request.target))) return fail("unauthorized-target", request.target);
+  const exactTarget = authorization.targets?.some((target) => targetMatches(target, request.target));
+  const derivedTarget = derivedTargetMatches(authorization, request);
+  const publicSource = publicSourceMatches(authorization, request);
+  if (!exactTarget && !derivedTarget && !publicSource) return fail("unauthorized-target", request.target);
   if (authorizationExpired(authorization, input.now)) return fail("expired-authorization");
   if (runtime.permissionGaps?.length || (Array.isArray(runtime.permittedOperations) && !runtime.permittedOperations.includes(operation))) return fail("runtime-permission-gap", operation);
   if (request.adapter && !authorization.targets?.includes(`adapter:${request.adapter}`)) return fail("unauthorized-adapter", request.adapter);
