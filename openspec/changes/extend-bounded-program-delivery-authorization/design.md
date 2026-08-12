@@ -50,14 +50,16 @@ outside the authorized workspace target.
 ### Validate independent review as immutable delivery evidence
 
 For `production-rapid`, an adapter first invokes a configured reviewer only
-with an immutable package: base and head SHAs, accumulated diff, relevant
+with an immutable package: canonical full base and head SHA object IDs,
+accumulated diff, relevant
 OpenSpec artifacts, and current validation evidence. The pure evaluator never
 spawns a process or mutates workspace/GitHub state; it requires the adapter to
 declare a non-interactive, isolated, read-only reviewer distinct from the
 implementing session. It rejects evidence lacking reviewer identity/type,
 execution and invocation references, timestamp, exact reviewed SHAs,
 findings, dispositions, a clear final status, or a deterministic manifest of
-that immutable input package.
+that immutable input package. It also requires a uniquely identified durable
+selected-entry review record that retains the transition and complete evidence.
 
 Any blocker or high `objective-fix` finding blocks delivery. A bounded,
 behavior-preserving fix reruns affected checks and produces new review evidence

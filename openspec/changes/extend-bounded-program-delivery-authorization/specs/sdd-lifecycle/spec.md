@@ -25,8 +25,9 @@ or conflicts with durable state.
 The lifecycle SHALL invoke and validate its configured independent-review
 channel after Apply and after every behavior-preserving objective fix before a
 `production-rapid` delivery transition. It MUST tie the review record to the
-exact base and current head, retain the reviewer execution record and finding
-dispositions durably with transition evidence, and pause on a material finding,
+exact full base and current head object IDs, retain the reviewer execution
+record and finding dispositions durably under a unique transition record, and
+pause on a material finding,
 three materially different fixes for one signature, or unavailable reviewer.
 
 #### Scenario: Rereview follows an objective fix

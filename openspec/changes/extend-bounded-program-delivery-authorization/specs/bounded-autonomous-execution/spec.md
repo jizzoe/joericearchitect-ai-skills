@@ -44,7 +44,8 @@ only within authorized workspace targets.
 The runner SHALL require a configured non-interactive reviewer in a separate,
 read-only execution context after Apply and after every behavior-preserving
 objective fix before it authorizes a `production-rapid` high-impact delivery
-transition. The reviewer input MUST contain only immutable base and head SHAs,
+transition. The reviewer input MUST contain only immutable canonical full base
+and head SHA object IDs,
 the accumulated diff, relevant OpenSpec artifacts, and current test or
 validation evidence; it MUST NOT contain the implementer's desired conclusion.
 The runner MUST reject self-review, unavailable reviewers, malformed evidence,
@@ -52,7 +53,7 @@ stale or wrong SHA evidence, and unresolved blocker or high `objective-fix`
 findings. It MUST record reviewer type and identity, execution and invocation
 references, reviewed SHAs, timestamp, findings, dispositions, and final status.
 The evidence MUST bind to a deterministic manifest of the immutable review
-input package.
+input package and a uniquely identified durable transition review record.
 GitHub review publication MAY supplement but MUST NOT replace this evidence.
 
 #### Scenario: Clean independent review authorizes exact-head delivery

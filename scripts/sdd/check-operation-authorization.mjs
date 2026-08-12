@@ -18,6 +18,7 @@ const lifecycleTargetPrefixes = {
 };
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
+function commitReference(value) { return typeof value === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value); }
 function fail(code, detail) { return { allowed: false, classification: "paused", issues: [{ code, ...(detail ? { detail } : {}) }] }; }
 
 function targetMatches(authorized, requested) {
@@ -40,8 +41,8 @@ function derivedTargetMatches(authorization, request) {
   if (record.repository !== derived.repository || record.entry !== entry) return false;
   if (request.target !== `${record.kind}:${record.id}`) return false;
   if (record.kind === "branch" || record.kind === "pr") {
-    if (!nonEmpty(record.baseBranch) || !nonEmpty(record.headCommit)) return false;
-    if (!nonEmpty(request.headCommit) || request.headCommit !== record.headCommit) return false;
+    if (!nonEmpty(record.baseBranch) || !commitReference(record.headCommit)) return false;
+    if (!commitReference(request.headCommit) || request.headCommit !== record.headCommit) return false;
   }
   if (request.lifecycleAction === "merge-pr" && record.kind !== "pr") return false;
   if (request.lifecycleAction === "archive-change" && record.kind !== "change") return false;
@@ -71,6 +72,14 @@ function adapterAllows(config, runtime, adapterName, operation) {
   return Array.isArray(capabilities) && capabilities.includes(operation);
 }
 
+function durableReviewMatches(request) {
+  const entry = request.checkpoint?.selectedEntry;
+  const record = entry?.reviewRecords?.find((candidate) => candidate.id === request.reviewRecordId);
+  if (!record || entry.name !== request.selectedEntry || record.entry !== request.selectedEntry ||
+      record.transition !== request.lifecycleAction || !record.evidence) return false;
+  return JSON.stringify(record.evidence) === JSON.stringify(request.independentReviewEvidence);
+}
+
 export function checkOperationAuthorization(input) {
   const { authorization = {}, runtime = {}, config = {}, request = {} } = input;
   const profile = request.profile;
@@ -98,6 +107,7 @@ export function checkOperationAuthorization(input) {
       const reviewInput = request.independentReviewInput;
       const manifest = immutableReviewManifest(reviewInput);
       if (!manifest || reviewInput.baseCommit !== request.baseCommit || reviewInput.headCommit !== request.headCommit) return fail("independent-review-input-incomplete");
+      if (!durableReviewMatches(request)) return fail("independent-review-evidence-not-durable");
       const review = validateIndependentReviewEvidence({ reviewer: request.reviewer, implementerSession: request.implementerSession, expectedBase: request.baseCommit, expectedHead: request.headCommit, expectedReviewManifest: manifest, evidence: request.independentReviewEvidence });
       if (!review.allowed) return review;
     }
