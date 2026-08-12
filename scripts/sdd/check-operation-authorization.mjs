@@ -112,6 +112,15 @@ function durableReviewMatches(request) {
   return JSON.stringify(record.evidence) === JSON.stringify(request.independentReviewEvidence);
 }
 
+function durableApplyEvidenceMatches(request) {
+  const records = request.checkpoint?.selectedEntry?.applyEvidenceRecords;
+  const supplied = request.applyEvidence;
+  if (!Array.isArray(records) || !supplied || typeof supplied !== "object") return false;
+  const matches = records.filter((candidate) => candidate?.reference === supplied.reference);
+  return matches.length === 1 && JSON.stringify(matches[0]) === JSON.stringify(supplied) &&
+    supplied.current === true && supplied.headCommit === request.headCommit;
+}
+
 function configuredReviewer(config, requested) {
   const reviewer = config?.independentReviewer;
   const attestation = reviewer?.attestation;
@@ -168,6 +177,7 @@ export function checkOperationAuthorization(input) {
       const reviewInput = request.independentReviewInput;
       const manifest = immutableReviewManifest(reviewInput);
       if (!manifest || reviewInput.baseCommit !== request.baseCommit || reviewInput.headCommit !== request.headCommit) return fail("independent-review-input-incomplete");
+      if (!durableApplyEvidenceMatches(request)) return fail("independent-review-apply-evidence-not-durable");
       if (JSON.stringify(reviewInput.openspecArtifacts) !== JSON.stringify(config.requiredOpenSpecArtifacts) ||
           JSON.stringify(reviewInput.validationEvidence) !== JSON.stringify(request.applyEvidence?.validationEvidence)) return fail("independent-review-input-evidence-mismatch");
       if (!nonEmpty(config.reviewRepositoryPath) || request.reviewRepositoryPath !== config.reviewRepositoryPath) return fail("independent-review-repository-mismatch");

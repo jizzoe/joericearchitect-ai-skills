@@ -76,7 +76,8 @@ ordered transition; a later durable record does not permit skipping prior work.
 The production reviewer package uses the configured relevant OpenSpec artifact
 identity list and the exact durable current Apply validation-evidence list. Its
 evidence references an Apply completion record for the reviewed head and has a
-timestamp no earlier than that completion.
+timestamp no earlier than that completion. The checkpoint owns that uniquely
+identified Apply record; a request-supplied lookalike is rejected.
 The delivery evaluator matches reviewer type and identity to a configured
 reviewer with adapter-attested non-interactive, isolated, read-only capability;
 request flags do not create reviewer authority. It resolves each supplied

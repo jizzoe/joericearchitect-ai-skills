@@ -42,12 +42,30 @@ function invalidReviewRecord(input) {
   return null;
 }
 
+function invalidApplyEvidenceRecord(input) {
+  const entry = input.selectedEntry;
+  if (!entry || entry.applyEvidenceRecords === undefined) return null;
+  if (!Array.isArray(entry.applyEvidenceRecords)) return "selected-entry-invalid-apply-evidence-records";
+  const seen = new Set();
+  for (const evidence of entry.applyEvidenceRecords) {
+    if (!evidence || typeof evidence.reference !== "string" || !evidence.reference || seen.has(evidence.reference) ||
+        evidence.current !== true || !commitReference(evidence.headCommit) ||
+        typeof evidence.completedAt !== "string" || Number.isNaN(Date.parse(evidence.completedAt)) ||
+        !Array.isArray(evidence.validationEvidence) || evidence.validationEvidence.length === 0 ||
+        !evidence.validationEvidence.every((item) => typeof item === "string" && item.trim())) return "invalid-apply-evidence-record";
+    seen.add(evidence.reference);
+  }
+  return null;
+}
+
 export function inspectCheckpoint(input) {
   const steps = input.steps ?? [];
   const recordIssue = invalidDerivedRecord(input);
   if (recordIssue) return { classification: "human-decision", firstIncomplete: null, reason: recordIssue };
   const reviewIssue = invalidReviewRecord(input);
   if (reviewIssue) return { classification: "human-decision", firstIncomplete: null, reason: reviewIssue };
+  const applyEvidenceIssue = invalidApplyEvidenceRecord(input);
+  if (applyEvidenceIssue) return { classification: "human-decision", firstIncomplete: null, reason: applyEvidenceIssue };
 
   const conflict = steps.find((step) => step.durableConflict === true);
   if (conflict) {
