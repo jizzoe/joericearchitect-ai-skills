@@ -1,0 +1,18 @@
+schema_version: 1
+openspec:
+  change: add-base-skill-authoring
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 76
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/76
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - openspec/changes/add-base-skill-authoring/
+      - skills/base/base-skill-authoring/
+      - evals/skills/base-skill-authoring/
+      - .agents/skills/base-skill-authoring/
+      - .claude/skills/base-skill-authoring/
