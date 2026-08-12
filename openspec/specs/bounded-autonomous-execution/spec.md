@@ -11,7 +11,11 @@ human control over material or destructive decisions.
 The runner SHALL require explicit run authorization that identifies the intended
 objective, allowed work selection policy, allowed mutation classes, forbidden
 actions, expiration or stopping conditions, and evidence required for
-completion.
+completion. Before each action, a deterministic operation checker SHALL also
+confirm that the action is in the named fixed profile allowlist, explicitly
+present in `allowedMutations`, targets an authorized workspace path, record, or
+configured adapter, and is permitted by both the configured adapter capability
+and active runtime permission.
 
 #### Scenario: Authorization is sufficient
 - **WHEN** a run authorization names the target repository, work queue or
@@ -31,6 +35,13 @@ completion.
   policy, tool access, or credential scope does not permit
 - **THEN** the runner reports the permission gap and a safe resume path without
   weakening sandbox, approval, credential, or repository controls
+
+#### Scenario: An operation fails an additional deterministic boundary
+- **WHEN** an action is outside the active profile allowlist, omitted from
+  `allowedMutations`, targets an unauthorized resource, lacks the configured
+  adapter capability, or has expired authorization
+- **THEN** the runner pauses before the action and reports the failed boundary
+  and safe resume requirement
 
 ### Requirement: Work selection is deterministic and dependency-aware
 The runner SHALL select work from either an explicitly ordered queue or a
@@ -79,12 +90,15 @@ evidence.
 ### Requirement: Objective corrections are bounded
 The runner SHALL automatically correct objective, narrowly scoped,
 behavior-preserving failures and SHALL stop after no more than three materially
-different correction attempts for the same failure signature.
+different correction attempts for the same failure signature. Each correction
+MUST separately pass the active profile, allowed-mutation, target, adapter, and
+runtime-permission checks before execution.
 
 #### Scenario: Objective failure has a scoped correction
 - **WHEN** formatting, lint, type, schema, deterministic test, link, generated
   exposure, stale fixture, secret-like fixture, or narrow review failure has an
-  evidence-backed behavior-preserving fix
+  evidence-backed behavior-preserving fix and the correction passes all active
+  operation checks
 - **THEN** the runner applies the correction, reruns every affected check, and
   records the correction evidence
 
@@ -150,7 +164,13 @@ exhausted correction-budget decisions.
 ### Requirement: External mutations stay inside authorized boundaries
 The runner SHALL perform external mutations only when the target, mutation
 class, preconditions, recovery behavior, and evidence are covered by the active
-authorization.
+authorization. First-release profiles MUST pause external send, calendar update,
+submission, release, and deployment even when another authorization field names
+them. The `sdd-delivery` profile MAY perform the named `merge-pr`,
+`archive-change`, or `delete-merged-topic-branch` operation without another
+routine prompt only when the active bounded authorization explicitly names that
+exact transition, target, evidence, recovery behavior, and expiration, and
+every existing lifecycle, adapter-capability, and runtime-permission gate passes.
 
 #### Scenario: Expected mutation is authorized
 - **WHEN** an issue, Project, branch, pull request, merge, Sync, Archive, or
@@ -169,6 +189,26 @@ authorization.
   completion
 - **THEN** the runner converges to the existing intended state without creating
   duplicates or losing human-authored content
+
+#### Scenario: A first-release profile requests a reserved action
+- **WHEN** a run requests external send, calendar update, submission, release,
+  deployment, a generic merge/archive/deletion, or a named SDD high-impact
+  transition outside the `sdd-delivery` profile
+- **THEN** the operation checker pauses and requires separate explicit
+  authorization under a later policy
+
+#### Scenario: An exact SDD delivery transition is authorized
+- **WHEN** `sdd-delivery` requests the named `merge-pr`, `archive-change`, or
+  `delete-merged-topic-branch` transition and the bounded authorization, exact
+  target, lifecycle evidence, recovery behavior, expiration, adapter capability,
+  and runtime permission all match
+- **THEN** the runner performs that transition without another routine prompt
+  and records its resulting evidence
+
+#### Scenario: An SDD delivery transition lacks an exact boundary
+- **WHEN** `sdd-delivery` requests a high-impact transition without any required
+  exact authorization or objective gate
+- **THEN** the runner pauses before mutation and reports the unmet boundary
 
 ### Requirement: Checkpoints are durable and idempotent
 The runner SHALL derive resume state from authoritative Git, OpenSpec, GitHub,
