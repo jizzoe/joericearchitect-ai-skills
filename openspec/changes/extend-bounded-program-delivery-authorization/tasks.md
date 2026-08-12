@@ -45,7 +45,7 @@
   and portability cases.
   Depends on: 3.1.
   Evidence: focused Node suite passes all named cases.
-- [ ] 3.4 Run amended full-scope review, focused tests, repository validators,
+- [x] 3.4 Run amended full-scope review, focused tests, repository validators,
   strict OpenSpec validation, and Verify preparation.
   Depends on: 3.2 and 3.3.
   Evidence: current exact-head evidence has no blocker or high objective-fix
