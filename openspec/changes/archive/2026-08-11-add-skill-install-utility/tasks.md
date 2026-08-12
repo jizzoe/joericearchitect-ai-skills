@@ -57,7 +57,7 @@
   - Depends on: 4.1.
   - Evidence: all commands pass, or blocked external behavior removes the
     corresponding support claim.
-- [ ] 4.3 Complete formal Verify, delivery, Sync, and Archive as separately
+- [x] 4.3 Complete formal Verify, delivery, Sync, and Archive as separately
   authorized lifecycle checkpoints.
   - Depends on: 4.2.
   - Evidence: verification maps requirements to objective tests; delivery links
