@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "skill": "example-skill",
+  "status": "completed",
+  "mode": "interactive",
+  "summary": "Unknown property fixture.",
+  "artifacts": [],
+  "evidence": [],
+  "assumptions": [],
+  "openQuestions": [],
+  "nextAction": { "kind": "none", "description": "Done." },
+  "unexpected": true
+}

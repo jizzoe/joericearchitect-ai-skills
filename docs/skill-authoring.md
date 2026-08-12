@@ -28,3 +28,27 @@ Validate canonical metadata before review:
 node scripts/validation/validate-skill-metadata.mjs
 node --test scripts/validation/test/skill-metadata.test.mjs
 ```
+
+Every canonical skill also ends with exactly this shared-policy reference:
+
+```markdown
+## Guardrails
+
+See [Shared guardrails](../_shared/guardrails.md).
+```
+
+Do not copy the shared policy into a skill. The dynamic validator rejects a
+missing, malformed, duplicate, broken, or copied guardrail section:
+
+```bash
+node scripts/validation/validate-shared-guardrails.mjs
+```
+
+New reusable skills return `skill-result-v1` and may consume the optional
+`config/ai-skills.json` contract. Use workspace-relative paths only, reject
+unsupported versions and unknown keys, and require explicit destinations when
+the optional configuration is absent. Validate synthetic inputs with:
+
+```bash
+node --test evals/skills/base-skill-contracts/run-fixtures.test.mjs
+```

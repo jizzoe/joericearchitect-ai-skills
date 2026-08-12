@@ -79,8 +79,11 @@ expiration, validations, recovery, and forbidden actions. No profile is a
 standing permission or permission to weaken the runtime sandbox.
 
 Final application submission, external communication, calendar mutation,
-credential/OTP handling, sensitive self-identification, destructive action,
-and unreviewed scope expansion remain outside these profiles.
+credential/OTP handling, sensitive self-identification, and unreviewed scope
+expansion remain outside these profiles. Destructive action also remains
+outside them except for the foundation's exact, time-bounded,
+evidence-gated `delete-merged-topic-branch` delivery exception; that exception
+never applies to a generic deletion or to other destructive actions.
 
 ## Asset and Configuration Design
 

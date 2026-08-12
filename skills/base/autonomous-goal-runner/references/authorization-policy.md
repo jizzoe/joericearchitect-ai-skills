@@ -49,6 +49,25 @@ targets, verify:
 Reruns must converge to the intended state without duplicate records or loss
 of human-authored content.
 
+## Operation and Delivery Approval Checks
+
+Before each autonomous operation, use the deterministic operation checker. It
+requires a fixed profile allowlist, an explicit `allowedMutations` entry, an
+authorized target, configured adapter capability when an adapter is used, and
+active runtime permission. A correction still stops after three materially
+different attempts for the same failure signature.
+
+External send, calendar updates, submissions, releases, and deployments pause
+in every first-release profile. `sdd-delivery` may perform only the named
+`merge-pr`, `archive-change`, or `delete-merged-topic-branch` transition
+without another routine prompt when the authorization names the exact target,
+evidence, recovery behavior, and expiration and every lifecycle gate passes.
+
+Interactive `production-rapid` work requests a just-in-time approval for those
+three transitions. An interactive `prototype-rapid` delivery may instead use a
+recorded, exact, time-bounded one-change preapproval; it is not a standing
+grant and is not an autonomous-runner invocation.
+
 ## Always Forbidden Without Separate Explicit Approval
 
 - repository deletion

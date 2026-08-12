@@ -1,6 +1,6 @@
 # Global Skill Master Inventory
 
-Date: 2026-08-11
+Date: 2026-08-12
 
 ## Scope and Reading Method
 
@@ -40,6 +40,38 @@ they deserve a separate trigger.
 | J5 | `/Users/joerice/Library/CloudStorage/GoogleDrive-jizzoerice@gmail.com/My Drive/2026/job-search/master-job-search-checklist.md` |
 | J6 | `/Users/joerice/Library/CloudStorage/GoogleDrive-jizzoerice@gmail.com/My Drive/2026/job-search/research/automation-apps-connectivity/handoff-job-search-automation.md` |
 | J7 | `/Users/joerice/Library/CloudStorage/GoogleDrive-jizzoerice@gmail.com/My Drive/2026/job-search/research/automation-apps-connectivity/convo-with-claude-job-search-automation.txt` |
+| S9 | `ai-planning/research/github-issues.md` |
+| S10 | `ai-planning/research/sdlc-skills-repo-review.md` |
+| S11 | `ai-planning/research/skills/github-research-job-search-and-sdlc-skills.md` |
+
+## Public Repository Reference Key
+
+The repository references below are source material to study and selectively
+adapt, not dependencies or content to copy wholesale. Before implementation,
+verify license, maintenance, version claims, platform fit, and security of any
+scripts or hooks. A **pattern-only** reference provides reusable skill or
+workflow structure but is not evidence of domain-specific coverage.
+
+| Key | Public repository | Best-supported use |
+|---|---|---|
+| R1 | [`anthropics/skills`](https://github.com/anthropics/skills) | `SKILL.md` shape, skill authoring, MCP, document workflows, frontend and web-app testing patterns. |
+| R2 | [`assafkip/research-mode`](https://github.com/assafkip/research-mode) | Grounded research and citation discipline. |
+| R3 | [`Pinperepette/grounded`](https://github.com/Pinperepette/grounded) | Guardrails, stale-assumption detection, and repeated-failure controls. |
+| R4 | [`awesome-skills/code-review-skill`](https://github.com/awesome-skills/code-review-skill) | Base review phases, severity taxonomy, and language-specific progressive disclosure. |
+| R5 | [`spartan-stratos/spartan-ai-toolkit`](https://github.com/spartan-stratos/spartan-ai-toolkit) | Quality gates, stack profiles, CI/CD, browser QA, and Terraform review. |
+| R6 | [`microsoft/win-dev-skills`](https://github.com/microsoft/win-dev-skills) | Review-only and cross-assistant plugin packaging patterns. |
+| R7 | [`affaan-m/everything-claude-code`](https://github.com/affaan-m/everything-claude-code) | Coding standards, verification, TDD, security review, and harness patterns. |
+| R8 | [`binyamineden/claude-combine`](https://github.com/binyamineden/claude-combine) | Planning, debugging, worktree, review, and verification workflow patterns. |
+| R9 | [`sethdford/claude-skills`](https://github.com/sethdford/claude-skills) | Standards-grounded SDLC taxonomy, threat modeling, QA, and defect triage. |
+| R10 | [`rrezartprebreza/spring-boot-skills`](https://github.com/rrezartprebreza/spring-boot-skills) | Java/Spring Boot conventions, architecture, persistence, security, testing, and AI failure modes. |
+| R11 | [`jdubois/dr-jskill`](https://github.com/jdubois/dr-jskill) | Opinionated end-to-end Spring Boot generation and version-manifest patterns. |
+| R12 | [`Jeffallan/claude-skills`](https://github.com/Jeffallan/claude-skills) | Java/Spring overlays tied to Maven/JaCoCo verification commands. |
+| R13 | [`piomin/claude-ai-spring-boot`](https://github.com/piomin/claude-ai-spring-boot) | Java code-quality/review, JPA, logging, and Spring Boot starter composition. |
+| R14 | [`mindrally/skills`](https://github.com/mindrally/skills) | Broad technology checklist discovery; raw material only. |
+| R15 | [`SpillwaveSolutions/mastering-typescript-skill`](https://github.com/SpillwaveSolutions/mastering-typescript-skill) | TypeScript strictness, Zod contracts, and React/NestJS split patterns. |
+| R16 | [`metabase/metabase`](https://github.com/metabase/metabase) | Production TypeScript write/review and E2E testing patterns. |
+| R17 | [`theaayushstha1/job-applier-agent`](https://github.com/theaayushstha1/job-applier-agent), [`neonwatty/job-apply-plugin`](https://github.com/neonwatty/job-apply-plugin), [`MadsLorentzen/ai-job-search`](https://github.com/MadsLorentzen/ai-job-search), [`proficientlyjobs/proficiently-claude-skills`](https://github.com/proficientlyjobs/proficiently-claude-skills) | Supervised job-search, fit, application, and tracking workflow patterns. |
+| R18 | [`aiagentwithdhruv/skills`](https://github.com/aiagentwithdhruv/skills) | Lead discovery, browser automation, and outreach-adjacent patterns. |
 
 ## Research, Planning, and Skill Authoring
 
@@ -124,6 +156,59 @@ they deserve a separate trigger.
 | `adr-authoring` | Captures architecture decisions and alternatives. | Preserve decision context in durable records. | S4 | Mentioned only as deferred; distinguish from `design-brief-from-research`. |
 | `stack-review` | Assesses a technology stack against project constraints. | Make architecture/tool choices explicit and defensible. | S4 | Mentioned only as deferred; overlaps with research-to-prototype planning. |
 | `mcp-design` | Designs MCP/connector integrations. | Define tool, auth, data, and safety boundaries for new integrations. | S4, S5 | Needs a clear split from `base-mcp-workflow`, which governs operation of an existing integration. |
+
+## Language, Infrastructure, and Triage Candidates
+
+These candidates close gaps exposed by the SDLC repository review and the
+GitHub-planning research. They are not part of the current base-skill design
+briefs and need their own design work after the shared base-review and
+guardrail foundations are implemented. “Research gap” means that a public
+repository may be useful for portable skill structure, but this inventory has
+not yet identified and reviewed a direct domain-specific skill source.
+
+| Skill name | Summary | Purpose | Sources | Public repository references | Notes |
+|---|---|---|---|---|---|
+| `java-spring-review` | Reviews Java and Spring Boot changes for language, framework, persistence, security, API, transaction, test, and build hazards. | Provide a stack overlay for `base-code-review`; it does not replace repository-specific conventions. | S10, S11 | R10, R12, R13 | Direct, detailed public sources exist. R10 is the primary reference; use R12/R13 for evidence-bound review and code-quality patterns. |
+| `typescript-javascript-review` | Reviews TypeScript and JavaScript changes for strict typing, unsafe `any`, async/error behavior, API-contract drift, test gaps, and framework-specific risks. | Provide a stack overlay for `base-code-review`. | S10, S11 | R15, R16, R4 | Direct TypeScript sources exist. JavaScript-specific rules require a separate decision so JavaScript is not incorrectly held to TypeScript-only checks. |
+| `react-web-review` | Reviews React web changes for component boundaries, state/effect behavior, accessibility, performance, type safety, and browser-test evidence. | Add a React overlay that composes the base and TypeScript/JavaScript reviews. | S10 | R15, R1, R4 | R15 contains React integration patterns; R1 and R4 supply portable frontend/test and review structure. No React-focused review skill has been independently vetted yet. |
+| `python-review` | Reviews Python changes for correctness, typing, package/toolchain conventions, dependency risks, tests, and framework-specific hazards. | Add a Python overlay that composes `base-code-review`. | S10 | R4, R9 (pattern-only) | **Research gap:** the reviewed material contains broad review/taxonomy patterns, not a vetted Python-specific skill. Research direct Python sources before design. |
+| `react-native-review` | Reviews React Native changes for component/state behavior, native boundaries, platform differences, accessibility, performance, and device-test evidence. | Add a mobile overlay without assuming Expo or a particular backend. | H1, S10 | R1, R4 (pattern-only) | **Research gap:** React Native is explicitly not part of the generic architecture planner. No direct React Native skill source has been identified. |
+| `expo-review` | Reviews Expo-managed application changes for SDK compatibility, native module/configuration boundaries, permissions, builds, updates, and device-test evidence. | Add an Expo-specific layer above `react-native-review` only when Expo is selected. | S10 | R1 (pattern-only) | **Research gap:** no Expo-specific public skill source was identified. Keep separate from React Native because it has distinct SDK, config, build, and update behavior. |
+| `terraform-review` | Reviews Terraform changes for plan safety, provider/module behavior, state impact, IAM/security, drift, and validation evidence. | Add an infrastructure-as-code overlay to `base-code-review`. | S10 | R5 | Direct candidate source exists, but its content must be reviewed for provider/version assumptions before adaptation. |
+| `aws-infrastructure-review` | Reviews AWS infrastructure changes for IAM, network, encryption, observability, cost, resilience, service limits, and deployment evidence. | Add an AWS overlay that can compose Terraform, application, and operational reviews. | S10 | R5, R9 (pattern-only) | **Research gap:** no vetted AWS-specific skill source was identified. Do not treat a generic Terraform review as adequate AWS service/security guidance. |
+| `github-bug-triage` | Classifies reproducibility, severity, duplicates, evidence, and whether reported behavior is already specified. | Turn incoming bugs into evidence-backed, actionable work without silently mutating GitHub. | S9 | R9, R4 (pattern-only) | Detailed internal concept exists; R9 supplies defect-triage taxonomy, but no GitHub-specific public triage implementation is yet vetted. |
+| `github-issue-decomposition` | Recommends whether a concern becomes OpenSpec tasks or independently deliverable linked issues. | Keep issue scope, dependencies, and implementation sequencing understandable. | S9 | R8, R9 (pattern-only) | Must compose with the implemented GitHub/OpenSpec skills instead of duplicating their mutations. |
+| `github-backlog-grooming` | Finds stale, duplicate, blocked, underspecified, or misclassified work and proposes evidence-backed updates. | Maintain a reliable backlog while keeping mutations previewed and authorized. | S9 | R9 (pattern-only) | No direct public GitHub-backlog skill was identified in reviewed sources. |
+| `github-duplicate-detection` | Searches open and closed issues for materially similar work before feature or bug intake. | Avoid duplicate work and preserve prior decisions. | S9 | R9 (pattern-only) | Needs a future decision on similarity evidence and human resolution of ambiguous matches. |
+| `github-dependency-mapping` | Creates or validates blocked-by relationships and identifies critical sequencing. | Make delivery dependencies visible and support safe work selection. | S9 | R8, R9 (pattern-only) | Closely related to `sdd-dependency-planning`; decide whether this is an adapter/module rather than a separate trigger. |
+| `github-project-status-audit` | Compares issue, PR, OpenSpec, and Project state, then reports or explicitly repairs drift. | Keep work tracking convergent and evidence-backed. | S9 | R8, R9 (pattern-only) | Overlaps with implemented `openspec-github-sync` and `project-pr-status-sync`; define composition before proposing it. |
+| `terraform-issue-triage` | Classifies Terraform incidents and defects by reproducibility, affected state/environment, plan safety, provider/module scope, severity, and required evidence. | Give infrastructure reports a safe, domain-aware intake path before remediation. | S9, S10 | R5 | Extends generic GitHub bug triage with Terraform context. No dedicated Terraform triage source was identified. |
+| `aws-issue-triage` | Classifies AWS incidents and defects by affected account/environment/service, blast radius, IAM/security exposure, cost, observability, reproducibility, and evidence. | Give AWS reports a safe, domain-aware intake path before remediation. | S9, S10 | R5, R9 (pattern-only) | **Research gap:** no AWS-specific triage source was identified. Require an AWS-focused research pass before design. |
+
+## Public Repository References for Existing Candidates
+
+This section provides at least one reusable public reference for every existing
+inventory row. References are grouped only for readability; each listed skill
+is covered by the repositories in its row. “Pattern-only” carries the same
+meaning defined above and must not be treated as a complete domain contract.
+
+| Existing inventory skills | Public repository references | Reference use and limits |
+|---|---|---|
+| `research-topic-workflow`; `design-brief-from-research`; `base-grounded-research` | R2, R3, R1 | Grounded research discipline, uncertainty, skill structure, and eval patterns. |
+| `research-to-prototype-architecture-planner`; `artifact-currency-and-handoff-audit`; `nonprofit-technology-cost-and-ownership-research`; `stack-review` | R1, R8, R9 (pattern-only) | Planning, architecture, handoff, and decision-record patterns. Direct nonprofit/cost-ownership sources have not been identified. |
+| `skill-authoring-security-review`; `base-skill-authoring`; `base-guardrails` | R1, R3, R7 | Canonical skill authoring plus guardrail/harness patterns; audit bundled scripts/hooks before use. |
+| `base-document-workflow` | R1 | Official document-workflow and skill-composition reference. |
+| `base-code-review`; `generic-code-review`; `pr-review-comment-remediation` | R4, R5, R6 | Review phases/severity, gated remediation, and review-only cross-assistant patterns. |
+| `base-verification-loop`; `debugging`; `tdd` | R5, R7, R8 | Quality gates, verification, debugging, and TDD workflow patterns. |
+| `base-mcp-workflow`; `mcp-design` | R1, R7 | MCP-builder and MCP-server workflow patterns; do not inherit connector credentials or product constants. |
+| `threat-modeling`; `adr-authoring` | R9, R7 | Standards/taxonomy and security workflow patterns; verify cited standards before adoption. |
+| `sdd-product-bootstrap`; `sdd-requirements-to-plan`; `sdd-dependency-planning`; `sdd-change-readiness-review`; `sdd-verification-and-closeout`; `spec-workflows` | R1, R5, R8, R9 (pattern-only) | Plan, gate, dependency, and verification patterns. OpenSpec-specific semantics remain repository-owned. |
+| `github-sdd-project-bootstrap`; `github-issue-authoring`; `github-issue-to-openspec`; `openspec-github-sync`; `github-pr-linkage`; `sdd-project-navigation`; `sdd-change-switching`; `openspec-action-context`; `sdd-session-handoff` | R8, R9, R12 (pattern-only) | Workflow, planning, and GitHub/Atlassian integration patterns. The current canonical skills remain the authoritative implementation sources. |
+| `git-change-inspection`; `git-topic-branch-management`; `dirty-worktree-to-topic-branch`; `git-commit-authoring`; `git-topic-branch-cleanup` | R8, R7 | Worktree, planning, coding-standards, and verification patterns. Preserve repository-specific Git safety rules. |
+| `github-pr-authoring`; `github-pr-readiness`; `github-squash-merge`; `github-ruleset-audit`; `github-lifecycle-audit` | R5, R6, R8 | Quality-gate, PR review, and lifecycle workflow patterns; no reference permits autonomous merge without explicit authorization. |
+| `github-actions-workflow-authoring`; `github-actions-security-review`; `github-actions-run-diagnostics` | R5, R7, R9 | CI/CD, security, and diagnosis patterns. Review every workflow for token and untrusted-input boundaries. |
+| `github-release-readiness`; `github-release-publishing`; `github-environment-audit`; `github-deployment-promotion`; `github-artifact-provenance` | R5, R7, R9 (pattern-only) | CI/CD and supply-chain patterns. Direct release/deployment skills were not independently reviewed, so release policy remains a prerequisite. |
+| `job-search-post-review`; `linkedin-job-lead-intake`; `gmail-job-lead-intake`; `supervised-job-application-assistance`; `job-application-fit-and-preparation` | R17, R18 | Direct job-search/application and lead-intake references. Preserve the inventory's human approval, privacy, credential, and final-submission limits. |
 
 ## Reconciliation Notes and Next Planning Step
 

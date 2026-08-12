@@ -42,9 +42,12 @@ until the corresponding explicit authorization is received.
 - Autonomous execution reuses the existing `autonomous-goal-runner`
   authorization object. The foundation adds deterministic profile/operation,
   target, adapter-capability, and runtime-permission checks.
-- First-release autonomous profiles do not authorize external send, calendar
-  updates, submissions, merges, releases, deployment, archive, or branch
-  deletion.
+- First-release profiles do not authorize external send, calendar updates,
+  submissions, releases, or deployments. Merge, OpenSpec Archive, and
+  merged-topic-branch deletion require a just-in-time approval by default;
+  they may proceed without a routine prompt only for an exact,
+  time-bounded, evidence-gated bounded-autonomous authorization or selected
+  `prototype-rapid` one-change delivery preapproval.
 - Existing autonomous correction policy remains: no more than three materially
   different behavior-preserving corrections per failure signature.
 

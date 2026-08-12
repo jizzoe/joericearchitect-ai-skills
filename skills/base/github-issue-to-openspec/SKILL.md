@@ -30,3 +30,7 @@ OpenSpec change and tracking metadata.
 - Do not create partial artifacts when required issue data is missing.
 - Do not duplicate OpenSpec artifact generation logic beyond minimal scaffold
   paths and tracking metadata.
+
+## Guardrails
+
+See [Shared guardrails](../_shared/guardrails.md).

@@ -51,14 +51,19 @@ Every user-invoked base or domain skill must support two execution modes:
 
 | Mode | Behavior |
 |---|---|
-| Interactive | The default. The skill requests approval at each mutation or human-decision gate defined by its contract. |
+| Interactive | The default. The skill requests approval at each mutation or human-decision gate defined by its contract; interactive `production-rapid` delivery always requests a just-in-time approval for PR merge, merged-topic-branch deletion, and OpenSpec Archive after their gates pass. |
 | Bounded autonomous | Opt-in for one named run. The skill continues through only the actions explicitly preapproved in the run authorization and pauses for everything else. |
 
 Autonomous mode reduces routine approval prompts; it does not grant unlimited
 authority. It reuses the existing `autonomous-goal-runner` authorization model
 and must never weaken runtime sandbox, connector scopes, platform permissions,
 or evidence gates. A skill may be invoked in autonomous mode only when the
-required contract is complete.
+required contract is complete. Execution mode and delivery profile are
+independent: an exact, time-bounded delivery authorization may suppress the
+routine prompt for merge, merged-topic-branch deletion, or OpenSpec Archive in
+either a bounded autonomous run or an explicitly selected `prototype-rapid`
+one-change delivery; the same gates still apply, and no profile itself grants
+standing authority.
 
 ### Required Autonomous Authorization Contract
 
@@ -137,7 +142,7 @@ the particular run.
 | `research-read-only` | Approved source reads, source evaluation, findings/sources creation in the named destination, and state notifications. | Routine source reads and local findings writes. | New source systems requiring authentication, unclear source authority, sensitive data, or any external write. |
 | `local-implementation` | Scoped local code/docs/tests/fixtures, deterministic checks, and objective corrective work. | Routine local writes and behavior-preserving fixes within the path allowlist. | Material behavior/design decisions, dependency conflicts, destructive cleanup, credential/configuration changes, and exhausted correction budget. |
 | `tracker-maintenance` | Duplicate-safe upserts, status/evidence recording, dated backup creation, reconciliation reports, and notifications for one named tracker. | Field-allowlisted, idempotent record updates that pass backup and post-write checks. | New fields/schema changes, bulk destructive changes, ambiguous duplicate resolution, any sensitive field, or a failed integrity check. |
-| `sdd-delivery` | Explicitly named issue/branch/commit/draft-PR/Project operations and lifecycle steps already permitted by existing SDD policy. | Routine delivery mechanics against the exact authorized repository and records. | Merge, release, deployment, archive, branch deletion, unexpected target, or any action not covered by the named SDD authorization. |
+| `sdd-delivery` | Explicitly named issue/branch/commit/draft-PR/Project operations and lifecycle steps already permitted by existing SDD policy. | Routine delivery mechanics against the exact authorized repository and records; an exact authorization may include `merge-pr`, `archive-change`, and `delete-merged-topic-branch` after their lifecycle gates pass. | External send, calendar update, submission, release, deployment, generic merge/archive/deletion, unexpected target, incomplete evidence, or any action not covered by the named authorization. |
 
 The safe override is only the repeated approval prompt for an action already
 bounded by the active profile. It does not override a mandatory human decision,
@@ -446,6 +451,13 @@ and scalability requirements; use local/manual recovery; and defer automation
 that needs production-grade operations. Do not defer input validation for the
 critical flow, authorization rules, secret/PII handling, mutation recovery, or
 evidence that the chosen slice works.
+
+For delivery, `prototype-rapid` may replace the otherwise required
+just-in-time approval for one exact merge, merged-topic-branch deletion, or
+OpenSpec Archive with a reviewed, time-bounded one-change preapproval. It must
+still name the target and action, require all normal lifecycle evidence and
+runtime permissions, and pause on a mismatch or incomplete evidence. This is
+a prompt-reduction rule, not a reduction in authorization or safety gates.
 
 ### Connector Decision Is Deferred Deliberately
 

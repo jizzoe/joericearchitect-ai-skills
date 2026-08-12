@@ -1,0 +1,9 @@
+{
+  "scenarios": [
+    { "name": "valid dynamic discovery", "kind": "positive" },
+    { "name": "missing guardrails section", "kind": "negative" },
+    { "name": "broken guardrail link", "kind": "negative" },
+    { "name": "duplicate guardrail link", "kind": "negative" },
+    { "name": "copied guardrail policy", "kind": "negative" }
+  ]
+}

@@ -174,6 +174,13 @@ plan. A plan may mix prototype-rapid and production-rapid changes when it
 explains why the selected profile meets the affected data, exposure, and
 recovery risk.
 
+For any candidate that can reach delivery, the plan identifies whether the
+normal interactive just-in-time approval for merge, merged-topic-branch
+deletion, and OpenSpec Archive applies, or whether a selected `prototype-rapid`
+one-change preapproval is proposed. A profile alone never grants that
+authority; the proposed preapproval must name the exact target, action,
+evidence, recovery behavior, and expiration.
+
 ### Pause Conditions
 
 Pause when requirements lack observable outcomes, dependencies are unresolved,

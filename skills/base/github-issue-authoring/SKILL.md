@@ -30,3 +30,7 @@ work through the configured GitHub intake flow.
 - Use dry-run output when authorization for live mutation is absent.
 - Do not store credentials, Project item IDs, field IDs, PR state, or
   timestamps in repository files.
+
+## Guardrails
+
+See [Shared guardrails](../_shared/guardrails.md).

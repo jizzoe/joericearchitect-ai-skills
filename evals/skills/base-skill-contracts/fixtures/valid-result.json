@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "skill": "example-skill",
+  "status": "completed",
+  "mode": "interactive",
+  "summary": "Synthetic result completed.",
+  "artifacts": [{ "kind": "file", "operation": "created", "subject": "docs/output.md" }],
+  "evidence": [{ "id": "test-1", "type": "test", "subject": "synthetic test", "result": "passed", "reference": "node --test" }],
+  "assumptions": ["Synthetic input is representative."],
+  "openQuestions": [{ "id": "q-1", "question": "Is more input needed?", "blocking": false }],
+  "nextAction": { "kind": "none", "description": "No next action." },
+  "details": { "synthetic": true }
+}

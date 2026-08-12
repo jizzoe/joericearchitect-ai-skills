@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "defaults": { "researchRoot": "docs/research", "designBriefRoot": "docs/briefs", "planRoot": "docs/plans" },
+  "paths": { "workspace-output": "var/output" },
+  "adapters": { "synthetic-adapter": { "kind": "fixture", "enabled": true, "operations": ["read-source", "write-result"] } },
+  "policies": { "retention": "short-lived" },
+  "featureFlags": { "synthetic-mode": true }
+}

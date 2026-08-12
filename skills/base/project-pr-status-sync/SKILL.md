@@ -34,3 +34,7 @@ Run:
 ```bash
 node --test scripts/github/test/pr-status-sync.test.mjs evals/workflows/project-pr-status-sync/run-fixtures.test.mjs
 ```
+
+## Guardrails
+
+See [Shared guardrails](../_shared/guardrails.md).

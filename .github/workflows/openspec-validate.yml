@@ -5,6 +5,8 @@ on:
     paths:
       - "openspec/**"
       - "skills/**"
+      - "schemas/**"
+      - "config/**"
       - ".agents/**"
       - ".claude/**"
       - "scripts/**"
@@ -25,5 +27,7 @@ jobs:
           node-version: "20"
       - run: npm install -g @fission-ai/openspec@1.8.0
       - run: node scripts/validation/validate-skill-metadata.mjs
+      - run: node scripts/validation/validate-shared-guardrails.mjs
       - run: node --test scripts/validation/test/skill-metadata.test.mjs
+      - run: node --test evals/skills/base-skill-contracts/run-fixtures.test.mjs evals/skills/shared-skill-guardrails/run-fixtures.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/skills/autonomous-goal-runner/operation-check.test.mjs
       - run: openspec validate --all --strict
