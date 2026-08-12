@@ -11,11 +11,11 @@ Date: 2026-08-12
 | Public-source boundary | The checker permits only configured public scopes and rejects authentication, private-source, and source-execution requests. |
 | Durable resume | `checkpoint.mjs` validates selected-entry record linkage and reports stale evidence, conflicts, or the first incomplete step. |
 | Portable policy | Canonical runner and authorization reference describe input-driven linkage without repository-specific constants or credentials. |
-| Independent review | `independent-review.mjs` prepares only immutable review inputs and validates a distinct, non-interactive, isolated read-only reviewer record for the exact base/head. Delivery integration rejects unavailable, self, malformed, stale, wrong-head, blocker, and high-objective-fix evidence. |
+| Independent review | `independent-review.mjs` prepares only immutable review inputs and validates a configured, adapter-attested distinct non-interactive, isolated read-only reviewer record for canonical commit base/head. Delivery rederives the exact Git diff, validates its manifest, and rejects unavailable, self, malformed, stale, wrong-head, duplicate, or non-durable evidence and blocker/high objective-fix findings. |
 
 ## Commands
 
-- `node --test scripts/sdd/test/*.test.mjs evals/skills/autonomous-goal-runner/*.test.mjs evals/workflows/autonomous-sdd-lifecycle/*.test.mjs scripts/validation/test/*.test.mjs` — 68 passed.
+- `node --test scripts/sdd/test/*.test.mjs evals/skills/autonomous-goal-runner/*.test.mjs evals/workflows/autonomous-sdd-lifecycle/*.test.mjs scripts/validation/test/*.test.mjs` — 69 passed.
 - `node scripts/validation/validate-openspec-artifacts.mjs openspec/changes/extend-bounded-program-delivery-authorization` — passed.
 - `openspec validate extend-bounded-program-delivery-authorization --strict` — passed.
 - `openspec validate --all --strict` — 19 passed, 0 failed.
@@ -30,8 +30,11 @@ credential-like value; this change adds no dependency or copied implementation.
 
 The amended independent-review gate has deterministic clean, blocker/high,
 objective-fix rereview, self-review, stale-SHA, malformed/missing-evidence,
-unavailable-reviewer, and portability coverage. A fresh isolated review of the
-final immutable implementation head remains required before delivery mutation.
+unavailable-reviewer, portability, configured-reviewer attestation, canonical
+commit, Git-diff-provenance, and duplicate-durable-record coverage. Independent
+review `m1-attestation-rereview-2026-08-12T18:30:33Z` inspected the complete
+immutable range `83da34f13a518941a9e66520f26be9f37ca28960..f0d787f1bb2ef20b5cbf28fc5b35709cb0073b26`,
+reported no findings, and returned `clear`.
 
 ## Delivery Gate
 
