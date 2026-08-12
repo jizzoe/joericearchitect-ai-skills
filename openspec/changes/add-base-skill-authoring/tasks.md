@@ -17,5 +17,8 @@
 - [x] 3.1 Run focused evals, metadata/shared-guardrail/contracts validation,
   OpenSpec validation, diff/security/portability/attribution/recovery reviews,
   and record requirements mapping. Depends on: 2.2.
-- [ ] 3.2 Complete formal OpenSpec Verify and independent read-only review using
+- [x] 3.2 Complete formal OpenSpec Verify and independent read-only review using
   immutable base/head evidence before implementation delivery. Depends on: 3.1.
+  Evidence: owner-approved one-time exception and formal Verify evidence for
+  `6eed4d9ffba8234085f4b3b2e50ea6aa1eb294e4` are recorded on issue #76:
+  https://github.com/jizzoe/joericearchitect-ai-skills/issues/76#issuecomment-5274108580.
