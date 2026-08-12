@@ -56,7 +56,8 @@ spawns a process or mutates workspace/GitHub state; it requires the adapter to
 declare a non-interactive, isolated, read-only reviewer distinct from the
 implementing session. It rejects evidence lacking reviewer identity/type,
 execution and invocation references, timestamp, exact reviewed SHAs,
-findings, dispositions, or a clear final status.
+findings, dispositions, a clear final status, or a deterministic manifest of
+that immutable input package.
 
 Any blocker or high `objective-fix` finding blocks delivery. A bounded,
 behavior-preserving fix reruns affected checks and produces new review evidence

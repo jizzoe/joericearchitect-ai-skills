@@ -51,6 +51,8 @@ The runner MUST reject self-review, unavailable reviewers, malformed evidence,
 stale or wrong SHA evidence, and unresolved blocker or high `objective-fix`
 findings. It MUST record reviewer type and identity, execution and invocation
 references, reviewed SHAs, timestamp, findings, dispositions, and final status.
+The evidence MUST bind to a deterministic manifest of the immutable review
+input package.
 GitHub review publication MAY supplement but MUST NOT replace this evidence.
 
 #### Scenario: Clean independent review authorizes exact-head delivery

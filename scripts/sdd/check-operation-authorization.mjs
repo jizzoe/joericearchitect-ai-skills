@@ -41,12 +41,12 @@ function derivedTargetMatches(authorization, request) {
   if (request.target !== `${record.kind}:${record.id}`) return false;
   if (record.kind === "branch" || record.kind === "pr") {
     if (!nonEmpty(record.baseBranch) || !nonEmpty(record.headCommit)) return false;
+    if (!nonEmpty(request.headCommit) || request.headCommit !== record.headCommit) return false;
   }
   if (request.lifecycleAction === "merge-pr" && record.kind !== "pr") return false;
   if (request.lifecycleAction === "archive-change" && record.kind !== "change") return false;
   if (request.lifecycleAction === "delete-merged-topic-branch" && record.kind !== "branch") return false;
   if (request.evidenceCurrent !== true && highImpactLifecycleActions.has(request.lifecycleAction)) return false;
-  if (request.headCommit && request.headCommit !== record.headCommit) return false;
   return true;
 }
 
@@ -95,7 +95,7 @@ export function checkOperationAuthorization(input) {
     if (!nonEmpty(request.recovery)) return fail("missing-recovery", request.lifecycleAction);
     if (request.evidenceCurrent !== true) return fail("incomplete-lifecycle-evidence", request.lifecycleAction);
     if (request.deliveryProfile === "production-rapid") {
-      const review = validateIndependentReviewEvidence({ reviewer: request.reviewer, implementerSession: request.implementerSession, expectedBase: request.baseCommit, expectedHead: request.headCommit, evidence: request.independentReviewEvidence });
+      const review = validateIndependentReviewEvidence({ reviewer: request.reviewer, implementerSession: request.implementerSession, expectedBase: request.baseCommit, expectedHead: request.headCommit, expectedReviewManifest: request.reviewInputManifest, evidence: request.independentReviewEvidence });
       if (!review.allowed) return review;
     }
   }

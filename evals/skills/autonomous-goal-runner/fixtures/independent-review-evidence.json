@@ -21,6 +21,7 @@
     "invocationRef": "configured-reviewer --input immutable-package",
     "reviewedBase": "base-a",
     "reviewedHead": "head-b",
+    "inputManifest": "0e69af895eb4a8c951c0be209df4d6bf7651f5767f17ab504c5e948426b81f7c",
     "timestamp": "2026-08-12T12:00:00.000Z",
     "findings": [],
     "dispositions": [],

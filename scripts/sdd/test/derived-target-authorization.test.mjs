@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { checkOperationAuthorization } from "../check-operation-authorization.mjs";
 import { inspectCheckpoint } from "../checkpoint.mjs";
-import { prepareIndependentReview } from "../independent-review.mjs";
+import { immutableReviewManifest, prepareIndependentReview } from "../independent-review.mjs";
 
 const authorization = {
   targets: ["workspace:reports"],
@@ -21,7 +21,7 @@ test("allows only a current exact derived pull request", () => {
 });
 
 test("rejects a lookalike queue entry and stale head", () => {
-  for (const request of [{ selectedEntry: "other-change", headCommit: "abc123" }, { selectedEntry: "first-change", headCommit: "different" }]) {
+  for (const request of [{ selectedEntry: "other-change", headCommit: "abc123" }, { selectedEntry: "first-change", headCommit: "different" }, { selectedEntry: "first-change", headCommit: "" }]) {
     const result = checkOperationAuthorization({ authorization, runtime, request: {
       profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", derivedRecord: record, evidenceCurrent: true, recovery: "recover", ...request
     } });
@@ -65,8 +65,11 @@ test("production-rapid delivery requires current independent review evidence", (
   const reviewInput = { baseCommit: "base", headCommit: "abc123", diff: "diff", openspecArtifacts: ["proposal"], validationEvidence: ["tests"] };
   assert.equal(prepareIndependentReview({ reviewer, implementerSession: "implementer", reviewInput }).allowed, true);
   const result = checkOperationAuthorization({ authorization, runtime, request: {
-    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: "abc123", baseCommit: "base", evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer,
-    independentReviewEvidence: { reviewer: { type: "fixture-reviewer", identity: "fresh-reviewer" }, executionRef: "run", invocationRef: "fixture", reviewedBase: "base", reviewedHead: "abc123", timestamp: "2026-08-12T12:00:00.000Z", findings: [], dispositions: [], finalStatus: "clear" }
+    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: "abc123", baseCommit: "base", reviewInputManifest: immutableReviewManifest(reviewInput), evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer,
+    independentReviewEvidence: { reviewer: { type: "fixture-reviewer", identity: "fresh-reviewer" }, executionRef: "run", invocationRef: "fixture", reviewedBase: "base", reviewedHead: "abc123", inputManifest: immutableReviewManifest(reviewInput), timestamp: "2026-08-12T12:00:00.000Z", findings: [], dispositions: [], finalStatus: "clear" }
   } });
   assert.equal(result.allowed, true, JSON.stringify(result));
+  assert.equal(checkOperationAuthorization({ authorization, runtime, request: {
+    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: "abc123", evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, reviewInputManifest: immutableReviewManifest(reviewInput), independentReviewEvidence: { ...result.independentReviewEvidence }
+  } }).issues[0]?.code, "independent-review-input-incomplete");
 });

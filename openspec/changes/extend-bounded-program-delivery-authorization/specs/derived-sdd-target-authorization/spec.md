@@ -62,4 +62,3 @@ conflicting durable records as requiring human review.
 - **WHEN** a checkpoint contains a durable-state conflict for a selected entry
 - **THEN** the system returns a human-decision result and does not select a
   later queue entry
-

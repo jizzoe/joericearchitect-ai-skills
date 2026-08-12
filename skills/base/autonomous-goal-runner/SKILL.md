@@ -62,7 +62,8 @@ state.
    malformed or stale evidence, and unresolved blocker or high objective-fix
    findings. Record reviewer identity/type, execution and invocation references,
    reviewed SHAs, timestamp, findings, dispositions, and final status. GitHub
-   review publication is optional and cannot replace this gate.
+   review publication is optional and cannot replace this gate. Bind the review
+   record to a deterministic manifest of the immutable input package.
 
 ## Progressive References
 
