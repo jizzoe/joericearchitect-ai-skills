@@ -1,0 +1,152 @@
+# Conversation Record: Claude Code External Connections & Job Search Automation
+
+_A chronological record of the discussion, captured 2026-08-06 for handoff to a future implementation session._
+---
+
+## 1. Starting question: how does Claude Code connect to external sources like Gmail?
+
+Established that Claude Code connects to external tools via **MCP (Model Context Protocol)** — small services that expose an API as a set of callable "tools." Command pattern:
+
+```bash
+claude mcp add --transport http <name> <url> --header "Authorization: Bearer <token>"
+```
+
+Initially surveyed three paths (one of which was later corrected — see Section 5):
+1. ~~Google's own official remote MCP servers~~ — **later found to be inaccurate; no such official servers exist**
+2. Managed/third-party connector services (e.g., Composio) — wraps OAuth handling, supports 1,000+ apps beyond Google
+3. Self-hosted/community MCP servers — most control, more setup (~15-20 min per typical guide)
+
+Also flagged: claude.ai/Claude Desktop's Chat tab has a **completely separate, simpler path** — built-in Google Workspace connectors under Settings → Connectors, no MCP needed at all.
+
+**Security note raised:** any MCP path grants broad access to whatever the authorizing account can see. Mitigation discussed: explicit `CLAUDE.md` rules requiring confirmation before any send/create/modify/delete action; read access treated as lower risk than write/send.
+
+**Efficiency tip raised:** for heavy Google Workspace use, some people skip MCP's per-session tool-schema context overhead by using a lightweight CLI + markdown reference file instead.
+
+## 2. Terminology correction: "Claude Code has native connectors, Claude CLI/Desktop doesn't" — is that right?
+
+Corrected — it's the reverse. Clarified terms first:
+- **Claude Code** = the CLI/coding agent tool (also embeddable in VS Code/JetBrains, or via the "Code" tab in Claude Desktop)
+- **Claude Desktop** = the app containing Chat, Cowork, and Code tabs
+- **claude.ai** = the web/mobile chat interface
+
+**Correct statement:** claude.ai and Claude Desktop's **Chat tab** have native, pre-built connectors (including Google Workspace) — no setup beyond authenticating. **Claude Code** has no built-in connectors at all — external access only via manually configured MCP servers.
+
+## 3. The actual automation goal, stated explicitly
+
+User's target workflow: check Gmail for new job-related emails/follow-ups, add them to a tracker spreadsheet in Google Drive, check Calendar for open interview slots, and possibly respond to emails until a meeting/interview is set up.
+
+User asked to confirm: "that would be natively supported in Claude Desktop, but Claude Code would need APIs — correct?"
+
+**Correction delivered — native connectors have real functional gaps, not just a Code-vs-Desktop split:**
+
+| Task | Native connector capability |
+|---|---|
+| Check Gmail for job emails | ✅ Full read/search |
+| Add leads to tracker spreadsheet | ⚠️ Partial — no dedicated Sheets connector; can read via Drive and create *new* files, but **cannot live-edit an existing tracker sheet** |
+| Check calendar for open slots | ✅ Full read/write |
+| Respond to emails to set up meetings | ❌ Gmail connector is **read + draft only — cannot send** |
+| React automatically to new email | ❌ No event triggers at all — only fires on request or on a scheduled Cowork task |
+
+**Conclusion:** the full "auto-detect → track → respond" workflow isn't achievable via native connectors **regardless of Code vs. Chat** — the Gmail "no send" and "no live Sheets edit" restrictions appear to be deliberate Anthropic safety/scope choices, not something Code vs. Chat changes. Achieving the full workflow requires the MCP/self-configured-API route, which uses real Google API scopes without Anthropic's restricted permission set.
+
+## 4. "Does Claude Work [Cowork] work in Claude Code, or would I build skills/custom agents?"
+
+Clarified terminology (Cowork, not a literal "Claude Work" product) and confirmed: **no, Cowork does not run inside Claude Code** — genuinely separate products, no bridge between them.
+
+Claude Code's own building blocks that can replicate similar automated behavior:
+
+| Building block | What it does | Role in the automation |
+|---|---|---|
+| Skills | Reusable `SKILL.md` procedures | Encode the actual workflow logic |
+| Subagents | Delegated workers, own context window | Keep noisy work (e.g. big inbox scans) out of main session |
+| MCP servers | External API access | Real Gmail/Sheets/Calendar connectivity |
+| Hooks | Deterministic lifecycle scripts | Less relevant here; more for dev workflows |
+| Scheduled Tasks | Cloud cron jobs (`/schedule` or `claude trigger create --schedule ...`) | Runs the workflow automatically on a recurring basis |
+| Plugins | Bundle skills+subagents+commands into one package | How the finished automation would be packaged/reused |
+
+**Flagged caveat:** Scheduled Tasks is a relatively new/still-maturing Claude Code capability — some sources describe it as absent as recently as a few months prior to this conversation. Worth confirming current syntax/availability directly before building around it.
+
+**Also flagged:** Cowork's local-session mode (via Claude Desktop) provides real browser automation (clicking/filling forms on LinkedIn, etc.) that Claude Code doesn't natively have — would need Claude in Chrome wired in separately to replicate that piece in Code.
+
+## 5. Deep research: Google's public APIs, authentication, account requirements, and MCP servers
+
+### The relevant Google APIs
+
+| API | What it does | Key scopes |
+|---|---|---|
+| Gmail API | Read, search, send, draft, label, filter email | `gmail.readonly`, `gmail.send`, `gmail.compose`, `gmail.modify`, `gmail.labels` |
+| Google Sheets API | Read/write cells, create sheets | `spreadsheets` (read/write) or `.readonly` |
+| Google Calendar API | Read/create/update/delete events | `calendar.events`, `calendar.readonly`, `calendar` (full) |
+| Google Drive API | List/search/create/organize files | `drive.file` (app-created only) or broader `drive` |
+
+### How authentication works
+
+Standard OAuth 2.0 flow:
+1. Create a project in Google Cloud Console (free)
+2. Enable the specific APIs needed
+3. Configure an OAuth consent screen, choosing scopes
+4. Create an OAuth Client ID — "Desktop app" type for CLI/desktop use
+5. First run opens a browser for login/consent; a refresh token is saved locally for future runs
+
+### Does this work with a free/personal Gmail account?
+
+**Yes** — these APIs work with any Google Account, not just Workspace. **But a real friction point exists:**
+
+- Apps in **"Testing" status** (the default for any solo project) get refresh tokens that **expire every 7 days** — a genuine problem for unattended automation, since it would silently break weekly and require manual browser re-login.
+- Fix: move the app to **"Production" status**. For scopes Google classifies as "sensitive" (which includes Gmail's read/send/modify scopes), this requires a **Google verification review** — for a solo personal project, typically a lighter review than a full security audit, but still a real step (app info, privacy policy, possibly a demo video) that can take time.
+- Practical middle-ground: stay in Testing but add yourself as a **Test User** — usable, but the 7-day refresh-token expiry still applies per Google's documentation.
+
+### Does Google have official MCP servers for Drive, Gmail, Sheets?
+
+**No.** This corrected an earlier statement made in Section 1 (that Google "publishes dedicated remote MCP servers") — direct research found this to be inaccurate. Every MCP server for Google Workspace is community/independent-developer built, using Google's public REST APIs. Options surveyed:
+
+- **`taylorwilsdon/google_workspace_mcp`** — most comprehensive: 120+ tools across 12 Workspace services, multi-user OAuth 2.1 support, actively maintained
+- **`aaronsb/google-workspace-mcp`** — Gmail/Calendar/Drive/Docs/Sheets/Tasks/Meet, easy Claude Desktop `.mcpb` installer
+- **`xing5/mcp-google-sheets`** — Sheets-only, notable for using **Service Account auth instead of OAuth** — sidesteps the 7-day token expiry problem entirely, worth considering specifically for the tracker-spreadsheet piece
+- **`dguido/google-workspace-mcp`** (and a maintained fork by `danielrosehill`) — solid general coverage, simple `npx` setup
+
+## 6. Popularity/adoption check — are any of these MCP servers actually widely used?
+
+Verified via GitHub metrics, PulseMCP directory listing, and evidence of independent security scrutiny (rather than assumption):
+
+**`taylorwilsdon/google_workspace_mcp` is the clear leader:**
+- ~2.7k–2.9k GitHub stars, 840+ forks — an order of magnitude ahead of alternatives
+- Actively developed (recent releases, active PR/issue activity)
+- Listed on PulseMCP with an explicit usage-ranking estimate
+- A third party built a **"Hardened Google Workspace MCP"** fork specifically to strip dangerous operations and prevent prompt-injection-based data exfiltration — read as a genuine trust/scrutiny signal, not a red flag
+- Supports registration as a native Claude **Connector** (HTTP mode via Settings → Connectors), not just old-style local config — meaning it's kept pace with Anthropic's own architecture
+
+**Everyone else is genuinely niche** — no comparable star counts or adoption evidence found for the alternatives listed above.
+
+**Honest gap acknowledged:** no dedicated Reddit threads or Stack Overflow questions were found discussing these servers by name — this space is young enough that discussion lives in GitHub Issues/Discord/directory sites (Glama.ai, PulseMCP) rather than general Q&A sites. GitHub metrics were treated as the strongest available evidence, with that caveat stated explicitly rather than overclaiming validation.
+
+## 7. Decision recorded
+
+> **Decision (2026-08-06): will use https://github.com/taylorwilsdon/google_workspace_mcp when building job search automation skills.**
+>
+> Rationale: clear popularity/maintenance leader, supports native Claude Connector registration as well as traditional local MCP config, covers all needed services (Gmail, Calendar, Sheets, Drive, plus more).
+
+## 8. Thread renamed
+
+Originally "Claude Code / CLI External Connections" — renamed to **"Automated Job Search Workflow"** per user request, to better reflect the broader goal rather than just the technical connection mechanism.
+
+## 9. GitHub research pass: job search automation agents + SDLC foundational skills
+
+Two-track research request: (1) public repos doing similar things to the target automation (job search, lead-gen, application tracking), and (2) foundational SDLC skills (Java/Spring Boot, TS/JS, code/design review, AI guardrails/anti-hallucination, skill authoring) as sample categories, not a narrow target.
+
+**Full results captured in a separate file:** `github-research-job-search-and-sdlc-skills.md` (later updated to include a homepage + clone URL for every confirmed repo).
+
+**Track 1 standouts (job search/lead-gen):**
+- `theaayushstha1/job-applier-agent`, `suxrobGM/jobpilot`, `neonwatty/job-apply-plugin`, `MadsLorentzen/ai-job-search`, `proficientlyjobs/proficiently-claude-skills`
+- `neonwatty/job-apply-plugin` and a minimal lead-generation tracker workspace (tracker CRUD + discovery + first-degree-only outreach, replies stay manual) identified as the best match for the user's stated caution level (confirmation-required, no blind auto-submit)
+- Flagged: several "auto-apply" tools brush against LinkedIn/ATS Terms of Service — worth reading each repo's own disclaimers
+
+**Track 2 standouts (SDLC foundational skills):**
+- Start with `anthropics/skills` (official, 167k stars) — includes `skill-creator`, the actual skill-authoring skill
+- Java/Spring Boot: `rrezartprebreza/spring-boot-skills` (documents common AI failure modes specific to Spring Boot)
+- TypeScript: `metabase/metabase`'s real production `.claude/skills/typescript-review` skill file
+- Code review: `awesome-skills/code-review-skill` (20+ languages, ~21,000 lines, progressive disclosure)
+- AI guardrails/anti-hallucination: `sethdford/claude-skills` (454 skills, each grounded in a named standard — SWEBOK, TOGAF, OWASP, ISTQB, NIST, AIPMM — with explicit Anti-Patterns sections) — identified as most relevant to the "objectively proven facts, not guessing" goal
+- Recurring architectural pattern identified across the guardrail-focused repos: **atomic task decomposition + binary pass/fail gates** — worth applying to the job-search automation skills too, not just the SDLC ones
+
+Two items could not be traced to a single confirmed repo (a LinkedIn outreach skill bundle, a "6 cognitive firewalls" guardrail skill) — flagged honestly rather than guessing at URLs, with topic pages provided instead.
