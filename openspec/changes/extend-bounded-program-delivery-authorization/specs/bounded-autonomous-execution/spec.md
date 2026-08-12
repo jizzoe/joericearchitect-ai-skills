@@ -62,8 +62,8 @@ read-only isolation attestation, and resolve recorded base/head identifiers as
 canonical lowercase full commit object IDs before accepting evidence.
 The reviewer input MUST exactly match configured relevant OpenSpec artifact
 identities and the durable current Apply validation-evidence list for the
-reviewed head. The selected-entry checkpoint MUST durably store one uniquely
-identified current Apply evidence record; the request and review record MUST
+reviewed head. The selected-entry checkpoint MUST durably store exactly one
+uniquely identified current Apply evidence record; the request and review record MUST
 exactly reference that record, whose completion time is no later than the
 review timestamp.
 GitHub review publication MAY supplement but MUST NOT replace this evidence.

@@ -45,7 +45,7 @@ function invalidReviewRecord(input) {
 function invalidApplyEvidenceRecord(input) {
   const entry = input.selectedEntry;
   if (!entry || entry.applyEvidenceRecords === undefined) return null;
-  if (!Array.isArray(entry.applyEvidenceRecords)) return "selected-entry-invalid-apply-evidence-records";
+  if (!Array.isArray(entry.applyEvidenceRecords) || entry.applyEvidenceRecords.length !== 1) return "selected-entry-invalid-apply-evidence-records";
   const seen = new Set();
   for (const evidence of entry.applyEvidenceRecords) {
     if (!evidence || typeof evidence.reference !== "string" || !evidence.reference || seen.has(evidence.reference) ||
