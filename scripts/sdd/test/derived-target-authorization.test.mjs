@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
 import { checkOperationAuthorization } from "../check-operation-authorization.mjs";
 import { inspectCheckpoint } from "../checkpoint.mjs";
@@ -11,12 +12,15 @@ const authorization = {
   publicSourceScopes: ["https://docs.example.test/"]
 };
 const runtime = { permittedOperations: ["run-lifecycle-action", "read-source"] };
-const baseSha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const headSha = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const repositoryPath = process.cwd();
+const config = { reviewRepositoryPath: repositoryPath };
+const baseSha = execFileSync("git", ["rev-parse", "HEAD~1"], { encoding: "utf8" }).trim();
+const headSha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+const accumulatedDiff = execFileSync("git", ["diff", "--no-ext-diff", "--no-textconv", "--binary", baseSha, headSha], { encoding: "utf8" });
 const record = { entry: "first-change", kind: "pr", id: "42", repository: "owner/repository", baseBranch: "main", headCommit: headSha };
 
 test("allows only a current exact derived pull request", () => {
-  const result = checkOperationAuthorization({ authorization, runtime, request: {
+  const result = checkOperationAuthorization({ authorization, runtime, config, request: {
     profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, evidenceCurrent: true, recovery: "re-read PR and checkpoint"
   } });
   assert.equal(result.allowed, true, JSON.stringify(result));
@@ -66,16 +70,19 @@ test("checkpoint resumes first incomplete step and stops invalid linkage", () =>
 
 test("production-rapid delivery requires current independent review evidence", () => {
   const reviewer = { type: "fixture-reviewer", identity: "fresh-reviewer", available: true, nonInteractive: true, isolatedContext: true, readOnly: true };
-  const reviewInput = { baseCommit: baseSha, headCommit: headSha, diff: "diff", openspecArtifacts: ["proposal"], validationEvidence: ["tests"] };
+  const reviewInput = { baseCommit: baseSha, headCommit: headSha, diff: accumulatedDiff, openspecArtifacts: ["proposal"], validationEvidence: ["tests"] };
   const evidence = { reviewer: { type: "fixture-reviewer", identity: "fresh-reviewer" }, executionRef: "run", invocationRef: "fixture", reviewedBase: baseSha, reviewedHead: headSha, inputManifest: immutableReviewManifest(reviewInput), timestamp: "2026-08-12T12:00:00.000Z", findings: [], dispositions: [], finalStatus: "clear" };
   const checkpoint = { selectedEntry: { name: "first-change", records: [record], reviewRecords: [{ id: "review-1", entry: "first-change", transition: "merge-pr", evidence }] }, steps: [] };
   assert.equal(prepareIndependentReview({ reviewer, implementerSession: "implementer", reviewInput }).allowed, true);
-  const result = checkOperationAuthorization({ authorization, runtime, request: {
-    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, independentReviewInput: reviewInput, evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, checkpoint, reviewRecordId: "review-1", independentReviewEvidence: evidence
+  const result = checkOperationAuthorization({ authorization, runtime, config, request: {
+    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, independentReviewInput: reviewInput, reviewRepositoryPath: repositoryPath, evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, checkpoint, reviewRecordId: "review-1", independentReviewEvidence: evidence
   } });
   assert.equal(result.allowed, true, JSON.stringify(result));
-  assert.equal(checkOperationAuthorization({ authorization, runtime, request: {
-    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, checkpoint, reviewRecordId: "review-1", independentReviewInput: { ...reviewInput, diff: "tampered" }, independentReviewEvidence: evidence
-  } }).issues[0]?.code, "independent-review-evidence-manifest-mismatch");
-  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, evidenceCurrent: true, recovery: "recover", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, independentReviewInput: reviewInput, independentReviewEvidence: evidence } }).issues[0]?.code, "independent-review-evidence-not-durable");
+  assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: {
+    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, checkpoint, reviewRecordId: "review-1", independentReviewInput: { ...reviewInput, diff: "tampered" }, reviewRepositoryPath: repositoryPath, independentReviewEvidence: evidence
+  } }).issues[0]?.code, "independent-review-diff-provenance-mismatch");
+  assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, evidenceCurrent: true, recovery: "recover", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, independentReviewInput: reviewInput, reviewRepositoryPath: repositoryPath, independentReviewEvidence: evidence } }).issues[0]?.code, "independent-review-evidence-not-durable");
+  const duplicateCheckpoint = { selectedEntry: { ...checkpoint.selectedEntry, reviewRecords: [...checkpoint.selectedEntry.reviewRecords, { ...checkpoint.selectedEntry.reviewRecords[0] }] }, steps: [] };
+  assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, independentReviewInput: reviewInput, reviewRepositoryPath: repositoryPath, evidenceCurrent: true, recovery: "recover", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, checkpoint: duplicateCheckpoint, reviewRecordId: "review-1", independentReviewEvidence: evidence } }).issues[0]?.code, "independent-review-evidence-not-durable");
+  assert.equal(checkOperationAuthorization({ authorization, runtime, config: { reviewRepositoryPath: "/wrong" }, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, independentReviewInput: reviewInput, reviewRepositoryPath: repositoryPath, evidenceCurrent: true, recovery: "recover", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, checkpoint, reviewRecordId: "review-1", independentReviewEvidence: evidence } }).issues[0]?.code, "independent-review-repository-mismatch");
 });

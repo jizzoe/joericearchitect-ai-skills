@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 // Pure evaluator for an independently executed, read-only review channel.
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
@@ -13,6 +14,18 @@ export function immutableReviewManifest(reviewInput) {
       !Array.isArray(openspecArtifacts) || openspecArtifacts.length === 0 ||
       !Array.isArray(validationEvidence) || validationEvidence.length === 0) return null;
   return createHash("sha256").update(JSON.stringify({ baseCommit, headCommit, diff, openspecArtifacts, validationEvidence })).digest("hex");
+}
+
+// The configured adapter supplies its repository path; this read-only check
+// derives the only acceptable accumulated diff from immutable object IDs.
+export function reviewInputMatchesGitDiff(reviewInput, repositoryPath) {
+  if (!immutableReviewManifest(reviewInput) || !nonEmpty(repositoryPath)) return false;
+  try {
+    const diff = execFileSync("git", ["-C", repositoryPath, "diff", "--no-ext-diff", "--no-textconv", "--binary", reviewInput.baseCommit, reviewInput.headCommit], { encoding: "utf8" });
+    return diff === reviewInput.diff;
+  } catch {
+    return false;
+  }
 }
 
 function reviewerIsUsable(reviewer, implementerSession) {

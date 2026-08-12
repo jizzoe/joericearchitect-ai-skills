@@ -54,6 +54,9 @@ findings. It MUST record reviewer type and identity, execution and invocation
 references, reviewed SHAs, timestamp, findings, dispositions, and final status.
 The evidence MUST bind to a deterministic manifest of the immutable review
 input package and a uniquely identified durable transition review record.
+The runner MUST derive and compare the accumulated diff from the recorded base
+and head through a read-only configured repository adapter, and reject a
+package or duplicated durable review record whose provenance is not exact.
 GitHub review publication MAY supplement but MUST NOT replace this evidence.
 
 #### Scenario: Clean independent review authorizes exact-head delivery

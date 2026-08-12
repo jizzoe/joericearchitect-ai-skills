@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { operationVocabulary } from "../validation/validate-base-skill-contracts.mjs";
-import { immutableReviewManifest, validateIndependentReviewEvidence } from "./independent-review.mjs";
+import { immutableReviewManifest, reviewInputMatchesGitDiff, validateIndependentReviewEvidence } from "./independent-review.mjs";
 
 export const profileOperations = {
   "research-read-only": new Set(["read-source", "write-findings", "write-sources", "write-result", "notify-state"]),
@@ -74,8 +74,9 @@ function adapterAllows(config, runtime, adapterName, operation) {
 
 function durableReviewMatches(request) {
   const entry = request.checkpoint?.selectedEntry;
-  const record = entry?.reviewRecords?.find((candidate) => candidate.id === request.reviewRecordId);
-  if (!record || entry.name !== request.selectedEntry || record.entry !== request.selectedEntry ||
+  const records = entry?.reviewRecords?.filter((candidate) => candidate.id === request.reviewRecordId) ?? [];
+  const record = records[0];
+  if (records.length !== 1 || !record || entry.name !== request.selectedEntry || record.entry !== request.selectedEntry ||
       record.transition !== request.lifecycleAction || !record.evidence) return false;
   return JSON.stringify(record.evidence) === JSON.stringify(request.independentReviewEvidence);
 }
@@ -107,6 +108,8 @@ export function checkOperationAuthorization(input) {
       const reviewInput = request.independentReviewInput;
       const manifest = immutableReviewManifest(reviewInput);
       if (!manifest || reviewInput.baseCommit !== request.baseCommit || reviewInput.headCommit !== request.headCommit) return fail("independent-review-input-incomplete");
+      if (!nonEmpty(config.reviewRepositoryPath) || request.reviewRepositoryPath !== config.reviewRepositoryPath) return fail("independent-review-repository-mismatch");
+      if (!reviewInputMatchesGitDiff(reviewInput, request.reviewRepositoryPath)) return fail("independent-review-diff-provenance-mismatch");
       if (!durableReviewMatches(request)) return fail("independent-review-evidence-not-durable");
       const review = validateIndependentReviewEvidence({ reviewer: request.reviewer, implementerSession: request.implementerSession, expectedBase: request.baseCommit, expectedHead: request.headCommit, expectedReviewManifest: manifest, evidence: request.independentReviewEvidence });
       if (!review.allowed) return review;

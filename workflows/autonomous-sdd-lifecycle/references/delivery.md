@@ -20,7 +20,8 @@ Before marking a pull request ready or merging, verify:
   non-interactive isolated read-only reviewer and the exact current base/head,
   with a manifest recomputed from the immutable review package and no unresolved
   blocker or high objective-fix finding; the evidence is retained in the
-  selected entry's exact durable transition review record
+  selected entry's exact durable transition review record, whose ID is unique
+  and whose diff provenance is rederived from the read-only base/head range
 
 ## Issue and Project Gate
 

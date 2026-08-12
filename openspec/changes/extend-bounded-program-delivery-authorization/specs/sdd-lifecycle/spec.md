@@ -29,6 +29,8 @@ exact full base and current head object IDs, retain the reviewer execution
 record and finding dispositions durably under a unique transition record, and
 pause on a material finding,
 three materially different fixes for one signature, or unavailable reviewer.
+It MUST use a read-only adapter to verify that the reviewed diff is the exact
+base-to-head range and treat duplicate review record IDs as durable conflicts.
 
 #### Scenario: Rereview follows an objective fix
 - **WHEN** an independent reviewer finding is corrected without changing

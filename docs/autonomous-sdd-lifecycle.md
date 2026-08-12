@@ -54,7 +54,9 @@ targets. Do not include token values or other secrets in authorization text.
    wrong-head evidence, or a blocker/high objective-fix finding; GitHub review
    publication is optional. Recompute its deterministic input manifest at the
    delivery boundary rather than trusting a caller-provided digest, and retain
-   the exact evidence in a unique durable transition review record.
+   the exact evidence in a unique durable transition review record. Derive the
+   diff again from the read-only base/head repository range, and treat duplicate
+   durable review IDs as a conflict.
 8. Pause for material decisions, credential changes, destructive actions,
    unexpected external targets, durable-state conflicts, or persistent
    environment failures.

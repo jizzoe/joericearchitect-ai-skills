@@ -90,7 +90,9 @@ timestamp, findings and dispositions, and final status. Require the evidence
 to match the exact current head and a deterministic manifest recomputed from
 the immutable input package at the delivery boundary. Retain the complete
 evidence under a unique durable selected-entry transition record and validate
-that exact record at delivery. After a behavior-preserving objective fix,
+that exact record at delivery. Derive the diff again from the configured
+read-only repository adapter for the recorded base/head and reject mismatches;
+duplicate review record IDs are durable conflicts. After a behavior-preserving objective fix,
 rerun affected evidence and review the new head; stop after three materially
 different fixes for one failure signature or on a material decision. An
 unavailable, self, malformed, stale, wrong-head, mutable, blocker, or high
