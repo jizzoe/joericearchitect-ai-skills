@@ -43,9 +43,8 @@ cleanup that it deterministically creates for an approved queue entry.
 
 - Affects the portable SDD authorization checker, checkpoint helper, their
   synthetic evaluations, and canonical autonomous-runner documentation.
-- Approved no-issue exception: GitHub authentication is unavailable; a linked
-  issue will be created idempotently before delivery and no external identifier
-  is asserted in this planning artifact.
+- Primary issue: [#72](https://github.com/jizzoe/joericearchitect-ai-skills/issues/72),
+  "Extend bounded program delivery authorization."
 - Scope is limited to portable local policy, synthetic evaluation, and later
   SDD delivery linkage. Compatibility is backward-preserved: authorizations
   without a derived-target declaration retain exact-target behavior. Security

@@ -30,9 +30,8 @@ credential-like value; this change adds no dependency or copied implementation.
 
 ## Delivery Gate
 
-Formal local verification is complete. GitHub delivery is not eligible yet:
-the configured GitHub CLI account reports an invalid token, so the linked
-issue, pull request, CI evidence, merge, Sync, Archive, and exact branch
-cleanup have not been attempted. Resume by restoring the existing account's
-valid authentication, rereading durable Git/OpenSpec/GitHub state, and creating
-only the M-1 linked issue and delivery records.
+Formal local verification is complete. Issue
+[#72](https://github.com/jizzoe/joericearchitect-ai-skills/issues/72) is the
+durably linked M-1 record. Before each remaining delivery transition, reread
+the issue, tracking metadata, branch head, pull request, and current evidence;
+then create or mutate only the matching next record.
