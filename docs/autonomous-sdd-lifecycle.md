@@ -56,7 +56,9 @@ targets. Do not include token values or other secrets in authorization text.
    delivery boundary rather than trusting a caller-provided digest, and retain
    the exact evidence in a unique durable transition review record. Derive the
    diff again from the read-only base/head repository range, and treat duplicate
-   durable review IDs as a conflict.
+   durable review IDs as a conflict. Require reviewer identity/type and
+   isolation/read-only capability from configured adapter attestation, then
+   resolve supplied lowercase full object IDs as canonical commits.
 8. Pause for material decisions, credential changes, destructive actions,
    unexpected external targets, durable-state conflicts, or persistent
    environment failures.

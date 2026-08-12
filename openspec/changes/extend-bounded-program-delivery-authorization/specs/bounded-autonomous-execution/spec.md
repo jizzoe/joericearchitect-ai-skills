@@ -57,6 +57,9 @@ input package and a uniquely identified durable transition review record.
 The runner MUST derive and compare the accumulated diff from the recorded base
 and head through a read-only configured repository adapter, and reject a
 package or duplicated durable review record whose provenance is not exact.
+It MUST compare reviewer identity and type to a configured reviewer with a
+read-only isolation attestation, and resolve recorded base/head identifiers as
+canonical lowercase full commit object IDs before accepting evidence.
 GitHub review publication MAY supplement but MUST NOT replace this evidence.
 
 #### Scenario: Clean independent review authorizes exact-head delivery

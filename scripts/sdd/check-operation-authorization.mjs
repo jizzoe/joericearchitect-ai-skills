@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { operationVocabulary } from "../validation/validate-base-skill-contracts.mjs";
-import { immutableReviewManifest, reviewInputMatchesGitDiff, validateIndependentReviewEvidence } from "./independent-review.mjs";
+import { canonicalGitCommit, immutableReviewManifest, reviewInputMatchesGitDiff, validateIndependentReviewEvidence } from "./independent-review.mjs";
 
 export const profileOperations = {
   "research-read-only": new Set(["read-source", "write-findings", "write-sources", "write-result", "notify-state"]),
@@ -81,6 +81,17 @@ function durableReviewMatches(request) {
   return JSON.stringify(record.evidence) === JSON.stringify(request.independentReviewEvidence);
 }
 
+function configuredReviewer(config, requested) {
+  const reviewer = config?.independentReviewer;
+  const attestation = reviewer?.attestation;
+  if (!reviewer?.enabled || !nonEmpty(reviewer.type) || !nonEmpty(reviewer.identity) ||
+      !nonEmpty(attestation?.ref) || attestation.nonInteractive !== true ||
+      attestation.isolatedContext !== true || attestation.readOnly !== true ||
+      requested?.type !== reviewer.type || requested?.identity !== reviewer.identity) return null;
+  return { available: true, type: reviewer.type, identity: reviewer.identity,
+    nonInteractive: true, isolatedContext: true, readOnly: true };
+}
+
 export function checkOperationAuthorization(input) {
   const { authorization = {}, runtime = {}, config = {}, request = {} } = input;
   const profile = request.profile;
@@ -109,9 +120,12 @@ export function checkOperationAuthorization(input) {
       const manifest = immutableReviewManifest(reviewInput);
       if (!manifest || reviewInput.baseCommit !== request.baseCommit || reviewInput.headCommit !== request.headCommit) return fail("independent-review-input-incomplete");
       if (!nonEmpty(config.reviewRepositoryPath) || request.reviewRepositoryPath !== config.reviewRepositoryPath) return fail("independent-review-repository-mismatch");
+      if (!canonicalGitCommit(request.baseCommit, request.reviewRepositoryPath) || !canonicalGitCommit(request.headCommit, request.reviewRepositoryPath)) return fail("independent-review-commit-not-canonical");
       if (!reviewInputMatchesGitDiff(reviewInput, request.reviewRepositoryPath)) return fail("independent-review-diff-provenance-mismatch");
       if (!durableReviewMatches(request)) return fail("independent-review-evidence-not-durable");
-      const review = validateIndependentReviewEvidence({ reviewer: request.reviewer, implementerSession: request.implementerSession, expectedBase: request.baseCommit, expectedHead: request.headCommit, expectedReviewManifest: manifest, evidence: request.independentReviewEvidence });
+      const reviewer = configuredReviewer(config, request.reviewer);
+      if (!reviewer) return fail("independent-reviewer-not-configured");
+      const review = validateIndependentReviewEvidence({ reviewer, implementerSession: request.implementerSession, expectedBase: request.baseCommit, expectedHead: request.headCommit, expectedReviewManifest: manifest, evidence: request.independentReviewEvidence });
       if (!review.allowed) return review;
     }
   }

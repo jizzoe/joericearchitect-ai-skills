@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 // Pure evaluator for an independently executed, read-only review channel.
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
-function commitReference(value) { return typeof value === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value); }
+function commitReference(value) { return typeof value === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(value); }
 function fail(code, detail) { return { allowed: false, classification: "paused", issues: [{ code, ...(detail ? { detail } : {}) }] }; }
 function validTimestamp(value) { return nonEmpty(value) && !Number.isNaN(Date.parse(value)); }
 
@@ -25,6 +25,16 @@ export function reviewInputMatchesGitDiff(reviewInput, repositoryPath) {
     return diff === reviewInput.diff;
   } catch {
     return false;
+  }
+}
+
+export function canonicalGitCommit(commit, repositoryPath) {
+  if (!commitReference(commit) || !nonEmpty(repositoryPath)) return null;
+  try {
+    const resolved = execFileSync("git", ["-C", repositoryPath, "rev-parse", "--verify", `${commit}^{commit}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return resolved === commit ? resolved : null;
+  } catch {
+    return null;
   }
 }
 

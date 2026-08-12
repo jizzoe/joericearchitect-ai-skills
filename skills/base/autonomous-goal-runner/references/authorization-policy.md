@@ -97,6 +97,10 @@ rerun affected evidence and review the new head; stop after three materially
 different fixes for one failure signature or on a material decision. An
 unavailable, self, malformed, stale, wrong-head, mutable, blocker, or high
 objective-fix review pauses the transition. GitHub publication is optional.
+The delivery evaluator compares reviewer identity/type to configured
+adapter-attested non-interactive, isolated read-only capability; request flags
+do not create reviewer authority. It resolves supplied lowercase full object
+IDs through read-only Git as commits and accepts only identical canonical IDs.
 
 ## Always Forbidden Without Separate Explicit Approval
 

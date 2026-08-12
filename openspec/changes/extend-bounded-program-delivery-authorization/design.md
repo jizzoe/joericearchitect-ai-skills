@@ -66,6 +66,11 @@ base-to-head comparison and rejects a supplied package whose diff differs; it
 does not trust a caller-provided diff string. Duplicate review record IDs are a
 durable-state conflict and are rejected by both checkpoint inspection and the
 delivery boundary.
+The delivery evaluator matches reviewer type and identity to a configured
+reviewer with adapter-attested non-interactive, isolated, read-only capability;
+request flags do not create reviewer authority. It resolves each supplied
+lowercase full object ID through read-only Git as a commit and requires the
+resolved canonical object ID to be identical.
 
 Any blocker or high `objective-fix` finding blocks delivery. A bounded,
 behavior-preserving fix reruns affected checks and produces new review evidence

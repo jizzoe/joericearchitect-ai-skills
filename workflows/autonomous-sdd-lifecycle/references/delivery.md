@@ -21,7 +21,9 @@ Before marking a pull request ready or merging, verify:
   with a manifest recomputed from the immutable review package and no unresolved
   blocker or high objective-fix finding; the evidence is retained in the
   selected entry's exact durable transition review record, whose ID is unique
-  and whose diff provenance is rederived from the read-only base/head range
+  and whose diff provenance is rederived from the read-only base/head range;
+  reviewer identity/type and isolated read-only capability match configured
+  adapter attestation, and both endpoints resolve to canonical commits
 
 ## Issue and Project Gate
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { immutableReviewManifest, prepareIndependentReview, validateIndependentReviewEvidence } from "../independent-review.mjs";
+import { canonicalGitCommit, immutableReviewManifest, prepareIndependentReview, validateIndependentReviewEvidence } from "../independent-review.mjs";
 
 const fixture = JSON.parse(fs.readFileSync(new URL("../../../evals/skills/autonomous-goal-runner/fixtures/independent-review-evidence.json", import.meta.url), "utf8"));
 const ready = () => prepareIndependentReview({ reviewer: fixture.reviewer, implementerSession: fixture.implementerSession, reviewInput: fixture.input });
@@ -44,4 +44,9 @@ test("review evaluator is portable because all reviewer and commit values are in
   const evidence = { ...fixture.evidence, reviewer: { type: other.reviewer.type, identity: other.reviewer.identity }, reviewedBase: other.input.baseCommit, reviewedHead: other.input.headCommit, inputManifest: otherManifest };
   assert.equal(prepareIndependentReview({ reviewer: other.reviewer, implementerSession: other.implementerSession, reviewInput: other.input }).allowed, true);
   assert.equal(validateIndependentReviewEvidence({ reviewer: other.reviewer, implementerSession: other.implementerSession, expectedBase: other.input.baseCommit, expectedHead: other.input.headCommit, expectedReviewManifest: otherManifest, evidence }).allowed, true);
+});
+
+test("canonical Git commit resolution rejects noncanonical and unresolved IDs", () => {
+  assert.equal(canonicalGitCommit("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", process.cwd()), null);
+  assert.equal(canonicalGitCommit("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", process.cwd()), null);
 });

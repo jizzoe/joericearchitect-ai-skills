@@ -31,6 +31,8 @@ pause on a material finding,
 three materially different fixes for one signature, or unavailable reviewer.
 It MUST use a read-only adapter to verify that the reviewed diff is the exact
 base-to-head range and treat duplicate review record IDs as durable conflicts.
+It MUST obtain reviewer isolation capability from configured adapter attestation
+and reject unresolvable or noncanonical commit identifiers.
 
 #### Scenario: Rereview follows an objective fix
 - **WHEN** an independent reviewer finding is corrected without changing
