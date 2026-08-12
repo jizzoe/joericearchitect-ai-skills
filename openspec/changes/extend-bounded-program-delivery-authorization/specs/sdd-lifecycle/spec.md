@@ -6,7 +6,8 @@ branch, pull request, delivery, Sync, Archive, and exact merged-branch cleanup
 only when each derived target is durably linked to that entry and current
 evidence ties the transition to the recorded head commit. It MUST pause before
 a transition when linkage, evidence, or runtime permission is missing, stale,
-or conflicts with durable state.
+or conflicts with durable state, and it MUST authorize only the first
+incomplete ordered checkpoint transition.
 
 #### Scenario: Derived delivery chain is current
 - **WHEN** the selected queue entry has one durably linked issue, branch, pull

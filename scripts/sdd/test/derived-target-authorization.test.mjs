@@ -19,7 +19,7 @@ const baseSha = execFileSync("git", ["rev-parse", "HEAD~1"], { encoding: "utf8" 
 const headSha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 const accumulatedDiff = execFileSync("git", ["diff", "--no-ext-diff", "--no-textconv", "--binary", baseSha, headSha], { encoding: "utf8" });
 const record = { entry: "first-change", kind: "pr", id: "42", repository: "owner/repository", baseBranch: "main", headCommit: headSha, evidence: { reference: "pr-evidence", current: true, headCommit: headSha } };
-const derivedCheckpoint = { selectedEntry: { name: "first-change", records: [record] }, steps: [] };
+const derivedCheckpoint = { selectedEntry: { name: "first-change", records: [record] }, steps: [{ id: "merge-pr", status: "pending" }] };
 
 test("allows only a current exact derived pull request", () => {
   const result = checkOperationAuthorization({ authorization, runtime, config, request: {
@@ -41,16 +41,16 @@ test("requires matching kinds for archive and merged-branch cleanup", () => {
   const base = { profile: "sdd-delivery", operation: "run-lifecycle-action", selectedEntry: "first-change", evidenceCurrent: true, recovery: "recover" };
   const change = { entry: "first-change", kind: "change", id: "first-change", repository: "owner/repository", evidence: { reference: "change-evidence", current: true } };
   const branch = { entry: "first-change", kind: "branch", id: "feature/first-change", repository: "owner/repository", baseBranch: "main", headCommit: headSha, evidence: { reference: "branch-evidence", current: true, headCommit: headSha } };
-  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "archive-change", target: "change:first-change", derivedRecord: change, checkpoint: { selectedEntry: { name: "first-change", records: [change] } }, evidenceReference: "change-evidence" } }).allowed, true);
-  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "delete-merged-topic-branch", target: "branch:feature/first-change", derivedRecord: branch, checkpoint: { selectedEntry: { name: "first-change", records: [branch] } }, headCommit: headSha, evidenceReference: "branch-evidence", evidenceHeadCommit: headSha } }).allowed, true);
+  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "archive-change", target: "change:first-change", derivedRecord: change, checkpoint: { selectedEntry: { name: "first-change", records: [change] }, steps: [{ id: "archive", status: "pending" }] }, evidenceReference: "change-evidence" } }).allowed, true);
+  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "delete-merged-topic-branch", target: "branch:feature/first-change", derivedRecord: branch, checkpoint: { selectedEntry: { name: "first-change", records: [branch] }, steps: [{ id: "cleanup", status: "pending" }] }, headCommit: headSha, evidenceReference: "branch-evidence", evidenceHeadCommit: headSha } }).allowed, true);
 });
 
 test("derived declarations require durable records for Sync as well as high-impact actions", () => {
   const sync = { entry: "first-change", kind: "sync", id: "first-change", repository: "owner/repository", evidence: { reference: "sync-evidence", current: true } };
   const request = { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "sync-change", target: "sync:first-change", selectedEntry: "first-change", derivedRecord: sync, evidenceCurrent: true, evidenceReference: "sync-evidence", recovery: "recover" };
-  assert.equal(checkOperationAuthorization({ authorization: { ...authorization, targets: ["sync:first-change"] }, runtime, request: { ...request, derivedRecord: undefined, selectedEntry: undefined } }).issues[0]?.code, "derived-record-not-durable");
-  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...request, checkpoint: { selectedEntry: { name: "first-change", records: [sync] } } } }).allowed, true);
-  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...request, derivedRecord: record, target: "pr:42", checkpoint: { selectedEntry: { name: "first-change", records: [record] } } } }).issues[0]?.code, "derived-record-not-durable");
+  assert.equal(checkOperationAuthorization({ authorization: { ...authorization, targets: ["sync:first-change"] }, runtime, request: { ...request, derivedRecord: undefined, selectedEntry: undefined, checkpoint: { selectedEntry: { name: "first-change", records: [sync] }, steps: [{ id: "sync", status: "pending" }] } } }).issues[0]?.code, "derived-record-not-durable");
+  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...request, checkpoint: { selectedEntry: { name: "first-change", records: [sync] }, steps: [{ id: "sync", status: "pending" }] } } }).allowed, true);
+  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...request, derivedRecord: record, target: "pr:42", checkpoint: { selectedEntry: { name: "first-change", records: [record] }, steps: [{ id: "sync", status: "pending" }] } } }).issues[0]?.code, "derived-record-not-durable");
 });
 
 test("preserves exact target authorization without derived declarations", () => {
@@ -58,8 +58,8 @@ test("preserves exact target authorization without derived declarations", () => 
     profile: "research-read-only", operation: "read-source", target: "workspace:reports/source-record.md"
   } });
   assert.equal(result.allowed, true, JSON.stringify(result));
-  assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, evidenceCurrent: true, recovery: "recover" } }).issues[0]?.code, "derived-record-not-durable");
-  assert.equal(checkOperationAuthorization({ authorization: { ...authorization, targets: ["pr:42"] }, runtime, config, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", headCommit: headSha, evidenceCurrent: true, recovery: "recover" } }).issues[0]?.code, "derived-record-not-durable");
+  assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, checkpoint: { selectedEntry: { name: "first-change", records: [] }, steps: [{ id: "merge-pr", status: "pending" }] }, headCommit: headSha, evidenceCurrent: true, recovery: "recover" } }).issues[0]?.code, "derived-record-not-durable");
+  assert.equal(checkOperationAuthorization({ authorization: { ...authorization, targets: ["pr:42"] }, runtime, config, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", checkpoint: { selectedEntry: { name: "first-change", records: [record] }, steps: [{ id: "merge-pr", status: "pending" }] }, headCommit: headSha, evidenceCurrent: true, recovery: "recover" } }).issues[0]?.code, "derived-record-not-durable");
 });
 
 test("allows only explicitly public unauthenticated source reads", () => {
@@ -84,12 +84,13 @@ test("production-rapid delivery requires current independent review evidence", (
   const reviewer = { type: "fixture-reviewer", identity: "fresh-reviewer", available: true, nonInteractive: true, isolatedContext: true, readOnly: true };
   const reviewInput = { baseCommit: baseSha, headCommit: headSha, diff: accumulatedDiff, openspecArtifacts: ["proposal"], validationEvidence: ["tests"] };
   const evidence = { reviewer: { type: "fixture-reviewer", identity: "fresh-reviewer" }, executionRef: "run", invocationRef: "fixture", reviewedBase: baseSha, reviewedHead: headSha, inputManifest: immutableReviewManifest(reviewInput), timestamp: "2026-08-12T12:00:00.000Z", findings: [], dispositions: [], finalStatus: "clear" };
-  const checkpoint = { selectedEntry: { name: "first-change", records: [record], reviewRecords: [{ id: "review-1", entry: "first-change", transition: "merge-pr", evidence }] }, steps: [] };
+  const checkpoint = { selectedEntry: { name: "first-change", records: [record], reviewRecords: [{ id: "review-1", entry: "first-change", transition: "merge-pr", evidence }] }, steps: [{ id: "merge-pr", status: "pending" }] };
   assert.equal(prepareIndependentReview({ reviewer, implementerSession: "implementer", reviewInput }).allowed, true);
   const result = checkOperationAuthorization({ authorization, runtime, config, request: {
     profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, independentReviewInput: reviewInput, reviewRepositoryPath: repositoryPath, evidenceCurrent: true, evidenceReference: "pr-evidence", evidenceHeadCommit: headSha, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, checkpoint, reviewRecordId: "review-1", independentReviewEvidence: evidence
   } });
   assert.equal(result.allowed, true, JSON.stringify(result));
+  assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, checkpoint: { ...checkpoint, steps: [{ id: "issue", status: "pending" }, { id: "merge-pr", status: "pending" }] }, headCommit: headSha, baseCommit: baseSha, independentReviewInput: reviewInput, reviewRepositoryPath: repositoryPath, evidenceCurrent: true, evidenceReference: "pr-evidence", evidenceHeadCommit: headSha, recovery: "recover", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, reviewRecordId: "review-1", independentReviewEvidence: evidence } }).issues[0]?.code, "derived-transition-out-of-order");
   assert.equal(checkOperationAuthorization({ authorization, runtime, config, request: {
     profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: headSha, baseCommit: baseSha, evidenceCurrent: true, evidenceReference: "pr-evidence", evidenceHeadCommit: headSha, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer, checkpoint, reviewRecordId: "review-1", independentReviewInput: { ...reviewInput, diff: "tampered" }, reviewRepositoryPath: repositoryPath, independentReviewEvidence: evidence
   } }).issues[0]?.code, "independent-review-diff-provenance-mismatch");

@@ -18,6 +18,12 @@ const lifecycleTargetPrefixes = {
   "delete-merged-topic-branch": "branch:",
   "sync-change": "sync:"
 };
+const lifecycleCheckpointSteps = {
+  "merge-pr": new Set(["merge-pr", "pr", "delivery"]),
+  "sync-change": new Set(["sync-change", "sync"]),
+  "archive-change": new Set(["archive-change", "archive"]),
+  "delete-merged-topic-branch": new Set(["delete-merged-topic-branch", "cleanup"])
+};
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
 function commitReference(value) { return typeof value === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value); }
@@ -124,6 +130,7 @@ export function checkOperationAuthorization(input) {
   if (lifecycleActions.has(request.lifecycleAction) && authorization.derivedTargets) {
     const checkpoint = inspectCheckpoint(request.checkpoint ?? {});
     if (checkpoint.classification === "human-decision" || checkpoint.classification === "stale-evidence") return fail("derived-checkpoint-not-valid", checkpoint.reason);
+    if (!lifecycleCheckpointSteps[request.lifecycleAction]?.has(checkpoint.firstIncomplete)) return fail("derived-transition-out-of-order", checkpoint.firstIncomplete);
   }
   if (lifecycleActions.has(request.lifecycleAction) && authorization.derivedTargets && !derivedTarget) return fail("derived-record-not-durable", request.target);
   if (!exactTarget && !derivedTarget && !publicSource) return fail("unauthorized-target", request.target);

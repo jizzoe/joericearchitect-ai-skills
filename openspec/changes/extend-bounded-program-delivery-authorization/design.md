@@ -70,6 +70,9 @@ Each derived record retains a current evidence reference and, for a
 branch- or PR-bound record, the evidence head equal to its recorded head. The
 operation request must name that evidence; an exact target cannot bypass this
 rule, and Sync follows the same durable derived-record chain.
+Before a lifecycle transition, the operation boundary validates the complete
+checkpoint and requires the requested action to equal its first incomplete
+ordered transition; a later durable record does not permit skipping prior work.
 The delivery evaluator matches reviewer type and identity to a configured
 reviewer with adapter-attested non-interactive, isolated, read-only capability;
 request flags do not create reviewer authority. It resolves each supplied
