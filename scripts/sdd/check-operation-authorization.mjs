@@ -24,6 +24,13 @@ const lifecycleCheckpointSteps = {
   "archive-change": "archive-change",
   "delete-merged-topic-branch": "delete-merged-topic-branch"
 };
+const canonicalLifecycleSteps = ["issue", "branch", "pr", "merge-pr", "sync-change", "archive-change", "delete-merged-topic-branch"];
+const prerequisiteRecordKinds = {
+  "merge-pr": ["issue", "branch", "pr"],
+  "sync-change": ["issue", "branch", "pr", "sync"],
+  "archive-change": ["issue", "branch", "pr", "sync", "change"],
+  "delete-merged-topic-branch": ["issue", "branch", "pr", "sync", "change", "branch"]
+};
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
 function commitReference(value) { return typeof value === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value); }
@@ -116,6 +123,16 @@ function configuredReviewer(config, requested) {
     nonInteractive: true, isolatedContext: true, readOnly: true };
 }
 
+function canonicalLifecycleCheckpointMatches(request) {
+  const entry = request.checkpoint?.selectedEntry;
+  const steps = request.checkpoint?.steps;
+  if (!entry || !Array.isArray(steps) || steps.length !== canonicalLifecycleSteps.length ||
+      !steps.every((step, index) => step?.id === canonicalLifecycleSteps[index])) return false;
+  const requiredKinds = prerequisiteRecordKinds[request.lifecycleAction] ?? [];
+  const kinds = entry.records?.map((record) => record.kind) ?? [];
+  return requiredKinds.every((kind) => kinds.filter((value) => value === kind).length >= (kind === "branch" && request.lifecycleAction === "delete-merged-topic-branch" ? 2 : 1));
+}
+
 export function checkOperationAuthorization(input) {
   const { authorization = {}, runtime = {}, config = {}, request = {} } = input;
   const profile = request.profile;
@@ -130,6 +147,7 @@ export function checkOperationAuthorization(input) {
   if (lifecycleActions.has(request.lifecycleAction) && authorization.derivedTargets) {
     const checkpoint = inspectCheckpoint(request.checkpoint ?? {});
     if (checkpoint.classification === "human-decision" || checkpoint.classification === "stale-evidence") return fail("derived-checkpoint-not-valid", checkpoint.reason);
+    if (!canonicalLifecycleCheckpointMatches(request)) return fail("derived-checkpoint-schema-invalid");
     if (checkpoint.firstIncomplete !== lifecycleCheckpointSteps[request.lifecycleAction]) return fail("derived-transition-out-of-order", checkpoint.firstIncomplete);
   }
   if (lifecycleActions.has(request.lifecycleAction) && authorization.derivedTargets && !derivedTarget) return fail("derived-record-not-durable", request.target);
@@ -150,13 +168,15 @@ export function checkOperationAuthorization(input) {
       const reviewInput = request.independentReviewInput;
       const manifest = immutableReviewManifest(reviewInput);
       if (!manifest || reviewInput.baseCommit !== request.baseCommit || reviewInput.headCommit !== request.headCommit) return fail("independent-review-input-incomplete");
+      if (JSON.stringify(reviewInput.openspecArtifacts) !== JSON.stringify(config.requiredOpenSpecArtifacts) ||
+          JSON.stringify(reviewInput.validationEvidence) !== JSON.stringify(request.applyEvidence?.validationEvidence)) return fail("independent-review-input-evidence-mismatch");
       if (!nonEmpty(config.reviewRepositoryPath) || request.reviewRepositoryPath !== config.reviewRepositoryPath) return fail("independent-review-repository-mismatch");
       if (!canonicalGitCommit(request.baseCommit, request.reviewRepositoryPath) || !canonicalGitCommit(request.headCommit, request.reviewRepositoryPath)) return fail("independent-review-commit-not-canonical");
       if (!reviewInputMatchesGitDiff(reviewInput, request.reviewRepositoryPath)) return fail("independent-review-diff-provenance-mismatch");
       if (!durableReviewMatches(request)) return fail("independent-review-evidence-not-durable");
       const reviewer = configuredReviewer(config, request.reviewer);
       if (!reviewer) return fail("independent-reviewer-not-configured");
-      const review = validateIndependentReviewEvidence({ reviewer, implementerSession: request.implementerSession, expectedBase: request.baseCommit, expectedHead: request.headCommit, expectedReviewManifest: manifest, evidence: request.independentReviewEvidence });
+      const review = validateIndependentReviewEvidence({ reviewer, implementerSession: request.implementerSession, expectedBase: request.baseCommit, expectedHead: request.headCommit, expectedReviewManifest: manifest, applyEvidence: request.applyEvidence, evidence: request.independentReviewEvidence });
       if (!review.allowed) return review;
     }
   }

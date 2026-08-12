@@ -64,7 +64,7 @@ export function prepareIndependentReview({ reviewer, implementerSession, reviewI
 
 // Accepts only evidence tied to the exact immutable review input. A review that
 // has blocker or high objective-fix findings cannot certify the delivery gate.
-export function validateIndependentReviewEvidence({ reviewer, implementerSession, expectedBase, expectedHead, expectedReviewManifest, evidence }) {
+export function validateIndependentReviewEvidence({ reviewer, implementerSession, expectedBase, expectedHead, expectedReviewManifest, applyEvidence, evidence }) {
   if (!reviewer?.available) return fail("independent-reviewer-unavailable");
   if (reviewer.identity === implementerSession || evidence?.reviewer?.identity === implementerSession) return fail("independent-review-self-review");
   if (!reviewerIsUsable(reviewer, implementerSession)) return fail("independent-reviewer-not-isolated-read-only");
@@ -74,13 +74,16 @@ export function validateIndependentReviewEvidence({ reviewer, implementerSession
       !nonEmpty(evidence.invocationRef) || !validTimestamp(evidence.timestamp) ||
       !Array.isArray(evidence.findings) || !Array.isArray(evidence.dispositions) ||
       !commitReference(evidence.reviewedBase) || !commitReference(evidence.reviewedHead) ||
-      !nonEmpty(evidence.inputManifest) || !nonEmpty(evidence.finalStatus)) {
+      !nonEmpty(evidence.inputManifest) || !nonEmpty(evidence.applyEvidenceRef) || !nonEmpty(evidence.finalStatus)) {
     return fail("independent-review-evidence-malformed");
   }
   if (evidence.reviewedBase !== expectedBase || evidence.reviewedHead !== expectedHead) {
     return fail("independent-review-evidence-stale-head");
   }
   if (evidence.inputManifest !== expectedReviewManifest) return fail("independent-review-evidence-manifest-mismatch");
+  if (!applyEvidence || applyEvidence.current !== true || applyEvidence.headCommit !== expectedHead ||
+      !nonEmpty(applyEvidence.reference) || evidence.applyEvidenceRef !== applyEvidence.reference ||
+      !validTimestamp(applyEvidence.completedAt) || Date.parse(evidence.timestamp) < Date.parse(applyEvidence.completedAt)) return fail("independent-review-apply-evidence-mismatch");
   const blocking = evidence.findings.find((finding) => finding?.severity === "blocker" ||
     (finding?.severity === "high" && finding?.classification === "objective-fix"));
   if (blocking || evidence.finalStatus !== "clear") return fail("independent-review-findings-unresolved", blocking?.id);

@@ -60,6 +60,10 @@ package or duplicated durable review record whose provenance is not exact.
 It MUST compare reviewer identity and type to a configured reviewer with a
 read-only isolation attestation, and resolve recorded base/head identifiers as
 canonical lowercase full commit object IDs before accepting evidence.
+The reviewer input MUST exactly match configured relevant OpenSpec artifact
+identities and the durable current Apply validation-evidence list for the
+reviewed head. The review record MUST reference Apply evidence whose completion
+time is no later than the review timestamp.
 GitHub review publication MAY supplement but MUST NOT replace this evidence.
 
 #### Scenario: Clean independent review authorizes exact-head delivery

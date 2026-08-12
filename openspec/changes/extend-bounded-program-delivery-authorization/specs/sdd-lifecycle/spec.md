@@ -8,6 +8,10 @@ evidence ties the transition to the recorded head commit. It MUST pause before
 a transition when linkage, evidence, or runtime permission is missing, stale,
 or conflicts with durable state, and it MUST authorize only the first
 incomplete ordered checkpoint transition.
+The checkpoint MUST contain the complete canonical ordered chain `issue`,
+`branch`, `pr`, `merge-pr`, `sync-change`, `archive-change`, and
+`delete-merged-topic-branch`; each transition requires its prerequisite durable
+record kinds before it becomes the next eligible action.
 
 #### Scenario: Derived delivery chain is current
 - **WHEN** the selected queue entry has one durably linked issue, branch, pull
