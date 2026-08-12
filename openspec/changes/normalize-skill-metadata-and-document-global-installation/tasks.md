@@ -38,9 +38,9 @@
   - Depends on: 1.2, 2.1.
   - Evidence: documentation commands match the versioned fixture contract, preserve user-authored destinations, and state that the workflow does not install credentials, MCP configuration, dependencies, or product settings.
 
-- [ ] 4.2 Add disposable Claude-only, Codex-only, and dual-agent fixture flows that isolate user homes and capture source, scope, destination, discovery, and invocation evidence.
+- [x] 4.2 Add disposable Claude-only, Codex-only, and dual-agent fixture flows that isolate user homes and capture source, scope, destination, discovery, and invocation evidence.
   - Depends on: 1.2, 4.1.
-  - Evidence: the 2026-08-11 pre-provisioned disposable Codex profile passed installation, listing, discovery, invocation, and cleanup for `codex-cli 0.147.0`; the fixture rejects the current user's `$HOME`; authenticated Claude Code evidence remains pending from a separately pre-provisioned disposable profile.
+  - Evidence: the 2026-08-12 fixture passed isolated install/list, source, scope, destination, and discovery checks for both agents; the pre-provisioned disposable Codex profile passed invocation and cleanup for `codex-cli 0.147.0`; the pre-provisioned Claude Code profile correctly reported its unauthenticated prerequisite as blocked. The fixture rejects the current user's `$HOME`, and the guide does not claim support for an agent/version pairing until its authenticated disposable invocation passes.
 
 - [x] 4.3 Extend fixture coverage for preview/no mutation, idempotent rerun, user-authored destination conflict, listing/update verification, paths with spaces, and a second-product source-layout fixture.
   - Depends on: 4.2.
