@@ -1,0 +1,30 @@
+{
+  "reviewer": {
+    "type": "synthetic-isolated-reviewer",
+    "identity": "reviewer-session-2",
+    "available": true,
+    "nonInteractive": true,
+    "isolatedContext": true,
+    "readOnly": true
+  },
+  "implementerSession": "implementer-session-1",
+  "input": {
+    "baseCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "headCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "diff": "diff --git a/file b/file",
+    "openspecArtifacts": ["proposal.md", "design.md", "spec.md", "tasks.md"],
+    "validationEvidence": ["node --test: pass", "openspec validate: pass"]
+  },
+  "evidence": {
+    "reviewer": { "type": "synthetic-isolated-reviewer", "identity": "reviewer-session-2" },
+    "executionRef": "review-run-7",
+    "invocationRef": "configured-reviewer --input immutable-package",
+    "reviewedBase": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "reviewedHead": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "inputManifest": "dea65a31383a81a63e44beb06c39340d23ffc710b86d8573157d51f2f941cee5",
+    "timestamp": "2026-08-12T12:00:00.000Z",
+    "findings": [],
+    "dispositions": [],
+    "finalStatus": "clear"
+  }
+}

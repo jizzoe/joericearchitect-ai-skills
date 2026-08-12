@@ -24,12 +24,16 @@ stopping conditions.
    OpenSpec validation where applicable, documentation review, security and
    supply-chain review, requirements mapping, portability review, attribution
    review, and recovery review.
-7. Run formal Verify after every task has current evidence.
-8. Deliver through a pull request only when the delivery gate passes and the
+7. After Apply and every behavior-preserving objective fix, invoke the
+   configured isolated read-only reviewer for `production-rapid`; preserve an
+   exact full-object-ID base/head durable evidence record and rerun review for
+   each new head.
+8. Run formal Verify after every task has current evidence.
+9. Deliver through a pull request only when the delivery gate passes and the
    active authorization permits the mutation.
-9. Sync living specs only after implementation delivery is merged and delta
+10. Sync living specs only after implementation delivery is merged and delta
    operations are proven reflected.
-10. Archive only after implementation and Sync are delivered and the archive
+11. Archive only after implementation and Sync are delivered and the archive
     move is content-preserving.
 
 ## Required References

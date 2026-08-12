@@ -16,6 +16,14 @@ Before marking a pull request ready or merging, verify:
 - the PR body uses a closing keyword only when merge means completion
 - no unrelated or destructive changes are included
 - branch cleanup is authorized and targets the merged topic branch only
+- for `production-rapid`, independent-review evidence names a distinct
+  non-interactive isolated read-only reviewer and the exact current base/head,
+  with a manifest recomputed from the immutable review package and no unresolved
+  blocker or high objective-fix finding; the evidence is retained in the
+  selected entry's exact durable transition review record, whose ID is unique
+  and whose diff provenance is rederived from the read-only base/head range;
+  reviewer identity/type and isolated read-only capability match configured
+  adapter attestation, and both endpoints resolve to canonical commits
 
 ## Issue and Project Gate
 

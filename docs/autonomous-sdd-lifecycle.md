@@ -45,7 +45,21 @@ targets. Do not include token values or other secrets in authorization text.
 5. Run tests, OpenSpec validation, review, security, portability, attribution,
    and recovery checks before marking tasks complete.
 6. Correct objective failures within the correction budget.
-7. Pause for material decisions, credential changes, destructive actions,
+7. For `production-rapid`, obtain independent review after Apply and after
+   every objective fix from a configured, non-interactive, isolated read-only
+   reviewer. Give it only immutable full base/head object IDs, the complete diff, relevant
+   OpenSpec artifacts, and current validation evidence. Record reviewer
+   identity/type, execution and invocation references, reviewed SHAs, time,
+   findings, dispositions, and status. Never accept self, malformed, stale, or
+   wrong-head evidence, or a blocker/high objective-fix finding; GitHub review
+   publication is optional. Recompute its deterministic input manifest at the
+   delivery boundary rather than trusting a caller-provided digest, and retain
+   the exact evidence in a unique durable transition review record. Derive the
+   diff again from the read-only base/head repository range, and treat duplicate
+   durable review IDs as a conflict. Require reviewer identity/type and
+   isolation/read-only capability from configured adapter attestation, then
+   resolve supplied lowercase full object IDs as canonical commits.
+8. Pause for material decisions, credential changes, destructive actions,
    unexpected external targets, durable-state conflicts, or persistent
    environment failures.
 
