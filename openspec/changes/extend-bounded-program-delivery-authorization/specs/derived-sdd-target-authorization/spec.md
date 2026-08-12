@@ -11,8 +11,9 @@ queue and a derived-target rule. A derived target MUST identify its selected
 queue entry, repository, record kind, exact identifier, base branch where
 applicable, and current head commit where applicable. The system MUST reject a
 derived target unless every field matches the active queue entry and the named
-repository, and it MUST retain exact-target behavior when no derived-target
-rule exists.
+repository and one durable current evidence reference, including the recorded
+head where applicable. It MUST retain exact-target behavior only when no
+derived-target rule exists.
 
 #### Scenario: Derived pull request target matches the selected entry
 - **WHEN** an active authorization selects one named queue entry and records a
@@ -24,6 +25,11 @@ rule exists.
 - **WHEN** a requested issue, branch, pull request, Sync record, Archive
   target, or cleanup branch is not recorded for the selected queue entry
 - **THEN** the system pauses before mutation with an unauthorized-target result
+
+#### Scenario: Exact target cannot bypass a declared derived rule
+- **WHEN** a lifecycle request names an exact target but its authorization also
+  declares derived targets and the selected entry has no matching durable record
+- **THEN** the system pauses before the transition
 
 ### Requirement: Derived targets retain all existing delivery gates
 The system SHALL authorize a derived delivery transition only after fixed

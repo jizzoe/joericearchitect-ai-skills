@@ -66,6 +66,10 @@ base-to-head comparison and rejects a supplied package whose diff differs; it
 does not trust a caller-provided diff string. Duplicate review record IDs are a
 durable-state conflict and are rejected by both checkpoint inspection and the
 delivery boundary.
+Each derived record retains a current evidence reference and, for a
+branch- or PR-bound record, the evidence head equal to its recorded head. The
+operation request must name that evidence; an exact target cannot bypass this
+rule, and Sync follows the same durable derived-record chain.
 The delivery evaluator matches reviewer type and identity to a configured
 reviewer with adapter-attested non-interactive, isolated, read-only capability;
 request flags do not create reviewer authority. It resolves each supplied

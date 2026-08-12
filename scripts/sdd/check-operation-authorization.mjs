@@ -58,8 +58,12 @@ function durableDerivedRecordMatches(request) {
   const matches = entry.records.filter((candidate) => candidate?.entry === record?.entry &&
     candidate.kind === record?.kind && candidate.id === record?.id &&
     candidate.repository === record?.repository && candidate.baseBranch === record?.baseBranch &&
-    candidate.headCommit === record?.headCommit);
-  return matches.length === 1;
+    candidate.headCommit === record?.headCommit && candidate.evidence?.reference === record?.evidence?.reference &&
+    candidate.evidence?.current === true && candidate.evidence?.headCommit === record?.evidence?.headCommit);
+  const candidate = matches[0];
+  if (matches.length !== 1 || !candidate || request.evidenceReference !== candidate.evidence.reference) return false;
+  if (candidate.headCommit && (candidate.evidence.headCommit !== candidate.headCommit || request.evidenceHeadCommit !== candidate.headCommit)) return false;
+  return true;
 }
 
 function publicSourceMatches(authorization, request) {
@@ -114,7 +118,7 @@ export function checkOperationAuthorization(input) {
   const exactTarget = authorization.targets?.some((target) => targetMatches(target, request.target));
   const derivedTarget = derivedTargetMatches(authorization, request);
   const publicSource = publicSourceMatches(authorization, request);
-  if (highImpactLifecycleActions.has(request.lifecycleAction) && authorization.derivedTargets && !derivedTarget) return fail("derived-record-not-durable", request.target);
+  if (lifecycleActions.has(request.lifecycleAction) && authorization.derivedTargets && !derivedTarget) return fail("derived-record-not-durable", request.target);
   if (!exactTarget && !derivedTarget && !publicSource) return fail("unauthorized-target", request.target);
   if (derivedTarget && !durableDerivedRecordMatches(request)) return fail("derived-record-not-durable", request.target);
   if (authorizationExpired(authorization, input.now)) return fail("expired-authorization");

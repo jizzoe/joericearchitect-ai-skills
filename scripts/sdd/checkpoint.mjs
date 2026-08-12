@@ -21,7 +21,9 @@ function invalidDerivedRecord(input) {
     if (!record || typeof record.kind !== "string" || typeof record.id !== "string" || seen.has(key)) return "invalid-derived-record";
     seen.add(key);
     if (record.entry !== checkpoint.name || !record.repository) return "derived-record-linkage-mismatch";
+    if (!record.evidence || typeof record.evidence.reference !== "string" || !record.evidence.reference || record.evidence.current !== true) return "derived-record-missing-current-evidence";
     if ((record.kind === "branch" || record.kind === "pr") && (!record.baseBranch || !commitReference(record.headCommit))) return "derived-record-missing-linkage";
+    if ((record.kind === "branch" || record.kind === "pr") && record.evidence.headCommit !== record.headCommit) return "derived-record-evidence-head-mismatch";
   }
   return null;
 }
