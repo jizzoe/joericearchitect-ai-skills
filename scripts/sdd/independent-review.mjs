@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 // Pure evaluator for an independently executed, read-only review channel.
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
-function commitReference(value) { return typeof value === "string" && /^[0-9a-f]{7,64}$/i.test(value); }
+function commitReference(value) { return typeof value === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value); }
 function fail(code, detail) { return { allowed: false, classification: "paused", issues: [{ code, ...(detail ? { detail } : {}) }] }; }
 function validTimestamp(value) { return nonEmpty(value) && !Number.isNaN(Date.parse(value)); }
 

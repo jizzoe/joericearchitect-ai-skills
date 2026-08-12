@@ -33,6 +33,8 @@ test("rejects self review, stale SHA, malformed or missing evidence, and unavail
   assert.equal(code(validateIndependentReviewEvidence({ reviewer: fixture.reviewer, implementerSession: fixture.implementerSession, expectedBase: fixture.input.baseCommit, expectedHead: fixture.input.headCommit, expectedReviewManifest: manifest })), "independent-review-evidence-malformed");
   assert.equal(code(validateIndependentReviewEvidence({ reviewer: fixture.reviewer, implementerSession: fixture.implementerSession, expectedBase: "", expectedHead: fixture.input.headCommit, expectedReviewManifest: manifest, evidence: fixture.evidence })), "independent-review-input-incomplete");
   assert.equal(code(validateIndependentReviewEvidence({ reviewer: fixture.reviewer, implementerSession: fixture.implementerSession, expectedBase: fixture.input.baseCommit, expectedHead: "", expectedReviewManifest: manifest, evidence: fixture.evidence })), "independent-review-input-incomplete");
+  assert.equal(code(prepareIndependentReview({ reviewer: fixture.reviewer, implementerSession: fixture.implementerSession, reviewInput: { ...fixture.input, baseCommit: "aaaaaaa" } })), "independent-review-input-incomplete");
+  assert.equal(code(validate({ reviewedHead: "bbbbbbb" })), "independent-review-evidence-malformed");
   assert.equal(code(validateIndependentReviewEvidence({ reviewer: { ...fixture.reviewer, available: false }, implementerSession: fixture.implementerSession, expectedBase: fixture.input.baseCommit, expectedHead: fixture.input.headCommit, expectedReviewManifest: manifest, evidence: fixture.evidence })), "independent-reviewer-unavailable");
 });
 
