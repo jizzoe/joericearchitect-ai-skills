@@ -114,8 +114,9 @@ export function checkOperationAuthorization(input) {
   const exactTarget = authorization.targets?.some((target) => targetMatches(target, request.target));
   const derivedTarget = derivedTargetMatches(authorization, request);
   const publicSource = publicSourceMatches(authorization, request);
+  if (highImpactLifecycleActions.has(request.lifecycleAction) && authorization.derivedTargets && !derivedTarget) return fail("derived-record-not-durable", request.target);
   if (!exactTarget && !derivedTarget && !publicSource) return fail("unauthorized-target", request.target);
-  if (!exactTarget && derivedTarget && !durableDerivedRecordMatches(request)) return fail("derived-record-not-durable", request.target);
+  if (derivedTarget && !durableDerivedRecordMatches(request)) return fail("derived-record-not-durable", request.target);
   if (authorizationExpired(authorization, input.now)) return fail("expired-authorization");
   if (runtime.permissionGaps?.length || (Array.isArray(runtime.permittedOperations) && !runtime.permittedOperations.includes(operation))) return fail("runtime-permission-gap", operation);
   if (request.adapter && !authorization.targets?.includes(`adapter:${request.adapter}`)) return fail("unauthorized-adapter", request.adapter);
