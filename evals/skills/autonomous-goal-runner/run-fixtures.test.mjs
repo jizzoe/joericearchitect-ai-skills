@@ -35,6 +35,21 @@ test("run policy rejects expired authorization", () => {
   assert.equal(result.issues.some((issue) => issue.code === "expired-authorization"), true);
 });
 
+test("run policy applies deterministic operation checks when an action is supplied", () => {
+  const input = fixture("run-policy-valid.json");
+  input.authorization.targets = ["workspace:docs"];
+  input.authorization.allowedMutations = ["local-edit"];
+  input.runtime.permittedOperations = ["local-edit"];
+  input.operationRequest = {
+    profile: "research-read-only",
+    operation: "local-edit",
+    target: "workspace:docs/result.md"
+  };
+  const result = validateRunPolicy(input);
+  assert.equal(result.valid, false);
+  assert.equal(result.issues.some((issue) => issue.code === "operation-operation-not-in-profile"), true);
+});
+
 test("run policy rejects configured product constants in canonical text", () => {
   const result = validateRunPolicy(fixture("run-policy-product-constant.json"));
   assert.equal(result.valid, false);

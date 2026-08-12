@@ -17,3 +17,7 @@ Canonical scripts:
 
 The skill is read-only. It reports in-flight, actionable, blocked, parallel,
 and next work and never switches changes without an explicit target.
+
+## Guardrails
+
+See [Shared guardrails](../_shared/guardrails.md).

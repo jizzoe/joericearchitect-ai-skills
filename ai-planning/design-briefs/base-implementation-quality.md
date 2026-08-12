@@ -116,6 +116,13 @@ equivalent configured repository control). If those are unavailable, the work
 must pause or use the prototype-rapid profile; it cannot claim production-rapid
 completion.
 
+Delivery-profile selection does not weaken the shared approval policy. In
+interactive `production-rapid` work, merge, merged-topic-branch deletion, and
+OpenSpec Archive require just-in-time approval after their evidence gates pass.
+A selected `prototype-rapid` one-change delivery may replace only that routine
+prompt with an exact, time-bounded preapproval; all target, evidence, recovery,
+and runtime-permission gates remain required.
+
 Playwright, Chromium, and axe-core are implementation prerequisites whenever a
 UI change requires browser/accessibility evidence. Missing tools never justify
 silently skipping required verification. In interactive mode, the skill reports

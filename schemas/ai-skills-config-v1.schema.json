@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ai-skills.invalid/ai-skills-config-v1.schema.json",
+  "title": "AI Skills Configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "researchRoot": { "type": "string", "minLength": 1 },
+        "designBriefRoot": { "type": "string", "minLength": 1 },
+        "planRoot": { "type": "string", "minLength": 1 }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z0-9]+(?:-[a-z0-9]+)*$": { "type": "string", "minLength": 1 }
+      }
+    },
+    "adapters": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z0-9]+(?:-[a-z0-9]+)*$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "enabled", "operations"],
+          "properties": {
+            "kind": { "type": "string", "minLength": 1 },
+            "enabled": { "type": "boolean" },
+            "operations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": ["read-source", "write-findings", "write-sources", "write-result", "read-workspace", "local-edit", "run-test", "run-validation", "objective-correction", "read-tracker", "backup-tracker", "upsert-allowlisted-record", "write-reconciliation-report", "issue-create-or-update", "project-update", "draft-pr-create-or-update", "run-lifecycle-action", "notify-state"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z0-9]+(?:-[a-z0-9]+)*$": { "type": "string", "minLength": 1 }
+      }
+    },
+    "featureFlags": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z0-9]+(?:-[a-z0-9]+)*$": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -29,3 +29,7 @@ dry-run synchronization, or explicitly authorized repair.
 - Repair requires explicit authorization.
 - Missing Project fields or unknown statuses fail safely.
 - PR linkage and PR-driven status reconciliation belong to later milestones.
+
+## Guardrails
+
+See [Shared guardrails](../_shared/guardrails.md).

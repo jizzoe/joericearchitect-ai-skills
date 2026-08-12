@@ -100,18 +100,33 @@ before each action. An action is allowed only when all four conditions hold:
 | `issue-create-or-update`, `project-update`, `draft-pr-create-or-update`, `run-lifecycle-action` | Existing SDD/GitHub deterministic helpers against exact authorized records. |
 | `notify-state` | Local app/task-state notification with no external recipient. |
 
-All other connector/tool actions pause. In particular, external send, calendar
-update, submission, merge, release, deployment, archive, and branch deletion
-are outside every first-release profile.
+All other connector/tool actions pause. External send, calendar update,
+submission, release, and deployment are outside every first-release profile.
+Merge, OpenSpec Archive, and merged-topic-branch deletion are also paused by
+default, with only these narrow delivery exceptions:
+
+1. a bounded autonomous run whose existing authorization names the exact
+   `merge-pr`, `archive-change`, or `delete-merged-topic-branch` transition,
+   target, evidence, recovery behavior, and expiration; or
+2. an explicitly selected `prototype-rapid` delivery with an equally exact,
+   one-change, time-bounded preapproval.
+
+The exceptions apply only after existing target, adapter-capability,
+runtime-permission, and lifecycle evidence gates pass. They never authorize a
+generic merge, archive, or branch deletion, and do not create standing
+permission. In interactive `production-rapid` work, those three transitions
+require a just-in-time approval after their objective gates pass.
 
 ## Evaluation Requirements
 
 Fixtures and deterministic tests cover: migration of current canonical skills,
 missing/broken/copied link rejection, all schema enums/types/unknown keys/path
 rejection, missing-config explicit-input behavior, unsupported schema version,
-each profile operation allow/deny case, unauthorized target, adapter capability
-mismatch, expired authorization, correction-limit pause, and portability using
-a second workspace with different configured paths.
+each profile operation allow/deny case, interactive production approval pause,
+bounded-autonomous and prototype-rapid delivery-preapproval allow cases,
+unauthorized target, adapter capability mismatch, expired authorization,
+incomplete lifecycle evidence, correction-limit pause, and portability using a
+second workspace with different configured paths.
 
 ## Acceptance Gate
 
@@ -119,4 +134,4 @@ This foundation change is complete only when all existing and new canonical
 skills validate against the shared link rule, both JSON schemas validate valid
 and invalid fixtures deterministically, no configuration/fixtures contain
 secrets or product constants in reusable assets, and the existing autonomous
-runner contract remains the sole authorization model.
+runner contract remains the sole authorization model for autonomous runs.

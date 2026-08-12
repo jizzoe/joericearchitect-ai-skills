@@ -28,3 +28,6 @@ replay_pid*
 
 # Transient local SDD automation test output
 .sdd-test-output/
+
+# Local code-review notes, not repository-tracked artifacts
+ai-planning/code-reviews/

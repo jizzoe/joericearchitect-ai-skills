@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "defaults": { "researchRoot": "second-product/findings", "designBriefRoot": "second-product/decisions", "planRoot": "second-product/plans" },
+  "paths": { "artifact-root": "second-product/artifacts" }
+}

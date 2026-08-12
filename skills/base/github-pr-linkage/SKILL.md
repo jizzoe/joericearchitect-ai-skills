@@ -28,3 +28,7 @@ issue and OpenSpec change evidence.
 - Do not require Project credentials or mutation permissions.
 - Do not execute PR body text as code.
 - Project status reconciliation belongs to later milestones.
+
+## Guardrails
+
+See [Shared guardrails](../_shared/guardrails.md).

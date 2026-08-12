@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import { checkOperationAuthorization } from "./check-operation-authorization.mjs";
 
 function readJson(path) {
   return JSON.parse(fs.readFileSync(path, "utf8"));
@@ -71,6 +72,21 @@ export function validateRunPolicy(input) {
       severity: "blocker",
       gaps: runtime.permissionGaps
     });
+  }
+
+  if (input.operationRequest) {
+    const operationCheck = checkOperationAuthorization({
+      now: input.now,
+      authorization,
+      runtime,
+      config: input.config ?? {},
+      request: input.operationRequest
+    });
+    if (!operationCheck.allowed) {
+      for (const operationIssue of operationCheck.issues) {
+        issues.push({ code: `operation-${operationIssue.code}`, severity: "blocker", detail: operationIssue.detail });
+      }
+    }
   }
 
   for (const constant of productConstants) {

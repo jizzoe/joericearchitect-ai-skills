@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ai-skills.invalid/skill-result-v1.schema.json",
+  "title": "AI Skills Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "skill", "status", "mode", "summary", "artifacts", "evidence", "assumptions", "openQuestions", "nextAction"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "skill": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "status": { "enum": ["completed", "paused", "blocked", "no-op"] },
+    "mode": { "enum": ["interactive", "autonomous"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "operation", "subject"],
+        "properties": {
+          "kind": { "enum": ["file", "record", "external-state", "other"] },
+          "operation": { "enum": ["read", "created", "updated", "unchanged"] },
+          "subject": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "subject", "result"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "type": { "enum": ["command", "validation", "test", "review", "screenshot", "accessibility", "record", "other"] },
+          "subject": { "type": "string", "minLength": 1 },
+          "result": { "enum": ["passed", "failed", "not-applicable", "informational"] },
+          "reference": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "assumptions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "openQuestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "question", "blocking"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "question": { "type": "string", "minLength": 1 },
+          "blocking": { "type": "boolean" }
+        }
+      }
+    },
+    "nextAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "description"],
+      "properties": {
+        "kind": { "enum": ["continue", "user-decision", "resume", "openspec-explore", "openspec-propose", "none"] },
+        "description": { "type": "string", "minLength": 1 }
+      }
+    },
+    "details": { "type": "object" }
+  }
+}
