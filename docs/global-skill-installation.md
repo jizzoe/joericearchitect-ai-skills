@@ -63,6 +63,53 @@ Do not add `--force` as routine maintenance. It overwrites the existing skill.
 Stop and inspect a conflict or user-authored destination before choosing an
 explicit replacement strategy.
 
+## Utility Commands
+
+For a repeatable development command, use the repository utility. It is a thin
+argument-safe wrapper around `gh skill install`; `gh` remains responsible for
+copying skills, provenance, conflict handling, and destinations.
+
+Install or refresh a local checkout during development. Local changes are
+copied, not linked, so rerun this explicit command with `--force` after each
+edit you want to test, then start a new agent session.
+
+```bash
+node scripts/skills/install-global-skill.mjs \
+  --local . \
+  --skill skills/base/github-pr-linkage \
+  --agent codex \
+  --force
+```
+
+Install every skill from a reviewed remote revision. Replace the pin with a
+reviewed release tag or commit SHA from `main`; do not treat an unreviewed
+branch name as a reproducible release identifier.
+
+```bash
+node scripts/skills/install-global-skill.mjs \
+  --remote jizzoe/joericearchitect-ai-skills \
+  --all \
+  --agent codex \
+  --pin <reviewed-release-tag-or-main-commit-sha>
+```
+
+The remote source may be unpinned, but the utility prints a warning because
+GitHub CLI then resolves its normal mutable version. Preview any command
+without starting `gh`:
+
+```bash
+node scripts/skills/install-global-skill.mjs \
+  --local . \
+  --all \
+  --agent claude-code \
+  --dry-run
+```
+
+Use `--help` to see the required explicit source, skill selection, and agent.
+The utility always passes `--scope user`; it never configures credentials,
+profiles, or project-scope skills. Direct `gh skill install` commands remain a
+supported alternative.
+
 ## Verify and Activate
 
 List the recorded installations and confirm the source URL, user scope, pin,
@@ -123,14 +170,17 @@ Run the local, disposable installer fixture after metadata validation:
 ```bash
 node scripts/validation/validate-skill-metadata.mjs
 node evals/skills/global-skill-installation/run-fixtures.mjs
+node --test scripts/skills/test/install-global-skill.test.mjs
+node evals/skills/global-skill-installation/run-install-utility-fixtures.mjs
 ```
 
-It covers user-scope local-source installation for Claude Code and Codex,
-discovery/listing, no-mutation skill discovery, rerun behavior, an existing
-destination conflict, paths with spaces, and an alternate source layout. It
-does not use your global assistant directories or credentials. Run the
-documented per-agent invocation manually from an authenticated disposable
-profile before claiming the tested agent/version pair is supported.
+The install/list fixture covers user-scope local-source installation for Claude
+Code and Codex, discovery/listing, no-mutation skill discovery, rerun behavior,
+an existing destination conflict, paths with spaces, and an alternate source
+layout. The utility fixture covers local and remote dry-run rendering with a
+second checkout path. Neither uses global assistant directories or credentials.
+Run the documented per-agent invocation manually from an authenticated
+disposable profile before claiming the tested agent/version pair is supported.
 
 The optional authenticated invocation accepts only a pre-provisioned disposable
 profile path, never your normal `$HOME`. It isolates `gh` configuration and
@@ -138,9 +188,9 @@ removes only the fixture skill that it installed in that disposable profile.
 
 ## Boundary
 
-`gh skill` is the initial installer for this repository. A custom installer is
-not included. Propose one only with repeatable fixture evidence that the GitHub
-CLI flow cannot satisfy a documented user requirement.
+`gh skill` remains the installer for this repository. The utility only validates
+and invokes its argument array; it does not copy files, manage provenance, or
+modify agent configuration. Direct `gh skill` commands remain authoritative.
 
 Sources: [GitHub CLI skill-install manual](https://cli.github.com/manual/gh_skill_install),
 [GitHub CLI skill preview manual](https://cli.github.com/manual/gh_skill_preview),

@@ -1,0 +1,17 @@
+schema_version: 1
+openspec:
+  change: add-skill-install-utility
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 59
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/59
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - docs/global-skill-installation.md
+      - evals/skills/global-skill-installation/run-install-utility-fixtures.mjs
+      - openspec/changes/add-skill-install-utility/
+      - scripts/skills/
