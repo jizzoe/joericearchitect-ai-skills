@@ -8,8 +8,8 @@ program delivery chain.
 ## Goals / Non-Goals
 
 **Goals:** add a data-only derived-target declaration, deterministic matching,
-durable entry checkpoints, and synthetic coverage for valid and invalid
-delivery chains.
+durable entry checkpoints, operational independent-review evidence, and
+synthetic coverage for valid and invalid delivery chains.
 
 **Non-Goals:** discover targets by loose naming patterns; create credentials;
 perform external delivery without a configured adapter and runtime permission;
@@ -47,18 +47,39 @@ rule is a declarative boundary checked before local source-record writes; it
 does not permit sign-in, downloaded-code execution, private access, or writes
 outside the authorized workspace target.
 
+### Validate independent review as immutable delivery evidence
+
+For `production-rapid`, an adapter first invokes a configured reviewer only
+with an immutable package: base and head SHAs, accumulated diff, relevant
+OpenSpec artifacts, and current validation evidence. The pure evaluator never
+spawns a process or mutates workspace/GitHub state; it requires the adapter to
+declare a non-interactive, isolated, read-only reviewer distinct from the
+implementing session. It rejects evidence lacking reviewer identity/type,
+execution and invocation references, timestamp, exact reviewed SHAs,
+findings, dispositions, or a clear final status.
+
+Any blocker or high `objective-fix` finding blocks delivery. A bounded,
+behavior-preserving fix reruns affected checks and produces new review evidence
+for the new exact head; stale prior evidence is rejected. The normal
+three-materially-different-fixes budget and material-decision pause rule remain
+in force. GitHub review publication can supplement this record but cannot
+replace it.
+
 ## Risks / Trade-offs
 
 - [A loosely specified record shape could broaden delivery authority] → require
   exact record kind, identifier, entry, repository, and applicable linkage.
 - [A caller could reuse stale evidence] → require current evidence and head
   matching for high-impact delivery operations.
+- [An implementer could label its own review independent] → reject matching
+  implementer/reviewer identities and require an isolated read-only reviewer.
 - [New fields could break existing consumers] → preserve exact-target fallback
   and cover it with regression fixtures.
 
 ## Migration Plan
 
-1. Add pure validation and checkpoint helpers with synthetic inputs.
+1. Add pure validation, checkpoint, and independent-review helpers with
+   synthetic inputs.
 2. Update canonical runner policy and progressive reference documentation.
 3. Run focused evaluator tests, full repository validation, and strict
    OpenSpec validation.
@@ -72,8 +93,8 @@ implementation and adds no dependency.
 
 ## Verification Strategy
 
-- Run valid and invalid derived-delivery, public-source, and checkpoint
-  evaluator fixtures through the focused Node suite.
+- Run valid and invalid derived-delivery, public-source, checkpoint, and
+  independent-review evaluator fixtures through the focused Node suite.
 - Run repository validation tests, artifact-quality validation, strict OpenSpec
   validation, and a diff/secret review.
 - Confirm exact-target compatibility remains covered by regression fixtures.
@@ -86,8 +107,8 @@ record conflicts for human review and never recreate a durable target.
 
 ## Reuse Plan
 
-Canonical helpers accept all repository, project, branch, record, and timing
-data as input. The runner skill links to the portable policy; platform adapters
+Canonical helpers accept all repository, project, branch, reviewer, record,
+and timing data as input. The runner skill links to the portable policy; platform adapters
 remain thin consumers. A second synthetic workspace configuration uses
 different identifiers to demonstrate that no product-specific value is needed.
 The security boundary forbids credentials and untrusted-code execution, while

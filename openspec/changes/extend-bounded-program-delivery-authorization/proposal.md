@@ -15,6 +15,8 @@ cleanup that it deterministically creates for an approved queue entry.
   incomplete, stale, mismatched, or expired delivery targets.
 - Permit preapproved unauthenticated public-source reads only when an active
   run authorization explicitly includes them.
+- Make `production-rapid` independent-review evidence an operational,
+  exact-head delivery gate rather than a planning-only statement.
 
 ## Non-Goals
 
@@ -38,11 +40,14 @@ cleanup that it deterministically creates for an approved queue entry.
   while retaining explicit profile, evidence, runtime, and expiry checks.
 - `sdd-lifecycle`: requires durable derived-target linkage before autonomous
   delivery, Sync, Archive, or merged-branch cleanup.
+- `bounded-autonomous-execution`: requires an isolated configured reviewer and
+  valid reviewer evidence before `production-rapid` delivery transitions.
 
 ## Impact
 
 - Affects the portable SDD authorization checker, checkpoint helper, their
-  synthetic evaluations, and canonical autonomous-runner documentation.
+  synthetic evaluations, canonical autonomous-runner documentation, and the
+  autonomous SDD lifecycle workflow.
 - Primary issue: [#72](https://github.com/jizzoe/joericearchitect-ai-skills/issues/72),
   "Extend bounded program delivery authorization."
 - Scope is limited to portable local policy, synthetic evaluation, and later

@@ -77,6 +77,21 @@ three transitions. An interactive `prototype-rapid` delivery may instead use a
 recorded, exact, time-bounded one-change preapproval; it is not a standing
 grant and is not an autonomous-runner invocation.
 
+## Production-Rapid Independent Review
+
+Before a high-impact `production-rapid` transition, invoke a configured,
+non-interactive reviewer in an execution context isolated from the implementing
+session. The reviewer is read-only: it cannot change the workspace or GitHub.
+Give it only immutable base/head SHAs, accumulated diff, relevant OpenSpec
+artifacts, and current test/validation evidence, without the desired outcome.
+Record its type/identity, execution and invocation reference, reviewed SHAs,
+timestamp, findings and dispositions, and final status. Require the evidence
+to match the exact current head. After a behavior-preserving objective fix,
+rerun affected evidence and review the new head; stop after three materially
+different fixes for one failure signature or on a material decision. An
+unavailable, self, malformed, stale, wrong-head, mutable, blocker, or high
+objective-fix review pauses the transition. GitHub publication is optional.
+
 ## Always Forbidden Without Separate Explicit Approval
 
 - repository deletion

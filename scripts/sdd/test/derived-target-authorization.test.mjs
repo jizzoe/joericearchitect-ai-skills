@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { checkOperationAuthorization } from "../check-operation-authorization.mjs";
 import { inspectCheckpoint } from "../checkpoint.mjs";
+import { prepareIndependentReview } from "../independent-review.mjs";
 
 const authorization = {
   targets: ["workspace:reports"],
@@ -57,4 +58,15 @@ test("checkpoint resumes first incomplete step and stops invalid linkage", () =>
   assert.deepEqual(inspectCheckpoint(base), { classification: "continue", firstIncomplete: "pr", reason: "first-incomplete-step" });
   assert.deepEqual(inspectCheckpoint({ ...base, steps: [{ id: "issue", status: "complete", evidence: { present: true, current: false } }] }), { classification: "stale-evidence", firstIncomplete: "issue", reason: "completed-step-lacks-current-evidence" });
   assert.equal(inspectCheckpoint({ ...base, selectedEntry: { name: "other", records: [record] } }).classification, "human-decision");
+});
+
+test("production-rapid delivery requires current independent review evidence", () => {
+  const reviewer = { type: "fixture-reviewer", identity: "fresh-reviewer", available: true, nonInteractive: true, isolatedContext: true, readOnly: true };
+  const reviewInput = { baseCommit: "base", headCommit: "abc123", diff: "diff", openspecArtifacts: ["proposal"], validationEvidence: ["tests"] };
+  assert.equal(prepareIndependentReview({ reviewer, implementerSession: "implementer", reviewInput }).allowed, true);
+  const result = checkOperationAuthorization({ authorization, runtime, request: {
+    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, headCommit: "abc123", baseCommit: "base", evidenceCurrent: true, recovery: "re-read PR and checkpoint", deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer,
+    independentReviewEvidence: { reviewer: { type: "fixture-reviewer", identity: "fresh-reviewer" }, executionRef: "run", invocationRef: "fixture", reviewedBase: "base", reviewedHead: "abc123", timestamp: "2026-08-12T12:00:00.000Z", findings: [], dispositions: [], finalStatus: "clear" }
+  } });
+  assert.equal(result.allowed, true, JSON.stringify(result));
 });

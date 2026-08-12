@@ -40,3 +40,31 @@ only within authorized workspace targets.
 - **THEN** the runner pauses before the read regardless of the public-source
   rule
 
+### Requirement: Production-rapid delivery requires independent review evidence
+The runner SHALL require a configured non-interactive reviewer in a separate,
+read-only execution context after Apply and after every behavior-preserving
+objective fix before it authorizes a `production-rapid` high-impact delivery
+transition. The reviewer input MUST contain only immutable base and head SHAs,
+the accumulated diff, relevant OpenSpec artifacts, and current test or
+validation evidence; it MUST NOT contain the implementer's desired conclusion.
+The runner MUST reject self-review, unavailable reviewers, malformed evidence,
+stale or wrong SHA evidence, and unresolved blocker or high `objective-fix`
+findings. It MUST record reviewer type and identity, execution and invocation
+references, reviewed SHAs, timestamp, findings, dispositions, and final status.
+GitHub review publication MAY supplement but MUST NOT replace this evidence.
+
+#### Scenario: Clean independent review authorizes exact-head delivery
+- **WHEN** a distinct configured read-only reviewer returns complete clear
+  evidence for the current immutable base and head after Apply
+- **THEN** the runner may treat independent review as current delivery evidence
+
+#### Scenario: Objective fix requires review of the new head
+- **WHEN** a reviewer identifies a bounded high `objective-fix` and the runner
+  applies the fix and reruns affected evidence
+- **THEN** the runner rejects the prior review and requires a new reviewer
+  record for the exact new head before delivery
+
+#### Scenario: Reviewer capability or evidence is invalid
+- **WHEN** the reviewer is unavailable, is the implementation session, can
+  mutate the workspace or GitHub, or produces malformed or stale evidence
+- **THEN** the runner pauses without downgrading the `production-rapid` gate

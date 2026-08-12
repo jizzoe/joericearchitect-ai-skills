@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { operationVocabulary } from "../validation/validate-base-skill-contracts.mjs";
+import { validateIndependentReviewEvidence } from "./independent-review.mjs";
 
 export const profileOperations = {
   "research-read-only": new Set(["read-source", "write-findings", "write-sources", "write-result", "notify-state"]),
@@ -93,6 +94,10 @@ export function checkOperationAuthorization(input) {
     if (!request.target?.startsWith(lifecycleTargetPrefixes[request.lifecycleAction])) return fail("lifecycle-target-type-mismatch", request.lifecycleAction);
     if (!nonEmpty(request.recovery)) return fail("missing-recovery", request.lifecycleAction);
     if (request.evidenceCurrent !== true) return fail("incomplete-lifecycle-evidence", request.lifecycleAction);
+    if (request.deliveryProfile === "production-rapid") {
+      const review = validateIndependentReviewEvidence({ reviewer: request.reviewer, implementerSession: request.implementerSession, expectedBase: request.baseCommit, expectedHead: request.headCommit, evidence: request.independentReviewEvidence });
+      if (!review.allowed) return review;
+    }
   }
   return { allowed: true, classification: "authorized", issues: [] };
 }

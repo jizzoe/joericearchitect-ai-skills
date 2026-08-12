@@ -16,6 +16,9 @@ Before marking a pull request ready or merging, verify:
 - the PR body uses a closing keyword only when merge means completion
 - no unrelated or destructive changes are included
 - branch cleanup is authorized and targets the merged topic branch only
+- for `production-rapid`, independent-review evidence names a distinct
+  non-interactive isolated read-only reviewer and the exact current base/head,
+  with no unresolved blocker or high objective-fix finding
 
 ## Issue and Project Gate
 
