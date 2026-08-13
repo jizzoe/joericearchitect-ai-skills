@@ -5,6 +5,7 @@ import path from "node:path";
 import { createDetachedReviewView, removeDetachedReviewView } from "./detached-review-view.mjs";
 import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
 import { validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
+import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { runCodexDegradedReviewAdapter, writeReviewPackageForView } from "./platform-review-adapters.mjs";
 
 const recoverableFailures = new Set([
@@ -48,6 +49,7 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
     allowed: true,
     status: "ready",
     code: "review-launcher-recovery-ready",
+    degradedAuthorization: degradedCheck.authorization,
     recovery: Object.freeze({
       launcherId: launcher.id,
       launcherKind,
@@ -117,9 +119,15 @@ export function executeReviewLauncherRecovery({
     else {
       const configuredReviewer = { ...reviewer, attestation: reviewer.attestation ?? { ref: attestationRef } };
       const validation = validateReviewResult(execution?.result, { expectedPackage: reviewPackage, configuredReviewer, implementerSession: authorization.implementerSession });
-      output = !validation.valid || execution.result.assuranceLevel !== "authorized-degraded"
-        ? fail("review-launcher-result-invalid", validation.issues?.[0]?.code)
-        : { allowed: true, status: execution.result.status, code: "review-launcher-recovery-complete", result: execution.result, launcherEvidence: preflight.recovery };
+      if (!validation.valid || execution.result.assuranceLevel !== "authorized-degraded") {
+        output = fail("review-launcher-result-invalid", validation.issues?.[0]?.code);
+      } else if (!strictSummaryMatchesResult(execution.result.strictUnavailable, strictResult)) {
+        output = fail("review-launcher-strict-unavailable-mismatch");
+      } else if (!degradedAuthorizationMatchesResult(execution.result.degradedAuthorization, preflight.degradedAuthorization)) {
+        output = fail("review-launcher-degraded-authorization-mismatch");
+      } else {
+        output = { allowed: true, status: execution.result.status, code: "review-launcher-recovery-complete", result: execution.result, launcherEvidence: preflight.recovery };
+      }
     }
   } catch {
     output = fail("review-launcher-execution-failed");

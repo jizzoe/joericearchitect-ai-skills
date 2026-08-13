@@ -147,6 +147,32 @@ test("launcher recovery creates an owned detached exact-head view and invokes on
     assert.equal(output.launcherEvidence.innerSandbox, "read-only");
     assert.equal(invoked, true);
     assert.equal(removed, true);
+    const packagePath = path.join(reviewPath, ".ai-independent-review-package.json");
+    const runWithResult = (nextResult) => {
+      fs.chmodSync(packagePath, 0o600);
+      return executeReviewLauncherRecovery({
+        ...baseInput,
+        repositoryPath: "/fixture",
+        reviewer: { type: "codex-degraded", identity: "fresh-reviewer", attestation: { ref: "degraded-attestation" } },
+        attestationRef: "degraded-attestation",
+        createView: () => ({ available: true, view }),
+        removeView: () => ({ removed: true }),
+        invoke: () => ({ status: "passed", result: nextResult })
+      });
+    };
+    for (const strictUnavailable of [
+      { ...result.strictUnavailable, reviewRecordId: "different-record" },
+      { ...result.strictUnavailable, executionId: "different-execution" },
+      { ...result.strictUnavailable, adapter: "different-adapter" }
+    ]) {
+      assert.equal(runWithResult({ ...result, strictUnavailable }).code, "review-launcher-strict-unavailable-mismatch");
+    }
+    for (const degradedAuthorization of [
+      { ...result.degradedAuthorization, expiresAt: "2026-08-14T00:00:01.000Z" },
+      { ...result.degradedAuthorization, riskReason: "different risk" }
+    ]) {
+      assert.equal(runWithResult({ ...result, degradedAuthorization }).code, "review-launcher-degraded-authorization-mismatch");
+    }
   } finally {
     fs.rmSync(temporaryRoot, { recursive: true, force: true });
   }

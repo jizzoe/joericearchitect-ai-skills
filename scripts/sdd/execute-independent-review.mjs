@@ -1,4 +1,4 @@
-import { canonicalJson, validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
+import { validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { validateReviewAdapterCapabilities } from "./review-adapter-contract.mjs";
 import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
@@ -40,24 +40,28 @@ function strictUnavailableResult({ reviewPackage, configuredReviewer, code }) {
   };
 }
 
-function durableStrictUnavailableMatches(record, candidate, reviewPackage, configuredReviewer, implementerSession) {
+function validatedDurableStrictUnavailable(record, reviewPackage, configuredReviewer, implementerSession) {
   const value = record?.result;
-  if (typeof record?.reference !== "string" || record.reference.length === 0 || record.current !== true) return false;
+  if (typeof record?.reference !== "string" || record.reference.length === 0 || record.current !== true) return null;
   const validation = validateReviewResult(value, { expectedPackage: reviewPackage, configuredReviewer, implementerSession });
+  const expectedAdapter = configuredReviewer?.adapter ?? configuredReviewer?.type;
   return validation.valid && value.status === "unavailable" && value.assuranceLevel === "strict-isolated" &&
-    canonicalJson(value) === canonicalJson(candidate);
+    value.reviewer.adapter === expectedAdapter ? value : null;
 }
 
 /** Strict is always attempted first. Degraded review is an explicit second
  * transport and receives only an immutable copy of the sealed package. */
 export async function executeAuthorizedIndependentReview({ package: reviewPackage, strictAdapter, degradedAdapter, configuredReviewer, degradedReviewer, implementerSession, authorization, selectedEntry, transition = "merge-pr", invokeStrict, invokeDegraded, durableStrictUnavailable, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now } = {}) {
-  const strict = await executeIndependentReview({ package: reviewPackage, adapter: strictAdapter, configuredReviewer, implementerSession, invoke: invokeStrict });
+  const durable = validatedDurableStrictUnavailable(durableStrictUnavailable, reviewPackage, configuredReviewer, implementerSession);
+  const strict = durable
+    ? { status: "unavailable", result: durable }
+    : await executeIndependentReview({ package: reviewPackage, adapter: strictAdapter, configuredReviewer, implementerSession, invoke: invokeStrict });
   if (strict.status !== "unavailable") return { ...strict, assuranceLevel: "strict-isolated" };
   const candidate = strict.result ?? strictUnavailableResult({ reviewPackage, configuredReviewer, code: strict.code ?? "independent-reviewer-unavailable" });
-  if (!durableStrictUnavailableMatches(durableStrictUnavailable, candidate, reviewPackage, configuredReviewer, implementerSession)) {
+  if (!durable) {
     return { status: "unavailable", code: "strict-unavailable-evidence-not-durable", strictResult: candidate, requiresPersistence: true };
   }
-  const strictResult = durableStrictUnavailable.result;
+  const strictResult = durable;
   const authorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts, derivedCorrection, correctionEvidence, now });
   if (!authorizationCheck.allowed) return { status: "unavailable", code: authorizationCheck.issues[0].code, strictResult };
   const probe = probeDegradedIndependentReviewAdapter(degradedAdapter);
