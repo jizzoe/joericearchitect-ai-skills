@@ -1,4 +1,5 @@
-import { validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
+import { canonicalJson, validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
+import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { validateReviewAdapterCapabilities } from "./review-adapter-contract.mjs";
 import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
 
@@ -39,13 +40,12 @@ function strictUnavailableResult({ reviewPackage, configuredReviewer, code }) {
   };
 }
 
-function durableStrictUnavailableMatches(record, candidate, reviewPackage) {
+function durableStrictUnavailableMatches(record, candidate, reviewPackage, configuredReviewer, implementerSession) {
   const value = record?.result;
-  return typeof record?.reference === "string" && record.reference.length > 0 && record.current === true &&
-    value?.status === "unavailable" && value.unavailableCode === candidate.unavailableCode &&
-    value.baseCommit === reviewPackage.baseCommit && value.headCommit === reviewPackage.headCommit &&
-    value.manifestDigest === reviewPackage.manifestDigest && typeof value.reviewRecordId === "string" &&
-    value.reviewRecordId.length > 0 && typeof value.executionId === "string" && value.executionId.length > 0;
+  if (typeof record?.reference !== "string" || record.reference.length === 0 || record.current !== true) return false;
+  const validation = validateReviewResult(value, { expectedPackage: reviewPackage, configuredReviewer, implementerSession });
+  return validation.valid && value.status === "unavailable" && value.assuranceLevel === "strict-isolated" &&
+    canonicalJson(value) === canonicalJson(candidate);
 }
 
 /** Strict is always attempted first. Degraded review is an explicit second
@@ -54,7 +54,7 @@ export async function executeAuthorizedIndependentReview({ package: reviewPackag
   const strict = await executeIndependentReview({ package: reviewPackage, adapter: strictAdapter, configuredReviewer, implementerSession, invoke: invokeStrict });
   if (strict.status !== "unavailable") return { ...strict, assuranceLevel: "strict-isolated" };
   const candidate = strict.result ?? strictUnavailableResult({ reviewPackage, configuredReviewer, code: strict.code ?? "independent-reviewer-unavailable" });
-  if (!durableStrictUnavailableMatches(durableStrictUnavailable, candidate, reviewPackage)) {
+  if (!durableStrictUnavailableMatches(durableStrictUnavailable, candidate, reviewPackage, configuredReviewer, implementerSession)) {
     return { status: "unavailable", code: "strict-unavailable-evidence-not-durable", strictResult: candidate, requiresPersistence: true };
   }
   const strictResult = durableStrictUnavailable.result;
@@ -65,5 +65,11 @@ export async function executeAuthorizedIndependentReview({ package: reviewPackag
   const result = await invokeDegraded(Object.freeze(structuredClone(reviewPackage)));
   const validation = validateReviewResult(result, { expectedPackage: reviewPackage, configuredReviewer: degradedReviewer, implementerSession });
   if (!validation.valid || result.assuranceLevel !== "authorized-degraded") return { status: "unavailable", code: validation.valid ? "degraded-independent-reviewer-assurance-invalid" : validation.issues[0].code, strictResult };
+  if (!strictSummaryMatchesResult(result.strictUnavailable, strictResult)) {
+    return { status: "unavailable", code: "independent-review-strict-unavailable-not-durable", strictResult };
+  }
+  if (!degradedAuthorizationMatchesResult(result.degradedAuthorization, authorizationCheck.authorization)) {
+    return { status: "unavailable", code: "independent-review-degraded-authorization-mismatch", strictResult };
+  }
   return { status: result.status, result, strictResult, assuranceLevel: "authorized-degraded" };
 }

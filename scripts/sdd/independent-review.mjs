@@ -96,14 +96,14 @@ export function validateIndependentReviewEvidence({ reviewer, implementerSession
 
 // V1 result records are additive during migration. The legacy evidence
 // evaluator above remains available to existing checkpoints and callers.
-function strictSummaryMatchesResult(summary, result) {
+export function strictSummaryMatchesResult(summary, result) {
   return summary?.reviewRecordId === result?.reviewRecordId && summary.executionId === result.executionId &&
     summary.adapter === result.reviewer?.adapter && summary.status === "unavailable" &&
     summary.unavailableCode === result.unavailableCode && summary.baseCommit === result.baseCommit &&
     summary.headCommit === result.headCommit && summary.manifestDigest === result.manifestDigest;
 }
 
-function degradedAuthorizationMatchesResult(result, authorization) {
+export function degradedAuthorizationMatchesResult(result, authorization) {
   return result?.change === authorization?.change && result.transition === authorization.transition &&
     result.expiresAt === authorization.expiresAt && result.riskReason === authorization.riskReason &&
     result.fallbackBoundary === authorization.fallbackBoundary;
