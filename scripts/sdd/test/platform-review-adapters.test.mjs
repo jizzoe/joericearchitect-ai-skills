@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, createClaudeReviewSettings, degradedCapabilityLedger, invokeReviewProcess, isolatedReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult } from "../platform-review-adapters.mjs";
+import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, createClaudeReviewSettings, degradedCapabilityLedger, invokeReviewProcess, isolatedReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult, writeReviewPackageForView } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 
@@ -11,6 +11,26 @@ const packageFixture = () => {
   return value;
 };
 const view = { reviewPath: "/tmp/ai-skills-review-fixture/repository" };
+
+test("review package injection rejects a pre-existing symlink without changing its target", () => {
+  const temporary = fs.mkdtempSync("/tmp/review-package-injection-");
+  const reviewPath = `${temporary}/repository`;
+  const canaryPath = `${temporary}/outside-canary.json`;
+  const packagePath = `${reviewPath}/.ai-independent-review-package.json`;
+  fs.mkdirSync(reviewPath);
+  fs.writeFileSync(canaryPath, "outside\n");
+  fs.symlinkSync(canaryPath, packagePath);
+  try {
+    assert.throws(
+      () => writeReviewPackageForView({ reviewPath }, packageFixture()),
+      (error) => error?.code === "EEXIST"
+    );
+    assert.equal(fs.readFileSync(canaryPath, "utf8"), "outside\n");
+    assert.equal(fs.lstatSync(packagePath).isSymbolicLink(), true);
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+});
 
 test("strict and degraded reviewer subprocesses receive only allowlisted operational environment", () => {
   const parentEnvironment = {

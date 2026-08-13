@@ -194,7 +194,10 @@ export function probeClaudeReviewAdapter({ executable = "claude", attestationRef
 
 export function writeReviewPackageForView(view, reviewPackage) {
   const filePath = path.join(view.reviewPath, ".ai-independent-review-package.json");
-  fs.writeFileSync(filePath, `${JSON.stringify(reviewPackage)}\n`, { mode: 0o400 });
+  // The detached view is built from untrusted repository content. Exclusive
+  // creation rejects both a committed file and a committed symlink at the
+  // injection path instead of following either one outside the owned view.
+  fs.writeFileSync(filePath, `${JSON.stringify(reviewPackage)}\n`, { mode: 0o400, flag: "wx" });
   return filePath;
 }
 
