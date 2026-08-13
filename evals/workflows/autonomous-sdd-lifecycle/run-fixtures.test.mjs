@@ -10,11 +10,11 @@ test("lifecycle scenarios cover required gates and outcomes", () => {
   const gates = new Set(scenarios.map((scenario) => scenario.gate));
   const kinds = new Set(scenarios.map((scenario) => scenario.kind));
 
-  for (const gate of ["propose", "apply", "verify", "delivery", "sync", "archive"]) {
+  for (const gate of ["preflight", "propose", "apply", "verify", "delivery", "sync", "archive"]) {
     assert.equal(gates.has(gate), true, `missing ${gate} gate`);
   }
 
-  for (const id of ["independent-review-rereview", "independent-review-unavailable"]) {
+  for (const id of ["delivery-request-preflight-gap", "independent-review-rereview", "independent-review-unavailable", "degraded-review-launcher-recovery"]) {
     assert.equal(scenarios.some((scenario) => scenario.id === id), true, `missing ${id} scenario`);
   }
 

@@ -19,6 +19,18 @@
       "expect": "runner pauses before work selection"
     },
     {
+      "id": "concise-delivery-request-complete",
+      "kind": "positive",
+      "given": "Named target plus mode, quality profile, authorization profile, review policy, and expiration",
+      "expect": "runner reports the fully expanded effective authorization before work selection"
+    },
+    {
+      "id": "concise-delivery-request-missing-inputs",
+      "kind": "stop",
+      "given": "One or more required concise delivery fields are missing or invalid",
+      "expect": "runner makes no mutation and asks once for every affected field with meanings and supported values"
+    },
+    {
       "id": "batching-risk-reduction",
       "kind": "positive",
       "given": "Next eligible task crosses a credential or generated-exposure boundary",

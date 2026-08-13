@@ -17,6 +17,9 @@ turning a runtime limitation into silent policy.
 - Bind reduced assurance and all remaining capability restrictions to durable
   checkpoint and delivery evidence.
 - Keep canonical policy adapter-neutral and platform wrappers transport-only.
+- Let users select the complete safe policy through a small stable vocabulary,
+  with deterministic expansion and one useful clarification when required
+  inputs are missing.
 
 **Non-Goals:**
 
@@ -24,6 +27,8 @@ turning a runtime limitation into silent policy.
   degraded review; do not broaden credentials, networking, mutation tools, or
   model-routing policy.
 - Do not make a fallback claim OS isolation or edit normal user settings.
+- Do not infer absent risk-bearing input, make `rapid` mean reduced quality, or
+  let a repository preset create runtime permission.
 
 ## Decisions
 
@@ -74,6 +79,57 @@ the existing result/finding logic. A new head or correction causes strict-first
 re-evaluation. The one-time queue-1 bootstrap record uses the same durable
 shape but is scoped in the run authorization and expires at Archive merge.
 
+### 5. Recover nested-reviewer startup through a separately authorized launcher
+
+Some managed outer sandboxes deny both Git worktree creation and the nested
+Codex app-server's local IPC initialization. A package-only retry outside that
+sandbox would not satisfy the detached committed-view contract. The recovery
+path therefore uses a configured, deterministic review launcher capability
+that, when runtime permission explicitly allows it, creates the owned detached
+exact-head view outside the outer sandbox and starts the *inner* reviewer with
+its own read-only sandbox, ephemeral session, and sealed package only.
+
+The runner never self-escalates. It first records the stable launcher-unavailable
+code and pauses unless the current run authorization and runtime permission
+explicitly permit the configured launcher. The launcher cannot receive arbitrary
+shell text, implementation history, GitHub/deployment tools, credentials as
+review input, or any authority beyond review-view setup and the fixed reviewer
+invocation. It records the parent-launch capability separately from the inner
+reviewer's assurance ledger.
+
+Alternative: run a package-only reviewer outside the outer sandbox. Rejected
+because it loses the detached committed view required by the review protocol.
+
+### 6. Resolve concise delivery requests through a closed preset vocabulary
+
+Add a pure request resolver in `scripts/sdd` and a canonical runner reference
+that define six required inputs: target, mode, quality profile, authorization
+profile, independent-review policy, and expiration. The resolver accepts only
+published values, emits a normalized effective-authorization record, and
+returns a stable structured gap for every missing or invalid field. The skill
+renders all gaps in one concise message with each field's meaning and possible
+values before selecting or mutating anything.
+
+`production-rapid` means production quality with the full evidence gates and
+the existing three-correction maximum; `rapid` means routine, already bounded
+transitions and objective corrections do not require repeated conversational
+approval. `sdd-delivery` expands to the selected entry's normal linked SDD
+lifecycle and excludes deployments, releases, credentials, external messages,
+and unrelated mutations. `strict-first-degraded` is the affirmative owner
+choice that derives an exact degraded authorization only after strict
+unavailability and also permits the fixed launcher recovery when the active
+runtime separately permits that launcher. `strict-only` pauses at strict
+unavailability.
+
+The resolver does not parse arbitrary prose or execute commands. The assistant
+maps explicit prompt labels and unambiguous named targets to its input, then the
+pure resolver validates the result. A duration is converted to one absolute
+expiration from the recorded goal start so recovery cannot extend it.
+
+Alternative: require every caller to restate all lifecycle and review safety
+details. Rejected because duplicated prompt policy drifts and makes safe
+behavior depend on individual memory.
+
 ## Risks / Trade-offs
 
 - **Reduced enforcement on some hosts** → Require affirmative, exact,
@@ -84,12 +140,20 @@ shape but is scoped in the run authorization and expires at Archive merge.
   ledger, secret/environment tests, and no mutation-capable command path.
 - **Resume ambiguity** → Re-derive strict record, authorization, package,
   result, checkpoint, and transition from durable records.
+- **Nested runtime denied by outer sandbox** → Return a stable launcher
+  permission code; use only an explicitly authorized configured launcher that
+  preserves the inner read-only reviewer and detached-view boundary.
+- **Preset hides a consequential choice** → Use a closed vocabulary, report the
+  expanded effective authorization, and ask once for all missing or invalid
+  required inputs before mutation.
 
 ## Verification Strategy
 
 Run deterministic authorization, schema, contract, adapter, checkpoint, and
 delivery-gate tests for strict success, strict unavailable, valid degraded,
-and every malformed/expired/mismatched rejection path. Run synthetic
+launcher-denied/recovery, concise-request expansion and missing-input rendering,
+and every malformed/expired/mismatched rejection
+path. Run synthetic
 second-workspace portability, command-injection, secret, security, and
 thin-adapter-drift checks,
 then formal OpenSpec validation and independent review for the exact Apply head.
@@ -113,8 +177,12 @@ unavailability into a standing exception.
 1. Add schema and pure authorization/capability validators with fixtures.
 2. Extend canonical review execution, adapters, checkpoint, delivery gate, and
    canonical documentation without changing strict behavior.
-3. Add focused deterministic tests and recorded planning/Apply evidence.
-4. Use the bootstrap authorization only for this change's delivery review;
+3. Add the permission-gated launcher recovery with a detached-view and inner
+   read-only-boundary test; record stable unavailable behavior when it is absent.
+4. Add the concise request resolver, canonical preset reference, and missing-
+   input/invalid-combination tests.
+5. Add focused deterministic tests and recorded planning/Apply evidence.
+6. Use the bootstrap authorization only for this change's delivery review;
    archive terminates it. Revert by removing the feature from a future change;
    existing strict records and fail-closed behavior remain intact.
 

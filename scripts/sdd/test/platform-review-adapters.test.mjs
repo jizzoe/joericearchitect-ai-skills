@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, createClaudeReviewSettings, degradedCapabilityLedger, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeReviewAdapter, runCodexReviewAdapter, unavailableReviewResult } from "../platform-review-adapters.mjs";
+import { buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, classifyCodexExecutionFailure, createClaudeReviewSettings, degradedCapabilityLedger, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, unavailableReviewResult } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 
@@ -22,12 +22,50 @@ test("Codex adapter uses a fresh read-only noninteractive transport without user
 
 test("degraded Codex transport is explicitly reduced-assurance and scrubs mutation credentials", () => {
   const invocation = buildCodexDegradedReviewInvocation({ view, schemaPath: "/tmp/result-schema.json", resultPath: "/tmp/result.json" });
-  assert.equal(invocation.args.includes("--sandbox"), false);
+  assert.deepEqual(invocation.args.slice(0, 5), ["exec", "--sandbox", "read-only", "--ephemeral", "--ignore-user-config"]);
   assert.equal(invocation.args.includes("--ephemeral"), true);
   assert.equal(invocation.environment.GH_TOKEN, "");
   const ledger = degradedCapabilityLedger();
+  assert.ok(ledger.enforced.includes("innerReadOnlySandbox"));
   assert.ok(ledger.instructionConstrained.includes("gitWrite"));
   assert.ok(ledger.instructionConstrained.includes("githubMutation"));
+});
+
+test("Codex nested app-server denial receives a stable launcher-recovery code", () => {
+  assert.equal(classifyCodexExecutionFailure({ stderr: "failed to initialize in-process app-server client: Operation not permitted" }), "independent-reviewer-nested-app-server-denied");
+  assert.equal(classifyCodexExecutionFailure({ stderr: "other failure" }), "independent-reviewer-codex-execution-unavailable");
+});
+
+test("degraded adapter seals reviewer findings into parent-owned exact-package evidence", () => {
+  const reviewPackage = packageFixture();
+  const strictResult = unavailableReviewResult("independent-reviewer-nested-app-server-denied", { reviewPackage, adapter: "codex", reviewer: { type: "codex", identity: "strict-reviewer" }, attestationRef: "strict-attestation" });
+  const temporary = fs.mkdtempSync("/tmp/degraded-adapter-");
+  const resultPath = `${temporary}/result.json`;
+  const payload = { schemaVersion: 1, findings: [], status: "passed" };
+  const run = (_executable, args) => {
+    assert.ok(args.includes("read-only"));
+    fs.writeFileSync(resultPath, JSON.stringify(payload));
+    return { status: 0, signal: null, stdout: "", stderr: "" };
+  };
+  try {
+    const output = runCodexDegradedReviewAdapter({
+      reviewPackage,
+      view,
+      schemaPath: "/tmp/findings-schema.json",
+      resultPath,
+      reviewer: { type: "codex-degraded", identity: "degraded-reviewer" },
+      attestationRef: "degraded-attestation",
+      strictResult,
+      degradedAuthorization: { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only" },
+      run
+    });
+    assert.equal(output.status, "passed");
+    assert.equal(output.result.assuranceLevel, "authorized-degraded");
+    assert.equal(output.result.strictUnavailable.unavailableCode, "independent-reviewer-nested-app-server-denied");
+    assert.deepEqual(output.result.findings, []);
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
 });
 
 test("Claude adapter uses a temporary strict sandbox configuration without inherited settings", () => {

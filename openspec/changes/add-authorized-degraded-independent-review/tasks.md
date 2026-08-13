@@ -18,6 +18,12 @@
 - [x] 2.3 Extend checkpoint and delivery-gate validation to retain and re-derive assurance, strict precursor, authorization, findings, dispositions, and derived-head envelope evidence.
   - Depends on: 1.1, 1.2.
   - Evidence: checkpoint/operation-authorization tests cover current exact-head success and every required pause condition.
+- [x] 2.4 Add a deterministic, permission-gated review-launcher recovery that detects outer-sandbox review-view or nested-app-server denial, creates the owned detached exact-head view only through the configured launcher, and preserves the inner ephemeral read-only reviewer boundary.
+  - Depends on: 2.1, 2.2, 2.3.
+  - Evidence: synthetic launcher-denied and launcher-permitted tests prove no self-escalation, no package-only substitute, sealed input, detached view, stable recovery codes, and inner reviewer mutation restrictions.
+- [x] 2.5 Add a pure concise SDD-delivery request resolver that requires target, mode, quality profile, authorization profile, independent-review policy, and expiration; expand recognized presets into complete effective authorization and return one structured clarification for all missing or invalid inputs.
+  - Depends on: 1.1, 2.4.
+  - Evidence: focused tests cover complete production-rapid expansion, three-correction default, strict-only and strict-first-degraded behavior, duration normalization, missing fields, invalid values, conflicting inputs, and no pre-resolution mutation.
 
 ## 3. Canonical documentation and portability
 
@@ -27,10 +33,13 @@
 - [x] 3.2 Add synthetic evaluation scenarios and a second-workspace fixture for strict/degraded distinction, untrusted content, secret exclusion, safe paths, expiration, recovery, and portability without product constants.
   - Depends on: 2.2, 2.3.
   - Evidence: deterministic eval suite.
+- [x] 3.3 Document the concise request vocabulary and require the runner to ask once for every missing field with a short meaning and supported values before work selection or mutation.
+  - Depends on: 2.5.
+  - Evidence: canonical skill/reference and lifecycle evals prove the missing-input message, effective-authorization report, and runtime-permission boundary.
 
 ## 4. Verification and delivery evidence
 
-- [x] 4.1 Run focused contract, adapter, checkpoint, authorization, eval, schema, secret, attribution, portability, and adapter-drift checks; record current Apply evidence and map each requirement/scenario to evidence.
+- [x] 4.1 Run focused contract, adapter, launcher-recovery, request-resolution, checkpoint, authorization, eval, schema, secret, attribution, portability, and adapter-drift checks; record current Apply evidence and map each requirement/scenario to evidence.
   - Depends on: 3.1, 3.2.
   - Evidence: current command output and requirements mapping under the change evidence directory.
 - [ ] 4.2 Obtain current-head independent review using strict first and the one-time queue-1 bootstrap only if strict isolation is unavailable; preserve the sealed package, strict unavailable record, exact authorization, degraded result/ledger, findings, dispositions, transition, and expiration.

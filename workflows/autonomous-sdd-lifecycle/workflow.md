@@ -8,6 +8,13 @@ selected change or deterministic selection policy, allowed lifecycle
 transitions, local and external mutation boundaries, evidence gates, and
 stopping conditions.
 
+For the concise named-delivery form, first apply
+`skills/base/autonomous-goal-runner/references/sdd-delivery-request.md`. Resolve
+the target, mode, quality profile, authorization profile, independent-review
+policy, and expiration before step 1. If any are missing, invalid, or
+conflicting, ask once for every affected value with a short meaning and the
+published choices, and perform no selection or mutation.
+
 ## Lifecycle
 
 1. Inspect durable state: Git, OpenSpec active changes, tasks, issues,
@@ -33,7 +40,11 @@ stopping conditions.
    assurance reviewer is eligible only under an explicit exact active
    degraded-review authorization after durable strict unavailability; its
    evidence remains labelled `authorized-degraded` with the strict precursor
-   and capability ledger and is never described as strict isolation.
+   and capability ledger and is never described as strict isolation. If the
+   outer sandbox denies detached-view setup or nested reviewer startup, use the
+   fixed review launcher only when the exact run authorization, launcher
+   configuration, and runtime permission permit it; retain its parent-launch
+   evidence and the inner ephemeral read-only boundary.
 8. Run formal Verify after every task has current evidence.
 9. Deliver through a pull request only when the delivery gate passes and the
    active authorization permits the mutation.

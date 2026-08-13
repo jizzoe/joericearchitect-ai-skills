@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ai-skills.invalid/independent-review-findings-v1.schema.json",
+  "title": "Independent Review Findings v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "findings", "status"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "evidence", "recommendation"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "severity": {"enum": ["blocker", "high", "objective-fix", "warning", "false-positive"]},
+          "evidence": {"type": "string", "minLength": 1},
+          "recommendation": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "status": {"enum": ["passed", "failed"]}
+  }
+}

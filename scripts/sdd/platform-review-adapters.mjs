@@ -57,15 +57,15 @@ export function buildCodexReviewInvocation({ executable = "codex", view, schemaP
 export function buildCodexDegradedReviewInvocation({ executable = "codex", view, schemaPath, resultPath }) {
   return {
     executable,
-    args: ["exec", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--cd", view.reviewPath, "--output-schema", schemaPath, "--output-last-message", resultPath,
-      "Review only the sealed package in this disposable detached view. Do not modify files, Git, credentials, network state, or external systems. Return only the required JSON review result."],
+    args: ["exec", "--sandbox", "read-only", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--cd", view.reviewPath, "--output-schema", schemaPath, "--output-last-message", resultPath,
+      "Review only the sealed package in this disposable detached view. Inspect the exact base-to-head diff and relevant committed files. Do not modify files, Git, credentials, network state, or external systems. Return only the required JSON findings payload without an intended conclusion."],
     environment: { NO_COLOR: "1", GITHUB_TOKEN: "", GH_TOKEN: "", SSH_AUTH_SOCK: "", AWS_ACCESS_KEY_ID: "", AWS_SECRET_ACCESS_KEY: "", AWS_SESSION_TOKEN: "", NPM_TOKEN: "" }
   };
 }
 
 export function degradedCapabilityLedger() {
   return {
-    enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView"],
+    enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "innerReadOnlySandbox"],
     unavailable: [],
     instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"]
   };
@@ -137,6 +137,23 @@ function parseJsonResult(output) {
   }
 }
 
+function validFindingPayload(value) {
+  return value?.schemaVersion === 1 && ["passed", "failed"].includes(value.status) &&
+    Array.isArray(value.findings) && value.findings.every((finding) =>
+      typeof finding?.id === "string" && finding.id.length > 0 &&
+      ["blocker", "high", "objective-fix", "warning", "false-positive"].includes(finding.severity) &&
+      typeof finding.evidence === "string" && finding.evidence.length > 0 &&
+      typeof finding.recommendation === "string" && finding.recommendation.length > 0);
+}
+
+export function classifyCodexExecutionFailure(execution = {}) {
+  const output = `${execution.stdout ?? ""}\n${execution.stderr ?? ""}`;
+  if (/in-process app-server client|app-server.*operation not permitted|operation not permitted.*app-server/i.test(output)) {
+    return "independent-reviewer-nested-app-server-denied";
+  }
+  return "independent-reviewer-codex-execution-unavailable";
+}
+
 function invoke(invocation, view, run) {
   return run(invocation.executable, invocation.args, {
     cwd: view.reviewPath,
@@ -154,8 +171,59 @@ export function runCodexReviewAdapter({ reviewPackage, view, schemaPath, resultP
   let result = null;
   try { result = fs.existsSync(resultPath) ? parseJsonResult(fs.readFileSync(resultPath, "utf8")) : null; } catch { result = null; }
   if (execution.status !== 0 || !result) {
-    return { status: "unavailable", result: unavailable("independent-reviewer-codex-execution-unavailable", { reviewPackage, adapter: "codex", reviewer, attestationRef }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
+    const code = classifyCodexExecutionFailure(execution);
+    return { status: "unavailable", result: unavailable(code, { reviewPackage, adapter: "codex", reviewer, attestationRef }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
   }
+  return { status: result.status, result, execution: { status: 0, signal: null, emittedResult: true } };
+}
+
+export function runCodexDegradedReviewAdapter({ reviewPackage, view, schemaPath, resultPath, reviewer, attestationRef, strictResult, degradedAuthorization, executable, run = spawnSync }) {
+  const probe = probeCodexReviewAdapter({ executable, attestationRef });
+  if (!probe.available) return { status: "unavailable", result: unavailable(probe.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
+  const startedAt = now();
+  const invocation = buildCodexDegradedReviewInvocation({ executable, view, schemaPath, resultPath });
+  const execution = invoke(invocation, view, run);
+  let payload = null;
+  try { payload = fs.existsSync(resultPath) ? parseJsonResult(fs.readFileSync(resultPath, "utf8")) : null; } catch { payload = null; }
+  if (execution.status !== 0 || !validFindingPayload(payload)) {
+    const code = classifyCodexExecutionFailure(execution);
+    return { status: "unavailable", result: unavailable(code, { reviewPackage, adapter: "codex", reviewer, attestationRef, startedAt }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
+  }
+  const executionId = randomUUID();
+  const result = {
+    schemaVersion: 1,
+    reviewRecordId: `degraded-${executionId}`,
+    executionId,
+    reviewer: { type: reviewer.type, identity: reviewer.identity, adapter: "codex" },
+    attestation: { ref: attestationRef, nonInteractive: true, isolatedContext: false, freshContext: true, readOnly: false },
+    assuranceLevel: "authorized-degraded",
+    capabilityLedger: degradedCapabilityLedger(),
+    strictUnavailable: {
+      reviewRecordId: strictResult.reviewRecordId,
+      executionId: strictResult.executionId,
+      adapter: strictResult.reviewer?.adapter ?? strictResult.reviewer?.type ?? "strict",
+      status: "unavailable",
+      unavailableCode: strictResult.unavailableCode,
+      baseCommit: reviewPackage.baseCommit,
+      headCommit: reviewPackage.headCommit,
+      manifestDigest: reviewPackage.manifestDigest
+    },
+    degradedAuthorization: {
+      change: degradedAuthorization.change,
+      transition: degradedAuthorization.transition,
+      expiresAt: degradedAuthorization.expiresAt,
+      riskReason: degradedAuthorization.riskReason,
+      fallbackBoundary: degradedAuthorization.fallbackBoundary
+    },
+    baseCommit: reviewPackage.baseCommit,
+    headCommit: reviewPackage.headCommit,
+    manifestDigest: reviewPackage.manifestDigest,
+    startedAt,
+    completedAt: now(),
+    findings: payload.findings,
+    status: payload.status,
+    unavailableCode: ""
+  };
   return { status: result.status, result, execution: { status: 0, signal: null, emittedResult: true } };
 }
 

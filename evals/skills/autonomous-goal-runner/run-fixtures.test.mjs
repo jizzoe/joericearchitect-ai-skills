@@ -133,6 +133,9 @@ test("generic runner scenarios cover required behavior groups", () => {
   for (const kind of ["positive", "negative", "retry", "no-op", "stop", "portability"]) {
     assert.equal(kinds.has(kind), true, `missing ${kind} scenario`);
   }
+  for (const id of ["concise-delivery-request-complete", "concise-delivery-request-missing-inputs"]) {
+    assert.equal(scenarios.some((scenario) => scenario.id === id), true, `missing ${id} scenario`);
+  }
 });
 
 test("second repository portability fixture uses configured repository values", () => {

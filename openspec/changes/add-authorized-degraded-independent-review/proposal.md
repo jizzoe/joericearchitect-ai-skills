@@ -14,6 +14,10 @@ Primary GitHub issue: [#84](https://github.com/jizzoe/joericearchitect-ai-skills
   authorization that expires no later than its enclosing autonomous goal.
 - Require strict review to be attempted and durably recorded as unavailable
   before a fresh, separate, non-mutating degraded reviewer can be invoked.
+- Add a named SDD-delivery request preset that expands concise user input into
+  the complete production, authorization, review, expiration, and correction
+  boundaries; consolidate any missing required inputs into one pre-mutation
+  clarification with meanings and allowed values.
 - Extend sealed result and delivery evidence with an unambiguous assurance
   level, a capability ledger, the authorization/risk record, and exact
   package/base/head bindings.
@@ -31,6 +35,9 @@ lifecycle evidence boundary.
 
 This change excludes standing fallback permission,
 credentials, external messages, deployment, release, and model selection.
+It also excludes silently guessing a missing risk-bearing delivery input or
+granting runtime elevation that the active execution environment has not
+permitted.
 
 ## Capabilities
 
@@ -45,7 +52,7 @@ credentials, external messages, deployment, release, and model selection.
   while preserving strict isolation as the default and non-equivalent evidence.
 - `bounded-autonomous-execution`: Allows the runner to evaluate only a
   time-bounded degraded-review authorization for the selected derived delivery
-  transition.
+  transition and defines the concise SDD-delivery request contract.
 - `sdd-lifecycle`: Requires lifecycle evidence and reports to retain the
   selected strict or authorized-degraded assurance level.
 
@@ -58,7 +65,8 @@ credentials, external messages, deployment, release, and model selection.
   delegate to the canonical skill; neither chooses a reviewer or fallback.
 - **Compatibility:** an absent, malformed, expired, mismatched, or broad
   authorization retains the present fail-closed pause. No existing strict
-  result is converted to degraded evidence.
+  result is converted to degraded evidence. Existing fully specified run
+  authorizations remain valid; the concise request resolver is additive.
 - **Security:** reviewers retain no Git, repository-write, GitHub, credential,
   network-mutation, deployment, release, external-send, or delegated-mutation
   authority. Product-specific values remain in run records, never reusable

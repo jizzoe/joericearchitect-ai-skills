@@ -74,6 +74,29 @@ fresh/sealed/detached boundary MUST pause the transition.
   or detached view, or has mutation-capable authority
 - **THEN** the adapter returns unavailable and the lifecycle pauses
 
+### Requirement: Nested-reviewer recovery preserves the review boundary
+When a managed outer sandbox prevents detached-view creation or nested reviewer
+startup, the system SHALL record a stable unavailable code and pause unless the
+active run authorization, configured deterministic launcher capability, and
+runtime permission explicitly permit a review launcher. The launcher MUST create
+the owned exact-head detached view outside the outer sandbox and start the
+inner reviewer with a fresh ephemeral read-only sandbox and sealed-package-only
+input. It MUST NOT self-escalate, execute untrusted shell text, receive the
+implementation session history, or grant the inner reviewer GitHub, credential,
+deployment, release, external-send, or delegated-mutation authority.
+
+#### Scenario: Launcher permission is unavailable
+- **WHEN** a strict or degraded attempt fails because the outer sandbox denies
+  review-view setup or nested reviewer initialization
+- **THEN** the system records the launcher-unavailable code and pauses without
+  trying a package-only or unsandboxed substitute
+
+#### Scenario: Configured launcher is explicitly permitted
+- **WHEN** the exact review transition has an active launcher authorization and
+  runtime permission
+- **THEN** the launcher creates the owned detached exact-head view and invokes
+  the inner reviewer with its separate read-only boundary and sealed package
+
 ### Requirement: Degraded review preserves finding and recovery gates
 The system SHALL apply the existing blocker, high, material-decision, finding
 disposition, correction-budget, current-evidence, and rereview gates to

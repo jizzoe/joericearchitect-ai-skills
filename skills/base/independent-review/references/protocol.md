@@ -23,6 +23,25 @@ enables its OS sandbox, denies review-view writes and home reads, disables
 unsandboxed fallback, removes mutation tools, and fails if sandboxing is
 unavailable. Neither path changes ordinary user settings.
 
+### Outer-sandbox launcher recovery
+
+If the managed implementation sandbox denies owned worktree creation or the
+nested Codex app-server, record `independent-review-view-create-failed` or
+`independent-reviewer-nested-app-server-denied`. A package-only retry is not an
+acceptable substitute. The runner may invoke only the configured
+`codex-detached-read-only-v1` launcher when the current change, transition,
+base, head, manifest, expiration, degraded authorization, launcher ID, and
+runtime permission all match.
+
+The launcher itself has one fixed operation: create the owned detached exact-
+head view, write the sealed package, and start a fresh ephemeral Codex process
+with its inner sandbox set to `read-only`. It accepts no arbitrary argument or
+shell text, scrubs mutation credentials, returns a parent-owned normalized
+result, and removes only its ownership-guarded view. The parent-launch
+permission and inner reviewer controls are recorded separately. If permission,
+configuration, detached setup, inner startup, result validation, or cleanup
+fails, return the stable unavailable code and pause.
+
 ## Authorized Degraded Path
 
 Strict isolation remains the default. Only after a strict adapter creates a

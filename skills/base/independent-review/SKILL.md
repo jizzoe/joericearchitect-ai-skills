@@ -35,11 +35,17 @@ standing grants, noncanonical commits, or content outside the sealed package.
    authorization names the selected change, transition, expiration, risk
    reason, and `fresh-separated-reviewer-only` boundary. It MUST retain the
    strict record and capability ledger and MUST NOT be called strict-isolated.
-6. Preserve each finding and use the canonical finding state machine. Apply a
+6. If detached-view creation or nested reviewer startup is denied by the outer
+   sandbox, use `scripts/sdd/review-launcher-recovery.mjs` only when the exact
+   degraded authorization, configured fixed launcher, and active runtime
+   permission all validate. The launcher creates the detached exact-head view
+   and starts a fresh ephemeral inner `read-only` reviewer; it never
+   self-escalates or accepts arbitrary commands.
+7. Preserve each finding and use the canonical finding state machine. Apply a
    bounded objective correction only when it is behavior-preserving and
    evidence-backed; rerun affected checks and obtain a fresh review for every
    new head.
-7. Record only the normalized result, non-sensitive execution reference,
+8. Record only the normalized result, non-sensitive execution reference,
    dispositions, and cleanup result in the durable checkpoint. Remove a review
    view only through its ownership-guarded cleanup helper.
 

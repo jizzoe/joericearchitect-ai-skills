@@ -114,6 +114,15 @@ receives sealed-package-only input, has no mutation-capable path, and records
 `authorized-degraded` assurance with a capability ledger; missing, broad,
 expired, stale, mismatched, or unavailable fallback evidence pauses.
 
+When the selected concise request policy is `strict-first-degraded`, it also
+authorizes deriving an exact launcher record after strict unavailability for
+the same selected entry, transition, base, head, manifest, correction envelope,
+and expiration. That policy does not create runtime permission. The configured
+launcher and active runtime must independently permit
+`codex-detached-read-only-v1`; otherwise pause with the permission gap. The
+launcher preserves the fresh sealed inner read-only reviewer and cannot accept
+arbitrary shell text or perform any other elevated operation.
+
 ## Always Forbidden Without Separate Explicit Approval
 
 - repository deletion
