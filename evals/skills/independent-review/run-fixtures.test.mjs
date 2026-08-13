@@ -21,7 +21,8 @@ test("scenario matrix covers strict and authorized-degraded safety boundaries", 
 
 test("independent-review eval matrix rejects malformed, secret, stale, self-review, wrong-attestation, and duplicate results", () => {
   const pack = reviewPackage();
-  assert.equal(validateReviewPackage({ ...pack, diff: "Bearer abcdefghijklmnop" }).valid, false);
+  const credentialShapedDiff = ["Bearer", "abcdefghijklmnop"].join(" ");
+  assert.equal(validateReviewPackage({ ...pack, diff: credentialShapedDiff }).valid, false);
   assert.equal(validateReviewPackage({ ...pack, manifestDigest: "0".repeat(64) }).valid, false);
   const current = result();
   const configuredReviewer = { type: "fixture", identity: "fresh-reviewer", attestation: { ref: "fixture-attestation" } };
