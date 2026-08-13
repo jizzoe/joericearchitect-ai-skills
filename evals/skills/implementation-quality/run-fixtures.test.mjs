@@ -235,6 +235,60 @@ test("result validator rejects readiness overclaim, stale production head, and s
   assert.ok(validateImplementationQualityResult(localFindings).issues.some((item) => item.code === "findings-not-deterministically-ordered"));
 });
 
+test("readiness requires current evidence bindings for prototype and production checks", () => {
+  for (const evidenceId of ["focused", "local-review"]) {
+    const value = readJson("valid-verification-prototype.json");
+    value.details.evidenceBindings.find((item) => item.evidenceId === evidenceId).binding.value = "workspace-state-old";
+    const result = validateImplementationQualityResult(value);
+    assert.ok(result.issues.some((item) => item.code === "stale-evidence-binding"), evidenceId);
+    assert.ok(result.issues.some((item) => item.code === "readiness-overclaim"), evidenceId);
+  }
+
+  for (const evidenceId of ["regression", "ci-current", "strict-review"]) {
+    const value = readJson("valid-verification-production.json");
+    value.details.evidenceBindings.find((item) => item.evidenceId === evidenceId).changedPaths = ["src/old-widget.mjs"];
+    const result = validateImplementationQualityResult(value);
+    assert.ok(result.issues.some((item) => item.code === "stale-evidence-binding"), evidenceId);
+    assert.ok(result.issues.some((item) => item.code === "readiness-overclaim"), evidenceId);
+  }
+});
+
+test("failed and exhausted correction histories cannot report readiness", () => {
+  const attempt = (number) => ({
+    failureSignature: "focused-regression",
+    attempt: number,
+    kind: "objective-fix",
+    result: "failed",
+    evidenceIds: ["focused"],
+    binding: "workspace-state-1"
+  });
+
+  const failed = readJson("valid-verification-prototype.json");
+  failed.details.correctionAttempts = [attempt(1)];
+  assert.ok(validateImplementationQualityResult(failed).issues.some((item) => item.code === "readiness-overclaim"));
+
+  const exhausted = readJson("valid-verification-prototype.json");
+  exhausted.details.correctionAttempts = [attempt(1), attempt(2), attempt(3)];
+  const invalidExhausted = validateImplementationQualityResult(exhausted);
+  assert.ok(invalidExhausted.issues.some((item) => item.code === "exhausted-correction-requires-blocked-status"));
+  assert.ok(invalidExhausted.issues.some((item) => item.code === "exhausted-correction-requires-blocked-readiness"));
+
+  exhausted.status = "blocked";
+  exhausted.summary = "Verification is blocked after the configured correction budget was exhausted.";
+  exhausted.details.readiness = "blocked";
+  exhausted.nextAction = { kind: "user-decision", description: "Resolve the exhausted correction failure before resuming." };
+  assert.deepEqual(validateImplementationQualityResult(exhausted), { valid: true, issues: [] });
+
+  const narrowBudget = readJson("valid-verification-prototype.json");
+  narrowBudget.status = "blocked";
+  narrowBudget.summary = "Verification is blocked after the configured correction budget was exhausted.";
+  narrowBudget.details.readiness = "blocked";
+  narrowBudget.details.correctionBudget = 1;
+  narrowBudget.details.correctionAttempts = [attempt(1)];
+  narrowBudget.nextAction = { kind: "user-decision", description: "Resolve the exhausted correction failure before resuming." };
+  assert.deepEqual(validateImplementationQualityResult(narrowBudget), { valid: true, issues: [] });
+});
+
 test("canonical skills expose read-only, correction, strict-review, recovery, and profile boundaries", () => {
   const review = fs.readFileSync(path.join(root, "skills/base/base-code-review/SKILL.md"), "utf8");
   assert.match(review, /Remain read-only in interactive and autonomous modes/);

@@ -4,7 +4,10 @@
 
 Both profiles retain shared guardrails, core data-integrity checks, the critical
 flow, focused deterministic evidence, local code and security review, explicit
-gaps, current bindings, and bounded corrections.
+gaps, and bounded corrections. Every completed readiness check and local-review
+finding carries a details record matching the current workspace or commit and
+the current changed-path list. A latest failed correction prevents readiness;
+an exhausted failed signature is blocked.
 
 ## Prototype Rapid
 
@@ -17,8 +20,10 @@ evidence not applicable with a scope reason.
 
 Add appropriate regression coverage, repeatability, operational checks,
 stronger release evidence, exact-head CI, and strict isolated independent
-review. UI work also retains applicable browser and device matrix evidence.
-Profile selection never grants mutation or delivery authority.
+review. Exact-head CI and strict review are never not applicable, must retain
+their production-gate evidence bindings, and must pass. UI work also retains
+applicable browser and device matrix evidence. Profile selection never grants
+mutation or delivery authority.
 
 ## Web UI Evidence
 

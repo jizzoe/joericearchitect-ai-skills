@@ -33,6 +33,17 @@
       { "id": "exact-head-ci", "category": "ci", "required": true, "result": "passed", "evidenceId": "ci-current" },
       { "id": "strict-independent-review", "category": "independent-review", "required": true, "result": "passed", "evidenceId": "strict-review" }
     ],
+    "evidenceBindings": [
+      { "evidenceId": "focused", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
+      { "evidenceId": "critical", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
+      { "evidenceId": "regression", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
+      { "evidenceId": "repeatability", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
+      { "evidenceId": "operational", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
+      { "evidenceId": "release", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
+      { "evidenceId": "ci-current", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
+      { "evidenceId": "strict-review", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] }
+    ],
+    "correctionBudget": 3,
     "correctionAttempts": [],
     "reviewedPaths": ["src/widget.mjs"],
     "localReviewFindings": [],

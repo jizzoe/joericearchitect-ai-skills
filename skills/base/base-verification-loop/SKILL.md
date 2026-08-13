@@ -57,11 +57,14 @@ readiness without inventing a fallback or silently changing profiles.
 ## Result
 
 Emit `skill-result-v1` with `skill: base-verification-loop`. Put profile,
-behavior, critical path, changed and reviewed paths, selected checks, correction
-attempts, local findings, unresolved gaps, recovery steps, current binding,
-readiness, and any production gate summary in `details`. Each completed check,
-test, screenshot, accessibility check, and review references one stable
-top-level evidence ID.
+behavior, critical path, changed and reviewed paths, selected checks, current
+binding records for their evidence IDs, correction budget and attempts, local
+findings, unresolved gaps, recovery steps, current binding, readiness, and any
+production gate summary in `details`. Each completed check, test, screenshot,
+accessibility check, and review references one stable top-level evidence ID
+whose details binding matches the current workspace or commit and changed-path
+set. A latest failed correction prevents readiness; an exhausted failed
+signature requires blocked status and recovery.
 
 Validate with `scripts/validation/validate-implementation-quality.mjs`. Report
 only `needs-implementation`, `paused`, `blocked`, or

@@ -90,8 +90,9 @@ the following documented `details` shapes before rendering Markdown:
 - code review: reviewed scope, ordered findings, review-area coverage, evidence
   gaps, and concise scope summary;
 - verification: selected profile and checks, critical path, changed paths,
-  correction attempts by failure signature, local review summary, unresolved
-  gaps, recovery steps, current head or workspace binding when applicable, and
+  current binding records for readiness evidence, correction budget and
+  attempts by failure signature, local review summary, unresolved gaps,
+  recovery steps, current head or workspace binding when applicable, and
   readiness state.
 
 Finding objects use stable IDs; `blocker`, `high`, `medium`, or `low` severity;

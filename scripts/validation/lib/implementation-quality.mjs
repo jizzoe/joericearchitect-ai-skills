@@ -202,6 +202,37 @@ function validateBinding(binding, subject, issues) {
   if (binding.kind === "commit" && !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(binding.value ?? "")) issues.push(issue("noncanonical-commit-binding", `${subject}.value`));
 }
 
+function sameStringArray(left, right) {
+  return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
+function validateEvidenceBindings(entries, details, evidenceById, issues) {
+  const subject = "result.details.evidenceBindings";
+  const byId = new Map();
+  if (!Array.isArray(entries)) {
+    issues.push(issue("invalid-array", subject));
+    return byId;
+  }
+  entries.forEach((entry, index) => {
+    const itemSubject = `${subject}[${index}]`;
+    if (!exactKeys(entry, new Set(["evidenceId", "binding", "changedPaths"]), itemSubject, issues)) return;
+    required(entry, ["evidenceId", "binding", "changedPaths"], itemSubject, issues);
+    if (!nonEmpty(entry.evidenceId) || !evidenceById.has(entry.evidenceId)) issues.push(issue("unknown-evidence-reference", `${itemSubject}.evidenceId`, entry.evidenceId));
+    if (byId.has(entry.evidenceId)) issues.push(issue("duplicate-evidence-binding", `${itemSubject}.evidenceId`, entry.evidenceId));
+    validateBinding(entry.binding, `${itemSubject}.binding`, issues);
+    validateStringArray(entry.changedPaths, `${itemSubject}.changedPaths`, issues, { paths: true, nonEmptyArray: true });
+    byId.set(entry.evidenceId, entry);
+  });
+  return byId;
+}
+
+function evidenceIsCurrent(evidenceId, bindings, details) {
+  const record = bindings.get(evidenceId);
+  return record?.binding?.kind === details.binding?.kind &&
+    record.binding.value === details.binding?.value &&
+    sameStringArray(record.changedPaths, details.changedPaths);
+}
+
 function validateProductionGate(gate, details, evidenceById, issues) {
   const subject = "result.details.productionGate";
   const keys = new Set(["head", "ciEvidenceId", "independentReviewEvidenceId", "reviewStatus", "reviewHead", "reviewerSession", "implementerSession", "source", "assurance"]);
@@ -228,9 +259,9 @@ function validateProductionGate(gate, details, evidenceById, issues) {
 function validateVerificationDetails(result, issues) {
   const details = result.details;
   const subject = "result.details";
-  const keys = new Set(["profile", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness", "productionGate"]);
+  const keys = new Set(["profile", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness", "productionGate"]);
   if (!exactKeys(details, keys, subject, issues)) return;
-  required(details, ["profile", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness"], subject, issues);
+  required(details, ["profile", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness"], subject, issues);
   const evidenceById = new Map((result.evidence ?? []).map((item) => [item.id, item]));
   if (!deliveryProfiles.includes(details.profile)) issues.push(issue("invalid-delivery-profile", `${subject}.profile`));
   if (!nonEmpty(details.intendedBehavior)) issues.push(issue("invalid-intended-behavior", `${subject}.intendedBehavior`));
@@ -240,13 +271,20 @@ function validateVerificationDetails(result, issues) {
   validateStringArray(details.unresolvedGaps, `${subject}.unresolvedGaps`, issues);
   validateStringArray(details.recoverySteps, `${subject}.recoverySteps`, issues, { nonEmptyArray: true });
   validateBinding(details.binding, `${subject}.binding`, issues);
+  const evidenceBindings = validateEvidenceBindings(details.evidenceBindings, details, evidenceById, issues);
+  if (!Number.isInteger(details.correctionBudget) || details.correctionBudget < 1 || details.correctionBudget > 3) issues.push(issue("invalid-correction-budget", `${subject}.correctionBudget`));
   if (!readinessStates.has(details.readiness)) issues.push(issue("invalid-readiness", `${subject}.readiness`));
 
+  let currentCheckEvidence = true;
   if (!Array.isArray(details.selectedChecks)) issues.push(issue("invalid-array", `${subject}.selectedChecks`));
   else {
     const ids = new Set();
     details.selectedChecks.forEach((check, index) => {
       validateCheck(check, index, evidenceById, issues);
+      if (check?.result !== "pending" && nonEmpty(check?.evidenceId) && !evidenceIsCurrent(check.evidenceId, evidenceBindings, details)) {
+        currentCheckEvidence = false;
+        issues.push(issue("stale-evidence-binding", `${subject}.selectedChecks[${index}].evidenceId`, check.evidenceId));
+      }
       if (nonEmpty(check?.id) && ids.has(check.id)) issues.push(issue("duplicate-check-id", `${subject}.selectedChecks[${index}].id`));
       ids.add(check?.id);
     });
@@ -262,6 +300,12 @@ function validateVerificationDetails(result, issues) {
     const ids = new Set();
     details.localReviewFindings.forEach((finding, index) => {
       validateFinding(finding, index, evidenceById, issues);
+      for (const evidenceId of finding?.evidenceIds ?? []) {
+        if (!evidenceIsCurrent(evidenceId, evidenceBindings, details)) {
+          currentCheckEvidence = false;
+          issues.push(issue("stale-evidence-binding", `${subject}.localReviewFindings[${index}].evidenceIds`, evidenceId));
+        }
+      }
       if (nonEmpty(finding?.id) && ids.has(finding.id)) issues.push(issue("duplicate-finding-id", `${subject}.localReviewFindings[${index}].id`));
       ids.add(finding?.id);
     });
@@ -270,9 +314,12 @@ function validateVerificationDetails(result, issues) {
   }
 
   let currentCorrectionEvidence = true;
+  let failedCorrection = false;
+  let exhaustedCorrection = false;
   if (!Array.isArray(details.correctionAttempts)) issues.push(issue("invalid-array", `${subject}.correctionAttempts`));
   else {
     const attemptsBySignature = new Map();
+    const latestBySignature = new Map();
     details.correctionAttempts.forEach((attempt, index) => {
       const itemSubject = `${subject}.correctionAttempts[${index}]`;
       const keys = new Set(["failureSignature", "attempt", "kind", "result", "evidenceIds", "binding"]);
@@ -283,6 +330,12 @@ function validateVerificationDetails(result, issues) {
       if (attempt.kind !== "objective-fix") issues.push(issue("invalid-correction-kind", `${itemSubject}.kind`));
       if (!new Set(["passed", "failed"]).has(attempt.result)) issues.push(issue("invalid-correction-result", `${itemSubject}.result`));
       validateEvidenceReferences(attempt.evidenceIds, `${itemSubject}.evidenceIds`, evidenceById, issues, { nonEmptyArray: true });
+      for (const evidenceId of attempt.evidenceIds ?? []) {
+        if (!evidenceIsCurrent(evidenceId, evidenceBindings, details)) {
+          currentCorrectionEvidence = false;
+          issues.push(issue("stale-evidence-binding", `${itemSubject}.evidenceIds`, evidenceId));
+        }
+      }
       if (!nonEmpty(attempt.binding)) issues.push(issue("invalid-correction-binding", `${itemSubject}.binding`));
       if (attempt.result === "passed" && nonEmpty(attempt.binding) && attempt.binding !== details.binding?.value) {
         currentCorrectionEvidence = false;
@@ -292,9 +345,19 @@ function validateVerificationDetails(result, issues) {
       }
       const expected = (attemptsBySignature.get(attempt.failureSignature) ?? 0) + 1;
       if (attempt.attempt !== expected) issues.push(issue("nonsequential-correction-attempt", `${itemSubject}.attempt`, expected));
+      if (Number.isInteger(details.correctionBudget) && attempt.attempt > details.correctionBudget) issues.push(issue("correction-budget-exceeded", `${itemSubject}.attempt`, details.correctionBudget));
       attemptsBySignature.set(attempt.failureSignature, expected);
+      latestBySignature.set(attempt.failureSignature, attempt);
     });
+    for (const attempt of latestBySignature.values()) {
+      if (attempt.result !== "failed") continue;
+      failedCorrection = true;
+      if (attempt.attempt >= details.correctionBudget) exhaustedCorrection = true;
+    }
   }
+
+  if (exhaustedCorrection && result.status !== "blocked") issues.push(issue("exhausted-correction-requires-blocked-status", "result.status"));
+  if (exhaustedCorrection && details.readiness !== "blocked") issues.push(issue("exhausted-correction-requires-blocked-readiness", `${subject}.readiness`));
 
   const requiredFailure = Array.isArray(details.selectedChecks) && details.selectedChecks.some((check) => {
     if (!check.required || check.result === "passed") return false;
@@ -329,7 +392,7 @@ function validateVerificationDetails(result, issues) {
       productionReady = productionReady && gate.ready;
     }
   }
-  if (details.readiness === "ready-for-openspec-verify" && (requiredFailure || hasGaps || !currentCorrectionEvidence || !productionValid || !productionReady)) {
+  if (details.readiness === "ready-for-openspec-verify" && (requiredFailure || hasGaps || !currentCheckEvidence || !currentCorrectionEvidence || failedCorrection || !productionValid || !productionReady)) {
     issues.push(issue("readiness-overclaim", `${subject}.readiness`));
   }
 }

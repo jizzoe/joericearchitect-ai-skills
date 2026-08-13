@@ -85,6 +85,23 @@ placeholder, while the runtime test assembles a synthetic sensitive value from
 non-secret-shaped source fragments and still proves that result validation
 rejects and omits it.
 
+### IQ-R6 — high / objective-fix
+
+Fresh strict review found that referenced check evidence did not carry a
+machine-validated current workspace or commit and changed-path binding. The
+verification details contract now requires a unique binding record for every
+completed selected-check evidence ID and local-finding evidence reference.
+Prototype and production regressions prove stale focused, profile, local-review,
+CI, and strict-review evidence cannot support readiness.
+
+### IQ-R7 — high / objective-fix
+
+Fresh strict review found that a latest failed or exhausted correction history
+did not affect readiness. The details contract now records a one-to-three
+attempt correction budget, prevents readiness while any latest correction is
+failed, and requires blocked result status and readiness when a failed signature
+reaches its budget. Full-budget and narrower-budget regressions pass.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -117,7 +134,8 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R3: 15 passed, 0 failed. Syntax checks,
-whitespace checks, adapter drift, metadata, guardrail linkage, product-constant
-scan, and focused strict OpenSpec validation pass. Strict independent review is
-the next dependency-bound task and requires an immutable exact-head package.
+Focused tests after IQ-R1 through IQ-R7: 17 passed, 0 failed. The complete
+current-main Node suite passes 185 tests. Syntax checks, whitespace checks,
+adapter drift, metadata, guardrail linkage, secret and product-constant scans,
+artifact quality, tracking, and selected and repository-wide strict OpenSpec
+validation pass. A fresh exact-head strict independent review is the next gate.

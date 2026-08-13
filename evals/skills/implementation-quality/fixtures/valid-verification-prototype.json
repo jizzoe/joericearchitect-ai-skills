@@ -23,6 +23,12 @@
       { "id": "critical-flow", "category": "critical-flow", "required": true, "result": "passed", "evidenceId": "critical" },
       { "id": "local-review", "category": "review", "required": true, "result": "passed", "evidenceId": "local-review" }
     ],
+    "evidenceBindings": [
+      { "evidenceId": "focused", "binding": { "kind": "workspace", "value": "workspace-state-1" }, "changedPaths": ["src/widget.mjs"] },
+      { "evidenceId": "critical", "binding": { "kind": "workspace", "value": "workspace-state-1" }, "changedPaths": ["src/widget.mjs"] },
+      { "evidenceId": "local-review", "binding": { "kind": "workspace", "value": "workspace-state-1" }, "changedPaths": ["src/widget.mjs"] }
+    ],
+    "correctionBudget": 3,
     "correctionAttempts": [],
     "reviewedPaths": ["src/widget.mjs"],
     "localReviewFindings": [],
