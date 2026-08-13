@@ -200,7 +200,7 @@ export function checkOperationAuthorization(input) {
         if (!request.independentReviewPackage || !request.independentReviewResult) return fail("independent-review-v1-input-incomplete");
         if (!durableApplyEvidenceMatches(request)) return fail("independent-review-apply-evidence-not-durable");
         if (!durableReviewV1Matches(request)) return fail("independent-review-evidence-not-durable");
-        const reviewer = configuredReviewer(config, request.reviewer);
+        const reviewer = configuredReviewer(config, request.independentReviewResult.assuranceLevel === "authorized-degraded" ? request.strictReviewer : request.reviewer);
         if (!reviewer) return fail("independent-reviewer-not-configured");
         const degradedReviewer = request.independentReviewResult.assuranceLevel === "authorized-degraded"
           ? configuredDegradedReviewer(config, request.reviewer) : reviewer;
