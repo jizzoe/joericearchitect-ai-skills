@@ -16,6 +16,8 @@ an in-scope, behavior-preserving objective correction inside the active
 per-signature correction budget and before expiration. Absence, broad scope,
 malformation, expiration, wrong change, wrong transition, stale SHA, stale
 manifest, material change, or exhausted budget MUST pause the transition.
+The correction-attempt count MUST represent corrections already present in the
+durable chain and equal both its length and latest attempt number.
 
 #### Scenario: Exact authorization permits evaluation
 - **WHEN** a selected transition has current Apply evidence, an exact active
@@ -85,8 +87,10 @@ input. The in-sandbox controller MUST only prepare and accept a digest-bound
 structured request; a separately configured fixed host MUST perform view and
 reviewer operations, and response acceptance MUST require trusted-runtime
 outside-sandbox execution evidence bound to that host execution. A host's own
-claim MUST NOT establish this boundary. Neither component may self-escalate,
-execute untrusted shell text, receive the
+claim MUST NOT establish this boundary. The sealed host request MUST NOT carry
+a caller-selected validation clock; host execution and response acceptance MUST
+each re-evaluate expiration against their own current runtime clock. Neither
+component may self-escalate, execute untrusted shell text, receive the
 implementation session history, or grant the inner reviewer GitHub, credential,
 deployment, release, external-send, or delegated-mutation authority.
 

@@ -44,7 +44,7 @@ function validResult() {
   };
 }
 
-function hostRun(prepared, result = validResult(), viewHead = reviewPackage.headCommit) {
+function hostRun(prepared, result = validResult(), viewHead = reviewPackage.headCommit, now = "2026-08-13T13:00:00.000Z") {
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "review-launcher-test-"));
   const reviewPath = path.join(temporaryRoot, "repository");
   fs.mkdirSync(path.join(reviewPath, "schemas"), { recursive: true });
@@ -54,6 +54,7 @@ function hostRun(prepared, result = validResult(), viewHead = reviewPackage.head
   let invoked = false;
   const response = executeReviewLauncherHost(prepared.hostRequest, {
     hostExecutionId: "host-execution-1",
+    now,
     createView: () => ({ available: true, view }),
     removeView: (received) => { removed = received === view; fs.rmSync(temporaryRoot, { recursive: true, force: true }); return { removed }; },
     invoke: (request) => { invoked = true; assert.equal(request.view, view); return { status: result.status, result }; }
@@ -78,6 +79,7 @@ test("controller prepares only a fixed external host request", () => {
   assert.equal(prepared.allowed, true);
   assert.equal(prepared.status, "host-launch-required");
   assert.equal(prepared.hostRequest.request.launcher.hostScript, "scripts/sdd/review-launcher-host.mjs");
+  assert.equal("now" in prepared.hostRequest.request, false);
   assert.match(prepared.hostRequest.requestDigest, /^[0-9a-f]{64}$/);
 });
 
@@ -121,12 +123,21 @@ test("acceptance authenticates exact precursor, authorization, and host executio
   assert.equal(acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: { ...evidence, outsideManagedSandbox: false } }).code, "review-launcher-runtime-attestation-missing");
 });
 
+test("host execution and controller acceptance each use their current clock", () => {
+  const prepared = prepareReviewLauncherRecovery(baseInput, { launchId: "launch-1" });
+  const expiredHost = hostRun(prepared, validResult(), reviewPackage.headCommit, "2026-08-14T00:00:00.000Z");
+  assert.equal(expiredHost.response.code, "degraded-independent-review-authorization-expired");
+  const { response } = hostRun(prepared);
+  const evidence = runtimeEvidence(prepared, response);
+  assert.equal(acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: evidence, now: "2026-08-14T00:00:00.000Z" }).code, "degraded-independent-review-authorization-expired");
+});
+
 test("recovery accepts a durable derived objective-correction chain", () => {
   const derivedDraft = { ...reviewPackage, headCommit: "5".repeat(40) }; delete derivedDraft.manifestDigest;
   const derived = { ...derivedDraft, manifestDigest: packageDigest(derivedDraft) };
   const derivedStrict = { ...strictResult, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest };
   const correctionEvidence = { id: "correction-1", change: "change", attempt: 1, failureSignature: "fixture-failure", classification: "objective-fix", behaviorPreserving: true, current: true, ancestryVerified: true, evidenceReference: "checkpoint:correction-1", baseCommit: derived.baseCommit, previousHead: reviewPackage.headCommit, previousManifestDigest: reviewPackage.manifestDigest, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest };
   const derivedAuthorization = { ...authorization, degradedIndependentReview: { ...authorization.degradedIndependentReview, allowDerivedObjectiveCorrections: true, derivedCorrections: [correctionEvidence] }, reviewLauncher: { ...authorization.reviewLauncher, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest } };
-  const result = validateReviewLauncherRecovery({ ...baseInput, reviewPackage: derived, strictResult: derivedStrict, authorization: derivedAuthorization, correctionAttempts: 0, derivedCorrection: true, correctionEvidence });
+  const result = validateReviewLauncherRecovery({ ...baseInput, reviewPackage: derived, strictResult: derivedStrict, authorization: derivedAuthorization, correctionAttempts: 1, derivedCorrection: true, correctionEvidence });
   assert.equal(result.allowed, true, JSON.stringify(result));
 });

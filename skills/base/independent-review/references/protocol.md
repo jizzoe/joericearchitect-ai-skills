@@ -46,7 +46,10 @@ only its ownership-guarded view.
 The controller accepts the response only when runtime-supplied execution
 evidence identifies the configured launcher, fixed host script, request digest,
 host execution, and outside-managed-sandbox boundary. Host self-attestation is
-not sufficient. The parent-launch evidence and inner reviewer controls are
+not sufficient. Preparation may use the controller's current time, but the
+sealed host request carries no caller-selected clock: host execution and
+controller acceptance each recheck expiration against their own current clock.
+The parent-launch evidence and inner reviewer controls are
 recorded separately. If permission, configuration, runtime attestation,
 detached setup, inner startup, result validation, or cleanup fails, return the
 stable unavailable code and pause.
@@ -76,3 +79,7 @@ Preserve the implementation branch and evidence after any failure. Record one
 stable unavailable/validation code, clean only the owned temporary view, and
 resume from durable Git/OpenSpec/checkpoint state. Never substitute self-review
 or a regular pull-request review for this protocol.
+
+`correctionAttempts` is the count of objective corrections already present in
+the durable correction chain. A derived review package is eligible only when
+that count equals the complete chain length and its latest attempt number.

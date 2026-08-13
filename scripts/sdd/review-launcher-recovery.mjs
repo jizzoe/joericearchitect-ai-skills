@@ -75,7 +75,9 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
 export function prepareReviewLauncherRecovery(request, { launchId = randomUUID() } = {}) {
   const preflight = validateReviewLauncherRecovery(request);
   if (!preflight.allowed) return preflight;
-  const hostRequest = { schemaVersion: 1, launchId, request: structuredClone(request) };
+  const sealedRequest = structuredClone(request);
+  delete sealedRequest.now;
+  const hostRequest = { schemaVersion: 1, launchId, request: sealedRequest };
   hostRequest.requestDigest = reviewLauncherRequestDigest(hostRequest);
   return {
     allowed: true,
@@ -94,12 +96,12 @@ function validRuntimeLaunchEvidence(value, prepared, response) {
     value.hostExecutionId === response?.hostExecutionId;
 }
 
-export function acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence } = {}) {
+export function acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence, now = new Date().toISOString() } = {}) {
   const hostRequest = prepared?.hostRequest;
   const requestDigest = reviewLauncherRequestDigest(hostRequest);
   if (prepared?.allowed !== true || prepared.code !== "review-launcher-external-host-required" ||
       requestDigest !== hostRequest?.requestDigest) return fail("review-launcher-prepared-request-invalid");
-  const preflight = validateReviewLauncherRecovery(hostRequest.request);
+  const preflight = validateReviewLauncherRecovery({ ...hostRequest.request, now });
   if (!preflight.allowed) return preflight;
   if (response?.allowed !== true || response.code !== "review-launcher-host-complete" ||
       response.launchId !== hostRequest.launchId || response.requestDigest !== requestDigest ||

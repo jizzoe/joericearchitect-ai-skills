@@ -22,7 +22,8 @@ function validCorrectionChain(records, record, authorizationRecord, selectedEntr
     priorHead = item.headCommit;
     priorManifest = item.manifestDigest;
   }
-  return record.attempt === correctionAttempts + 1 && record.attempt <= 3 &&
+  return records.length === correctionAttempts && record.attempt === correctionAttempts &&
+    correctionAttempts > 0 && correctionAttempts <= 3 &&
     record.headCommit === reviewPackage.headCommit && record.manifestDigest === reviewPackage.manifestDigest;
 }
 

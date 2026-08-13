@@ -18,12 +18,13 @@ export function executeReviewLauncherHost(hostRequest, {
   createView = createDetachedReviewView,
   removeView = removeDetachedReviewView,
   invoke = runCodexDegradedReviewAdapter,
-  hostExecutionId = randomUUID()
+  hostExecutionId = randomUUID(),
+  now = new Date().toISOString()
 } = {}) {
   const digest = reviewLauncherRequestDigest(hostRequest);
   if (!digest || digest !== hostRequest?.requestDigest) return fail("review-launcher-host-request-invalid");
   const request = hostRequest.request;
-  const preflight = validateReviewLauncherRecovery(request);
+  const preflight = validateReviewLauncherRecovery({ ...request, now });
   if (!preflight.allowed) return preflight;
   if (!text(request.repositoryPath) || !request.reviewer || !text(request.reviewer.type) || !text(request.reviewer.identity) || !text(request.attestationRef)) return fail("review-launcher-input-incomplete");
   const created = createView({ repositoryPath: request.repositoryPath, headCommit: request.reviewPackage.headCommit });

@@ -97,7 +97,10 @@ configured fixed host script, invoked outside the failed sandbox by the trusted
 runtime, independently validates that request and alone owns review-view setup
 and the fixed reviewer invocation. The controller accepts the response only
 with runtime-supplied outside-sandbox execution evidence bound to the request
-digest and host execution. Host self-attestation is insufficient.
+digest and host execution. Host self-attestation is insufficient. The prepared
+host request omits the controller's caller-supplied clock; host execution and
+controller acceptance independently evaluate expiration using their current
+runtime clocks, preventing replay of a previously valid timestamp.
 
 Neither component can receive arbitrary shell text, implementation history,
 GitHub/deployment tools, credentials as review input, or any authority beyond
@@ -146,7 +149,8 @@ behavior depend on individual memory.
 - **Fallback accidentally gains authority** → Fixed adapters, capability
   ledger, secret/environment tests, and no mutation-capable command path.
 - **Resume ambiguity** → Re-derive strict record, authorization, package,
-  result, checkpoint, and transition from durable records.
+  result, checkpoint, correction count, and transition from durable records;
+  the correction count equals the already-recorded chain length.
 - **Nested runtime denied by outer sandbox** → Return a stable launcher
   permission code; use only an explicitly authorized fixed external host with
   trusted runtime execution evidence, preserving the inner read-only reviewer
