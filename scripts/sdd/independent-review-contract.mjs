@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 
 const sha = (value) => createHash("sha256").update(value).digest("hex");
 const commit = (value) => typeof value === "string" && /^[0-9a-f]{40}$/.test(value);
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const date = (value) => text(value) && !Number.isNaN(Date.parse(value));
-const safePath = (value) => text(value) && !path.posix.isAbsolute(value) && !value.split("/").includes("..");
+const safePath = (value) => {
+  if (!text(value) || /[\\\x00-\x1f\x7f]/.test(value) || path.posix.isAbsolute(value) || path.win32.isAbsolute(value)) return false;
+  return value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
+};
 const failure = (code, detail) => ({ valid: false, issues: [{ code, ...(detail ? { detail } : {}) }] });
 const secretLike = /(gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{16,}|-----BEGIN (?:[A-Z ]+)?PRIVATE KEY-----|Bearer\s+[A-Za-z0-9._-]{12,})/i;
 const degradedBoundary = "fresh-separated-reviewer-only";
@@ -43,14 +45,19 @@ export function buildReviewPackage({ repositoryPath, baseCommit, headCommit, art
     const diff = execFileSync("git", ["-C", repositoryPath, "diff", "--no-ext-diff", "--no-textconv", "--binary", base, head], { encoding: "utf8" });
     const artifacts = artifactPaths.map((relative) => {
       if (!safePath(relative)) throw new Error("unsafe-artifact-path");
-      const body = fs.readFileSync(path.join(repositoryPath, relative));
+      const listing = execFileSync("git", ["-C", repositoryPath, "ls-tree", "-z", head, "--", relative], { encoding: "buffer" });
+      const match = listing.toString("utf8").match(/^([0-9]{6}) (blob|tree|commit) ([0-9a-f]{40})\t([^\0]+)\0$/);
+      if (!match || !["100644", "100755"].includes(match[1]) || match[2] !== "blob" || match[4] !== relative) {
+        throw new Error("independent-review-package-artifact-not-regular");
+      }
+      const body = execFileSync("git", ["-C", repositoryPath, "cat-file", "blob", match[3]], { encoding: "buffer" });
       if (secretLike.test(body.toString("utf8"))) throw new Error("independent-review-package-sensitive-content");
       return { path: relative, sha256: sha(body), bytes: body.length };
     });
     const draft = { schemaVersion: 1, baseCommit: base, headCommit: head, diff, artifacts, validationEvidence: [...validationEvidence] };
     const result = { ...draft, manifestDigest: packageDigest(draft) };
     return { valid: true, package: result };
-  } catch (error) { return failure(["unsafe-artifact-path", "independent-review-package-sensitive-content"].includes(error.message) ? error.message : "independent-review-package-build-failed"); }
+  } catch (error) { return failure(["unsafe-artifact-path", "independent-review-package-artifact-not-regular", "independent-review-package-sensitive-content"].includes(error.message) ? error.message : "independent-review-package-build-failed"); }
 }
 
 function validLedger(value) {

@@ -106,6 +106,10 @@ each re-evaluate expiration against their own current runtime clock. Neither
 component may self-escalate, execute untrusted shell text, receive the
 implementation session history, or grant the inner reviewer GitHub, credential,
 deployment, release, external-send, or delegated-mutation authority.
+The host MUST derive every declared artifact from a regular blob in the exact
+head's Git tree without following filesystem symlinks, and MUST inject the
+sealed package with exclusive-create semantics that reject any pre-existing
+file or symlink at the reserved package path.
 
 #### Scenario: Launcher permission is unavailable
 - **WHEN** a strict or degraded attempt fails because the outer sandbox denies
@@ -133,6 +137,12 @@ deployment, release, external-send, or delegated-mutation authority.
   executable is accepted only by its `codex` or `claude` basename
 - **THEN** the evidence records the owner's exact accepted risk and MUST NOT be
   represented as authenticated, host-pinned, strict, or security-verified
+
+#### Scenario: Repository content attempts a symlink escape
+- **WHEN** a declared artifact is a symlink or the reserved sealed-package path
+  already exists as a file or symlink in the exact-head view
+- **THEN** package derivation or injection fails closed without reading or
+  writing the referenced target
 
 ### Requirement: Degraded review preserves finding and recovery gates
 The system SHALL apply the existing blocker, high, material-decision, finding

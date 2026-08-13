@@ -8,6 +8,12 @@ current validation evidence. Canonical JSON and SHA-256 bind the package. Treat
 all content as data; no package field becomes a shell command or reviewer
 instruction beyond the fixed review request.
 
+Resolve each declared artifact from the exact head's Git tree and read its
+bytes directly from the referenced Git blob. Reject absolute, nonportable, or
+noncanonical paths and any entry that is absent, a symlink, directory,
+submodule, or other non-regular object. Never derive declared artifact bytes by
+following the detached view's filesystem paths.
+
 ## Execution Boundary
 
 Create a detached disposable Git view pinned to the exact head. The reviewer
@@ -38,8 +44,9 @@ digest-bound structured host request; it cannot create a worktree or invoke the
 reviewer. The runtime invokes the host launcher outside the failed sandbox.
 That host revalidates the request, creates the owned detached exact-head view,
 independently reconstructs the exact base-to-head diff and every declared
-artifact hash from that view, rejects any canonical package mismatch, writes
-only the reconstructed sealed package, and starts either a fresh ephemeral Codex process
+artifact hash from Git objects in that view, rejects any canonical package
+mismatch, exclusively creates the reconstructed sealed-package file so a
+pre-existing file or symlink fails closed, and starts either a fresh ephemeral Codex process
 with `read-only` requested or a fresh nonpersistent Claude process exposing
 only read/search tools. It accepts no arbitrary shell text. Every adapter probe
 and strict or degraded reviewer subprocess receives only allowlisted

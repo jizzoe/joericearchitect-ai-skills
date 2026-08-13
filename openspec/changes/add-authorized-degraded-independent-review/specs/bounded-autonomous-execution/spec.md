@@ -74,6 +74,8 @@ assurance level, reviewer identity, package/base/head, findings, dispositions,
 transition, and expiration in a unique durable review record. It MUST retry
 strict review first for every new head and MUST pause on an absent, expired,
 mismatched, malformed, broad, or out-of-envelope degraded authorization.
+Declared artifact hashes MUST be derived from regular Git blobs at the exact
+head rather than from symlink-following working-tree reads.
 
 #### Scenario: Clean independent review authorizes exact-head delivery
 - **WHEN** an isolated configured reviewer returns current passed evidence for

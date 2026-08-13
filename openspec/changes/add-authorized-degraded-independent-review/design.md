@@ -108,8 +108,11 @@ explicitly permit the configured launcher. The in-sandbox recovery controller
 can only validate and prepare a digest-bound structured request. A separately
 configured host script, invoked outside the failed sandbox by the runtime,
 validates that request, reconstructs the full diff and every declared artifact
-hash from its detached committed view, rejects any canonical package mismatch,
-and owns review-view setup and reviewer invocation. The
+hash directly from regular Git blobs in its detached committed view, rejects
+symlinks and other non-regular artifact entries, rejects any canonical package
+mismatch, and exclusively creates the sealed-package file so a committed file
+or symlink at that reserved path fails closed. The host owns review-view setup
+and reviewer invocation. The
 controller accepts the response only with runtime-supplied outside-sandbox
 execution data bound to the request digest and host execution. Under the
 accepted degraded-risk decision, this ordinary data is evidence of the intended

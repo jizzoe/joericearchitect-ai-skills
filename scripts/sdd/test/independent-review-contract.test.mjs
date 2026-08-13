@@ -42,7 +42,36 @@ test("package builder rederives a disposable repository's exact diff", () => {
   const base = run("rev-parse", "HEAD").trim();
   fs.writeFileSync(path.join(root, "openspec/changes/example/proposal.md"), "two\n"); run("add", "."); run("commit", "-m", "head");
   const head = run("rev-parse", "HEAD").trim();
+  fs.writeFileSync(path.join(root, "openspec/changes/example/proposal.md"), "uncommitted-worktree-content\n");
   const result = buildReviewPackage({ repositoryPath: root, baseCommit: base, headCommit: head, artifactPaths: ["openspec/changes/example/proposal.md"], validationEvidence: ["tests"] });
   assert.equal(result.valid, true, JSON.stringify(result));
   assert.equal(validateReviewPackage(result.package).valid, true);
+  assert.equal(result.package.artifacts[0].sha256, "27dd8ed44a83ff94d557f9fd0412ed5a8cbca69ea04922d88c01184a07300a5a");
+});
+
+test("package builder rejects a committed artifact symlink without reading its target", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "independent-review-symlink-"));
+  const canaryPath = path.join(os.tmpdir(), `independent-review-canary-${process.pid}-${Date.now()}`);
+  const run = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  try {
+    run("init"); run("config", "user.email", "fixture@example.invalid"); run("config", "user.name", "Fixture");
+    fs.writeFileSync(path.join(root, "regular.md"), "base\n"); run("add", "."); run("commit", "-m", "base");
+    const base = run("rev-parse", "HEAD").trim();
+    fs.writeFileSync(canaryPath, "outside-canary\n");
+    try {
+      fs.symlinkSync(canaryPath, path.join(root, "linked-artifact.md"));
+    } catch (error) {
+      if (["EPERM", "EACCES"].includes(error?.code)) return t.skip("filesystem does not permit symlink fixtures");
+      throw error;
+    }
+    run("add", "linked-artifact.md"); run("commit", "-m", "head");
+    const head = run("rev-parse", "HEAD").trim();
+    const result = buildReviewPackage({ repositoryPath: root, baseCommit: base, headCommit: head, artifactPaths: ["linked-artifact.md"], validationEvidence: ["tests"] });
+    assert.equal(result.valid, false);
+    assert.equal(result.issues[0].code, "independent-review-package-artifact-not-regular");
+    assert.equal(fs.readFileSync(canaryPath, "utf8"), "outside-canary\n");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(canaryPath, { force: true });
+  }
 });
