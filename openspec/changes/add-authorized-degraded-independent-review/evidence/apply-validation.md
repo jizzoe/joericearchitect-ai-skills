@@ -6,7 +6,7 @@ self-referential commit literal.
 
 Passed current evidence:
 
-- `node --test` — 205 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, restricted reviewer home/credential access, per-signature correction enforcement, host package rederivation, symlink-safe package injection and Git-object artifact derivation, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
+- `node --test` — 206 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, restricted reviewer home/credential access, per-signature correction enforcement including checkpoint resume, host package rederivation, symlink-safe package injection and Git-object artifact derivation, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
 - `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 54 focused launcher, request, adapter, and lifecycle tests pass.
 - `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 15 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running and per-signature correction budget enforcement.
 - `node scripts/sdd/check-adapter-drift.mjs` — canonical wrappers have no policy drift.
@@ -74,3 +74,10 @@ derives declared artifact bytes only from regular Git blobs at the exact head,
 rejecting symlinks and other non-regular entries without filesystem-following
 reads. It is recorded in `evidence/review-correction-artifact-symlink.md` and
 is the seventh globally ordered correction, first for its failure signature.
+The previously authorized correction-budget enforcement was then exercised by
+the fresh reviewer, which identified a stale global three-correction cap in
+checkpoint inspection. The correction replaces that global cap with the same
+per-`failureSignature` accounting used by authorization, operation, and finding
+validation. It is recorded in
+`evidence/review-correction-checkpoint-correction-budget.md` and is the eighth
+globally ordered correction, first for its failure signature.

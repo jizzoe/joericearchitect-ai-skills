@@ -125,6 +125,29 @@ test("checkpoint inspection detects durable-state conflict", () => {
   assert.equal(result.reason, "durable-state-conflict");
 });
 
+test("checkpoint correction limits apply per failure signature rather than globally", () => {
+  const correctionRecords = ["signature-a", "signature-a", "signature-a", "signature-b"].map((failureSignature, index) => ({
+    id: `correction-${index + 1}`,
+    change: "change",
+    attempt: index + 1,
+    failureSignature,
+    classification: "objective-fix",
+    behaviorPreserving: true,
+    current: true,
+    ancestryVerified: true,
+    evidenceReference: `evidence:correction-${index + 1}`,
+    baseCommit: "1".repeat(40),
+    previousHead: String(index + 2).repeat(40),
+    previousManifestDigest: String(index + 2).repeat(64),
+    headCommit: String(index + 3).repeat(40),
+    manifestDigest: String(index + 3).repeat(64)
+  }));
+  const checkpoint = { selectedEntry: { name: "change", records: [], correctionRecords }, steps: [{ id: "apply", status: "pending" }] };
+  assert.equal(inspectCheckpoint(checkpoint).classification, "continue");
+  const exhausted = { ...checkpoint, selectedEntry: { ...checkpoint.selectedEntry, correctionRecords: correctionRecords.map((record, index) => index === 3 ? { ...record, failureSignature: "signature-a" } : record) } };
+  assert.equal(inspectCheckpoint(exhausted).reason, "selected-entry-invalid-correction-records");
+});
+
 test("generic runner scenarios cover required behavior groups", () => {
   const scenarios = JSON.parse(
     fs.readFileSync(new URL("./scenarios.json", import.meta.url), "utf8")

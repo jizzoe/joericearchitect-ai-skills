@@ -91,8 +91,9 @@ function invalidApplyEvidenceRecord(input) {
 function invalidCorrectionRecord(input) {
   const entry = input.selectedEntry;
   if (!entry || entry.correctionRecords === undefined) return null;
-  if (!Array.isArray(entry.correctionRecords) || entry.correctionRecords.length > 3) return "selected-entry-invalid-correction-records";
+  if (!Array.isArray(entry.correctionRecords)) return "selected-entry-invalid-correction-records";
   const seen = new Set();
+  const attemptsByFailureSignature = new Map();
   for (let index = 0; index < entry.correctionRecords.length; index += 1) {
     const record = entry.correctionRecords[index];
     if (!record || typeof record.id !== "string" || !record.id || seen.has(record.id) ||
@@ -103,6 +104,9 @@ function invalidCorrectionRecord(input) {
         !commitReference(record.baseCommit) || !commitReference(record.previousHead) || !commitReference(record.headCommit) ||
         typeof record.previousManifestDigest !== "string" || !record.previousManifestDigest ||
         typeof record.manifestDigest !== "string" || !record.manifestDigest) return "invalid-objective-correction-record";
+    const signatureAttempts = (attemptsByFailureSignature.get(record.failureSignature) ?? 0) + 1;
+    if (signatureAttempts > 3) return "selected-entry-invalid-correction-records";
+    attemptsByFailureSignature.set(record.failureSignature, signatureAttempts);
     seen.add(record.id);
   }
   return null;
