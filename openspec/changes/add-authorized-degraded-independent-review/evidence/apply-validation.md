@@ -8,6 +8,7 @@ Passed current evidence:
 
 - `node --test $(rg --files | rg '\.test\.mjs$')` — 199 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
 - `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 51 focused launcher, request, adapter, and lifecycle tests pass.
+- `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 13 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running.
 - `node scripts/sdd/check-adapter-drift.mjs` — canonical wrappers have no policy drift.
 - `node scripts/validation/validate-skill-metadata.mjs` — canonical skill metadata passes.
 - `node scripts/validation/validate-shared-guardrails.mjs` — canonical guardrail linkage passes.
@@ -30,4 +31,7 @@ is pure, each launcher accepts no arbitrary shell command, creates only an owned
 detached exact-head view, and cleans it through the ownership guard. `IR-001`
 and `IR-002` remain explicitly accepted risks rather than resolved controls;
 this evidence does not claim cryptographic attestation or host-pinned reviewer
-identity.
+identity. The separately authorized `degraded-review-expiry-toctou` correction
+rechecks the exact authorization with a fresh runtime clock after review and is
+recorded in `evidence/review-correction-degraded-expiry.md`; its corrected head
+requires fresh strict-first review.

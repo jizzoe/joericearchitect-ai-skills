@@ -50,7 +50,10 @@ Add a pure validator that receives the run authorization, selected change and
 transition, current SHA/manifest, strict unavailable record, current time, and
 correction context. It returns a stable failure code and a normalized record.
 The operation checker calls this only after strict review has failed unavailable
-and before accepting a degraded result. It is not an adapter capability or
+and before invoking a degraded reviewer. The execution path repeats the same
+validation with a fresh runtime clock immediately after the reviewer returns
+and binds acceptance to that post-invocation record, so a review that completes
+at or after expiration cannot pass. It is not an adapter capability or
 configuration feature flag.
 
 Alternative: adapter decides whether to downgrade. Rejected because it makes

@@ -51,7 +51,7 @@ function validatedDurableStrictUnavailable(record, reviewPackage, configuredRevi
 
 /** Strict is always attempted first. Degraded review is an explicit second
  * transport and receives only an immutable copy of the sealed package. */
-export async function executeAuthorizedIndependentReview({ package: reviewPackage, strictAdapter, degradedAdapter, configuredReviewer, degradedReviewer, implementerSession, authorization, selectedEntry, transition = "merge-pr", invokeStrict, invokeDegraded, durableStrictUnavailable, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now } = {}) {
+export async function executeAuthorizedIndependentReview({ package: reviewPackage, strictAdapter, degradedAdapter, configuredReviewer, degradedReviewer, implementerSession, authorization, selectedEntry, transition = "merge-pr", invokeStrict, invokeDegraded, durableStrictUnavailable, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now, clock = () => new Date().toISOString() } = {}) {
   const durable = validatedDurableStrictUnavailable(durableStrictUnavailable, reviewPackage, configuredReviewer, implementerSession);
   const strict = durable
     ? { status: "unavailable", result: durable }
@@ -67,12 +67,14 @@ export async function executeAuthorizedIndependentReview({ package: reviewPackag
   const probe = probeDegradedIndependentReviewAdapter(degradedAdapter);
   if (!probe.available || typeof invokeDegraded !== "function") return { status: "unavailable", code: probe.available ? "degraded-independent-reviewer-invocation-unavailable" : probe.code, strictResult };
   const result = await invokeDegraded(Object.freeze(structuredClone(reviewPackage)));
+  const completionAuthorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts, derivedCorrection, correctionEvidence, now: clock() });
+  if (!completionAuthorizationCheck.allowed) return { status: "unavailable", code: completionAuthorizationCheck.issues[0].code, strictResult };
   const validation = validateReviewResult(result, { expectedPackage: reviewPackage, configuredReviewer: degradedReviewer, implementerSession });
   if (!validation.valid || result.assuranceLevel !== "authorized-degraded") return { status: "unavailable", code: validation.valid ? "degraded-independent-reviewer-assurance-invalid" : validation.issues[0].code, strictResult };
   if (!strictSummaryMatchesResult(result.strictUnavailable, strictResult)) {
     return { status: "unavailable", code: "independent-review-strict-unavailable-not-durable", strictResult };
   }
-  if (!degradedAuthorizationMatchesResult(result.degradedAuthorization, authorizationCheck.authorization)) {
+  if (!degradedAuthorizationMatchesResult(result.degradedAuthorization, completionAuthorizationCheck.authorization)) {
     return { status: "unavailable", code: "independent-review-degraded-authorization-mismatch", strictResult };
   }
   return { status: result.status, result, strictResult, assuranceLevel: "authorized-degraded" };

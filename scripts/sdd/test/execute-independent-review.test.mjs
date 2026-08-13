@@ -55,6 +55,14 @@ test("degraded execution is strict-first and requires the explicit sealed-packag
   assert.equal(out.status, "passed", JSON.stringify(out));
   assert.deepEqual(calls, ["degraded"]);
   calls.length = 0;
+  const expiredDuringReview = await executeAuthorizedIndependentReview({
+    ...common,
+    durableStrictUnavailable: durable,
+    clock: () => "2026-08-14T00:00:00.000Z"
+  });
+  assert.equal(expiredDuringReview.code, "degraded-independent-review-authorization-expired");
+  assert.deepEqual(calls, ["degraded"], "the post-invocation check must reject a result completed at expiration");
+  calls.length = 0;
   for (const strictUnavailableSummary of [
     { ...degraded.strictUnavailable, reviewRecordId: "different-record" },
     { ...degraded.strictUnavailable, executionId: "different-execution" },
