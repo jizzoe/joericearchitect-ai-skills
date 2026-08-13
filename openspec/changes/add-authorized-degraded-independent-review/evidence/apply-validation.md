@@ -6,8 +6,8 @@ self-referential commit literal.
 
 Passed current evidence:
 
-- `node --test $(rg --files | rg '\.test\.mjs$')` — 185 passing tests covering authorization, strict-first execution, launcher recovery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
-- `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 40 focused launcher, request, adapter, and lifecycle tests pass.
+- `node --test $(rg --files | rg '\.test\.mjs$')` — 186 passing tests covering authorization, strict-first execution, launcher recovery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
+- `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 41 focused launcher, request, adapter, and lifecycle tests pass.
 - `node scripts/sdd/check-adapter-drift.mjs` — canonical wrappers have no policy drift.
 - `node scripts/validation/validate-skill-metadata.mjs` — canonical skill metadata passes.
 - `node scripts/validation/validate-shared-guardrails.mjs` — canonical guardrail linkage passes.
