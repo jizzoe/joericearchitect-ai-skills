@@ -21,12 +21,12 @@ function executableIsCodex(value) {
   return ["codex", "codex.exe"].includes(path.basename(value).toLowerCase());
 }
 
-export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, strictResult, launcher, runtime, correctionAttempts = 0, derivedCorrection = false, now = new Date().toISOString() } = {}) {
+export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, strictResult, launcher, runtime, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
   const packageCheck = validateReviewPackage(reviewPackage);
   if (!packageCheck.valid) return fail(packageCheck.issues[0].code);
   if (!recoverableFailures.has(failureCode)) return fail("review-launcher-failure-not-recoverable", failureCode);
   if (strictResult?.status !== "unavailable" || strictResult.unavailableCode !== failureCode) return fail("review-launcher-strict-unavailable-mismatch");
-  const degradedCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts, derivedCorrection, now });
+  const degradedCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts, derivedCorrection, correctionEvidence, now });
   if (!degradedCheck.allowed) return fail(degradedCheck.issues[0].code);
   const record = authorization?.reviewLauncher;
   if (record?.enabled !== true) return fail("review-launcher-not-authorized");
@@ -79,12 +79,13 @@ export function executeReviewLauncherRecovery({
   attestationRef,
   correctionAttempts = 0,
   derivedCorrection = false,
+  correctionEvidence,
   now,
   createView = createDetachedReviewView,
   removeView = removeDetachedReviewView,
   invoke = runCodexDegradedReviewAdapter
 } = {}) {
-  const preflight = validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition, reviewPackage, strictResult, launcher, runtime, correctionAttempts, derivedCorrection, now });
+  const preflight = validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition, reviewPackage, strictResult, launcher, runtime, correctionAttempts, derivedCorrection, correctionEvidence, now });
   if (!preflight.allowed) return preflight;
   if (!text(repositoryPath) || !reviewer || !text(reviewer.type) || !text(reviewer.identity) || !text(attestationRef)) return fail("review-launcher-input-incomplete");
   const created = createView({ repositoryPath, headCommit: reviewPackage.headCommit });

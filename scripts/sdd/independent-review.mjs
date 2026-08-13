@@ -96,7 +96,14 @@ export function validateIndependentReviewEvidence({ reviewer, implementerSession
 
 // V1 result records are additive during migration. The legacy evidence
 // evaluator above remains available to existing checkpoints and callers.
-export function validateIndependentReviewV1({ reviewer, degradedReviewer, authorization, selectedEntry, transition = "merge-pr", implementerSession, reviewPackage, reviewResult, applyEvidence, dispositions = [], correctionAttempts = 0, seenRecordIds = new Set(), derivedCorrection = false, correctionEvidence, now }) {
+function strictSummaryMatchesResult(summary, result) {
+  return summary?.reviewRecordId === result?.reviewRecordId && summary.executionId === result.executionId &&
+    summary.adapter === result.reviewer?.adapter && summary.status === "unavailable" &&
+    summary.unavailableCode === result.unavailableCode && summary.baseCommit === result.baseCommit &&
+    summary.headCommit === result.headCommit && summary.manifestDigest === result.manifestDigest;
+}
+
+export function validateIndependentReviewV1({ reviewer, degradedReviewer, authorization, selectedEntry, transition = "merge-pr", implementerSession, reviewPackage, reviewResult, strictUnavailableResult, applyEvidence, dispositions = [], correctionAttempts = 0, seenRecordIds = new Set(), derivedCorrection = false, correctionEvidence, now }) {
   if (!reviewer?.available) return fail("independent-reviewer-unavailable");
   const packageValidation = validateReviewPackage(reviewPackage);
   if (!packageValidation.valid) return fail(packageValidation.issues[0].code);
@@ -114,8 +121,16 @@ export function validateIndependentReviewV1({ reviewer, degradedReviewer, author
   if (reviewResult.status === "unavailable") return fail(reviewResult.unavailableCode);
   if (reviewResult.status !== "passed") return fail("independent-review-findings-unresolved");
   if (reviewResult.assuranceLevel === "authorized-degraded") {
+    const strictValidation = validateReviewResult(strictUnavailableResult, {
+      expectedPackage: reviewPackage, configuredReviewer: reviewer, implementerSession
+    });
+    if (!strictValidation.valid || strictUnavailableResult.status !== "unavailable" ||
+        strictUnavailableResult.assuranceLevel !== "strict-isolated" ||
+        !strictSummaryMatchesResult(reviewResult.strictUnavailable, strictUnavailableResult)) {
+      return fail("independent-review-strict-unavailable-not-durable");
+    }
     const authorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage,
-      strictResult: reviewResult.strictUnavailable, correctionAttempts, derivedCorrection, correctionEvidence, now });
+      strictResult: strictUnavailableResult, correctionAttempts, derivedCorrection, correctionEvidence, now });
     if (!authorizationCheck.allowed) return authorizationCheck;
   }
   const dispositionValidation = validateFindingDispositions({ findings: reviewResult.findings, dispositions, correctionAttempts });

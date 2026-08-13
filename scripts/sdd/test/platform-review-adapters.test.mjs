@@ -75,6 +75,14 @@ test("findings output schema is accepted by strict structured-output validators"
   assert.deepEqual(new Set(schema.required), new Set(Object.keys(schema.properties)));
 });
 
+test("strict result schema distinguishes unavailable from proven isolation", () => {
+  const schema = JSON.parse(fs.readFileSync(new URL("../../../schemas/independent-review-result-v1.schema.json", import.meta.url), "utf8"));
+  assert.equal(schema.allOf.length, 3);
+  assert.equal(schema.allOf[0].if.properties.status.enum.includes("passed"), true);
+  assert.equal(schema.allOf[1].if.properties.status.const, "unavailable");
+  assert.equal(schema.allOf[1].then.properties.attestation.properties.readOnly.const, false);
+});
+
 test("Claude adapter uses a temporary strict sandbox configuration without inherited settings", () => {
   const settings = createClaudeReviewSettings(view);
   assert.equal(settings.sandbox.failIfUnavailable, true);

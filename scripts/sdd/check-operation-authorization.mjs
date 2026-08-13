@@ -126,6 +126,16 @@ function durableReviewV1Matches(request) {
        JSON.stringify(record.capabilityLedger) === JSON.stringify(request.independentReviewResult.capabilityLedger)));
 }
 
+function durableStrictUnavailableRecord(request) {
+  if (request.independentReviewResult?.assuranceLevel !== "authorized-degraded") return null;
+  const summary = request.independentReviewResult.strictUnavailable;
+  const records = request.checkpoint?.selectedEntry?.strictUnavailableRecords ?? [];
+  const matching = records.filter((record) => record.id === summary?.reviewRecordId && record.entry === request.selectedEntry &&
+    record.transition === request.lifecycleAction && record.current === true &&
+    JSON.stringify(record.reviewPackage) === JSON.stringify(request.independentReviewPackage));
+  return matching.length === 1 ? matching[0] : null;
+}
+
 function durableApplyEvidenceMatches(request) {
   const records = request.checkpoint?.selectedEntry?.applyEvidenceRecords;
   const supplied = request.applyEvidence;
@@ -204,6 +214,8 @@ export function checkOperationAuthorization(input) {
         if (!request.independentReviewPackage || !request.independentReviewResult) return fail("independent-review-v1-input-incomplete");
         if (!durableApplyEvidenceMatches(request)) return fail("independent-review-apply-evidence-not-durable");
         if (!durableReviewV1Matches(request)) return fail("independent-review-evidence-not-durable");
+        const strictUnavailableRecord = durableStrictUnavailableRecord(request);
+        if (request.independentReviewResult.assuranceLevel === "authorized-degraded" && !strictUnavailableRecord) return fail("independent-review-strict-unavailable-not-durable");
         const reviewer = configuredReviewer(config, request.independentReviewResult.assuranceLevel === "authorized-degraded" ? request.strictReviewer : request.reviewer);
         if (!reviewer) return fail("independent-reviewer-not-configured");
         const degradedReviewer = request.independentReviewResult.assuranceLevel === "authorized-degraded"
@@ -211,6 +223,7 @@ export function checkOperationAuthorization(input) {
         if (!degradedReviewer) return fail("degraded-independent-reviewer-not-configured");
         return validateIndependentReviewV1({ reviewer, implementerSession: request.implementerSession, reviewPackage: request.independentReviewPackage,
           reviewResult: request.independentReviewResult, applyEvidence: request.applyEvidence, dispositions: request.reviewDispositions ?? [],
+          strictUnavailableResult: strictUnavailableRecord?.result,
           correctionAttempts: request.correctionAttempts ?? 0, seenRecordIds: new Set(request.seenReviewRecordIds ?? []),
           degradedReviewer, authorization, selectedEntry: request.selectedEntry, transition: request.lifecycleAction,
           derivedCorrection: request.derivedCorrection === true,

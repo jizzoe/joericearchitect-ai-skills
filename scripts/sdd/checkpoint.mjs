@@ -53,6 +53,25 @@ function invalidReviewRecord(input) {
   return null;
 }
 
+function invalidStrictUnavailableRecord(input) {
+  const entry = input.selectedEntry;
+  if (!entry || entry.strictUnavailableRecords === undefined) return null;
+  if (!Array.isArray(entry.strictUnavailableRecords)) return "selected-entry-invalid-strict-unavailable-records";
+  const seen = new Set();
+  for (const record of entry.strictUnavailableRecords) {
+    const validation = validateReviewResult(record?.result);
+    if (!record || typeof record.id !== "string" || !record.id || seen.has(record.id) ||
+        record.entry !== entry.name || typeof record.transition !== "string" || !record.transition ||
+        record.current !== true || typeof record.evidenceReference !== "string" || !record.evidenceReference ||
+        !record.reviewPackage || !validation.valid || record.result.status !== "unavailable" ||
+        record.result.assuranceLevel !== "strict-isolated" || record.result.reviewRecordId !== record.id ||
+        record.reviewPackage.baseCommit !== record.result.baseCommit || record.reviewPackage.headCommit !== record.result.headCommit ||
+        record.reviewPackage.manifestDigest !== record.result.manifestDigest) return "invalid-strict-unavailable-record";
+    seen.add(record.id);
+  }
+  return null;
+}
+
 function invalidApplyEvidenceRecord(input) {
   const entry = input.selectedEntry;
   if (!entry || entry.applyEvidenceRecords === undefined) return null;
@@ -95,6 +114,8 @@ export function inspectCheckpoint(input) {
   if (recordIssue) return { classification: "human-decision", firstIncomplete: null, reason: recordIssue };
   const reviewIssue = invalidReviewRecord(input);
   if (reviewIssue) return { classification: "human-decision", firstIncomplete: null, reason: reviewIssue };
+  const strictUnavailableIssue = invalidStrictUnavailableRecord(input);
+  if (strictUnavailableIssue) return { classification: "human-decision", firstIncomplete: null, reason: strictUnavailableIssue };
   const applyEvidenceIssue = invalidApplyEvidenceRecord(input);
   if (applyEvidenceIssue) return { classification: "human-decision", firstIncomplete: null, reason: applyEvidenceIssue };
   const correctionIssue = invalidCorrectionRecord(input);

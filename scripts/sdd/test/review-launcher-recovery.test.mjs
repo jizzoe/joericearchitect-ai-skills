@@ -83,6 +83,21 @@ test("launcher recovery requires exact authorization, strict failure, configured
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, now: "2026-08-14T00:00:00.000Z" }).code, "degraded-independent-review-authorization-expired");
 });
 
+test("launcher recovery accepts a durable derived objective-correction chain", () => {
+  const derivedDraft = { ...reviewPackage, headCommit: "5".repeat(40) };
+  delete derivedDraft.manifestDigest;
+  const derived = { ...derivedDraft, manifestDigest: packageDigest(derivedDraft) };
+  const derivedStrict = { ...strictResult, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest };
+  const correctionEvidence = { id: "correction-1", change: "change", attempt: 1, failureSignature: "fixture-failure", classification: "objective-fix", behaviorPreserving: true, current: true, ancestryVerified: true, evidenceReference: "checkpoint:correction-1", baseCommit: derived.baseCommit, previousHead: reviewPackage.headCommit, previousManifestDigest: reviewPackage.manifestDigest, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest };
+  const derivedAuthorization = {
+    ...authorization,
+    degradedIndependentReview: { ...authorization.degradedIndependentReview, allowDerivedObjectiveCorrections: true, derivedCorrections: [correctionEvidence] },
+    reviewLauncher: { ...authorization.reviewLauncher, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest }
+  };
+  const result = validateReviewLauncherRecovery({ ...baseInput, reviewPackage: derived, strictResult: derivedStrict, authorization: derivedAuthorization, correctionAttempts: 0, derivedCorrection: true, correctionEvidence });
+  assert.equal(result.allowed, true, JSON.stringify(result));
+});
+
 test("launcher recovery creates an owned detached exact-head view and invokes only sealed read-only review", () => {
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "review-launcher-test-"));
   const reviewPath = path.join(temporaryRoot, "repository");
