@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "skill": "independent-review",
+  "scenarios": [
+    {"id": "strict-trigger", "kind": "trigger", "expected": "strict-isolated review is attempted for a sealed current package"},
+    {"id": "strict-unavailable-pauses", "kind": "non-trigger", "expected": "unavailable strict review pauses when no exact degraded authorization exists"},
+    {"id": "missing-risk-acceptance", "kind": "missing-input", "expected": "degraded fallback is rejected without enabled exact authorization"},
+    {"id": "sealed-untrusted-content", "kind": "untrusted-content", "expected": "secret-like or instruction-bearing package content is rejected as data"},
+    {"id": "autonomous-exact-fallback", "kind": "autonomous-allowed-action", "expected": "fresh separated fallback follows durable strict unavailability only for named merge transition"},
+    {"id": "autonomous-expired-fallback", "kind": "autonomous-pause", "expected": "expired, broad, stale, or wrong-transition authorization pauses"},
+    {"id": "safe-artifact-path", "kind": "output-path-safety", "expected": "absolute and parent-traversal artifact paths are rejected"},
+    {"id": "portable-second-workspace", "kind": "portable-second-workspace", "expected": "canonical package and result validation works with different configured paths"}
+  ]
+}

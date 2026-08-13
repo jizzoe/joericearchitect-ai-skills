@@ -24,7 +24,7 @@
 - [x] 3.1 Update the canonical independent-review skill, protocol/result references, autonomous-runner policy, and lifecycle guidance to explain strict default, explicit degraded risk acceptance, current-head rereview, pause/recovery, and the queue-1 bootstrap boundary.
   - Depends on: 2.1, 2.3.
   - Evidence: documentation/link and canonical thin-adapter drift checks.
-- [ ] 3.2 Add synthetic evaluation scenarios and a second-workspace fixture for strict/degraded distinction, untrusted content, secret exclusion, safe paths, expiration, recovery, and portability without product constants.
+- [x] 3.2 Add synthetic evaluation scenarios and a second-workspace fixture for strict/degraded distinction, untrusted content, secret exclusion, safe paths, expiration, recovery, and portability without product constants.
   - Depends on: 2.2, 2.3.
   - Evidence: deterministic eval suite.
 
