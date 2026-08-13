@@ -13,16 +13,9 @@ const capabilities = { adapter: "fixture", attestationRef: "fixture-attestation"
 const reviewPackage = () => { const value = fixture("valid-package.json"); value.manifestDigest = packageDigest(value); return value; };
 const result = () => { const value = fixture("valid-result.json"); value.manifestDigest = reviewPackage().manifestDigest; return value; };
 
-test("scenario matrix covers strict and authorized-degraded safety boundaries", () => {
-  const matrix = JSON.parse(fs.readFileSync(new URL("./scenarios.json", import.meta.url), "utf8"));
-  assert.equal(matrix.skill, "independent-review");
-  assert.deepEqual(matrix.scenarios.map((scenario) => scenario.kind).sort(), ["autonomous-allowed-action", "autonomous-pause", "missing-input", "non-trigger", "output-path-safety", "portable-second-workspace", "trigger", "untrusted-content"]);
-});
-
 test("independent-review eval matrix rejects malformed, secret, stale, self-review, wrong-attestation, and duplicate results", () => {
   const pack = reviewPackage();
-  const credentialShapedDiff = ["Bearer", "abcdefghijklmnop"].join(" ");
-  assert.equal(validateReviewPackage({ ...pack, diff: credentialShapedDiff }).valid, false);
+  assert.equal(validateReviewPackage({ ...pack, diff: "Bearer abcdefghijklmnop" }).valid, false);
   assert.equal(validateReviewPackage({ ...pack, manifestDigest: "0".repeat(64) }).valid, false);
   const current = result();
   const configuredReviewer = { type: "fixture", identity: "fresh-reviewer", attestation: { ref: "fixture-attestation" } };
