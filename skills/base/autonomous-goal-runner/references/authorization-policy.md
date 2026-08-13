@@ -102,6 +102,18 @@ adapter-attested non-interactive, isolated read-only capability; request flags
 do not create reviewer authority. It resolves supplied lowercase full object
 IDs through read-only Git as commits and accepts only identical canonical IDs.
 
+## Authorized Degraded Independent Review
+
+An authorization may include `degradedIndependentReview` only as a disabled-by-
+default positive owner choice for one selected queue entry and named delivery
+transition. It names expiration, risk reason, fallback boundary, and initial
+sealed package binding; derived packages are eligible only for recorded in-scope
+behavior-preserving corrections before expiry and inside the correction budget.
+Strict review is always attempted first. The fallback is fresh and separate,
+receives sealed-package-only input, has no mutation-capable path, and records
+`authorized-degraded` assurance with a capability ledger; missing, broad,
+expired, stale, mismatched, or unavailable fallback evidence pauses.
+
 ## Always Forbidden Without Separate Explicit Approval
 
 - repository deletion

@@ -1,0 +1,75 @@
+## Why
+
+Strict, OS-isolated independent review must remain the standard for
+`production-rapid` delivery, but a bounded owner-authorized run may need an
+explicitly lower-assurance signal when that adapter is objectively unavailable.
+The current protocol correctly pauses; it cannot record or safely use that
+specific risk acceptance without weakening its default.
+
+Primary GitHub issue: [#84](https://github.com/jizzoe/joericearchitect-ai-skills/issues/84).
+
+## What Changes
+
+- Add an opt-in, transition- and change-bound degraded independent-review
+  authorization that expires no later than its enclosing autonomous goal.
+- Require strict review to be attempted and durably recorded as unavailable
+  before a fresh, separate, non-mutating degraded reviewer can be invoked.
+- Extend sealed result and delivery evidence with an unambiguous assurance
+  level, a capability ledger, the authorization/risk record, and exact
+  package/base/head bindings.
+- Add deterministic schema, authorization, adapter, delivery-gate, recovery,
+  portability, command-injection, secret, and thin-adapter-drift tests.
+- Preserve existing finding disposition, correction-budget, verification,
+  recovery, and strict fail-closed behavior for all un-authorized runs.
+
+## Scope
+
+The scope is the canonical independent-review, autonomous authorization, and
+lifecycle evidence boundary.
+
+## Non-Goals
+
+This change excludes standing fallback permission,
+credentials, external messages, deployment, release, and model selection.
+
+## Capabilities
+
+### New Capabilities
+
+- `authorized-degraded-independent-review`: Defines the narrow opt-in fallback
+  and its authorization, evidence, assurance, and recovery contract.
+
+### Modified Capabilities
+
+- `isolated-independent-review`: Adds the explicit strict-first fallback path
+  while preserving strict isolation as the default and non-equivalent evidence.
+- `bounded-autonomous-execution`: Allows the runner to evaluate only a
+  time-bounded degraded-review authorization for the selected derived delivery
+  transition.
+- `sdd-lifecycle`: Requires lifecycle evidence and reports to retain the
+  selected strict or authorized-degraded assurance level.
+
+## Impact
+
+- **Canonical assets:** independent-review schemas, deterministic package/result
+  validation and adapter orchestration, the autonomous authorization checker,
+  durable checkpoints, and focused fixtures/evaluations.
+- **Assistant exposure:** existing Claude and Codex wrappers remain thin and
+  delegate to the canonical skill; neither chooses a reviewer or fallback.
+- **Compatibility:** an absent, malformed, expired, mismatched, or broad
+  authorization retains the present fail-closed pause. No existing strict
+  result is converted to degraded evidence.
+- **Security:** reviewers retain no Git, repository-write, GitHub, credential,
+  network-mutation, deployment, release, external-send, or delegated-mutation
+  authority. Product-specific values remain in run records, never reusable
+  assets.
+- **Reuse plan:** the contracts and validators are product-neutral; exact
+  change, transition, SHA, expiration, reviewer identity, and risk reason are
+  runtime evidence. Platform wrappers provide transport and accurately report
+  restrictions only.
+
+## Reuse Plan
+
+Canonical contracts, validators, and tests remain reusable; repository-specific
+issue, Project, branch, transition, reviewer, expiry, and risk-acceptance data
+are carried only in product-owned run records and evidence.

@@ -142,6 +142,18 @@ function configuredReviewer(config, requested) {
     attestation: { ref: attestation.ref }, nonInteractive: true, isolatedContext: true, readOnly: true };
 }
 
+function configuredDegradedReviewer(config, requested) {
+  const reviewer = config?.degradedIndependentReviewer;
+  const attestation = reviewer?.attestation;
+  if (!reviewer?.enabled || !nonEmpty(reviewer.type) || !nonEmpty(reviewer.identity) ||
+      !nonEmpty(attestation?.ref) || attestation.nonInteractive !== true ||
+      attestation.freshContext !== true || requested?.type !== reviewer.type ||
+      requested?.identity !== reviewer.identity) return null;
+  return { available: true, type: reviewer.type, identity: reviewer.identity,
+    attestation: { ref: attestation.ref }, nonInteractive: true,
+    isolatedContext: false, readOnly: false };
+}
+
 function canonicalLifecycleCheckpointMatches(request) {
   const entry = request.checkpoint?.selectedEntry;
   const steps = request.checkpoint?.steps;
@@ -190,9 +202,14 @@ export function checkOperationAuthorization(input) {
         if (!durableReviewV1Matches(request)) return fail("independent-review-evidence-not-durable");
         const reviewer = configuredReviewer(config, request.reviewer);
         if (!reviewer) return fail("independent-reviewer-not-configured");
+        const degradedReviewer = request.independentReviewResult.assuranceLevel === "authorized-degraded"
+          ? configuredDegradedReviewer(config, request.reviewer) : reviewer;
+        if (!degradedReviewer) return fail("degraded-independent-reviewer-not-configured");
         return validateIndependentReviewV1({ reviewer, implementerSession: request.implementerSession, reviewPackage: request.independentReviewPackage,
           reviewResult: request.independentReviewResult, applyEvidence: request.applyEvidence, dispositions: request.reviewDispositions ?? [],
-          correctionAttempts: request.correctionAttempts ?? 0, seenRecordIds: new Set(request.seenReviewRecordIds ?? []) });
+          correctionAttempts: request.correctionAttempts ?? 0, seenRecordIds: new Set(request.seenReviewRecordIds ?? []),
+          degradedReviewer, authorization, selectedEntry: request.selectedEntry, transition: request.lifecycleAction,
+          derivedCorrection: request.derivedCorrection === true, now: input.now });
       }
       const reviewInput = request.independentReviewInput;
       const manifest = immutableReviewManifest(reviewInput);

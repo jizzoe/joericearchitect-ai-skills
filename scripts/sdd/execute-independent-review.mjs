@@ -1,5 +1,6 @@
 import { validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { validateReviewAdapterCapabilities } from "./review-adapter-contract.mjs";
+import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
 
 export function probeIndependentReviewAdapter(adapter) {
   const result = validateReviewAdapterCapabilities(adapter);
@@ -15,4 +16,41 @@ export async function executeIndependentReview({ package: reviewPackage, adapter
   const result = await invoke(Object.freeze(structuredClone(reviewPackage)));
   const resultValidation = validateReviewResult(result, { expectedPackage: reviewPackage, configuredReviewer, implementerSession });
   return resultValidation.valid ? { status: result.status, result } : { status: "unavailable", code: resultValidation.issues[0].code };
+}
+
+export function probeDegradedIndependentReviewAdapter(adapter) {
+  if (!adapter || adapter.freshContext !== true || adapter.nonInteractive !== true || adapter.detachedView !== true ||
+      adapter.sealedPackageOnly !== true || adapter.disabledMutationTools !== true || adapter.credentialScrubbed !== true) {
+    return { available: false, code: "degraded-independent-reviewer-boundary-unavailable" };
+  }
+  return { available: true, code: "degraded-independent-reviewer-ready" };
+}
+
+function strictUnavailableResult({ reviewPackage, configuredReviewer, code }) {
+  return {
+    schemaVersion: 1,
+    reviewRecordId: `strict-unavailable-${reviewPackage.manifestDigest.slice(0, 12)}`,
+    executionId: `strict-unavailable-${reviewPackage.headCommit.slice(0, 12)}`,
+    reviewer: { type: configuredReviewer?.type ?? "strict", identity: configuredReviewer?.identity ?? "strict-reviewer", adapter: configuredReviewer?.type ?? "strict" },
+    attestation: { ref: configuredReviewer?.attestation?.ref ?? "strict-unavailable", nonInteractive: false, isolatedContext: false, freshContext: false, readOnly: false },
+    assuranceLevel: "strict-isolated",
+    baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest,
+    startedAt: new Date(0).toISOString(), completedAt: new Date(0).toISOString(), findings: [], status: "unavailable", unavailableCode: code
+  };
+}
+
+/** Strict is always attempted first. Degraded review is an explicit second
+ * transport and receives only an immutable copy of the sealed package. */
+export async function executeAuthorizedIndependentReview({ package: reviewPackage, strictAdapter, degradedAdapter, configuredReviewer, degradedReviewer, implementerSession, authorization, selectedEntry, transition = "merge-pr", invokeStrict, invokeDegraded, correctionAttempts = 0, derivedCorrection = false, now } = {}) {
+  const strict = await executeIndependentReview({ package: reviewPackage, adapter: strictAdapter, configuredReviewer, implementerSession, invoke: invokeStrict });
+  if (strict.status !== "unavailable") return { ...strict, assuranceLevel: "strict-isolated" };
+  const strictResult = strict.result ?? strictUnavailableResult({ reviewPackage, configuredReviewer, code: strict.code ?? "independent-reviewer-unavailable" });
+  const authorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts, derivedCorrection, now });
+  if (!authorizationCheck.allowed) return { status: "unavailable", code: authorizationCheck.issues[0].code, strictResult };
+  const probe = probeDegradedIndependentReviewAdapter(degradedAdapter);
+  if (!probe.available || typeof invokeDegraded !== "function") return { status: "unavailable", code: probe.available ? "degraded-independent-reviewer-invocation-unavailable" : probe.code, strictResult };
+  const result = await invokeDegraded(Object.freeze(structuredClone(reviewPackage)));
+  const validation = validateReviewResult(result, { expectedPackage: reviewPackage, configuredReviewer: degradedReviewer, implementerSession });
+  if (!validation.valid || result.assuranceLevel !== "authorized-degraded") return { status: "unavailable", code: validation.valid ? "degraded-independent-reviewer-assurance-invalid" : validation.issues[0].code, strictResult };
+  return { status: result.status, result, strictResult, assuranceLevel: "authorized-degraded" };
 }

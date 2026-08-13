@@ -4,17 +4,25 @@
   "title": "Independent Review Result v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "reviewRecordId", "executionId", "reviewer", "attestation", "baseCommit", "headCommit", "manifestDigest", "startedAt", "completedAt", "findings", "status", "unavailableCode"],
+  "required": ["schemaVersion", "reviewRecordId", "executionId", "reviewer", "attestation", "assuranceLevel", "baseCommit", "headCommit", "manifestDigest", "startedAt", "completedAt", "findings", "status", "unavailableCode"],
   "properties": {
     "schemaVersion": {"type": "integer", "const": 1},
     "reviewRecordId": {"type": "string", "minLength": 1},
     "executionId": {"type": "string", "minLength": 1},
     "reviewer": {"type": "object", "additionalProperties": false, "required": ["type", "identity", "adapter"], "properties": {"type": {"type": "string", "minLength": 1}, "identity": {"type": "string", "minLength": 1}, "adapter": {"type": "string", "minLength": 1}}},
     "attestation": {"type": "object", "additionalProperties": false, "required": ["ref", "nonInteractive", "isolatedContext", "freshContext", "readOnly"], "properties": {"ref": {"type": "string", "minLength": 1}, "nonInteractive": {"type": "boolean"}, "isolatedContext": {"type": "boolean"}, "freshContext": {"type": "boolean"}, "readOnly": {"type": "boolean"}}},
+    "assuranceLevel": {"enum": ["strict-isolated", "authorized-degraded"]},
+    "capabilityLedger": {"type": "object", "additionalProperties": false, "required": ["enforced", "unavailable", "instructionConstrained"], "properties": {"enforced": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "unavailable": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "instructionConstrained": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}},
+    "strictUnavailable": {"type": "object", "additionalProperties": false, "required": ["reviewRecordId", "executionId", "adapter", "status", "unavailableCode", "baseCommit", "headCommit", "manifestDigest"], "properties": {"reviewRecordId": {"type": "string", "minLength": 1}, "executionId": {"type": "string", "minLength": 1}, "adapter": {"type": "string", "minLength": 1}, "status": {"const": "unavailable"}, "unavailableCode": {"type": "string", "minLength": 1}, "baseCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "headCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "manifestDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
+    "degradedAuthorization": {"type": "object", "additionalProperties": false, "required": ["change", "transition", "expiresAt", "riskReason", "fallbackBoundary"], "properties": {"change": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}, "transition": {"enum": ["merge-pr"]}, "expiresAt": {"type": "string", "format": "date-time"}, "riskReason": {"type": "string", "minLength": 1}, "fallbackBoundary": {"const": "fresh-separated-reviewer-only"}}},
     "baseCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "headCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}, "manifestDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "startedAt": {"type": "string", "format": "date-time"}, "completedAt": {"type": "string", "format": "date-time"},
     "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "severity", "evidence", "recommendation"], "properties": {"id": {"type": "string", "minLength": 1}, "severity": {"enum": ["blocker", "high", "objective-fix", "warning", "false-positive"]}, "evidence": {"type": "string", "minLength": 1}, "recommendation": {"type": "string", "minLength": 1}}}},
     "status": {"enum": ["passed", "failed", "unavailable"]},
     "unavailableCode": {"type": "string"}
-  }
+  },
+  "allOf": [
+    {"if": {"properties": {"assuranceLevel": {"const": "strict-isolated"}}}, "then": {"properties": {"attestation": {"properties": {"nonInteractive": {"const": true}, "isolatedContext": {"const": true}, "freshContext": {"const": true}, "readOnly": {"const": true}}}}}},
+    {"if": {"properties": {"assuranceLevel": {"const": "authorized-degraded"}}}, "then": {"required": ["capabilityLedger", "strictUnavailable", "degradedAuthorization"], "properties": {"attestation": {"properties": {"nonInteractive": {"const": true}, "freshContext": {"const": true}}}}}}
+  ]
 }

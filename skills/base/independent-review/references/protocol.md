@@ -23,6 +23,18 @@ enables its OS sandbox, denies review-view writes and home reads, disables
 unsandboxed fallback, removes mutation tools, and fails if sandboxing is
 unavailable. Neither path changes ordinary user settings.
 
+## Authorized Degraded Path
+
+Strict isolation remains the default. Only after a strict adapter creates a
+durable unavailable result for the same base, head, and manifest may an active
+bounded authorization permit `fresh-separated-reviewer-only` fallback for that
+one delivery transition. The fallback receives only the sealed package and an
+owned detached committed view, has no implementation-session history or desired
+conclusion, and reports enforced, unavailable, and instruction-constrained
+controls. It is never called strict-isolated; missing freshness, sealed input,
+detached view, non-mutation boundary, authorization, or expiration returns
+`unavailable`.
+
 ## Feedback and Recovery
 
 Keep reviewer findings immutable. Store an evidence-backed implementer

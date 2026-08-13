@@ -12,6 +12,7 @@ const unavailable = (code, { reviewPackage, adapter, reviewer, attestationRef, s
   executionId,
   reviewer: { type: reviewer?.type ?? adapter, identity: reviewer?.identity ?? `${adapter}-reviewer`, adapter },
   attestation: { ref: attestationRef ?? "unavailable", nonInteractive: false, isolatedContext: false, freshContext: false, readOnly: false },
+  assuranceLevel: "strict-isolated",
   baseCommit: reviewPackage?.baseCommit ?? "0000000000000000000000000000000000000000",
   headCommit: reviewPackage?.headCommit ?? "0000000000000000000000000000000000000000",
   manifestDigest: reviewPackage?.manifestDigest ?? "0".repeat(64),

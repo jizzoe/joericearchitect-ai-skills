@@ -29,7 +29,11 @@ stopping conditions.
    its sealed v1 package, normalized result, and dispositions in the exact
    durable transition record. A new head invalidates prior review and requires
    affected checks plus a fresh reviewer; unavailable or material outcomes
-   pause the lifecycle.
+   pause the lifecycle. Strict OS-isolated review is attempted first. A reduced-
+   assurance reviewer is eligible only under an explicit exact active
+   degraded-review authorization after durable strict unavailability; its
+   evidence remains labelled `authorized-degraded` with the strict precursor
+   and capability ledger and is never described as strict isolation.
 8. Run formal Verify after every task has current evidence.
 9. Deliver through a pull request only when the delivery gate passes and the
    active authorization permits the mutation.

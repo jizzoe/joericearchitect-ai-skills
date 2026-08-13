@@ -10,6 +10,8 @@ const date = (value) => text(value) && !Number.isNaN(Date.parse(value));
 const safePath = (value) => text(value) && !path.posix.isAbsolute(value) && !value.split("/").includes("..");
 const failure = (code, detail) => ({ valid: false, issues: [{ code, ...(detail ? { detail } : {}) }] });
 const secretLike = /(gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{16,}|-----BEGIN (?:[A-Z ]+)?PRIVATE KEY-----|Bearer\s+[A-Za-z0-9._-]{12,})/i;
+const degradedBoundary = "fresh-separated-reviewer-only";
+const protectedCapabilities = ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"];
 
 export function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -51,10 +53,26 @@ export function buildReviewPackage({ repositoryPath, baseCommit, headCommit, art
   } catch (error) { return failure(["unsafe-artifact-path", "independent-review-package-sensitive-content"].includes(error.message) ? error.message : "independent-review-package-build-failed"); }
 }
 
+function validLedger(value) {
+  if (!value || !["enforced", "unavailable", "instructionConstrained"].every((key) => Array.isArray(value[key]) && value[key].every(text))) return false;
+  const entries = Object.values(value).flat();
+  return new Set(entries).size === entries.length && protectedCapabilities.every((capability) => entries.includes(capability));
+}
+
+function validDegradedBindings(value, expectedPackage) {
+  const strict = value.strictUnavailable;
+  const authorization = value.degradedAuthorization;
+  if (!validLedger(value.capabilityLedger) || !strict || strict.status !== "unavailable" || strict.baseCommit !== value.baseCommit || strict.headCommit !== value.headCommit || strict.manifestDigest !== value.manifestDigest || !text(strict.reviewRecordId) || !text(strict.executionId) || !text(strict.adapter) || !text(strict.unavailableCode)) return false;
+  if (!authorization || !text(authorization.change) || authorization.transition !== "merge-pr" || authorization.fallbackBoundary !== degradedBoundary || !text(authorization.riskReason) || !date(authorization.expiresAt)) return false;
+  if (expectedPackage && (strict.baseCommit !== expectedPackage.baseCommit || strict.headCommit !== expectedPackage.headCommit || strict.manifestDigest !== expectedPackage.manifestDigest)) return false;
+  return true;
+}
+
 export function validateReviewResult(value, { expectedPackage, configuredReviewer, implementerSession, seenRecordIds = new Set() } = {}) {
-  if (!value || value.schemaVersion !== 1 || !text(value.reviewRecordId) || !text(value.executionId) || !text(value.reviewer?.type) || !text(value.reviewer?.identity) || !text(value.reviewer?.adapter) || !text(value.attestation?.ref) || typeof value.attestation?.nonInteractive !== "boolean" || typeof value.attestation?.isolatedContext !== "boolean" || typeof value.attestation?.freshContext !== "boolean" || typeof value.attestation?.readOnly !== "boolean" || !commit(value.baseCommit) || !commit(value.headCommit) || !text(value.manifestDigest) || !date(value.startedAt) || !date(value.completedAt) || !Array.isArray(value.findings) || !["passed", "failed", "unavailable"].includes(value.status)) return failure("independent-review-result-malformed");
+  if (!value || value.schemaVersion !== 1 || !text(value.reviewRecordId) || !text(value.executionId) || !text(value.reviewer?.type) || !text(value.reviewer?.identity) || !text(value.reviewer?.adapter) || !text(value.attestation?.ref) || typeof value.attestation?.nonInteractive !== "boolean" || typeof value.attestation?.isolatedContext !== "boolean" || typeof value.attestation?.freshContext !== "boolean" || typeof value.attestation?.readOnly !== "boolean" || !["strict-isolated", "authorized-degraded"].includes(value.assuranceLevel) || !commit(value.baseCommit) || !commit(value.headCommit) || !text(value.manifestDigest) || !date(value.startedAt) || !date(value.completedAt) || !Array.isArray(value.findings) || !["passed", "failed", "unavailable"].includes(value.status)) return failure("independent-review-result-malformed");
   if (value.status === "unavailable" && !text(value.unavailableCode)) return failure("independent-review-result-unavailable-code-missing");
-  if (value.status !== "unavailable" && (value.attestation.nonInteractive !== true || value.attestation.isolatedContext !== true || value.attestation.freshContext !== true || value.attestation.readOnly !== true)) return failure("independent-review-result-not-isolated-read-only");
+  if (value.assuranceLevel === "strict-isolated" && value.status !== "unavailable" && (value.attestation.nonInteractive !== true || value.attestation.isolatedContext !== true || value.attestation.freshContext !== true || value.attestation.readOnly !== true)) return failure("independent-review-result-not-isolated-read-only");
+  if (value.assuranceLevel === "authorized-degraded" && (value.attestation.nonInteractive !== true || value.attestation.freshContext !== true || value.attestation.isolatedContext === true || value.attestation.readOnly === true || !validDegradedBindings(value, expectedPackage))) return failure("independent-review-result-degraded-evidence-invalid");
   if (seenRecordIds.has(value.reviewRecordId)) return failure("independent-review-result-duplicate-record");
   if (value.reviewer.identity === implementerSession) return failure("independent-review-self-review");
   if (configuredReviewer && (value.reviewer.type !== configuredReviewer.type || value.reviewer.identity !== configuredReviewer.identity || value.attestation.ref !== configuredReviewer.attestation?.ref)) return failure("independent-review-result-attestation-mismatch");

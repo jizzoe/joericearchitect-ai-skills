@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { canonicalJson } from "./independent-review-contract.mjs";
 import { validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { validateFindingDispositions } from "./review-findings.mjs";
+import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
 // Pure evaluator for an independently executed, read-only review channel.
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
@@ -95,21 +96,28 @@ export function validateIndependentReviewEvidence({ reviewer, implementerSession
 
 // V1 result records are additive during migration. The legacy evidence
 // evaluator above remains available to existing checkpoints and callers.
-export function validateIndependentReviewV1({ reviewer, implementerSession, reviewPackage, reviewResult, applyEvidence, dispositions = [], correctionAttempts = 0, seenRecordIds = new Set() }) {
+export function validateIndependentReviewV1({ reviewer, degradedReviewer, authorization, selectedEntry, transition = "merge-pr", implementerSession, reviewPackage, reviewResult, applyEvidence, dispositions = [], correctionAttempts = 0, seenRecordIds = new Set(), derivedCorrection = false, now }) {
   if (!reviewer?.available) return fail("independent-reviewer-unavailable");
   const packageValidation = validateReviewPackage(reviewPackage);
   if (!packageValidation.valid) return fail(packageValidation.issues[0].code);
   if (!applyEvidence || applyEvidence.current !== true || applyEvidence.headCommit !== reviewPackage.headCommit ||
       JSON.stringify(applyEvidence.validationEvidence) !== JSON.stringify(reviewPackage.validationEvidence)) return fail("independent-review-apply-evidence-mismatch");
+  const selectedReviewer = reviewResult?.assuranceLevel === "authorized-degraded" ? degradedReviewer : reviewer;
+  if (!selectedReviewer?.available) return fail("degraded-independent-reviewer-not-configured");
   const resultValidation = validateReviewResult(reviewResult, {
     expectedPackage: reviewPackage,
-    configuredReviewer: reviewer,
+    configuredReviewer: selectedReviewer,
     implementerSession,
     seenRecordIds
   });
   if (!resultValidation.valid) return fail(resultValidation.issues[0].code);
   if (reviewResult.status === "unavailable") return fail(reviewResult.unavailableCode);
   if (reviewResult.status !== "passed") return fail("independent-review-findings-unresolved");
+  if (reviewResult.assuranceLevel === "authorized-degraded") {
+    const authorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage,
+      strictResult: reviewResult.strictUnavailable, correctionAttempts, derivedCorrection, now });
+    if (!authorizationCheck.allowed) return authorizationCheck;
+  }
   const dispositionValidation = validateFindingDispositions({ findings: reviewResult.findings, dispositions, correctionAttempts });
   if (!dispositionValidation.allowed) return dispositionValidation;
   return { allowed: true, classification: "authorized", issues: [] };

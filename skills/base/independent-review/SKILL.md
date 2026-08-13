@@ -30,11 +30,16 @@ standing grants, noncanonical commits, or content outside the sealed package.
 4. Validate every returned `independent-review-result-v1` with the shared
    canonical validator. An unavailable, malformed, self-review, writable, or
    stale result pauses the transition.
-5. Preserve each finding and use the canonical finding state machine. Apply a
+5. An `authorized-degraded` result is eligible only after strict review has a
+   durable unavailable result for the exact sealed package and active bounded
+   authorization names the selected change, transition, expiration, risk
+   reason, and `fresh-separated-reviewer-only` boundary. It MUST retain the
+   strict record and capability ledger and MUST NOT be called strict-isolated.
+6. Preserve each finding and use the canonical finding state machine. Apply a
    bounded objective correction only when it is behavior-preserving and
    evidence-backed; rerun affected checks and obtain a fresh review for every
    new head.
-6. Record only the normalized result, non-sensitive execution reference,
+7. Record only the normalized result, non-sensitive execution reference,
    dispositions, and cleanup result in the durable checkpoint. Remove a review
    view only through its ownership-guarded cleanup helper.
 
