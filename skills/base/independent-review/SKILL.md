@@ -36,11 +36,15 @@ standing grants, noncanonical commits, or content outside the sealed package.
    reason, and `fresh-separated-reviewer-only` boundary. It MUST retain the
    strict record and capability ledger and MUST NOT be called strict-isolated.
 6. If detached-view creation or nested reviewer startup is denied by the outer
-   sandbox, use `scripts/sdd/review-launcher-recovery.mjs` only when the exact
-   degraded authorization, configured fixed launcher, and active runtime
-   permission all validate. The launcher creates the detached exact-head view
-   and starts a fresh ephemeral inner `read-only` reviewer; it never
-   self-escalates or accepts arbitrary commands.
+   sandbox, use `scripts/sdd/review-launcher-recovery.mjs` to validate and
+   prepare a sealed host request only when the exact degraded authorization,
+   configured fixed launcher, and active runtime permission all validate. The
+   trusted runtime invokes `scripts/sdd/review-launcher-host.mjs` outside the
+   failed sandbox; only that fixed host creates the detached exact-head view and
+   starts a fresh ephemeral inner `read-only` reviewer. Accept its response only
+   with runtime-supplied outside-sandbox execution evidence and exact request,
+   result, precursor, authorization, cleanup, and launcher bindings. Neither
+   component self-escalates or accepts arbitrary commands.
 7. Preserve each finding and use the canonical finding state machine. Apply a
    bounded objective correction only when it is behavior-preserving and
    evidence-backed; rerun affected checks and obtain a fresh review for every

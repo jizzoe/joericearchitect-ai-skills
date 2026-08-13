@@ -91,11 +91,18 @@ its own read-only sandbox, ephemeral session, and sealed package only.
 
 The runner never self-escalates. It first records the stable launcher-unavailable
 code and pauses unless the current run authorization and runtime permission
-explicitly permit the configured launcher. The launcher cannot receive arbitrary
-shell text, implementation history, GitHub/deployment tools, credentials as
-review input, or any authority beyond review-view setup and the fixed reviewer
-invocation. It records the parent-launch capability separately from the inner
-reviewer's assurance ledger.
+explicitly permit the configured launcher. The in-sandbox recovery controller
+can only validate and prepare a digest-bound structured request. A separately
+configured fixed host script, invoked outside the failed sandbox by the trusted
+runtime, independently validates that request and alone owns review-view setup
+and the fixed reviewer invocation. The controller accepts the response only
+with runtime-supplied outside-sandbox execution evidence bound to the request
+digest and host execution. Host self-attestation is insufficient.
+
+Neither component can receive arbitrary shell text, implementation history,
+GitHub/deployment tools, credentials as review input, or any authority beyond
+the fixed recovery operation. Evidence records the external host launch
+separately from the inner reviewer's assurance ledger.
 
 Alternative: run a package-only reviewer outside the outer sandbox. Rejected
 because it loses the detached committed view required by the review protocol.
@@ -141,8 +148,9 @@ behavior depend on individual memory.
 - **Resume ambiguity** → Re-derive strict record, authorization, package,
   result, checkpoint, and transition from durable records.
 - **Nested runtime denied by outer sandbox** → Return a stable launcher
-  permission code; use only an explicitly authorized configured launcher that
-  preserves the inner read-only reviewer and detached-view boundary.
+  permission code; use only an explicitly authorized fixed external host with
+  trusted runtime execution evidence, preserving the inner read-only reviewer
+  and detached-view boundary.
 - **Preset hides a consequential choice** → Use a closed vocabulary, report the
   expanded effective authorization, and ask once for all missing or invalid
   required inputs before mutation.
@@ -177,8 +185,9 @@ unavailability into a standing exception.
 1. Add schema and pure authorization/capability validators with fixtures.
 2. Extend canonical review execution, adapters, checkpoint, delivery gate, and
    canonical documentation without changing strict behavior.
-3. Add the permission-gated launcher recovery with a detached-view and inner
-   read-only-boundary test; record stable unavailable behavior when it is absent.
+3. Add the permission-gated controller/external-host launcher recovery with
+   request-digest, runtime-attestation, detached-view, cleanup, and inner read-
+   only-boundary tests; record stable unavailable behavior when it is absent.
 4. Add the concise request resolver, canonical preset reference, and missing-
    input/invalid-combination tests.
 5. Add focused deterministic tests and recorded planning/Apply evidence.

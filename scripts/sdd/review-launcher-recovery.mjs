@@ -1,12 +1,10 @@
 #!/usr/bin/env node
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
-import path from "node:path";
 
-import { createDetachedReviewView, removeDetachedReviewView } from "./detached-review-view.mjs";
 import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
-import { validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
+import { canonicalJson, validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
-import { runCodexDegradedReviewAdapter, writeReviewPackageForView } from "./platform-review-adapters.mjs";
 
 const recoverableFailures = new Set([
   "independent-review-view-create-failed",
@@ -14,12 +12,18 @@ const recoverableFailures = new Set([
 ]);
 const boundary = "detached-exact-head-inner-read-only";
 const launcherKind = "codex-detached-read-only-v1";
+const hostScript = "scripts/sdd/review-launcher-host.mjs";
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const fail = (code, detail) => ({ allowed: false, status: "unavailable", code, ...(detail ? { detail } : {}) });
 
 function executableIsCodex(value) {
   if (!text(value) || /[\r\n\0]/.test(value)) return false;
-  return ["codex", "codex.exe"].includes(path.basename(value).toLowerCase());
+  return ["codex", "codex.exe"].includes(value.split(/[\\/]/).at(-1).toLowerCase());
+}
+
+export function reviewLauncherRequestDigest({ schemaVersion, launchId, request } = {}) {
+  if (schemaVersion !== 1 || !text(launchId) || !request) return null;
+  return createHash("sha256").update(canonicalJson({ schemaVersion, launchId, request })).digest("hex");
 }
 
 export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, strictResult, launcher, runtime, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
@@ -37,7 +41,7 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
   const expires = Date.parse(record.expiresAt);
   const current = Date.parse(now);
   if (Number.isNaN(expires) || Number.isNaN(current) || expires <= current) return fail("review-launcher-authorization-expired");
-  if (launcher?.enabled !== true || launcher.kind !== launcherKind || !executableIsCodex(launcher.executable) ||
+  if (launcher?.enabled !== true || launcher.kind !== launcherKind || launcher.hostScript !== hostScript || !executableIsCodex(launcher.executable) ||
       launcher.detachedView !== true || launcher.innerReadOnlySandbox !== true || launcher.ephemeral !== true ||
       launcher.sealedPackageOnly !== true || launcher.credentialScrubbed !== true || launcher.nonInteractive !== true) {
     return fail("review-launcher-capability-unavailable");
@@ -53,6 +57,7 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
     recovery: Object.freeze({
       launcherId: launcher.id,
       launcherKind,
+      hostScript,
       boundary,
       selectedEntry,
       transition,
@@ -67,90 +72,72 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
   };
 }
 
-export function executeReviewLauncherRecovery({
-  failureCode,
-  authorization,
-  selectedEntry,
-  transition = "merge-pr",
-  reviewPackage,
-  strictResult,
-  launcher,
-  runtime,
-  repositoryPath,
-  reviewer,
-  attestationRef,
-  correctionAttempts = 0,
-  derivedCorrection = false,
-  correctionEvidence,
-  now,
-  createView = createDetachedReviewView,
-  removeView = removeDetachedReviewView,
-  invoke = runCodexDegradedReviewAdapter
-} = {}) {
-  const preflight = validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition, reviewPackage, strictResult, launcher, runtime, correctionAttempts, derivedCorrection, correctionEvidence, now });
+export function prepareReviewLauncherRecovery(request, { launchId = randomUUID() } = {}) {
+  const preflight = validateReviewLauncherRecovery(request);
   if (!preflight.allowed) return preflight;
-  if (!text(repositoryPath) || !reviewer || !text(reviewer.type) || !text(reviewer.identity) || !text(attestationRef)) return fail("review-launcher-input-incomplete");
-  const created = createView({ repositoryPath, headCommit: reviewPackage.headCommit });
-  if (!created?.available) return fail("review-launcher-detached-view-unavailable", created?.code);
-  if (created.view?.headCommit !== reviewPackage.headCommit) {
-    const cleanup = removeView(created.view);
-    return cleanup?.removed === true
-      ? fail("review-launcher-detached-view-unavailable", "review-launcher-detached-view-head-mismatch")
-      : fail("review-launcher-cleanup-failed", cleanup?.code);
-  }
-  const { view } = created;
-  let output;
-  try {
-    writeReviewPackageForView(view, reviewPackage);
-    const schemaPath = path.join(view.reviewPath, "schemas", "independent-review-findings-v1.schema.json");
-    const resultPath = path.join(view.temporaryRoot, "independent-review-findings.json");
-    const execution = invoke({
-      reviewPackage,
-      view,
-      schemaPath,
-      resultPath,
-      reviewer,
-      attestationRef,
-      strictResult,
-      degradedAuthorization: {
-        change: selectedEntry,
-        transition,
-        expiresAt: authorization.degradedIndependentReview.expiresAt,
-        riskReason: authorization.degradedIndependentReview.riskReason,
-        fallbackBoundary: authorization.degradedIndependentReview.fallbackBoundary
-      },
-      executable: launcher.executable
-    });
-    if (execution?.status === "unavailable") output = fail("review-launcher-inner-reviewer-unavailable", execution.result?.unavailableCode);
-    else {
-      const configuredReviewer = { ...reviewer, attestation: reviewer.attestation ?? { ref: attestationRef } };
-      const validation = validateReviewResult(execution?.result, { expectedPackage: reviewPackage, configuredReviewer, implementerSession: authorization.implementerSession });
-      if (!validation.valid || execution.result.assuranceLevel !== "authorized-degraded") {
-        output = fail("review-launcher-result-invalid", validation.issues?.[0]?.code);
-      } else if (!strictSummaryMatchesResult(execution.result.strictUnavailable, strictResult)) {
-        output = fail("review-launcher-strict-unavailable-mismatch");
-      } else if (!degradedAuthorizationMatchesResult(execution.result.degradedAuthorization, preflight.degradedAuthorization)) {
-        output = fail("review-launcher-degraded-authorization-mismatch");
-      } else {
-        output = { allowed: true, status: execution.result.status, code: "review-launcher-recovery-complete", result: execution.result, launcherEvidence: preflight.recovery };
-      }
-    }
-  } catch {
-    output = fail("review-launcher-execution-failed");
-  }
-  const cleanup = removeView(view);
-  if (cleanup?.removed !== true) return fail("review-launcher-cleanup-failed", cleanup?.code);
-  return output;
+  const hostRequest = { schemaVersion: 1, launchId, request: structuredClone(request) };
+  hostRequest.requestDigest = reviewLauncherRequestDigest(hostRequest);
+  return {
+    allowed: true,
+    status: "host-launch-required",
+    code: "review-launcher-external-host-required",
+    hostRequest,
+    expectedRecovery: preflight.recovery
+  };
+}
+
+function validRuntimeLaunchEvidence(value, prepared, response) {
+  return value?.attestedBy === "trusted-runtime" && value.outsideManagedSandbox === true &&
+    text(value.executionRef) && value.launcherId === prepared.expectedRecovery.launcherId &&
+    value.launcherKind === launcherKind && value.hostScript === hostScript &&
+    value.requestDigest === prepared.hostRequest.requestDigest &&
+    value.hostExecutionId === response?.hostExecutionId;
+}
+
+export function acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence } = {}) {
+  const hostRequest = prepared?.hostRequest;
+  const requestDigest = reviewLauncherRequestDigest(hostRequest);
+  if (prepared?.allowed !== true || prepared.code !== "review-launcher-external-host-required" ||
+      requestDigest !== hostRequest?.requestDigest) return fail("review-launcher-prepared-request-invalid");
+  const preflight = validateReviewLauncherRecovery(hostRequest.request);
+  if (!preflight.allowed) return preflight;
+  if (response?.allowed !== true || response.code !== "review-launcher-host-complete" ||
+      response.launchId !== hostRequest.launchId || response.requestDigest !== requestDigest ||
+      response.launcherId !== preflight.recovery.launcherId || response.launcherKind !== launcherKind ||
+      response.hostScript !== hostScript || !text(response.hostExecutionId)) return fail("review-launcher-host-response-invalid");
+  if (!validRuntimeLaunchEvidence(runtimeLaunchEvidence, prepared, response)) return fail("review-launcher-runtime-attestation-missing");
+  const request = hostRequest.request;
+  const configuredReviewer = { ...request.reviewer, attestation: request.reviewer?.attestation ?? { ref: request.attestationRef } };
+  const validation = validateReviewResult(response.result, { expectedPackage: request.reviewPackage, configuredReviewer, implementerSession: request.authorization?.implementerSession });
+  if (!validation.valid || response.result.assuranceLevel !== "authorized-degraded") return fail("review-launcher-result-invalid", validation.issues?.[0]?.code);
+  if (!strictSummaryMatchesResult(response.result.strictUnavailable, request.strictResult)) return fail("review-launcher-strict-unavailable-mismatch");
+  if (!degradedAuthorizationMatchesResult(response.result.degradedAuthorization, preflight.degradedAuthorization)) return fail("review-launcher-degraded-authorization-mismatch");
+  if (canonicalJson(response.launcherEvidence) !== canonicalJson(preflight.recovery) || response.cleanup?.removed !== true) return fail("review-launcher-host-evidence-invalid");
+  return {
+    allowed: true,
+    status: response.result.status,
+    code: "review-launcher-recovery-complete",
+    result: response.result,
+    launcherEvidence: response.launcherEvidence,
+    runtimeLaunchEvidence: { ...runtimeLaunchEvidence }
+  };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const inputPath = process.argv[2];
-  if (!inputPath) {
-    console.error("Usage: review-launcher-recovery.mjs <request.json>");
+  const [command, ...paths] = process.argv.slice(2);
+  let result;
+  if (command === "prepare" && paths.length === 1) {
+    result = prepareReviewLauncherRecovery(JSON.parse(fs.readFileSync(paths[0], "utf8")));
+  } else if (command === "accept" && paths.length === 3) {
+    result = acceptReviewLauncherHostResponse({
+      prepared: JSON.parse(fs.readFileSync(paths[0], "utf8")),
+      response: JSON.parse(fs.readFileSync(paths[1], "utf8")),
+      runtimeLaunchEvidence: JSON.parse(fs.readFileSync(paths[2], "utf8"))
+    });
+  } else {
+    console.error("Usage: review-launcher-recovery.mjs prepare <request.json> | accept <prepared.json> <response.json> <runtime-evidence.json>");
     process.exit(2);
   }
-  const request = JSON.parse(fs.readFileSync(inputPath, "utf8"));
-  const result = executeReviewLauncherRecovery(request);
   console.log(JSON.stringify(result, null, 2));
-  process.exit(result.allowed && result.status !== "unavailable" ? 0 : 1);
+  process.exit(result.allowed ? 0 : 1);
 }

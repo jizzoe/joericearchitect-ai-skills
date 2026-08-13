@@ -47,9 +47,12 @@ credential or scope changes, external messages, and unrelated mutations.
 `strict-first-degraded` always attempts strict review first. After durable exact-
 package unavailability, it permits a fresh, separate, transition-bound degraded
 review and the configured review-launcher recovery for the same change, head,
-manifest, correction envelope, and expiration. The selection is the owner's
-affirmative reduced-assurance risk choice; derive the exact authorization only
-when the package and transition exist.
+manifest, correction envelope, and expiration. Recovery prepares a structured
+request in the implementation sandbox; only the trusted runtime may invoke the
+fixed host launcher outside that sandbox, and acceptance requires runtime-
+supplied execution evidence. The selection is the owner's affirmative reduced-
+assurance risk choice; derive the exact authorization only when the package and
+transition exist.
 
 The preset is authorization, not runtime permission. If the configured launcher
 cannot run under the platform's active permission policy, report that gap and

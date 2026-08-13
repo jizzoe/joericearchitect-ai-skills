@@ -33,14 +33,23 @@ acceptable substitute. The runner may invoke only the configured
 base, head, manifest, expiration, degraded authorization, launcher ID, and
 runtime permission all match.
 
-The launcher itself has one fixed operation: create the owned detached exact-
-head view, write the sealed package, and start a fresh ephemeral Codex process
-with its inner sandbox set to `read-only`. It accepts no arbitrary argument or
-shell text, scrubs mutation credentials, returns a parent-owned normalized
-result, and removes only its ownership-guarded view. The parent-launch
-permission and inner reviewer controls are recorded separately. If permission,
-configuration, detached setup, inner startup, result validation, or cleanup
-fails, return the stable unavailable code and pause.
+The in-sandbox recovery controller validates authorization and emits only a
+digest-bound structured host request; it cannot create a worktree or invoke the
+reviewer. The trusted runtime must invoke the separately configured fixed host
+launcher outside the failed sandbox. That host has one operation: independently
+revalidate the request, create the owned detached exact-head view, write the
+sealed package, and start a fresh ephemeral Codex process with its inner sandbox
+set to `read-only`. It accepts no arbitrary command or shell text, scrubs
+mutation credentials, returns a request-bound normalized response, and removes
+only its ownership-guarded view.
+
+The controller accepts the response only when runtime-supplied execution
+evidence identifies the configured launcher, fixed host script, request digest,
+host execution, and outside-managed-sandbox boundary. Host self-attestation is
+not sufficient. The parent-launch evidence and inner reviewer controls are
+recorded separately. If permission, configuration, runtime attestation,
+detached setup, inner startup, result validation, or cleanup fails, return the
+stable unavailable code and pause.
 
 ## Authorized Degraded Path
 

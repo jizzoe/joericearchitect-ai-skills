@@ -81,7 +81,12 @@ active run authorization, configured deterministic launcher capability, and
 runtime permission explicitly permit a review launcher. The launcher MUST create
 the owned exact-head detached view outside the outer sandbox and start the
 inner reviewer with a fresh ephemeral read-only sandbox and sealed-package-only
-input. It MUST NOT self-escalate, execute untrusted shell text, receive the
+input. The in-sandbox controller MUST only prepare and accept a digest-bound
+structured request; a separately configured fixed host MUST perform view and
+reviewer operations, and response acceptance MUST require trusted-runtime
+outside-sandbox execution evidence bound to that host execution. A host's own
+claim MUST NOT establish this boundary. Neither component may self-escalate,
+execute untrusted shell text, receive the
 implementation session history, or grant the inner reviewer GitHub, credential,
 deployment, release, external-send, or delegated-mutation authority.
 
@@ -94,8 +99,10 @@ deployment, release, external-send, or delegated-mutation authority.
 #### Scenario: Configured launcher is explicitly permitted
 - **WHEN** the exact review transition has an active launcher authorization and
   runtime permission
-- **THEN** the launcher creates the owned detached exact-head view and invokes
-  the inner reviewer with its separate read-only boundary and sealed package
+- **THEN** the controller prepares the bound request, the trusted runtime invokes
+  the fixed host outside the failed sandbox, and the host creates the owned
+  detached exact-head view and invokes the inner reviewer with its separate
+  read-only boundary and sealed package
 
 ### Requirement: Degraded review preserves finding and recovery gates
 The system SHALL apply the existing blocker, high, material-decision, finding
