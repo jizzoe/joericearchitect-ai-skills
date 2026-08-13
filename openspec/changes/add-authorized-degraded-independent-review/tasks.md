@@ -12,7 +12,7 @@
 - [x] 2.1 Update canonical independent-review orchestration to attempt strict isolation first, preserve stable unavailable evidence, and invoke a fresh separate degraded reviewer only after the validator authorizes it.
   - Depends on: 1.1, 1.2.
   - Evidence: deterministic adapter/orchestration tests proving ordering and no fallback without strict unavailability.
-- [ ] 2.2 Add the degraded adapter boundary with a detached committed view, sealed-package-only input, fixed allowlisted inspection path, environment/tool scrubbing, and truthful enforced/unavailable/instruction-constrained capability ledger.
+- [x] 2.2 Add the degraded adapter boundary with a detached committed view, sealed-package-only input, fixed allowlisted inspection path, environment/tool scrubbing, and truthful enforced/unavailable/instruction-constrained capability ledger.
   - Depends on: 2.1.
   - Evidence: synthetic adapter tests reject same-session, mutable, credential, GitHub, deployment, release, external-send, and delegated-mutation paths.
 - [ ] 2.3 Extend checkpoint and delivery-gate validation to retain and re-derive assurance, strict precursor, authorization, findings, dispositions, and derived-head envelope evidence.

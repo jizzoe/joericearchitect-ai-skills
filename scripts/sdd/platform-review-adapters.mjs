@@ -51,6 +51,26 @@ export function buildCodexReviewInvocation({ executable = "codex", view, schemaP
   };
 }
 
+// This is deliberately not a strict-isolation transport. It is available only
+// to the authorized fallback orchestrator after strict unavailability and
+// reports every restriction that cannot be runtime-proven in its ledger.
+export function buildCodexDegradedReviewInvocation({ executable = "codex", view, schemaPath, resultPath }) {
+  return {
+    executable,
+    args: ["exec", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--cd", view.reviewPath, "--output-schema", schemaPath, "--output-last-message", resultPath,
+      "Review only the sealed package in this disposable detached view. Do not modify files, Git, credentials, network state, or external systems. Return only the required JSON review result."],
+    environment: { NO_COLOR: "1", GITHUB_TOKEN: "", GH_TOKEN: "", SSH_AUTH_SOCK: "", AWS_ACCESS_KEY_ID: "", AWS_SECRET_ACCESS_KEY: "", AWS_SESSION_TOKEN: "", NPM_TOKEN: "" }
+  };
+}
+
+export function degradedCapabilityLedger() {
+  return {
+    enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView"],
+    unavailable: [],
+    instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"]
+  };
+}
+
 export function probeCodexReviewAdapter({ executable = "codex", attestationRef = "attestations/codex-read-only-v1.json" } = {}) {
   if (!helpIncludes(executable, ["exec", "--help"], ["--sandbox", "--ephemeral", "--ignore-user-config", "--output-schema"])) {
     return { available: false, code: "independent-reviewer-codex-runtime-unavailable" };

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeReviewInvocation, buildCodexReviewInvocation, createClaudeReviewSettings, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeReviewAdapter, runCodexReviewAdapter, unavailableReviewResult } from "../platform-review-adapters.mjs";
+import { buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, createClaudeReviewSettings, degradedCapabilityLedger, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeReviewAdapter, runCodexReviewAdapter, unavailableReviewResult } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 
@@ -18,6 +18,16 @@ test("Codex adapter uses a fresh read-only noninteractive transport without user
   const probe = probeCodexReviewAdapter();
   assert.equal(typeof probe.available, "boolean");
   if (probe.available) assert.equal(probe.capability.denied.delegatedMutation, true);
+});
+
+test("degraded Codex transport is explicitly reduced-assurance and scrubs mutation credentials", () => {
+  const invocation = buildCodexDegradedReviewInvocation({ view, schemaPath: "/tmp/result-schema.json", resultPath: "/tmp/result.json" });
+  assert.equal(invocation.args.includes("--sandbox"), false);
+  assert.equal(invocation.args.includes("--ephemeral"), true);
+  assert.equal(invocation.environment.GH_TOKEN, "");
+  const ledger = degradedCapabilityLedger();
+  assert.ok(ledger.instructionConstrained.includes("gitWrite"));
+  assert.ok(ledger.instructionConstrained.includes("githubMutation"));
 });
 
 test("Claude adapter uses a temporary strict sandbox configuration without inherited settings", () => {
