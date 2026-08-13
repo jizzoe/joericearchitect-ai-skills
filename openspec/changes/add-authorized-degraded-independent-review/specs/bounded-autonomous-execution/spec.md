@@ -83,6 +83,12 @@ head rather than from symlink-following working-tree reads.
 - **THEN** the runner may use `strict-isolated` review only for the named
   authorized transition
 
+#### Scenario: Caller attempts to bypass the production review gate
+- **WHEN** a high-impact SDD transition omits its delivery profile or supplies
+  a profile that differs from the resolved durable authorization
+- **THEN** the runner rejects the transition before delivery and does not use
+  the caller-supplied value to weaken the independent-review requirement
+
 #### Scenario: Objective fix requires review of the new head
 - **WHEN** a reviewer identifies a bounded `objective-fix` and the runner
   applies the behavior-preserving fix and reruns affected evidence

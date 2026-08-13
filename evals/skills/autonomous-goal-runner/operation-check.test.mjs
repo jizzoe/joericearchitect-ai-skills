@@ -9,6 +9,7 @@ function input(profile, operation, overrides = {}) {
     authorization: {
       targets: ["workspace:docs", "record:tracker-1", "adapter:fixture", "pr:42", "change:example", "branch:feature/example"],
       allowedMutations: [operation],
+      qualityProfile: "prototype-rapid",
       expiresAt: "2026-08-13T12:00:00.000Z",
       ...overrides.authorization
     },
@@ -46,12 +47,20 @@ test("operation checker pauses for profile, authorization, target, adapter, runt
 test("sdd high-impact transitions require exact evidence and recovery boundaries", () => {
   for (const lifecycleAction of ["merge-pr", "archive-change", "delete-merged-topic-branch"]) {
     const target = lifecycleAction === "archive-change" ? "change:example" : lifecycleAction === "delete-merged-topic-branch" ? "branch:feature/example" : "pr:42";
-    const result = checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { request: { target, lifecycleAction, evidenceCurrent: true, recovery: "restore from durable records" } }));
+    const result = checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { request: { target, lifecycleAction, evidenceCurrent: true, recovery: "restore from durable records", deliveryProfile: "prototype-rapid" } }));
     assert.equal(result.allowed, true, lifecycleAction);
   }
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "run-lifecycle-action", { request: { lifecycleAction: "merge-pr", evidenceCurrent: true, recovery: "recover" } }))), "operation-not-in-profile");
   assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { request: { target: "pr:42", lifecycleAction: "merge-pr", evidenceCurrent: false } }))), "missing-recovery");
   assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action"))), "unnamed-or-unsupported-lifecycle-action");
+});
+
+test("high-impact delivery derives its quality gate from durable authorization", () => {
+  const request = { target: "pr:42", lifecycleAction: "merge-pr", evidenceCurrent: true, recovery: "re-read durable state" };
+  assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { request }))), "delivery-profile-authorization-mismatch");
+  assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { request: { ...request, deliveryProfile: "production-rapid" } }))), "delivery-profile-authorization-mismatch");
+  assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { authorization: { qualityProfile: "production-rapid" }, request: { ...request, deliveryProfile: "prototype-rapid" } }))), "delivery-profile-authorization-mismatch");
+  assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { authorization: { qualityProfile: "production-rapid" }, request: { ...request, deliveryProfile: "production-rapid" } }))), "independent-review-input-incomplete");
 });
 
 test("delivery preapproval preserves normal interactive prompts and permits only exact prototype exceptions", () => {

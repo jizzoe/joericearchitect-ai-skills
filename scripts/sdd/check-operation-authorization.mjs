@@ -11,6 +11,7 @@ export const profileOperations = {
 };
 
 export const highImpactLifecycleActions = new Set(["merge-pr", "archive-change", "delete-merged-topic-branch"]);
+const deliveryProfiles = new Set(["production-rapid", "prototype-rapid"]);
 const lifecycleActions = new Set(["sync-change", ...highImpactLifecycleActions]);
 const lifecycleTargetPrefixes = {
   "merge-pr": "pr:",
@@ -210,7 +211,12 @@ export function checkOperationAuthorization(input) {
     if (!request.target?.startsWith(lifecycleTargetPrefixes[request.lifecycleAction])) return fail("lifecycle-target-type-mismatch", request.lifecycleAction);
     if (!nonEmpty(request.recovery)) return fail("missing-recovery", request.lifecycleAction);
     if (request.evidenceCurrent !== true) return fail("incomplete-lifecycle-evidence", request.lifecycleAction);
-    if (request.deliveryProfile === "production-rapid") {
+    if (!deliveryProfiles.has(authorization.qualityProfile) ||
+        !deliveryProfiles.has(request.deliveryProfile) ||
+        request.deliveryProfile !== authorization.qualityProfile) {
+      return fail("delivery-profile-authorization-mismatch", request.deliveryProfile);
+    }
+    if (authorization.qualityProfile === "production-rapid") {
       if (request.independentReviewPackage || request.independentReviewResult) {
         if (!request.independentReviewPackage || !request.independentReviewResult) return fail("independent-review-v1-input-incomplete");
         if (!durableApplyEvidenceMatches(request)) return fail("independent-review-apply-evidence-not-durable");

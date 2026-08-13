@@ -8,9 +8,11 @@ import { immutableReviewManifest, prepareIndependentReview } from "../independen
 const authorization = {
   targets: ["workspace:reports"],
   allowedMutations: ["run-lifecycle-action", "read-source"],
+  qualityProfile: "production-rapid",
   derivedTargets: { queue: ["first-change"], selectedEntry: "first-change", repository: "owner/repository" },
   publicSourceScopes: ["https://docs.example.test/"]
 };
+const prototypeAuthorization = { ...authorization, qualityProfile: "prototype-rapid" };
 const runtime = { permittedOperations: ["run-lifecycle-action", "read-source"] };
 const repositoryPath = process.cwd();
 const configuredReviewer = { type: "fixture-reviewer", identity: "fresh-reviewer", enabled: true, attestation: { ref: "attestation-1", nonInteractive: true, isolatedContext: true, readOnly: true } };
@@ -30,8 +32,8 @@ function lifecycleCheckpoint(records, pending) {
 const derivedCheckpoint = lifecycleCheckpoint([issueRecord, branchRecord, record], "merge-pr");
 
 test("allows only a current exact derived pull request", () => {
-  const result = checkOperationAuthorization({ authorization, runtime, config, request: {
-    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, checkpoint: derivedCheckpoint, headCommit: headSha, evidenceCurrent: true, evidenceReference: "pr-evidence", evidenceHeadCommit: headSha, recovery: "re-read PR and checkpoint"
+  const result = checkOperationAuthorization({ authorization: prototypeAuthorization, runtime, config, request: {
+    profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:42", selectedEntry: "first-change", derivedRecord: record, checkpoint: derivedCheckpoint, headCommit: headSha, evidenceCurrent: true, evidenceReference: "pr-evidence", evidenceHeadCommit: headSha, recovery: "re-read PR and checkpoint", deliveryProfile: "prototype-rapid"
   } });
   assert.equal(result.allowed, true, JSON.stringify(result));
 });
@@ -46,12 +48,12 @@ test("rejects a lookalike queue entry and stale head", () => {
 });
 
 test("requires matching kinds for archive and merged-branch cleanup", () => {
-  const base = { profile: "sdd-delivery", operation: "run-lifecycle-action", selectedEntry: "first-change", evidenceCurrent: true, recovery: "recover" };
+  const base = { profile: "sdd-delivery", operation: "run-lifecycle-action", selectedEntry: "first-change", evidenceCurrent: true, recovery: "recover", deliveryProfile: "prototype-rapid" };
   const sync = { entry: "first-change", kind: "sync", id: "first-change", repository: "owner/repository", evidence: { reference: "sync-evidence", current: true } };
   const change = { entry: "first-change", kind: "change", id: "first-change", repository: "owner/repository", evidence: { reference: "change-evidence", current: true } };
   const cleanupBranch = { ...branchRecord, id: "merged-feature/first-change", evidence: { reference: "cleanup-evidence", current: true, headCommit: headSha } };
-  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "archive-change", target: "change:first-change", derivedRecord: change, checkpoint: lifecycleCheckpoint([issueRecord, branchRecord, record, sync, change], "archive-change"), evidenceReference: "change-evidence" } }).allowed, true);
-  assert.equal(checkOperationAuthorization({ authorization, runtime, request: { ...base, lifecycleAction: "delete-merged-topic-branch", target: "branch:merged-feature/first-change", derivedRecord: cleanupBranch, checkpoint: lifecycleCheckpoint([issueRecord, branchRecord, record, sync, change, cleanupBranch], "delete-merged-topic-branch"), headCommit: headSha, evidenceReference: "cleanup-evidence", evidenceHeadCommit: headSha } }).allowed, true);
+  assert.equal(checkOperationAuthorization({ authorization: prototypeAuthorization, runtime, request: { ...base, lifecycleAction: "archive-change", target: "change:first-change", derivedRecord: change, checkpoint: lifecycleCheckpoint([issueRecord, branchRecord, record, sync, change], "archive-change"), evidenceReference: "change-evidence" } }).allowed, true);
+  assert.equal(checkOperationAuthorization({ authorization: prototypeAuthorization, runtime, request: { ...base, lifecycleAction: "delete-merged-topic-branch", target: "branch:merged-feature/first-change", derivedRecord: cleanupBranch, checkpoint: lifecycleCheckpoint([issueRecord, branchRecord, record, sync, change, cleanupBranch], "delete-merged-topic-branch"), headCommit: headSha, evidenceReference: "cleanup-evidence", evidenceHeadCommit: headSha } }).allowed, true);
 });
 
 test("derived declarations require durable records for Sync as well as high-impact actions", () => {

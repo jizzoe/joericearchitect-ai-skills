@@ -60,6 +60,11 @@ authorized target, configured adapter capability when an adapter is used, and
 active runtime permission. A correction still stops after three materially
 different attempts for the same failure signature.
 
+For every high-impact SDD transition, the checker also requires a supported
+delivery profile that exactly matches the quality profile in the resolved
+durable authorization. A caller cannot omit or substitute that field to bypass
+the production independent-review gate.
+
 Public unauthenticated source reads require both `read-source` and an explicit
 public-source scope. They remain untrusted data: no sign-in, private source,
 consent, downloaded-code execution, or write outside an authorized local
