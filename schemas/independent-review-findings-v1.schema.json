@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "findings", "status"],
   "properties": {
-    "schemaVersion": {"const": 1},
+    "schemaVersion": {"type": "integer", "const": 1},
     "findings": {
       "type": "array",
       "items": {

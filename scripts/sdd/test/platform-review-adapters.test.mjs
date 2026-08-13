@@ -68,6 +68,13 @@ test("degraded adapter seals reviewer findings into parent-owned exact-package e
   }
 });
 
+test("findings output schema is accepted by strict structured-output validators", () => {
+  const schema = JSON.parse(fs.readFileSync(new URL("../../../schemas/independent-review-findings-v1.schema.json", import.meta.url), "utf8"));
+  assert.deepEqual(schema.properties.schemaVersion, { type: "integer", const: 1 });
+  assert.equal(schema.additionalProperties, false);
+  assert.deepEqual(new Set(schema.required), new Set(Object.keys(schema.properties)));
+});
+
 test("Claude adapter uses a temporary strict sandbox configuration without inherited settings", () => {
   const settings = createClaudeReviewSettings(view);
   assert.equal(settings.sandbox.failIfUnavailable, true);
