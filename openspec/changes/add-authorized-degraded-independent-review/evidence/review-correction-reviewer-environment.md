@@ -30,8 +30,9 @@ The correction constructs each probe and reviewer environment from a closed,
 cross-platform allowlist of operational variables plus fixed adapter-owned
 overrides. Ambient OpenAI, Anthropic, synthetic credential, and `NODE_OPTIONS`
 values are absent. The same shared launcher applies this behavior to strict and
-degraded Codex and Claude transports. No authorization, assurance, finding,
-transition, or delivery behavior changed.
+degraded Codex and Claude transports, and the canonical protocol documents the
+boundary. No authorization, assurance, finding, transition, or delivery
+behavior changed.
 
 ## Correction budget and exact-head rule
 

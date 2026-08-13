@@ -39,9 +39,12 @@ reviewer. The runtime invokes the host launcher outside the failed sandbox.
 That host revalidates the request, creates the owned detached exact-head view,
 writes the sealed package, and starts either a fresh ephemeral Codex process
 with `read-only` requested or a fresh nonpersistent Claude process exposing
-only read/search tools. It accepts no arbitrary shell text, scrubs known
-mutation credentials, returns a request-bound normalized response, and removes
-only its ownership-guarded view.
+only read/search tools. It accepts no arbitrary shell text. Every adapter probe
+and strict or degraded reviewer subprocess receives only allowlisted
+cross-platform operational environment variables and fixed adapter overrides,
+not the caller's ambient credentials or process-injection variables. The host
+returns a request-bound normalized response and removes only its
+ownership-guarded view.
 
 The controller accepts the response only when runtime-supplied execution
 evidence identifies the configured launcher, host script, request digest, host
