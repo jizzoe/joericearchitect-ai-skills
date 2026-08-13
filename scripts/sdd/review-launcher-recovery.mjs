@@ -91,7 +91,13 @@ export function executeReviewLauncherRecovery({
   if (!preflight.allowed) return preflight;
   if (!text(repositoryPath) || !reviewer || !text(reviewer.type) || !text(reviewer.identity) || !text(attestationRef)) return fail("review-launcher-input-incomplete");
   const created = createView({ repositoryPath, headCommit: reviewPackage.headCommit });
-  if (!created?.available || created.view?.headCommit !== reviewPackage.headCommit) return fail("review-launcher-detached-view-unavailable", created?.code);
+  if (!created?.available) return fail("review-launcher-detached-view-unavailable", created?.code);
+  if (created.view?.headCommit !== reviewPackage.headCommit) {
+    const cleanup = removeView(created.view);
+    return cleanup?.removed === true
+      ? fail("review-launcher-detached-view-unavailable", "review-launcher-detached-view-head-mismatch")
+      : fail("review-launcher-cleanup-failed", cleanup?.code);
+  }
   const { view } = created;
   let output;
   try {

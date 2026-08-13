@@ -182,4 +182,10 @@ test("launcher recovery never substitutes a package-only or mutable inner review
   const output = executeReviewLauncherRecovery({ ...baseInput, repositoryPath: "/fixture", reviewer: { type: "codex-degraded", identity: "fresh-reviewer" }, attestationRef: "degraded-attestation", createView: () => ({ available: false, code: "denied" }), invoke: () => { throw new Error("must not invoke"); } });
   assert.equal(output.allowed, false);
   assert.equal(output.code, "review-launcher-detached-view-unavailable");
+  const mismatchedView = { headCommit: "4".repeat(40) };
+  let cleaned = false;
+  const mismatch = executeReviewLauncherRecovery({ ...baseInput, repositoryPath: "/fixture", reviewer: { type: "codex-degraded", identity: "fresh-reviewer" }, attestationRef: "degraded-attestation", createView: () => ({ available: true, view: mismatchedView }), removeView: (view) => { cleaned = view === mismatchedView; return { removed: cleaned }; }, invoke: () => { throw new Error("must not invoke"); } });
+  assert.equal(mismatch.code, "review-launcher-detached-view-unavailable");
+  assert.equal(mismatch.detail, "review-launcher-detached-view-head-mismatch");
+  assert.equal(cleaned, true);
 });
