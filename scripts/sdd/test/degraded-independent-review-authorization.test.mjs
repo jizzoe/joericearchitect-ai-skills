@@ -16,6 +16,7 @@ test("degraded authorization is explicit, strict-first, exact, and expiring", ()
   assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, strictResult: { ...strictResult, status: "passed" } }).issues[0].code, "degraded-independent-review-strict-unavailable-missing");
   assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, transition: "archive-change" }).issues[0].code, "degraded-independent-review-transition-mismatch");
   assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, now: "2026-08-15T00:00:00.000Z" }).issues[0].code, "degraded-independent-review-authorization-expired");
+  assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, now: "not-a-time" }).issues[0].code, "degraded-independent-review-authorization-expired");
   assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, reviewPackage: { ...reviewPackage, headCommit: "d".repeat(40) } }).issues[0].code, "degraded-independent-review-strict-unavailable-missing");
 });
 

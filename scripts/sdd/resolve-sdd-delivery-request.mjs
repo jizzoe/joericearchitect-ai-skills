@@ -61,18 +61,23 @@ function normalizeTarget(value) {
 function parseExpiration(value, goalStartedAt) {
   const started = Date.parse(goalStartedAt);
   if (Number.isNaN(started)) return null;
+  const durationResult = (hours) => {
+    const timestamp = started + hours * 3_600_000;
+    if (!Number.isFinite(timestamp) || Math.abs(timestamp) > 8_640_000_000_000_000) return null;
+    return { kind: "duration", durationHours: hours, expiresAt: new Date(timestamp).toISOString() };
+  };
   if (text(value)) {
     const duration = value.trim().match(/^(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)$/i);
     if (duration) {
       const hours = Number(duration[1]);
       if (!Number.isFinite(hours) || hours <= 0) return null;
-      return { kind: "duration", durationHours: hours, expiresAt: new Date(started + hours * 3_600_000).toISOString() };
+      return durationResult(hours);
     }
     const absolute = Date.parse(value);
     if (!Number.isNaN(absolute) && absolute > started) return { kind: "timestamp", expiresAt: new Date(absolute).toISOString() };
   }
   if (Number.isFinite(value?.hours) && value.hours > 0) {
-    return { kind: "duration", durationHours: value.hours, expiresAt: new Date(started + value.hours * 3_600_000).toISOString() };
+    return durationResult(value.hours);
   }
   if (text(value?.expiresAt)) return parseExpiration(value.expiresAt, goalStartedAt);
   return null;

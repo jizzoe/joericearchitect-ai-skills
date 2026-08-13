@@ -82,3 +82,12 @@ test("target rejects duplicates, unsafe names, and empty queues", () => {
     assert.equal(result.issues[0].field, "target");
   }
 });
+
+test("duration overflow returns a structured invalid-input clarification", () => {
+  for (const expiration of ["999999999999h", { hours: 999999999999 }]) {
+    const result = resolveSddDeliveryRequest({ ...complete, expiration }, { goalStartedAt: started });
+    assert.equal(result.ready, false);
+    assert.equal(result.classification, "invalid");
+    assert.equal(result.issues[0].field, "expiration");
+  }
+});

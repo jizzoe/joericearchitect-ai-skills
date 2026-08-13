@@ -22,6 +22,17 @@ test("review result binds a fresh configured reviewer to one package", () => {
   assert.equal(validateReviewResult({ ...result, reviewer: { ...result.reviewer, identity: "implementer" } }, { expectedPackage: pack, configuredReviewer, implementerSession: "implementer" }).valid, false);
   assert.equal(validateReviewResult({ ...result, headCommit: "cccccccccccccccccccccccccccccccccccccccc" }, { expectedPackage: pack, configuredReviewer, implementerSession: "implementer" }).valid, false);
 });
+
+test("strict unavailable results cannot claim successful isolation controls", () => {
+  const reviewPackage = fixture("valid-package.json"); reviewPackage.manifestDigest = packageDigest(reviewPackage);
+  const result = fixture("valid-result.json");
+  Object.assign(result, { manifestDigest: reviewPackage.manifestDigest, status: "unavailable", unavailableCode: "runtime-unavailable", attestation: { ...result.attestation, nonInteractive: false, isolatedContext: false, freshContext: false, readOnly: false } });
+  assert.equal(validateReviewResult(result, { expectedPackage: reviewPackage }).valid, true);
+  for (const field of ["nonInteractive", "isolatedContext", "freshContext", "readOnly"]) {
+    const invalid = { ...result, attestation: { ...result.attestation, [field]: true } };
+    assert.equal(validateReviewResult(invalid, { expectedPackage: reviewPackage }).issues[0].code, "independent-review-result-unavailable-claims-isolation");
+  }
+});
 test("package builder rederives a disposable repository's exact diff", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "independent-review-"));
   const run = (...args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
