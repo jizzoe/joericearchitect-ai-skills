@@ -1,4 +1,4 @@
-import { canonicalFailureSignature } from "./correction-chain.mjs";
+import { inspectCorrectionChain } from "./correction-chain.mjs";
 
 const commit = (value) => typeof value === "string" && /^[0-9a-f]{40}$/.test(value);
 const text = (value) => typeof value === "string" && value.trim().length > 0;
@@ -12,26 +12,14 @@ const fail = (code) => ({ allowed: false, classification: "paused", issues: [{ c
 function validCorrectionChain(records, record, authorizationRecord, selectedEntry, reviewPackage, correctionAttempts) {
   if (!Array.isArray(records) || records.length === 0 || !record ||
       JSON.stringify(records.at(-1)) !== JSON.stringify(record)) return false;
-  let priorHead = authorizationRecord.headCommit;
-  let priorManifest = authorizationRecord.manifestDigest;
-  const attemptsByFailureSignature = new Map();
-  for (let index = 0; index < records.length; index += 1) {
-    const item = records[index];
-    const failureSignature = canonicalFailureSignature(item?.failureSource);
-    if (!item || item.attempt !== index + 1 || item.change !== selectedEntry || item.classification !== "objective-fix" ||
-        item.behaviorPreserving !== true || item.current !== true || item.ancestryVerified !== true ||
-        !text(item.id) || !failureSignature || item.failureSignature !== failureSignature || !text(item.evidenceReference) ||
-        item.baseCommit !== reviewPackage.baseCommit || item.previousHead !== priorHead ||
-        item.previousManifestDigest !== priorManifest || !commit(item.headCommit) || !text(item.manifestDigest)) return false;
-    const signatureAttempts = (attemptsByFailureSignature.get(failureSignature) ?? 0) + 1;
-    if (signatureAttempts > 3) return false;
-    attemptsByFailureSignature.set(failureSignature, signatureAttempts);
-    priorHead = item.headCommit;
-    priorManifest = item.manifestDigest;
-  }
+  const chain = inspectCorrectionChain(records, {
+    selectedEntry,
+    anchor: { baseCommit: reviewPackage.baseCommit, headCommit: authorizationRecord.headCommit, manifestDigest: authorizationRecord.manifestDigest }
+  });
+  if (!chain.valid) return false;
   return records.length === correctionAttempts && record.attempt === correctionAttempts &&
     correctionAttempts > 0 &&
-    record.headCommit === reviewPackage.headCommit && record.manifestDigest === reviewPackage.manifestDigest;
+    chain.headCommit === reviewPackage.headCommit && chain.manifestDigest === reviewPackage.manifestDigest;
 }
 
 export function validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {

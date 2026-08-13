@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import { validateReviewResult } from "./independent-review-contract.mjs";
-import { canonicalFailureSignature } from "./correction-chain.mjs";
+import { inspectCorrectionChain } from "./correction-chain.mjs";
 
 function readJson(path) {
   return JSON.parse(fs.readFileSync(path, "utf8"));
@@ -92,26 +92,12 @@ function invalidApplyEvidenceRecord(input) {
 function invalidCorrectionRecord(input) {
   const entry = input.selectedEntry;
   if (!entry || entry.correctionRecords === undefined) return null;
-  if (!Array.isArray(entry.correctionRecords)) return "selected-entry-invalid-correction-records";
-  const seen = new Set();
-  const attemptsByFailureSignature = new Map();
-  for (let index = 0; index < entry.correctionRecords.length; index += 1) {
-    const record = entry.correctionRecords[index];
-    const failureSignature = canonicalFailureSignature(record?.failureSource);
-    if (!record || typeof record.id !== "string" || !record.id || seen.has(record.id) ||
-        record.change !== entry.name || record.attempt !== index + 1 || record.classification !== "objective-fix" ||
-        record.behaviorPreserving !== true || record.current !== true || record.ancestryVerified !== true ||
-        !failureSignature || record.failureSignature !== failureSignature ||
-        typeof record.evidenceReference !== "string" || !record.evidenceReference ||
-        !commitReference(record.baseCommit) || !commitReference(record.previousHead) || !commitReference(record.headCommit) ||
-        typeof record.previousManifestDigest !== "string" || !record.previousManifestDigest ||
-        typeof record.manifestDigest !== "string" || !record.manifestDigest) return "invalid-objective-correction-record";
-    const signatureAttempts = (attemptsByFailureSignature.get(failureSignature) ?? 0) + 1;
-    if (signatureAttempts > 3) return "selected-entry-invalid-correction-records";
-    attemptsByFailureSignature.set(failureSignature, signatureAttempts);
-    seen.add(record.id);
-  }
-  return null;
+  const result = inspectCorrectionChain(entry.correctionRecords, {
+    selectedEntry: entry.name,
+    anchor: entry.correctionAnchor,
+    maxPerFailureSignature: entry.correctionBudgetPerFailureSignature ?? 3
+  });
+  return result.valid ? null : result.reason;
 }
 
 export function inspectCheckpoint(input) {

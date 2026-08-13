@@ -197,7 +197,8 @@ behavior depend on individual memory.
   ledger, secret/environment tests, and no mutation-capable command path.
 - **Resume ambiguity** → Re-derive strict record, authorization, package,
   result, checkpoint, correction count, and transition from durable records;
-  the correction count equals the already-recorded chain length.
+  the correction count equals the already-recorded chain length, and every
+  record links to one canonical base/head/manifest anchor and its predecessor.
 - **Nested runtime denied by outer sandbox** → Return a stable launcher
   permission code; use only an explicitly authorized external host, preserving
   the detached view and strongest configured Codex/Claude reviewer restrictions.

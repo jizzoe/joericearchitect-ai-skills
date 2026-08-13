@@ -20,7 +20,11 @@ The correction-attempt count MUST represent corrections already present in the
 durable chain and equal both its length and latest attempt number. That count
 orders the complete chain; budget exhaustion MUST be calculated separately for
 each immutable failure signature, so corrections for unrelated signatures do
-not consume one another's three-attempt budget.
+not consume one another's three-attempt budget. The chain MUST have one
+canonical base/head/manifest anchor; each record MUST retain that base, bind
+its failure signature to its durable finding source, link its previous head and
+manifest to the prior record or initial anchor, and use canonical commit and
+64-hex manifest values.
 
 #### Scenario: Exact authorization permits evaluation
 - **WHEN** a selected transition has current Apply evidence, an exact active
@@ -33,6 +37,12 @@ not consume one another's three-attempt budget.
   different change, transition, head, or manifest
 - **THEN** the runner pauses before fallback invocation and records the failed
   authorization boundary
+
+#### Scenario: Correction chain is disconnected or reordered
+- **WHEN** a correction record changes the chain base, does not link to the
+  preceding head and manifest, uses a malformed digest, or is reordered
+- **THEN** checkpoint and degraded-authorization validation reject the chain
+  before it can authorize another correction or delivery transition
 
 ### Requirement: Degraded evidence is distinct and capability-bounded
 The system SHALL label every accepted fallback result `authorized-degraded` and

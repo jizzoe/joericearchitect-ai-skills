@@ -6,7 +6,7 @@ self-referential commit literal.
 
 Passed current evidence:
 
-- `node --test` in a clean exact-head clone — 209 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, required distinct implementer/reviewer identity binding, restricted reviewer home/credential access, durable per-signature correction enforcement including checkpoint resume, host package rederivation, symlink-safe package injection and Git-object artifact derivation, authorized delivery-profile binding, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
+- `node --test` in a clean exact-head clone — 209 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, required distinct implementer/reviewer identity binding, restricted reviewer home/credential access, durable-source per-signature correction enforcement and complete chain linkage, disposition-driven human pauses, host package rederivation, symlink-safe package injection and Git-object artifact derivation, authorized delivery-profile binding, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
 - `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 54 focused launcher, request, adapter, and lifecycle tests pass.
 - `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 15 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running and per-signature correction budget enforcement.
 - `node scripts/sdd/check-adapter-drift.mjs` — canonical wrappers have no policy drift.
@@ -99,3 +99,17 @@ per-signature counts from the validated durable checkpoint, enforces the
 resolved authorization budget, and rejects mismatched caller counters. It is
 recorded in `evidence/review-correction-durable-correction-counter.md` and is
 the eleventh globally ordered correction, first for its failure signature.
+The owner then made the durable decision that finding severity describes
+impact while disposition controls whether human judgment is required. High-
+severity objective fixes proceed only when they are scoped, behavior-
+preserving, evidence-backed, and inside budget; delivery still requires fresh
+passing review. The `correction-budget-signature-renaming` correction binds
+each failure signature to its exact durable review finding and rejects caller
+renaming. It is recorded in
+`evidence/review-correction-failure-signature-binding.md` and is the twelfth
+globally ordered correction, first for its failure signature.
+The `correction-chain-linkage-not-validated` correction anchors the chain and
+validates each base, predecessor head/manifest, canonical commit and digest,
+ordering, and budget through one shared validator. It is recorded in
+`evidence/review-correction-chain-linkage.md` and is the thirteenth globally
+ordered correction, first for its failure signature.

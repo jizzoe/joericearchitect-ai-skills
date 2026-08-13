@@ -143,10 +143,14 @@ test("checkpoint correction limits apply per failure signature rather than globa
     headCommit: String(index + 3).repeat(40),
     manifestDigest: String(index + 3).repeat(64)
   }));
-  const checkpoint = { selectedEntry: { name: "change", records: [], correctionRecords }, steps: [{ id: "apply", status: "pending" }] };
+  const checkpoint = { selectedEntry: { name: "change", records: [], correctionAnchor: { baseCommit: "1".repeat(40), headCommit: "2".repeat(40), manifestDigest: "2".repeat(64) }, correctionRecords }, steps: [{ id: "apply", status: "pending" }] };
   assert.equal(inspectCheckpoint(checkpoint).classification, "continue");
   const exhausted = { ...checkpoint, selectedEntry: { ...checkpoint.selectedEntry, correctionRecords: correctionRecords.map((record, index) => index === 3 ? { ...record, failureSource: { ...record.failureSource, findingId: "signature-a" }, failureSignature: "independent-review/signature-a/scripts/sdd/checkpoint.mjs/merge-pr" } : record) } };
   assert.equal(inspectCheckpoint(exhausted).reason, "selected-entry-invalid-correction-records");
+  const disconnected = { ...checkpoint, selectedEntry: { ...checkpoint.selectedEntry, correctionRecords: correctionRecords.map((record, index) => index === 2 ? { ...record, previousHead: "9".repeat(40) } : record) } };
+  assert.equal(inspectCheckpoint(disconnected).reason, "invalid-objective-correction-record");
+  const malformedDigest = { ...checkpoint, selectedEntry: { ...checkpoint.selectedEntry, correctionRecords: correctionRecords.map((record, index) => index === 1 ? { ...record, manifestDigest: "not-a-digest" } : record) } };
+  assert.equal(inspectCheckpoint(malformedDigest).reason, "invalid-objective-correction-record");
 });
 
 test("generic runner scenarios cover required behavior groups", () => {
