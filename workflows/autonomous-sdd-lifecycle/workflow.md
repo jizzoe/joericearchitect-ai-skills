@@ -24,10 +24,12 @@ stopping conditions.
    OpenSpec validation where applicable, documentation review, security and
    supply-chain review, requirements mapping, portability review, attribution
    review, and recovery review.
-7. After Apply and every behavior-preserving objective fix, invoke the
-   configured isolated read-only reviewer for `production-rapid`; preserve an
-   exact full-object-ID base/head durable evidence record and rerun review for
-   each new head.
+7. After current Apply evidence and every behavior-preserving objective fix,
+   invoke `skills/base/independent-review/` for `production-rapid`. Preserve
+   its sealed v1 package, normalized result, and dispositions in the exact
+   durable transition record. A new head invalidates prior review and requires
+   affected checks plus a fresh reviewer; unavailable or material outcomes
+   pause the lifecycle.
 8. Run formal Verify after every task has current evidence.
 9. Deliver through a pull request only when the delivery gate passes and the
    active authorization permits the mutation.

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "reviewRecordId": "unavailable-live-codex-019ff908-b1f3-72c1-ba32-7c51281b953d",
+  "executionId": "019ff908-b1f3-72c1-ba32-7c51281b953d",
+  "reviewer": {
+    "type": "codex",
+    "identity": "gpt-5.6-sol",
+    "adapter": "codex"
+  },
+  "attestation": {
+    "ref": "codex-exec-read-only-v1",
+    "nonInteractive": false,
+    "isolatedContext": false,
+    "freshContext": false,
+    "readOnly": false
+  },
+  "baseCommit": "90f571533be06ab6c1d626647851a2147dce6d16",
+  "headCommit": "91d9a0119325e2cf44e0645bd8b61d3ca3456bed",
+  "manifestDigest": "6d62ade60028f221dd7349300f56c084404512596806d9917694ba97c7ab3549",
+  "startedAt": "2026-08-13T02:52:04.000Z",
+  "completedAt": "2026-08-13T02:52:34.000Z",
+  "findings": [],
+  "status": "unavailable",
+  "unavailableCode": "independent-reviewer-codex-execution-unavailable"
+}

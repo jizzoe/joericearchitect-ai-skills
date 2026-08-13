@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { canonicalJson } from "./independent-review-contract.mjs";
+import { validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
+import { validateFindingDispositions } from "./review-findings.mjs";
 // Pure evaluator for an independently executed, read-only review channel.
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
@@ -13,7 +16,7 @@ export function immutableReviewManifest(reviewInput) {
   if (!commitReference(baseCommit) || !commitReference(headCommit) || !nonEmpty(diff) ||
       !Array.isArray(openspecArtifacts) || openspecArtifacts.length === 0 ||
       !Array.isArray(validationEvidence) || validationEvidence.length === 0) return null;
-  return createHash("sha256").update(JSON.stringify({ baseCommit, headCommit, diff, openspecArtifacts, validationEvidence })).digest("hex");
+  return createHash("sha256").update(canonicalJson({ baseCommit, headCommit, diff, openspecArtifacts, validationEvidence })).digest("hex");
 }
 
 // The configured adapter supplies its repository path; this read-only check
@@ -87,6 +90,28 @@ export function validateIndependentReviewEvidence({ reviewer, implementerSession
   const blocking = evidence.findings.find((finding) => finding?.severity === "blocker" ||
     (finding?.severity === "high" && finding?.classification === "objective-fix"));
   if (blocking || evidence.finalStatus !== "clear") return fail("independent-review-findings-unresolved", blocking?.id);
+  return { allowed: true, classification: "authorized", issues: [] };
+}
+
+// V1 result records are additive during migration. The legacy evidence
+// evaluator above remains available to existing checkpoints and callers.
+export function validateIndependentReviewV1({ reviewer, implementerSession, reviewPackage, reviewResult, applyEvidence, dispositions = [], correctionAttempts = 0, seenRecordIds = new Set() }) {
+  if (!reviewer?.available) return fail("independent-reviewer-unavailable");
+  const packageValidation = validateReviewPackage(reviewPackage);
+  if (!packageValidation.valid) return fail(packageValidation.issues[0].code);
+  if (!applyEvidence || applyEvidence.current !== true || applyEvidence.headCommit !== reviewPackage.headCommit ||
+      JSON.stringify(applyEvidence.validationEvidence) !== JSON.stringify(reviewPackage.validationEvidence)) return fail("independent-review-apply-evidence-mismatch");
+  const resultValidation = validateReviewResult(reviewResult, {
+    expectedPackage: reviewPackage,
+    configuredReviewer: reviewer,
+    implementerSession,
+    seenRecordIds
+  });
+  if (!resultValidation.valid) return fail(resultValidation.issues[0].code);
+  if (reviewResult.status === "unavailable") return fail(reviewResult.unavailableCode);
+  if (reviewResult.status !== "passed") return fail("independent-review-findings-unresolved");
+  const dispositionValidation = validateFindingDispositions({ findings: reviewResult.findings, dispositions, correctionAttempts });
+  if (!dispositionValidation.allowed) return dispositionValidation;
   return { allowed: true, classification: "authorized", issues: [] };
 }
 

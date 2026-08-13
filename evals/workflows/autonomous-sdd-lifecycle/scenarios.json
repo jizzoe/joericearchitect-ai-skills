@@ -25,6 +25,18 @@
       "expect": "Verify pauses when scenario or task evidence is absent"
     },
     {
+      "id": "independent-review-rereview",
+      "kind": "complete",
+      "gate": "delivery",
+      "expect": "An objective correction reruns affected checks and receives a fresh exact-head v1 review"
+    },
+    {
+      "id": "independent-review-unavailable",
+      "kind": "stop",
+      "gate": "delivery",
+      "expect": "An unavailable or unprovable isolated reviewer pauses production-rapid delivery"
+    },
+    {
       "id": "delivery-partial-mutation",
       "kind": "ambiguous",
       "gate": "delivery",

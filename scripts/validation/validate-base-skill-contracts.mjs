@@ -155,7 +155,7 @@ function validateNextAction(value, issues) {
 export function validateAiSkillsConfig(value, { present = true } = {}) {
   if (!present || value === undefined || value === null) return { valid: true, requiresExplicitPaths: true, issues: [] };
   const issues = [];
-  if (!exactKeys(value, new Set(["schemaVersion", "defaults", "paths", "adapters", "policies", "featureFlags"]), "config", issues)) return { valid: false, requiresExplicitPaths: false, issues };
+  if (!exactKeys(value, new Set(["schemaVersion", "defaults", "paths", "adapters", "policies", "featureFlags", "independentReview"]), "config", issues)) return { valid: false, requiresExplicitPaths: false, issues };
   required(value, ["schemaVersion"], "config", issues);
   if (value.schemaVersion !== 1) issues.push(issue("unsupported-schema-version", "config.schemaVersion"));
   validateDefaults(value.defaults, issues);
@@ -163,7 +163,21 @@ export function validateAiSkillsConfig(value, { present = true } = {}) {
   validateAdapters(value.adapters, issues);
   validateStringMap(value.policies, "config.policies", issues);
   validateFeatureFlags(value.featureFlags, issues);
+  validateIndependentReviewConfig(value.independentReview, issues);
   return { valid: issues.length === 0, requiresExplicitPaths: false, issues };
+}
+
+export function validateIndependentReviewConfig(value, issues = []) {
+  if (value === undefined) return { valid: issues.length === 0, issues };
+  if (!isObject(value) || !exactKeys(value, new Set(["enabled", "adapter", "attestationRef", "reviewPath", "allowedCommands", "artifactPaths", "evidenceRoot"]), "config.independentReview", issues)) return { valid: false, issues };
+  required(value, ["enabled", "adapter", "attestationRef", "reviewPath", "allowedCommands", "artifactPaths", "evidenceRoot"], "config.independentReview", issues);
+  if (typeof value.enabled !== "boolean") issues.push(issue("invalid-independent-review-enabled", "config.independentReview.enabled"));
+  if (!kebab.test(value.adapter ?? "")) issues.push(issue("invalid-independent-review-adapter", "config.independentReview.adapter"));
+  for (const key of ["attestationRef", "reviewPath", "evidenceRoot"]) if (!workspacePath(value[key])) issues.push(issue("unsafe-independent-review-path", `config.independentReview.${key}`));
+  if (!Array.isArray(value.artifactPaths) || !value.artifactPaths.length || !value.artifactPaths.every(workspacePath)) issues.push(issue("unsafe-independent-review-artifacts", "config.independentReview.artifactPaths"));
+  const allowed = new Set(["git-diff", "openspec-validate", "node-test"]);
+  if (!Array.isArray(value.allowedCommands) || !value.allowedCommands.length || !value.allowedCommands.every((item) => allowed.has(item)) || new Set(value.allowedCommands).size !== value.allowedCommands.length) issues.push(issue("invalid-independent-review-commands", "config.independentReview.allowedCommands"));
+  return { valid: issues.length === 0, issues };
 }
 
 function validateDefaults(value, issues) {
