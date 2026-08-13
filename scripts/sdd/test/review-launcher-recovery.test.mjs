@@ -44,7 +44,7 @@ function validResult() {
   };
 }
 
-function hostRun(prepared, result = validResult(), viewHead = reviewPackage.headCommit, now = "2026-08-13T13:00:00.000Z") {
+function hostRun(prepared, result = validResult(), viewHead = reviewPackage.headCommit, now = "2026-08-13T13:00:00.000Z", rebuiltPackage = reviewPackage) {
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "review-launcher-test-"));
   const reviewPath = path.join(temporaryRoot, "repository");
   fs.mkdirSync(path.join(reviewPath, "schemas"), { recursive: true });
@@ -57,6 +57,13 @@ function hostRun(prepared, result = validResult(), viewHead = reviewPackage.head
     now,
     createView: () => ({ available: true, view }),
     removeView: (received) => { removed = received === view; fs.rmSync(temporaryRoot, { recursive: true, force: true }); return { removed }; },
+    rebuildPackage: (input) => {
+      assert.equal(input.repositoryPath, reviewPath);
+      assert.equal(input.baseCommit, prepared.hostRequest.request.reviewPackage.baseCommit);
+      assert.equal(input.headCommit, prepared.hostRequest.request.reviewPackage.headCommit);
+      assert.deepEqual(input.artifactPaths, prepared.hostRequest.request.reviewPackage.artifacts.map((artifact) => artifact.path));
+      return { valid: true, package: rebuiltPackage };
+    },
     invoke: (request) => { invoked = true; assert.equal(request.view, view); return { status: result.status, result }; }
   });
   return { response, removed, invoked };
@@ -127,6 +134,17 @@ test("external host owns the detached view and acceptance requires the recorded 
   const accepted = acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: runtimeEvidence(prepared, response) });
   assert.equal(accepted.allowed, true, JSON.stringify(accepted));
   assert.equal(accepted.status, "passed");
+});
+
+test("external host rederives the sealed package and fails closed before review on any mismatch", () => {
+  const prepared = prepareReviewLauncherRecovery(baseInput, { launchId: "launch-rederive" });
+  const changedDraft = { ...reviewPackage, diff: `${reviewPackage.diff}omitted committed change\n` };
+  delete changedDraft.manifestDigest;
+  const changedPackage = { ...changedDraft, manifestDigest: packageDigest(changedDraft) };
+  const { response, removed, invoked } = hostRun(prepared, validResult(), reviewPackage.headCommit, "2026-08-13T13:00:00.000Z", changedPackage);
+  assert.equal(response.code, "review-launcher-package-mismatch");
+  assert.equal(invoked, false);
+  assert.equal(removed, true);
 });
 
 test("host cleans a mismatched view without invoking the reviewer", () => {

@@ -37,7 +37,9 @@ The in-sandbox recovery controller validates authorization and emits only a
 digest-bound structured host request; it cannot create a worktree or invoke the
 reviewer. The runtime invokes the host launcher outside the failed sandbox.
 That host revalidates the request, creates the owned detached exact-head view,
-writes the sealed package, and starts either a fresh ephemeral Codex process
+independently reconstructs the exact base-to-head diff and every declared
+artifact hash from that view, rejects any canonical package mismatch, writes
+only the reconstructed sealed package, and starts either a fresh ephemeral Codex process
 with `read-only` requested or a fresh nonpersistent Claude process exposing
 only read/search tools. It accepts no arbitrary shell text. Every adapter probe
 and strict or degraded reviewer subprocess receives only allowlisted

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { createDetachedReviewView, removeDetachedReviewView } from "./detached-review-view.mjs";
-import { validateReviewResult } from "./independent-review-contract.mjs";
+import { buildReviewPackage, canonicalJson, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { runClaudeDegradedReviewAdapter, runCodexDegradedReviewAdapter, writeReviewPackageForView } from "./platform-review-adapters.mjs";
 import { reviewLauncherDefinition, reviewLauncherRequestDigest, validateReviewLauncherRecovery } from "./review-launcher-recovery.mjs";
@@ -16,6 +16,7 @@ const fail = (code, detail) => ({ allowed: false, status: "unavailable", code, .
 export function executeReviewLauncherHost(hostRequest, {
   createView = createDetachedReviewView,
   removeView = removeDetachedReviewView,
+  rebuildPackage = buildReviewPackage,
   invoke,
   hostExecutionId = randomUUID(),
   now = new Date().toISOString()
@@ -37,40 +38,53 @@ export function executeReviewLauncherHost(hostRequest, {
     if (view?.headCommit !== request.reviewPackage.headCommit) {
       output = fail("review-launcher-detached-view-unavailable", "review-launcher-detached-view-head-mismatch");
     } else {
-      writeReviewPackageForView(view, request.reviewPackage);
-      const schemaPath = path.join(view.reviewPath, "schemas", "independent-review-findings-v1.schema.json");
-      const resultPath = path.join(view.temporaryRoot, "independent-review-findings.json");
-      const execution = invokeAdapter({
-        reviewPackage: request.reviewPackage,
-        view,
-        schemaPath,
-        resultPath,
-        reviewer: request.reviewer,
-        attestationRef: request.attestationRef,
-        strictResult: request.strictResult,
-        degradedAuthorization: preflight.degradedAuthorization,
-        executable: request.launcher.executable
+      const rebuilt = rebuildPackage({
+        repositoryPath: view.reviewPath,
+        baseCommit: request.reviewPackage.baseCommit,
+        headCommit: request.reviewPackage.headCommit,
+        artifactPaths: request.reviewPackage.artifacts.map((artifact) => artifact.path),
+        validationEvidence: request.reviewPackage.validationEvidence
       });
-      if (execution?.status === "unavailable") output = fail("review-launcher-inner-reviewer-unavailable", execution.result?.unavailableCode);
-      else {
-        const configuredReviewer = { ...request.reviewer, attestation: request.reviewer.attestation ?? { ref: request.attestationRef } };
-        const validation = validateReviewResult(execution?.result, { expectedPackage: request.reviewPackage, configuredReviewer, implementerSession: request.authorization.implementerSession });
-        if (!validation.valid || execution.result.assuranceLevel !== "authorized-degraded") output = fail("review-launcher-result-invalid", validation.issues?.[0]?.code);
-        else if (!strictSummaryMatchesResult(execution.result.strictUnavailable, request.strictResult)) output = fail("review-launcher-strict-unavailable-mismatch");
-        else if (!degradedAuthorizationMatchesResult(execution.result.degradedAuthorization, preflight.degradedAuthorization)) output = fail("review-launcher-degraded-authorization-mismatch");
-        else output = {
-          allowed: true,
-          status: execution.result.status,
-          code: "review-launcher-host-complete",
-          launchId: hostRequest.launchId,
-          requestDigest: digest,
-          launcherId: preflight.recovery.launcherId,
-          launcherKind: preflight.recovery.launcherKind,
-          hostScript,
-          hostExecutionId,
-          result: execution.result,
-          launcherEvidence: preflight.recovery
-        };
+      if (!rebuilt?.valid) {
+        output = fail("review-launcher-package-rederivation-failed", rebuilt?.issues?.[0]?.code);
+      } else if (canonicalJson(rebuilt.package) !== canonicalJson(request.reviewPackage)) {
+        output = fail("review-launcher-package-mismatch");
+      } else {
+        writeReviewPackageForView(view, rebuilt.package);
+        const schemaPath = path.join(view.reviewPath, "schemas", "independent-review-findings-v1.schema.json");
+        const resultPath = path.join(view.temporaryRoot, "independent-review-findings.json");
+        const execution = invokeAdapter({
+          reviewPackage: rebuilt.package,
+          view,
+          schemaPath,
+          resultPath,
+          reviewer: request.reviewer,
+          attestationRef: request.attestationRef,
+          strictResult: request.strictResult,
+          degradedAuthorization: preflight.degradedAuthorization,
+          executable: request.launcher.executable
+        });
+        if (execution?.status === "unavailable") output = fail("review-launcher-inner-reviewer-unavailable", execution.result?.unavailableCode);
+        else {
+          const configuredReviewer = { ...request.reviewer, attestation: request.reviewer.attestation ?? { ref: request.attestationRef } };
+          const validation = validateReviewResult(execution?.result, { expectedPackage: rebuilt.package, configuredReviewer, implementerSession: request.authorization.implementerSession });
+          if (!validation.valid || execution.result.assuranceLevel !== "authorized-degraded") output = fail("review-launcher-result-invalid", validation.issues?.[0]?.code);
+          else if (!strictSummaryMatchesResult(execution.result.strictUnavailable, request.strictResult)) output = fail("review-launcher-strict-unavailable-mismatch");
+          else if (!degradedAuthorizationMatchesResult(execution.result.degradedAuthorization, preflight.degradedAuthorization)) output = fail("review-launcher-degraded-authorization-mismatch");
+          else output = {
+            allowed: true,
+            status: execution.result.status,
+            code: "review-launcher-host-complete",
+            launchId: hostRequest.launchId,
+            requestDigest: digest,
+            launcherId: preflight.recovery.launcherId,
+            launcherKind: preflight.recovery.launcherKind,
+            hostScript,
+            hostExecutionId,
+            result: execution.result,
+            launcherEvidence: preflight.recovery
+          };
+        }
       }
     }
   } catch {

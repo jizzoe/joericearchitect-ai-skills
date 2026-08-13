@@ -6,7 +6,7 @@ self-referential commit literal.
 
 Passed current evidence:
 
-- `node --test` — 200 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
+- `node --test` — 201 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, host package rederivation, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
 - `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 51 focused launcher, request, adapter, and lifecycle tests pass.
 - `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 13 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running.
 - `node scripts/sdd/check-adapter-drift.mjs` — canonical wrappers have no policy drift.
@@ -41,3 +41,10 @@ for every strict/degraded Codex/Claude probe and reviewer subprocess. Its
 regression and correction-chain evidence is recorded in
 `evidence/review-correction-reviewer-environment.md`; its corrected head also
 requires fresh strict-first review.
+The separately authorized `degraded-host-package-not-rederived` correction
+reconstructs and canonically compares the complete review package from the
+external host's detached committed view before either Codex or Claude can run.
+It is recorded in
+`evidence/review-correction-host-package-rederivation.md`; its corrected head
+requires fresh strict-first review and is the third and final correction in
+the current chain.
