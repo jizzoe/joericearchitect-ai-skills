@@ -269,6 +269,7 @@ function validateVerificationDetails(result, issues) {
     if (details.localReviewFindings.some((finding, index) => finding !== sorted[index])) issues.push(issue("findings-not-deterministically-ordered", `${subject}.localReviewFindings`));
   }
 
+  let currentCorrectionEvidence = true;
   if (!Array.isArray(details.correctionAttempts)) issues.push(issue("invalid-array", `${subject}.correctionAttempts`));
   else {
     const attemptsBySignature = new Map();
@@ -283,17 +284,40 @@ function validateVerificationDetails(result, issues) {
       if (!new Set(["passed", "failed"]).has(attempt.result)) issues.push(issue("invalid-correction-result", `${itemSubject}.result`));
       validateEvidenceReferences(attempt.evidenceIds, `${itemSubject}.evidenceIds`, evidenceById, issues, { nonEmptyArray: true });
       if (!nonEmpty(attempt.binding)) issues.push(issue("invalid-correction-binding", `${itemSubject}.binding`));
+      if (attempt.result === "passed" && nonEmpty(attempt.binding) && attempt.binding !== details.binding?.value) {
+        currentCorrectionEvidence = false;
+        if (details.readiness === "ready-for-openspec-verify") {
+          issues.push(issue("stale-correction-binding", `${itemSubject}.binding`, details.binding?.value));
+        }
+      }
       const expected = (attemptsBySignature.get(attempt.failureSignature) ?? 0) + 1;
       if (attempt.attempt !== expected) issues.push(issue("nonsequential-correction-attempt", `${itemSubject}.attempt`, expected));
       attemptsBySignature.set(attempt.failureSignature, expected);
     });
   }
 
-  const requiredFailure = Array.isArray(details.selectedChecks) && details.selectedChecks.some((check) => check.required && !new Set(["passed", "not-applicable"]).has(check.result));
+  const requiredFailure = Array.isArray(details.selectedChecks) && details.selectedChecks.some((check) => {
+    if (!check.required || check.result === "passed") return false;
+    const productionGateCheck = details.profile === "production-rapid" && new Set(["ci", "independent-review"]).has(check.category);
+    return check.result !== "not-applicable" || productionGateCheck;
+  });
   const hasGaps = Array.isArray(details.unresolvedGaps) && details.unresolvedGaps.length > 0;
   let productionValid = true;
   let productionReady = true;
   if (details.profile === "production-rapid") {
+    const selectedById = new Map((Array.isArray(details.selectedChecks) ? details.selectedChecks : []).map((check) => [check.id, check]));
+    for (const [id, category, gateEvidenceField] of [["exact-head-ci", "ci", "ciEvidenceId"], ["strict-independent-review", "independent-review", "independentReviewEvidenceId"]]) {
+      const check = selectedById.get(id);
+      if (!check || check.category !== category || check.required !== true) {
+        issues.push(issue("missing-production-check", `${subject}.selectedChecks`, id));
+        productionValid = false;
+        productionReady = false;
+      } else if (details.productionGate && check.evidenceId !== details.productionGate[gateEvidenceField]) {
+        issues.push(issue("production-check-evidence-mismatch", `${subject}.selectedChecks`, id));
+        productionValid = false;
+        productionReady = false;
+      }
+    }
     if (details.binding?.kind !== "commit") issues.push(issue("production-requires-commit-binding", `${subject}.binding`));
     if (!details.productionGate) {
       issues.push(issue("missing-production-gate", `${subject}.productionGate`));
@@ -301,11 +325,11 @@ function validateVerificationDetails(result, issues) {
       productionReady = false;
     } else {
       const gate = validateProductionGate(details.productionGate, details, evidenceById, issues);
-      productionValid = gate.valid;
-      productionReady = gate.ready;
+      productionValid = productionValid && gate.valid;
+      productionReady = productionReady && gate.ready;
     }
   }
-  if (details.readiness === "ready-for-openspec-verify" && (requiredFailure || hasGaps || !productionValid || !productionReady)) {
+  if (details.readiness === "ready-for-openspec-verify" && (requiredFailure || hasGaps || !currentCorrectionEvidence || !productionValid || !productionReady)) {
     issues.push(issue("readiness-overclaim", `${subject}.readiness`));
   }
 }

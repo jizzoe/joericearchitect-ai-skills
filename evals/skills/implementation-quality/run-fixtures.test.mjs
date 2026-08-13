@@ -192,6 +192,35 @@ test("result validator rejects readiness overclaim, stale production head, and s
   selfReview.details.productionGate.reviewerSession = selfReview.details.productionGate.implementerSession;
   assert.ok(validateImplementationQualityResult(selfReview).issues.some((item) => item.code === "reviewer-not-independent"));
 
+  const skippedProductionGates = readJson("valid-verification-production.json");
+  skippedProductionGates.details.selectedChecks.find((item) => item.id === "exact-head-ci").result = "not-applicable";
+  skippedProductionGates.details.selectedChecks.find((item) => item.id === "strict-independent-review").result = "not-applicable";
+  const skippedGateResult = validateImplementationQualityResult(skippedProductionGates);
+  assert.ok(skippedGateResult.issues.some((item) => item.code === "readiness-overclaim"));
+
+  const missingProductionGateCheck = readJson("valid-verification-production.json");
+  missingProductionGateCheck.details.selectedChecks = missingProductionGateCheck.details.selectedChecks.filter((item) => item.id !== "strict-independent-review");
+  assert.ok(validateImplementationQualityResult(missingProductionGateCheck).issues.some((item) => item.code === "missing-production-check"));
+
+  const mismatchedProductionEvidence = readJson("valid-verification-production.json");
+  mismatchedProductionEvidence.details.selectedChecks.find((item) => item.id === "exact-head-ci").evidenceId = "focused";
+  const mismatchedEvidenceResult = validateImplementationQualityResult(mismatchedProductionEvidence);
+  assert.ok(mismatchedEvidenceResult.issues.some((item) => item.code === "production-check-evidence-mismatch"));
+  assert.ok(mismatchedEvidenceResult.issues.some((item) => item.code === "readiness-overclaim"));
+
+  const staleCorrection = readJson("valid-verification-production.json");
+  staleCorrection.details.correctionAttempts.push({
+    failureSignature: "review-finding",
+    attempt: 1,
+    kind: "objective-fix",
+    result: "passed",
+    evidenceIds: ["focused"],
+    binding: "2".repeat(40)
+  });
+  const staleCorrectionResult = validateImplementationQualityResult(staleCorrection);
+  assert.ok(staleCorrectionResult.issues.some((item) => item.code === "stale-correction-binding"));
+  assert.ok(staleCorrectionResult.issues.some((item) => item.code === "readiness-overclaim"));
+
   const malformedGate = readJson("valid-verification-production.json");
   malformedGate.details.productionGate = [];
   const malformedResult = validateImplementationQualityResult(malformedGate);
