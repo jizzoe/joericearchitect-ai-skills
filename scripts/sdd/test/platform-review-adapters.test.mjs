@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, createClaudeReviewSettings, degradedCapabilityLedger, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, unavailableReviewResult } from "../platform-review-adapters.mjs";
+import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, createClaudeReviewSettings, degradedCapabilityLedger, invokeReviewProcess, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 
@@ -11,6 +11,46 @@ const packageFixture = () => {
   return value;
 };
 const view = { reviewPath: "/tmp/ai-skills-review-fixture/repository" };
+
+test("strict and degraded reviewer subprocesses receive only allowlisted operational environment", () => {
+  const parentEnvironment = {
+    PATH: "/usr/bin:/bin",
+    HOME: "/tmp/reviewer-home",
+    LANG: "en_US.UTF-8",
+    UNLISTED_SYNTHETIC_CREDENTIAL: "must-not-leak",
+    OPENAI_API_KEY: "must-not-leak",
+    ANTHROPIC_API_KEY: "must-not-leak",
+    NODE_OPTIONS: "--require=/tmp/untrusted-hook.cjs"
+  };
+  const schema = { type: "object" };
+  const invocations = [
+    ["Codex strict", buildCodexReviewInvocation({ view, schemaPath: "/tmp/schema.json", resultPath: "/tmp/result.json" })],
+    ["Codex degraded", buildCodexDegradedReviewInvocation({ view, schemaPath: "/tmp/schema.json", resultPath: "/tmp/result.json" })],
+    ["Claude strict", buildClaudeReviewInvocation({ view, settingsPath: "/tmp/settings.json", schema })],
+    ["Claude degraded", buildClaudeDegradedReviewInvocation({ view, schema })]
+  ];
+
+  for (const [label, invocation] of invocations) {
+    let receivedEnvironment = null;
+    invokeReviewProcess(invocation, view, (_executable, _args, options) => {
+      receivedEnvironment = options.env;
+      return { status: 0, signal: null, stdout: "", stderr: "" };
+    }, parentEnvironment);
+    assert.equal(receivedEnvironment.PATH, parentEnvironment.PATH, `${label} retains PATH`);
+    assert.equal(receivedEnvironment.HOME, parentEnvironment.HOME, `${label} retains HOME`);
+    assert.equal(receivedEnvironment.NO_COLOR, "1", `${label} applies fixed adapter overrides`);
+    assert.equal("UNLISTED_SYNTHETIC_CREDENTIAL" in receivedEnvironment, false, `${label} rejects an unlisted credential`);
+    assert.equal("OPENAI_API_KEY" in receivedEnvironment, false, `${label} rejects OpenAI credentials`);
+    assert.equal("ANTHROPIC_API_KEY" in receivedEnvironment, false, `${label} rejects Anthropic credentials`);
+    assert.equal("NODE_OPTIONS" in receivedEnvironment, false, `${label} rejects process injection options`);
+  }
+
+  assert.deepEqual(sanitizedReviewEnvironment(parentEnvironment), {
+    PATH: parentEnvironment.PATH,
+    HOME: parentEnvironment.HOME,
+    LANG: parentEnvironment.LANG
+  });
+});
 
 test("Codex adapter uses a fresh read-only noninteractive transport without user configuration", () => {
   const invocation = buildCodexReviewInvocation({ view, schemaPath: "/tmp/result-schema.json", resultPath: "/tmp/result.json" });

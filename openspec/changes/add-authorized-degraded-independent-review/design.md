@@ -63,7 +63,10 @@ transport choose authorization and cannot bind risk acceptance to delivery.
 
 The platform adapter creates a new noninteractive process and the existing
 owned detached view. Its fixed request exposes only the sealed package and
-allowlisted inspection commands. It scrubs known credential variables and
+allowlisted inspection commands. Every adapter probe and strict or degraded
+reviewer subprocess receives only an allowlist of cross-platform operational
+environment variables plus fixed adapter overrides; it never inherits the
+caller's ambient credential or process-injection variables. The adapter also
 disables configured GitHub, web, deployment, release, external-send, and
 delegated-mutation tools where the runtime permits. The capability ledger
 accurately categorizes controls as enforced, unavailable, or

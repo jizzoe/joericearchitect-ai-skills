@@ -6,6 +6,21 @@ import path from "node:path";
 import { requiredReviewDenials } from "./review-adapter-contract.mjs";
 
 const now = () => new Date().toISOString();
+const operationalReviewEnvironmentNames = Object.freeze([
+  "PATH", "Path", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA",
+  "SYSTEMROOT", "SystemRoot", "COMSPEC", "PATHEXT", "PROGRAMDATA",
+  "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE", "TERM",
+  "COLORTERM", "SHELL", "USER", "LOGNAME"
+]);
+
+export function sanitizedReviewEnvironment(parentEnvironment = process.env, overrides = {}) {
+  const environment = {};
+  for (const name of operationalReviewEnvironmentNames) {
+    if (typeof parentEnvironment[name] === "string") environment[name] = parentEnvironment[name];
+  }
+  return { ...environment, ...overrides };
+}
+
 const unavailable = (code, { reviewPackage, adapter, reviewer, attestationRef, startedAt = now(), executionId = randomUUID() } = {}) => ({
   schemaVersion: 1,
   reviewRecordId: `unavailable-${executionId}`,
@@ -24,7 +39,11 @@ const unavailable = (code, { reviewPackage, adapter, reviewer, attestationRef, s
 });
 
 function helpIncludes(executable, arguments_, required) {
-  const run = spawnSync(executable, arguments_, { encoding: "utf8", timeout: 10_000 });
+  const run = spawnSync(executable, arguments_, {
+    encoding: "utf8",
+    timeout: 10_000,
+    env: sanitizedReviewEnvironment(process.env, { NO_COLOR: "1" })
+  });
   const output = `${run.stdout ?? ""}\n${run.stderr ?? ""}`;
   return run.status === 0 && required.every((item) => output.includes(item));
 }
@@ -177,12 +196,12 @@ export function classifyClaudeExecutionFailure(execution = {}) {
   return "independent-reviewer-claude-execution-unavailable";
 }
 
-function invoke(invocation, view, run) {
+export function invokeReviewProcess(invocation, view, run, parentEnvironment = process.env) {
   return run(invocation.executable, invocation.args, {
     cwd: view.reviewPath,
     encoding: "utf8",
     timeout: 120_000,
-    env: { ...process.env, ...invocation.environment }
+    env: sanitizedReviewEnvironment(parentEnvironment, invocation.environment)
   });
 }
 
@@ -190,7 +209,7 @@ export function runCodexReviewAdapter({ reviewPackage, view, schemaPath, resultP
   const probe = probeCodexReviewAdapter({ executable, attestationRef });
   if (!probe.available) return { status: "unavailable", result: unavailable(probe.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
   const invocation = buildCodexReviewInvocation({ executable, view, schemaPath, resultPath });
-  const execution = invoke(invocation, view, run);
+  const execution = invokeReviewProcess(invocation, view, run);
   let result = null;
   try { result = fs.existsSync(resultPath) ? parseJsonResult(fs.readFileSync(resultPath, "utf8")) : null; } catch { result = null; }
   if (execution.status !== 0 || !result) {
@@ -205,7 +224,7 @@ export function runCodexDegradedReviewAdapter({ reviewPackage, view, schemaPath,
   if (!probe.available) return { status: "unavailable", result: unavailable(probe.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
   const startedAt = now();
   const invocation = buildCodexDegradedReviewInvocation({ executable, view, schemaPath, resultPath });
-  const execution = invoke(invocation, view, run);
+  const execution = invokeReviewProcess(invocation, view, run);
   let payload = null;
   try { payload = fs.existsSync(resultPath) ? parseJsonResult(fs.readFileSync(resultPath, "utf8")) : null; } catch { payload = null; }
   if (execution.status !== 0 || !validFindingPayload(payload)) {
@@ -258,7 +277,7 @@ export function runClaudeDegradedReviewAdapter({ reviewPackage, view, schemaPath
   try { schema = JSON.parse(fs.readFileSync(schemaPath, "utf8")); } catch { schema = null; }
   if (!schema) return { status: "unavailable", result: unavailable("independent-reviewer-claude-schema-unavailable", { reviewPackage, adapter: "claude", reviewer, attestationRef, startedAt }) };
   const invocation = buildClaudeDegradedReviewInvocation({ executable, view, schema });
-  const execution = invoke(invocation, view, run);
+  const execution = invokeReviewProcess(invocation, view, run);
   const payload = parseJsonResult(execution.stdout);
   if (execution.status !== 0 || !validFindingPayload(payload)) {
     const code = classifyClaudeExecutionFailure(execution);
@@ -311,7 +330,7 @@ export function runClaudeReviewAdapter({ reviewPackage, view, settingsPath, sche
   if (!probe.available) return { status: "unavailable", result: unavailable(probe.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }) };
   fs.writeFileSync(settingsPath, `${JSON.stringify(createClaudeReviewSettings(view))}\n`, { mode: 0o600 });
   const invocation = buildClaudeReviewInvocation({ executable, view, settingsPath, schema });
-  const execution = invoke(invocation, view, run);
+  const execution = invokeReviewProcess(invocation, view, run);
   const result = parseJsonResult(execution.stdout);
   if (execution.status !== 0 || !result) {
     return { status: "unavailable", result: unavailable(classifyClaudeExecutionFailure(execution), { reviewPackage, adapter: "claude", reviewer, attestationRef }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
