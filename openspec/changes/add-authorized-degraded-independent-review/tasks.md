@@ -45,9 +45,9 @@
 - [x] 4.1 Run focused contract, adapter, launcher-recovery, request-resolution, checkpoint, authorization, eval, schema, secret, attribution, portability, and adapter-drift checks; record current Apply evidence and map each requirement/scenario to evidence.
   - Depends on: 3.1, 3.2.
   - Evidence: current command output and requirements mapping under the change evidence directory.
-- [ ] 4.2 Obtain current-head independent review using strict first and the one-time queue-1 bootstrap only if strict isolation is unavailable; preserve the sealed package, strict unavailable record, exact authorization, degraded result/ledger, findings, dispositions, transition, and expiration.
+- [x] 4.2 Obtain current-head independent review using strict first and the one-time queue-1 bootstrap only if strict isolation is unavailable; preserve the sealed package, strict unavailable record, exact authorization, degraded result/ledger, findings, dispositions, transition, and expiration.
   - Depends on: 4.1.
   - Evidence: unique durable exact-head review record and validated dispositions.
-- [ ] 4.3 Run formal OpenSpec Verify and `openspec validate --all --strict`; correct only evidence-backed behavior-preserving objective findings and repeat affected checks and review for a new head.
+- [x] 4.3 Run formal OpenSpec Verify and `openspec validate --all --strict`; correct only evidence-backed behavior-preserving objective findings and repeat affected checks and review for a new head.
   - Depends on: 4.2.
   - Evidence: Verify report, strict validation output, and transition-gate record.
