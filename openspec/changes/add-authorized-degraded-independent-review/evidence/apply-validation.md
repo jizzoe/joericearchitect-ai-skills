@@ -6,8 +6,8 @@ self-referential commit literal.
 
 Passed current evidence:
 
-- `node --test` — 203 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, restricted reviewer home/credential access, per-signature correction enforcement, host package rederivation, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
-- `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 53 focused launcher, request, adapter, and lifecycle tests pass.
+- `node --test` — 205 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, restricted reviewer home/credential access, per-signature correction enforcement, host package rederivation, symlink-safe package injection and Git-object artifact derivation, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
+- `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 54 focused launcher, request, adapter, and lifecycle tests pass.
 - `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 15 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running and per-signature correction budget enforcement.
 - `node scripts/sdd/check-adapter-drift.mjs` — canonical wrappers have no policy drift.
 - `node scripts/validation/validate-skill-metadata.mjs` — canonical skill metadata passes.
@@ -64,3 +64,13 @@ same boundary as one accepted strict-config TOML inline table and is recorded
 in `evidence/review-correction-permission-profile-serialization.md`. Its
 corrected head requires fresh strict-first review and is the fifth globally
 ordered correction, first for its startup failure signature.
+The separately authorized `review-package-write-symlink-escape` correction
+exclusively creates the host-injected package path, failing closed on a
+committed file or symlink without altering its external target. It is recorded
+in `evidence/review-correction-package-write-symlink.md` and is the sixth
+globally ordered correction, first for its failure signature.
+The separately authorized `review-artifact-symlink-read-escape` correction
+derives declared artifact bytes only from regular Git blobs at the exact head,
+rejecting symlinks and other non-regular entries without filesystem-following
+reads. It is recorded in `evidence/review-correction-artifact-symlink.md` and
+is the seventh globally ordered correction, first for its failure signature.
