@@ -44,6 +44,10 @@ function invalidReviewRecord(input) {
       if (!result.valid || record.result.reviewRecordId !== record.id) return "invalid-independent-review-v1-record";
       if (!record.reviewPackage || record.reviewPackage.manifestDigest !== record.result.manifestDigest ||
           record.reviewPackage.baseCommit !== record.result.baseCommit || record.reviewPackage.headCommit !== record.result.headCommit) return "independent-review-v1-binding-mismatch";
+      if (record.result.assuranceLevel === "authorized-degraded" && (!record.strictUnavailable ||
+          JSON.stringify(record.strictUnavailable) !== JSON.stringify(record.result.strictUnavailable) ||
+          !record.degradedAuthorization || JSON.stringify(record.degradedAuthorization) !== JSON.stringify(record.result.degradedAuthorization) ||
+          !record.capabilityLedger || JSON.stringify(record.capabilityLedger) !== JSON.stringify(record.result.capabilityLedger))) return "independent-review-degraded-record-mismatch";
     }
   }
   return null;

@@ -119,7 +119,11 @@ function durableReviewV1Matches(request) {
   return records.length === 1 && record?.entry === request.selectedEntry && record.transition === request.lifecycleAction &&
     JSON.stringify(record.reviewPackage) === JSON.stringify(request.independentReviewPackage) &&
     JSON.stringify(record.result) === JSON.stringify(request.independentReviewResult) &&
-    JSON.stringify(record.dispositions ?? []) === JSON.stringify(request.reviewDispositions ?? []);
+    JSON.stringify(record.dispositions ?? []) === JSON.stringify(request.reviewDispositions ?? []) &&
+    (request.independentReviewResult?.assuranceLevel !== "authorized-degraded" ||
+      (JSON.stringify(record.strictUnavailable) === JSON.stringify(request.independentReviewResult.strictUnavailable) &&
+       JSON.stringify(record.degradedAuthorization) === JSON.stringify(request.independentReviewResult.degradedAuthorization) &&
+       JSON.stringify(record.capabilityLedger) === JSON.stringify(request.independentReviewResult.capabilityLedger)));
 }
 
 function durableApplyEvidenceMatches(request) {
