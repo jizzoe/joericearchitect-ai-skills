@@ -96,7 +96,7 @@ export function validateIndependentReviewEvidence({ reviewer, implementerSession
 
 // V1 result records are additive during migration. The legacy evidence
 // evaluator above remains available to existing checkpoints and callers.
-export function validateIndependentReviewV1({ reviewer, degradedReviewer, authorization, selectedEntry, transition = "merge-pr", implementerSession, reviewPackage, reviewResult, applyEvidence, dispositions = [], correctionAttempts = 0, seenRecordIds = new Set(), derivedCorrection = false, now }) {
+export function validateIndependentReviewV1({ reviewer, degradedReviewer, authorization, selectedEntry, transition = "merge-pr", implementerSession, reviewPackage, reviewResult, applyEvidence, dispositions = [], correctionAttempts = 0, seenRecordIds = new Set(), derivedCorrection = false, correctionEvidence, now }) {
   if (!reviewer?.available) return fail("independent-reviewer-unavailable");
   const packageValidation = validateReviewPackage(reviewPackage);
   if (!packageValidation.valid) return fail(packageValidation.issues[0].code);
@@ -115,7 +115,7 @@ export function validateIndependentReviewV1({ reviewer, degradedReviewer, author
   if (reviewResult.status !== "passed") return fail("independent-review-findings-unresolved");
   if (reviewResult.assuranceLevel === "authorized-degraded") {
     const authorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage,
-      strictResult: reviewResult.strictUnavailable, correctionAttempts, derivedCorrection, now });
+      strictResult: reviewResult.strictUnavailable, correctionAttempts, derivedCorrection, correctionEvidence, now });
     if (!authorizationCheck.allowed) return authorizationCheck;
   }
   const dispositionValidation = validateFindingDispositions({ findings: reviewResult.findings, dispositions, correctionAttempts });

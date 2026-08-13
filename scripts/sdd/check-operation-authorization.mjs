@@ -213,7 +213,8 @@ export function checkOperationAuthorization(input) {
           reviewResult: request.independentReviewResult, applyEvidence: request.applyEvidence, dispositions: request.reviewDispositions ?? [],
           correctionAttempts: request.correctionAttempts ?? 0, seenRecordIds: new Set(request.seenReviewRecordIds ?? []),
           degradedReviewer, authorization, selectedEntry: request.selectedEntry, transition: request.lifecycleAction,
-          derivedCorrection: request.derivedCorrection === true, now: input.now });
+          derivedCorrection: request.derivedCorrection === true,
+          correctionEvidence: request.checkpoint?.selectedEntry?.correctionRecords?.at(-1), now: input.now });
       }
       const reviewInput = request.independentReviewInput;
       const manifest = immutableReviewManifest(reviewInput);

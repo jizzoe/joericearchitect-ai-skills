@@ -69,6 +69,26 @@ function invalidApplyEvidenceRecord(input) {
   return null;
 }
 
+function invalidCorrectionRecord(input) {
+  const entry = input.selectedEntry;
+  if (!entry || entry.correctionRecords === undefined) return null;
+  if (!Array.isArray(entry.correctionRecords) || entry.correctionRecords.length > 3) return "selected-entry-invalid-correction-records";
+  const seen = new Set();
+  for (let index = 0; index < entry.correctionRecords.length; index += 1) {
+    const record = entry.correctionRecords[index];
+    if (!record || typeof record.id !== "string" || !record.id || seen.has(record.id) ||
+        record.change !== entry.name || record.attempt !== index + 1 || record.classification !== "objective-fix" ||
+        record.behaviorPreserving !== true || record.current !== true || record.ancestryVerified !== true ||
+        typeof record.failureSignature !== "string" || !record.failureSignature ||
+        typeof record.evidenceReference !== "string" || !record.evidenceReference ||
+        !commitReference(record.baseCommit) || !commitReference(record.previousHead) || !commitReference(record.headCommit) ||
+        typeof record.previousManifestDigest !== "string" || !record.previousManifestDigest ||
+        typeof record.manifestDigest !== "string" || !record.manifestDigest) return "invalid-objective-correction-record";
+    seen.add(record.id);
+  }
+  return null;
+}
+
 export function inspectCheckpoint(input) {
   const steps = input.steps ?? [];
   const recordIssue = invalidDerivedRecord(input);
@@ -77,6 +97,8 @@ export function inspectCheckpoint(input) {
   if (reviewIssue) return { classification: "human-decision", firstIncomplete: null, reason: reviewIssue };
   const applyEvidenceIssue = invalidApplyEvidenceRecord(input);
   if (applyEvidenceIssue) return { classification: "human-decision", firstIncomplete: null, reason: applyEvidenceIssue };
+  const correctionIssue = invalidCorrectionRecord(input);
+  if (correctionIssue) return { classification: "human-decision", firstIncomplete: null, reason: correctionIssue };
 
   const conflict = steps.find((step) => step.durableConflict === true);
   if (conflict) {

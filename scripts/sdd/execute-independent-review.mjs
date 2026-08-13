@@ -39,13 +39,26 @@ function strictUnavailableResult({ reviewPackage, configuredReviewer, code }) {
   };
 }
 
+function durableStrictUnavailableMatches(record, candidate, reviewPackage) {
+  const value = record?.result;
+  return typeof record?.reference === "string" && record.reference.length > 0 && record.current === true &&
+    value?.status === "unavailable" && value.unavailableCode === candidate.unavailableCode &&
+    value.baseCommit === reviewPackage.baseCommit && value.headCommit === reviewPackage.headCommit &&
+    value.manifestDigest === reviewPackage.manifestDigest && typeof value.reviewRecordId === "string" &&
+    value.reviewRecordId.length > 0 && typeof value.executionId === "string" && value.executionId.length > 0;
+}
+
 /** Strict is always attempted first. Degraded review is an explicit second
  * transport and receives only an immutable copy of the sealed package. */
-export async function executeAuthorizedIndependentReview({ package: reviewPackage, strictAdapter, degradedAdapter, configuredReviewer, degradedReviewer, implementerSession, authorization, selectedEntry, transition = "merge-pr", invokeStrict, invokeDegraded, correctionAttempts = 0, derivedCorrection = false, now } = {}) {
+export async function executeAuthorizedIndependentReview({ package: reviewPackage, strictAdapter, degradedAdapter, configuredReviewer, degradedReviewer, implementerSession, authorization, selectedEntry, transition = "merge-pr", invokeStrict, invokeDegraded, durableStrictUnavailable, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now } = {}) {
   const strict = await executeIndependentReview({ package: reviewPackage, adapter: strictAdapter, configuredReviewer, implementerSession, invoke: invokeStrict });
   if (strict.status !== "unavailable") return { ...strict, assuranceLevel: "strict-isolated" };
-  const strictResult = strict.result ?? strictUnavailableResult({ reviewPackage, configuredReviewer, code: strict.code ?? "independent-reviewer-unavailable" });
-  const authorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts, derivedCorrection, now });
+  const candidate = strict.result ?? strictUnavailableResult({ reviewPackage, configuredReviewer, code: strict.code ?? "independent-reviewer-unavailable" });
+  if (!durableStrictUnavailableMatches(durableStrictUnavailable, candidate, reviewPackage)) {
+    return { status: "unavailable", code: "strict-unavailable-evidence-not-durable", strictResult: candidate, requiresPersistence: true };
+  }
+  const strictResult = durableStrictUnavailable.result;
+  const authorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts, derivedCorrection, correctionEvidence, now });
   if (!authorizationCheck.allowed) return { status: "unavailable", code: authorizationCheck.issues[0].code, strictResult };
   const probe = probeDegradedIndependentReviewAdapter(degradedAdapter);
   if (!probe.available || typeof invokeDegraded !== "function") return { status: "unavailable", code: probe.available ? "degraded-independent-reviewer-invocation-unavailable" : probe.code, strictResult };

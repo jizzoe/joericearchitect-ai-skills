@@ -7,7 +7,26 @@ const fail = (code) => ({ allowed: false, classification: "paused", issues: [{ c
  * module receives durable evidence only; it never infers permission from an
  * adapter, environment, feature flag, or unavailable outcome.
  */
-export function validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts = 0, derivedCorrection = false, now = new Date().toISOString() } = {}) {
+function validCorrectionChain(records, record, authorizationRecord, selectedEntry, reviewPackage, correctionAttempts) {
+  if (!Array.isArray(records) || records.length === 0 || !record ||
+      JSON.stringify(records.at(-1)) !== JSON.stringify(record)) return false;
+  let priorHead = authorizationRecord.headCommit;
+  let priorManifest = authorizationRecord.manifestDigest;
+  for (let index = 0; index < records.length; index += 1) {
+    const item = records[index];
+    if (!item || item.attempt !== index + 1 || item.change !== selectedEntry || item.classification !== "objective-fix" ||
+        item.behaviorPreserving !== true || item.current !== true || item.ancestryVerified !== true ||
+        !text(item.id) || !text(item.failureSignature) || !text(item.evidenceReference) ||
+        item.baseCommit !== reviewPackage.baseCommit || item.previousHead !== priorHead ||
+        item.previousManifestDigest !== priorManifest || !commit(item.headCommit) || !text(item.manifestDigest)) return false;
+    priorHead = item.headCommit;
+    priorManifest = item.manifestDigest;
+  }
+  return record.attempt === correctionAttempts + 1 && record.attempt <= 3 &&
+    record.headCommit === reviewPackage.headCommit && record.manifestDigest === reviewPackage.manifestDigest;
+}
+
+export function validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
   const record = authorization?.degradedIndependentReview;
   if (!record || record.enabled !== true) return fail("degraded-independent-review-not-authorized");
   if (!text(selectedEntry) || record.change !== selectedEntry) return fail("degraded-independent-review-change-mismatch");
@@ -19,7 +38,10 @@ export function validateDegradedIndependentReviewAuthorization({ authorization, 
   if (!strictResult || strictResult.status !== "unavailable" || !text(strictResult.unavailableCode) || strictResult.baseCommit !== reviewPackage.baseCommit || strictResult.headCommit !== reviewPackage.headCommit || strictResult.manifestDigest !== reviewPackage.manifestDigest) return fail("degraded-independent-review-strict-unavailable-missing");
   const exact = record.baseCommit === reviewPackage.baseCommit && record.headCommit === reviewPackage.headCommit && record.manifestDigest === reviewPackage.manifestDigest;
   if (!exact) {
-    if (record.allowDerivedObjectiveCorrections !== true || derivedCorrection !== true || correctionAttempts >= 3) return fail("degraded-independent-review-package-mismatch");
+    if (record.allowDerivedObjectiveCorrections !== true || derivedCorrection !== true ||
+        !validCorrectionChain(record.derivedCorrections, correctionEvidence, record, selectedEntry, reviewPackage, correctionAttempts)) {
+      return fail("degraded-independent-review-package-mismatch");
+    }
   }
   return { allowed: true, classification: "authorized", issues: [], authorization: { change: record.change, transition, expiresAt: record.expiresAt, riskReason: record.riskReason, fallbackBoundary: record.fallbackBoundary } };
 }

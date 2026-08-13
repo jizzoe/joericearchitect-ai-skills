@@ -22,6 +22,9 @@ test("degraded authorization is explicit, strict-first, exact, and expiring", ()
 test("derived packages are limited to an evidenced corrective envelope", () => {
   const derived = { ...reviewPackage, headCommit: "d".repeat(40), manifestDigest: "e".repeat(64) };
   const strict = { ...strictResult, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest };
-  assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, reviewPackage: derived, strictResult: strict, derivedCorrection: true, correctionAttempts: 2 }).allowed, true);
-  assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, reviewPackage: derived, strictResult: strict, derivedCorrection: true, correctionAttempts: 3 }).issues[0].code, "degraded-independent-review-package-mismatch");
+  const correctionEvidence = { id: "correction-1", change: "add-authorized-degraded-independent-review", attempt: 1, failureSignature: "fixture-failure", classification: "objective-fix", behaviorPreserving: true, current: true, ancestryVerified: true, evidenceReference: "checkpoint:correction-1", baseCommit, previousHead: headCommit, previousManifestDigest: manifestDigest, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest };
+  const derivedAuthorization = { degradedIndependentReview: { ...authorization.degradedIndependentReview, derivedCorrections: [correctionEvidence] } };
+  assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, authorization: derivedAuthorization, reviewPackage: derived, strictResult: strict, derivedCorrection: true, correctionAttempts: 0, correctionEvidence }).allowed, true);
+  assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, authorization: derivedAuthorization, reviewPackage: derived, strictResult: strict, derivedCorrection: true, correctionAttempts: 1, correctionEvidence }).issues[0].code, "degraded-independent-review-package-mismatch");
+  assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, authorization: derivedAuthorization, reviewPackage: derived, strictResult: strict, derivedCorrection: true, correctionAttempts: 0, correctionEvidence: { ...correctionEvidence, ancestryVerified: false } }).issues[0].code, "degraded-independent-review-package-mismatch");
 });
