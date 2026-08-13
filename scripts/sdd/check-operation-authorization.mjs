@@ -202,7 +202,8 @@ export function checkOperationAuthorization(input) {
   if (runtime.permissionGaps?.length || (Array.isArray(runtime.permittedOperations) && !runtime.permittedOperations.includes(operation))) return fail("runtime-permission-gap", operation);
   if (request.adapter && !authorization.targets?.includes(`adapter:${request.adapter}`)) return fail("unauthorized-adapter", request.adapter);
   if (request.adapter && !adapterAllows(config, runtime, request.adapter, operation)) return fail("adapter-capability-mismatch", request.adapter);
-  if (operation === "objective-correction" && Number(request.correctionAttempts ?? 0) >= 3) return fail("correction-limit-exhausted");
+  const correctionAttemptsForSignature = request.correctionAttemptsForFailureSignature ?? request.correctionAttempts ?? 0;
+  if (operation === "objective-correction" && Number(correctionAttemptsForSignature) >= 3) return fail("correction-limit-exhausted");
   if (operation === "run-lifecycle-action" && !lifecycleActions.has(request.lifecycleAction)) return fail("unnamed-or-unsupported-lifecycle-action");
   if (highImpactLifecycleActions.has(request.lifecycleAction)) {
     if (profile !== "sdd-delivery") return fail("high-impact-action-profile-mismatch", request.lifecycleAction);

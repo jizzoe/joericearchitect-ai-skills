@@ -39,6 +39,8 @@ test("operation checker pauses for profile, authorization, target, adapter, runt
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "local-edit", { runtime: { permissionGaps: ["sandbox"] } }))), "runtime-permission-gap");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "local-edit", { authorization: { expiresAt: "2026-08-11T12:00:00.000Z" } }))), "expired-authorization");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { correctionAttempts: 3 } }))), "correction-limit-exhausted");
+  assert.equal(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { correctionAttempts: 4, correctionAttemptsForFailureSignature: 1 } })).allowed, true);
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { correctionAttempts: 4, correctionAttemptsForFailureSignature: 3 } }))), "correction-limit-exhausted");
 });
 
 test("sdd high-impact transitions require exact evidence and recovery boundaries", () => {

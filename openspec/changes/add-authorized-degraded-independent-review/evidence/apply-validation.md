@@ -6,9 +6,9 @@ self-referential commit literal.
 
 Passed current evidence:
 
-- `node --test` — 201 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, host package rederivation, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
-- `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 51 focused launcher, request, adapter, and lifecycle tests pass.
-- `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 13 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running.
+- `node --test` — 203 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, restricted reviewer home/credential access, per-signature correction enforcement, host package rederivation, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
+- `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 53 focused launcher, request, adapter, and lifecycle tests pass.
+- `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 15 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running and per-signature correction budget enforcement.
 - `node scripts/sdd/check-adapter-drift.mjs` — canonical wrappers have no policy drift.
 - `node scripts/validation/validate-skill-metadata.mjs` — canonical skill metadata passes.
 - `node scripts/validation/validate-shared-guardrails.mjs` — canonical guardrail linkage passes.
@@ -46,5 +46,14 @@ reconstructs and canonically compares the complete review package from the
 external host's detached committed view before either Codex or Claude can run.
 It is recorded in
 `evidence/review-correction-host-package-rederivation.md`; its corrected head
-requires fresh strict-first review and is the third and final correction in
-the current chain.
+requires fresh strict-first review and was the third globally ordered
+correction.
+The separately authorized `degraded-reviewer-home-credential-access`
+correction gives Codex model-generated commands an OS-enforced restricted-read
+profile while retaining parent-only CLI authentication and gives Claude an
+empty isolated home. It also aligns the durable chain validator, operation
+checker, and finding policy with the original three-corrections-per-failure-
+signature budget. It is recorded in
+`evidence/review-correction-reviewer-home-access.md`; its corrected head
+requires fresh strict-first review and is the fourth globally ordered
+correction but only the first for this signature.

@@ -12,6 +12,7 @@ function validCorrectionChain(records, record, authorizationRecord, selectedEntr
       JSON.stringify(records.at(-1)) !== JSON.stringify(record)) return false;
   let priorHead = authorizationRecord.headCommit;
   let priorManifest = authorizationRecord.manifestDigest;
+  const attemptsByFailureSignature = new Map();
   for (let index = 0; index < records.length; index += 1) {
     const item = records[index];
     if (!item || item.attempt !== index + 1 || item.change !== selectedEntry || item.classification !== "objective-fix" ||
@@ -19,11 +20,14 @@ function validCorrectionChain(records, record, authorizationRecord, selectedEntr
         !text(item.id) || !text(item.failureSignature) || !text(item.evidenceReference) ||
         item.baseCommit !== reviewPackage.baseCommit || item.previousHead !== priorHead ||
         item.previousManifestDigest !== priorManifest || !commit(item.headCommit) || !text(item.manifestDigest)) return false;
+    const signatureAttempts = (attemptsByFailureSignature.get(item.failureSignature) ?? 0) + 1;
+    if (signatureAttempts > 3) return false;
+    attemptsByFailureSignature.set(item.failureSignature, signatureAttempts);
     priorHead = item.headCommit;
     priorManifest = item.manifestDigest;
   }
   return records.length === correctionAttempts && record.attempt === correctionAttempts &&
-    correctionAttempts > 0 && correctionAttempts <= 3 &&
+    correctionAttempts > 0 &&
     record.headCommit === reviewPackage.headCommit && record.manifestDigest === reviewPackage.manifestDigest;
 }
 

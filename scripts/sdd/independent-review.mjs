@@ -142,7 +142,13 @@ export function validateIndependentReviewV1({ reviewer, degradedReviewer, author
       return fail("independent-review-degraded-authorization-mismatch");
     }
   }
-  const dispositionValidation = validateFindingDispositions({ findings: reviewResult.findings, dispositions, correctionAttempts });
+  const correctionAttemptsByFailureSignature = {};
+  for (const correction of authorization?.degradedIndependentReview?.derivedCorrections ?? []) {
+    if (typeof correction?.failureSignature === "string") {
+      correctionAttemptsByFailureSignature[correction.failureSignature] = (correctionAttemptsByFailureSignature[correction.failureSignature] ?? 0) + 1;
+    }
+  }
+  const dispositionValidation = validateFindingDispositions({ findings: reviewResult.findings, dispositions, correctionAttempts, correctionAttemptsByFailureSignature });
   if (!dispositionValidation.allowed) return dispositionValidation;
   return { allowed: true, classification: "authorized", issues: [] };
 }

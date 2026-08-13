@@ -29,3 +29,40 @@ test("derived packages are limited to an evidenced corrective envelope", () => {
   assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, authorization: derivedAuthorization, reviewPackage: derived, strictResult: strict, derivedCorrection: true, correctionAttempts: 0, correctionEvidence }).issues[0].code, "degraded-independent-review-package-mismatch");
   assert.equal(validateDegradedIndependentReviewAuthorization({ ...input, authorization: derivedAuthorization, reviewPackage: derived, strictResult: strict, derivedCorrection: true, correctionAttempts: 1, correctionEvidence: { ...correctionEvidence, ancestryVerified: false } }).issues[0].code, "degraded-independent-review-package-mismatch");
 });
+
+test("derived correction chains enforce three attempts per failure signature rather than three total", () => {
+  const makeChain = (signatures) => {
+    let previousHead = headCommit;
+    let previousManifestDigest = manifestDigest;
+    return signatures.map((failureSignature, index) => {
+      const item = {
+        id: `correction-${index + 1}`,
+        change: input.selectedEntry,
+        attempt: index + 1,
+        failureSignature,
+        classification: "objective-fix",
+        behaviorPreserving: true,
+        current: true,
+        ancestryVerified: true,
+        evidenceReference: `checkpoint:correction-${index + 1}`,
+        baseCommit,
+        previousHead,
+        previousManifestDigest,
+        headCommit: String(index + 1).repeat(40),
+        manifestDigest: String(index + 1).repeat(64)
+      };
+      previousHead = item.headCommit;
+      previousManifestDigest = item.manifestDigest;
+      return item;
+    });
+  };
+  const evaluate = (chain) => {
+    const latest = chain.at(-1);
+    const derived = { ...reviewPackage, headCommit: latest.headCommit, manifestDigest: latest.manifestDigest };
+    const strict = { ...strictResult, headCommit: latest.headCommit, manifestDigest: latest.manifestDigest };
+    const derivedAuthorization = { degradedIndependentReview: { ...authorization.degradedIndependentReview, derivedCorrections: chain } };
+    return validateDegradedIndependentReviewAuthorization({ ...input, authorization: derivedAuthorization, reviewPackage: derived, strictResult: strict, derivedCorrection: true, correctionAttempts: chain.length, correctionEvidence: latest });
+  };
+  assert.equal(evaluate(makeChain(["signature-a", "signature-b", "signature-c", "signature-d"])).allowed, true);
+  assert.equal(evaluate(makeChain(["same-signature", "same-signature", "same-signature", "same-signature"])).issues[0].code, "degraded-independent-review-package-mismatch");
+});

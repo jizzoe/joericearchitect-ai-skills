@@ -44,7 +44,12 @@ with `read-only` requested or a fresh nonpersistent Claude process exposing
 only read/search tools. It accepts no arbitrary shell text. Every adapter probe
 and strict or degraded reviewer subprocess receives only allowlisted
 cross-platform operational environment variables and fixed adapter overrides,
-not the caller's ambient credentials or process-injection variables. The host
+not the caller's ambient credential values or process-injection variables.
+Codex retains only the home/profile locations needed by its parent CLI for
+authentication, while a strict-config OS permission profile limits model-
+generated commands to minimal runtime paths and the detached workspace,
+disables tool network access, and inherits no parent environment. Claude uses
+an empty launcher-owned temporary home and isolated config/cache/data paths. The host
 returns a request-bound normalized response and removes only its
 ownership-guarded view.
 
@@ -91,6 +96,9 @@ stable unavailable/validation code, clean only the owned temporary view, and
 resume from durable Git/OpenSpec/checkpoint state. Never substitute self-review
 or a regular pull-request review for this protocol.
 
-`correctionAttempts` is the count of objective corrections already present in
-the durable correction chain. A derived review package is eligible only when
-that count equals the complete chain length and its latest attempt number.
+`correctionAttempts` is the total count of objective corrections already
+present in the durable correction chain and exists to validate chain ordering.
+A derived review package is eligible only when that count equals the complete
+chain length and its latest attempt number. The correction limit is evaluated
+separately by immutable `failureSignature`; unrelated signatures do not consume
+one another's three-attempt budget.

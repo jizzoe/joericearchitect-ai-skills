@@ -17,7 +17,10 @@ per-signature correction budget and before expiration. Absence, broad scope,
 malformation, expiration, wrong change, wrong transition, stale SHA, stale
 manifest, material change, or exhausted budget MUST pause the transition.
 The correction-attempt count MUST represent corrections already present in the
-durable chain and equal both its length and latest attempt number.
+durable chain and equal both its length and latest attempt number. That count
+orders the complete chain; budget exhaustion MUST be calculated separately for
+each immutable failure signature, so corrections for unrelated signatures do
+not consume one another's three-attempt budget.
 
 #### Scenario: Exact authorization permits evaluation
 - **WHEN** a selected transition has current Apply evidence, an exact active

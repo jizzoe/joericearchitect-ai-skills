@@ -66,7 +66,13 @@ owned detached view. Its fixed request exposes only the sealed package and
 allowlisted inspection commands. Every adapter probe and strict or degraded
 reviewer subprocess receives only an allowlist of cross-platform operational
 environment variables plus fixed adapter overrides; it never inherits the
-caller's ambient credential or process-injection variables. The adapter also
+caller's ambient credential values or process-injection variables. Codex keeps
+only the platform home/profile locations its parent CLI needs to load its own
+cached login, while a strict-config OS permission profile limits every model-
+generated command to minimal runtime paths and the detached workspace, disables
+tool network access, and passes no parent environment into tools. Claude
+processes receive an empty launcher-owned temporary home plus isolated config,
+cache, data, and temp paths. The adapter also
 disables configured GitHub, web, deployment, release, external-send, and
 delegated-mutation tools where the runtime permits. The capability ledger
 accurately categorizes controls as enforced, unavailable, or
@@ -154,7 +160,9 @@ renders all gaps in one concise message with each field's meaning and possible
 values before selecting or mutating anything.
 
 `production-rapid` means production quality with the full evidence gates and
-the existing three-correction maximum; `rapid` means routine, already bounded
+the existing three-correction maximum per failure signature; the complete
+chain remains globally ordered even when it contains more than three distinct
+signatures. `rapid` means routine, already bounded
 transitions and objective corrections do not require repeated conversational
 approval. `sdd-delivery` expands to the selected entry's normal linked SDD
 lifecycle and excludes deployments, releases, credentials, external messages,

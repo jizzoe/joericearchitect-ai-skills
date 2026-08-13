@@ -7,10 +7,9 @@ import { requiredReviewDenials } from "./review-adapter-contract.mjs";
 
 const now = () => new Date().toISOString();
 const operationalReviewEnvironmentNames = Object.freeze([
-  "PATH", "Path", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA",
-  "SYSTEMROOT", "SystemRoot", "COMSPEC", "PATHEXT", "PROGRAMDATA",
+  "PATH", "Path", "SYSTEMROOT", "SystemRoot", "COMSPEC", "PATHEXT", "PROGRAMDATA",
   "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE", "TERM",
-  "COLORTERM", "SHELL", "USER", "LOGNAME"
+  "COLORTERM", "SHELL"
 ]);
 
 export function sanitizedReviewEnvironment(parentEnvironment = process.env, overrides = {}) {
@@ -19,6 +18,48 @@ export function sanitizedReviewEnvironment(parentEnvironment = process.env, over
     if (typeof parentEnvironment[name] === "string") environment[name] = parentEnvironment[name];
   }
   return { ...environment, ...overrides };
+}
+
+export function isolatedReviewerEnvironment(homePath) {
+  if (typeof homePath !== "string" || !path.isAbsolute(homePath) || /[\r\n\0]/.test(homePath)) return {};
+  const temporaryPath = path.join(homePath, "tmp");
+  return {
+    HOME: homePath,
+    USERPROFILE: homePath,
+    APPDATA: path.join(homePath, "appdata", "roaming"),
+    LOCALAPPDATA: path.join(homePath, "appdata", "local"),
+    XDG_CONFIG_HOME: path.join(homePath, "config"),
+    XDG_CACHE_HOME: path.join(homePath, "cache"),
+    XDG_DATA_HOME: path.join(homePath, "data"),
+    TMPDIR: temporaryPath,
+    TMP: temporaryPath,
+    TEMP: temporaryPath
+  };
+}
+
+export function codexAuthenticationEnvironment(parentEnvironment = process.env) {
+  return Object.fromEntries(["HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA"]
+    .filter((name) => typeof parentEnvironment[name] === "string")
+    .map((name) => [name, parentEnvironment[name]]));
+}
+
+function codexRestrictedReviewArguments() {
+  return [
+    "--config", "default_permissions=\"sealed-review\"",
+    "--config", "permissions.sealed-review.filesystem.\":minimal\"=\"read\"",
+    "--config", "permissions.sealed-review.filesystem.\":workspace_roots\".\".\"=\"read\"",
+    "--config", "permissions.sealed-review.network.enabled=false",
+    "--config", "shell_environment_policy.inherit=\"none\""
+  ];
+}
+
+function prepareReviewerHome(view) {
+  if (typeof view?.temporaryRoot !== "string" || !path.isAbsolute(view.temporaryRoot)) return null;
+  const homePath = path.join(view.temporaryRoot, "reviewer-home");
+  for (const directory of Object.values(isolatedReviewerEnvironment(homePath))) {
+    if (path.isAbsolute(directory)) fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  }
+  return homePath;
 }
 
 const unavailable = (code, { reviewPackage, adapter, reviewer, attestationRef, startedAt = now(), executionId = randomUUID() } = {}) => ({
@@ -61,37 +102,37 @@ function capabilities({ adapter, attestationRef, probeReference }) {
   };
 }
 
-export function buildCodexReviewInvocation({ executable = "codex", view, schemaPath, resultPath }) {
+export function buildCodexReviewInvocation({ executable = "codex", view, schemaPath, resultPath, authenticationEnvironment = {} }) {
   return {
     executable,
-    args: ["exec", "--sandbox", "read-only", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--cd", view.reviewPath, "--output-schema", schemaPath, "--output-last-message", resultPath,
+    args: ["exec", "--strict-config", ...codexRestrictedReviewArguments(), "--ephemeral", "--ignore-user-config", "--ignore-rules", "--cd", view.reviewPath, "--output-schema", schemaPath, "--output-last-message", resultPath,
       "Review only the committed detached repository view. Read .ai-independent-review-package.json and inspect the exact base-to-head diff. Do not modify files, Git, credentials, network state, or external systems. Return only the required JSON review result."],
-    environment: { NO_COLOR: "1" }
+    environment: { ...authenticationEnvironment, NO_COLOR: "1" }
   };
 }
 
 // This is deliberately not a strict-isolation transport. It is available only
 // to the authorized fallback orchestrator after strict unavailability and
 // reports every restriction that cannot be runtime-proven in its ledger.
-export function buildCodexDegradedReviewInvocation({ executable = "codex", view, schemaPath, resultPath }) {
+export function buildCodexDegradedReviewInvocation({ executable = "codex", view, schemaPath, resultPath, authenticationEnvironment = {} }) {
   return {
     executable,
-    args: ["exec", "--sandbox", "read-only", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--cd", view.reviewPath, "--output-schema", schemaPath, "--output-last-message", resultPath,
+    args: ["exec", "--strict-config", ...codexRestrictedReviewArguments(), "--ephemeral", "--ignore-user-config", "--ignore-rules", "--cd", view.reviewPath, "--output-schema", schemaPath, "--output-last-message", resultPath,
       "Review only the sealed package in this disposable detached view. Inspect the exact base-to-head diff and relevant committed files. Do not modify files, Git, credentials, network state, or external systems. Return only the required JSON findings payload without an intended conclusion."],
-    environment: { NO_COLOR: "1", GITHUB_TOKEN: "", GH_TOKEN: "", SSH_AUTH_SOCK: "", AWS_ACCESS_KEY_ID: "", AWS_SECRET_ACCESS_KEY: "", AWS_SESSION_TOKEN: "", NPM_TOKEN: "" }
+    environment: { ...authenticationEnvironment, NO_COLOR: "1", GITHUB_TOKEN: "", GH_TOKEN: "", SSH_AUTH_SOCK: "", AWS_ACCESS_KEY_ID: "", AWS_SECRET_ACCESS_KEY: "", AWS_SESSION_TOKEN: "", NPM_TOKEN: "" }
   };
 }
 
 export function degradedCapabilityLedger() {
   return {
-    enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "innerReadOnlySandbox"],
+    enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "innerReadOnlySandbox", "credentialAccess"],
     unavailable: [],
-    instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"]
+    instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"]
   };
 }
 
 export function probeCodexReviewAdapter({ executable = "codex", attestationRef = "attestations/codex-read-only-v1.json" } = {}) {
-  if (!helpIncludes(executable, ["exec", "--help"], ["--sandbox", "--ephemeral", "--ignore-user-config", "--output-schema"])) {
+  if (!helpIncludes(executable, ["exec", "--help"], ["--config", "--strict-config", "--ephemeral", "--ignore-user-config", "--output-schema"])) {
     return { available: false, code: "independent-reviewer-codex-runtime-unavailable" };
   }
   return { available: true, capability: capabilities({ adapter: "codex", attestationRef, probeReference: "codex-exec-read-only-v1" }) };
@@ -120,20 +161,20 @@ export function createClaudeReviewSettings(view) {
   };
 }
 
-export function buildClaudeReviewInvocation({ executable = "claude", view, settingsPath, schema }) {
+export function buildClaudeReviewInvocation({ executable = "claude", view, settingsPath, schema, reviewerHomePath }) {
   return {
     executable,
     args: ["--print", "--safe-mode", "--no-session-persistence", "--setting-sources", "", "--settings", settingsPath,
       "--tools", "Bash", "--disallowed-tools", "Edit,Write,NotebookEdit,Task,Agent,WebFetch,WebSearch,MCP", "--permission-mode", "dontAsk", "--output-format", "json", "--json-schema", JSON.stringify(schema),
       "Review only the committed detached repository view. Read .ai-independent-review-package.json and inspect the exact base-to-head diff. Do not modify files, Git, credentials, network state, or external systems. Return only the required JSON review result."],
-    environment: { CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1", NO_COLOR: "1" }
+    environment: { ...isolatedReviewerEnvironment(reviewerHomePath), CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1", NO_COLOR: "1" }
   };
 }
 
 // Claude's degraded transport deliberately does not claim an OS sandbox. It
 // starts a fresh non-persistent process with only read/search tools exposed and
 // records the remaining boundary as reduced assurance.
-export function buildClaudeDegradedReviewInvocation({ executable = "claude", view, schema }) {
+export function buildClaudeDegradedReviewInvocation({ executable = "claude", view, schema, reviewerHomePath }) {
   return {
     executable,
     args: ["--print", "--safe-mode", "--no-session-persistence", "--setting-sources", "",
@@ -141,7 +182,7 @@ export function buildClaudeDegradedReviewInvocation({ executable = "claude", vie
       "--disallowed-tools", "Bash,Edit,Write,NotebookEdit,Task,Agent,WebFetch,WebSearch,MCP",
       "--permission-mode", "dontAsk", "--output-format", "json", "--json-schema", JSON.stringify(schema),
       "Review only the sealed package in this disposable detached view. Inspect the exact base-to-head diff and relevant committed files. Do not modify files, Git, credentials, network state, or external systems. Return only the required JSON findings payload without an intended conclusion."],
-    environment: { CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1", NO_COLOR: "1", GITHUB_TOKEN: "", GH_TOKEN: "", SSH_AUTH_SOCK: "", AWS_ACCESS_KEY_ID: "", AWS_SECRET_ACCESS_KEY: "", AWS_SESSION_TOKEN: "", NPM_TOKEN: "" }
+    environment: { ...isolatedReviewerEnvironment(reviewerHomePath), CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1", NO_COLOR: "1", GITHUB_TOKEN: "", GH_TOKEN: "", SSH_AUTH_SOCK: "", AWS_ACCESS_KEY_ID: "", AWS_SECRET_ACCESS_KEY: "", AWS_SESSION_TOKEN: "", NPM_TOKEN: "" }
   };
 }
 
@@ -208,7 +249,7 @@ export function invokeReviewProcess(invocation, view, run, parentEnvironment = p
 export function runCodexReviewAdapter({ reviewPackage, view, schemaPath, resultPath, reviewer, attestationRef, executable, run = spawnSync }) {
   const probe = probeCodexReviewAdapter({ executable, attestationRef });
   if (!probe.available) return { status: "unavailable", result: unavailable(probe.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
-  const invocation = buildCodexReviewInvocation({ executable, view, schemaPath, resultPath });
+  const invocation = buildCodexReviewInvocation({ executable, view, schemaPath, resultPath, authenticationEnvironment: codexAuthenticationEnvironment() });
   const execution = invokeReviewProcess(invocation, view, run);
   let result = null;
   try { result = fs.existsSync(resultPath) ? parseJsonResult(fs.readFileSync(resultPath, "utf8")) : null; } catch { result = null; }
@@ -223,7 +264,7 @@ export function runCodexDegradedReviewAdapter({ reviewPackage, view, schemaPath,
   const probe = probeCodexReviewAdapter({ executable, attestationRef });
   if (!probe.available) return { status: "unavailable", result: unavailable(probe.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
   const startedAt = now();
-  const invocation = buildCodexDegradedReviewInvocation({ executable, view, schemaPath, resultPath });
+  const invocation = buildCodexDegradedReviewInvocation({ executable, view, schemaPath, resultPath, authenticationEnvironment: codexAuthenticationEnvironment() });
   const execution = invokeReviewProcess(invocation, view, run);
   let payload = null;
   try { payload = fs.existsSync(resultPath) ? parseJsonResult(fs.readFileSync(resultPath, "utf8")) : null; } catch { payload = null; }
@@ -276,7 +317,7 @@ export function runClaudeDegradedReviewAdapter({ reviewPackage, view, schemaPath
   let schema = null;
   try { schema = JSON.parse(fs.readFileSync(schemaPath, "utf8")); } catch { schema = null; }
   if (!schema) return { status: "unavailable", result: unavailable("independent-reviewer-claude-schema-unavailable", { reviewPackage, adapter: "claude", reviewer, attestationRef, startedAt }) };
-  const invocation = buildClaudeDegradedReviewInvocation({ executable, view, schema });
+  const invocation = buildClaudeDegradedReviewInvocation({ executable, view, schema, reviewerHomePath: prepareReviewerHome(view) });
   const execution = invokeReviewProcess(invocation, view, run);
   const payload = parseJsonResult(execution.stdout);
   if (execution.status !== 0 || !validFindingPayload(payload)) {
@@ -329,7 +370,7 @@ export function runClaudeReviewAdapter({ reviewPackage, view, settingsPath, sche
   const probe = probeClaudeReviewAdapter({ executable, attestationRef });
   if (!probe.available) return { status: "unavailable", result: unavailable(probe.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }) };
   fs.writeFileSync(settingsPath, `${JSON.stringify(createClaudeReviewSettings(view))}\n`, { mode: 0o600 });
-  const invocation = buildClaudeReviewInvocation({ executable, view, settingsPath, schema });
+  const invocation = buildClaudeReviewInvocation({ executable, view, settingsPath, schema, reviewerHomePath: prepareReviewerHome(view) });
   const execution = invokeReviewProcess(invocation, view, run);
   const result = parseJsonResult(execution.stdout);
   if (execution.status !== 0 || !result) {

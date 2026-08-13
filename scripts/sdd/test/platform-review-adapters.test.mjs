@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, createClaudeReviewSettings, degradedCapabilityLedger, invokeReviewProcess, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult } from "../platform-review-adapters.mjs";
+import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, createClaudeReviewSettings, degradedCapabilityLedger, invokeReviewProcess, isolatedReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 
@@ -23,21 +23,31 @@ test("strict and degraded reviewer subprocesses receive only allowlisted operati
     NODE_OPTIONS: "--require=/tmp/untrusted-hook.cjs"
   };
   const schema = { type: "object" };
+  const reviewerHomePath = "/tmp/isolated-reviewer-home";
+  const authenticationEnvironment = codexAuthenticationEnvironment(parentEnvironment);
   const invocations = [
-    ["Codex strict", buildCodexReviewInvocation({ view, schemaPath: "/tmp/schema.json", resultPath: "/tmp/result.json" })],
-    ["Codex degraded", buildCodexDegradedReviewInvocation({ view, schemaPath: "/tmp/schema.json", resultPath: "/tmp/result.json" })],
-    ["Claude strict", buildClaudeReviewInvocation({ view, settingsPath: "/tmp/settings.json", schema })],
-    ["Claude degraded", buildClaudeDegradedReviewInvocation({ view, schema })]
+    ["Codex strict", buildCodexReviewInvocation({ view, schemaPath: "/tmp/schema.json", resultPath: "/tmp/result.json", authenticationEnvironment }), parentEnvironment.HOME],
+    ["Codex degraded", buildCodexDegradedReviewInvocation({ view, schemaPath: "/tmp/schema.json", resultPath: "/tmp/result.json", authenticationEnvironment }), parentEnvironment.HOME],
+    ["Claude strict", buildClaudeReviewInvocation({ view, settingsPath: "/tmp/settings.json", schema, reviewerHomePath }), reviewerHomePath],
+    ["Claude degraded", buildClaudeDegradedReviewInvocation({ view, schema, reviewerHomePath }), reviewerHomePath]
   ];
 
-  for (const [label, invocation] of invocations) {
+  for (const [label, invocation, expectedHome] of invocations) {
     let receivedEnvironment = null;
     invokeReviewProcess(invocation, view, (_executable, _args, options) => {
       receivedEnvironment = options.env;
       return { status: 0, signal: null, stdout: "", stderr: "" };
     }, parentEnvironment);
     assert.equal(receivedEnvironment.PATH, parentEnvironment.PATH, `${label} retains PATH`);
-    assert.equal(receivedEnvironment.HOME, parentEnvironment.HOME, `${label} retains HOME`);
+    assert.equal(receivedEnvironment.HOME, expectedHome, `${label} uses only its required authentication boundary`);
+    if (label.startsWith("Codex")) {
+      assert.ok(invocation.args.includes("default_permissions=\"sealed-review\""), `${label} uses a restricted OS permission profile`);
+      assert.ok(invocation.args.includes("permissions.sealed-review.filesystem.\":workspace_roots\".\".\"=\"read\""), `${label} restricts reads to its workspace and minimal runtime paths`);
+      assert.ok(invocation.args.includes("shell_environment_policy.inherit=\"none\""), `${label} denies authentication variables to model-generated commands`);
+    } else {
+      assert.notEqual(receivedEnvironment.HOME, parentEnvironment.HOME, `${label} rejects the caller home`);
+      assert.equal(receivedEnvironment.XDG_CONFIG_HOME, `${reviewerHomePath}/config`, `${label} isolates configuration`);
+    }
     assert.equal(receivedEnvironment.NO_COLOR, "1", `${label} applies fixed adapter overrides`);
     assert.equal("UNLISTED_SYNTHETIC_CREDENTIAL" in receivedEnvironment, false, `${label} rejects an unlisted credential`);
     assert.equal("OPENAI_API_KEY" in receivedEnvironment, false, `${label} rejects OpenAI credentials`);
@@ -47,14 +57,20 @@ test("strict and degraded reviewer subprocesses receive only allowlisted operati
 
   assert.deepEqual(sanitizedReviewEnvironment(parentEnvironment), {
     PATH: parentEnvironment.PATH,
-    HOME: parentEnvironment.HOME,
     LANG: parentEnvironment.LANG
   });
+  assert.deepEqual(isolatedReviewerEnvironment("relative/home"), {});
 });
 
 test("Codex adapter uses a fresh read-only noninteractive transport without user configuration", () => {
   const invocation = buildCodexReviewInvocation({ view, schemaPath: "/tmp/result-schema.json", resultPath: "/tmp/result.json" });
-  assert.deepEqual(invocation.args.slice(0, 11), ["exec", "--sandbox", "read-only", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--cd", view.reviewPath, "--output-schema", "/tmp/result-schema.json", "--output-last-message"]);
+  assert.equal(invocation.args[0], "exec");
+  assert.ok(invocation.args.includes("default_permissions=\"sealed-review\""));
+  assert.ok(invocation.args.includes("permissions.sealed-review.filesystem.\":minimal\"=\"read\""));
+  assert.ok(invocation.args.includes("permissions.sealed-review.filesystem.\":workspace_roots\".\".\"=\"read\""));
+  assert.equal(invocation.args.includes("--sandbox"), false);
+  assert.ok(invocation.args.includes("--ephemeral"));
+  assert.ok(invocation.args.includes("--ignore-user-config"));
   const probe = probeCodexReviewAdapter();
   assert.equal(typeof probe.available, "boolean");
   if (probe.available) assert.equal(probe.capability.denied.delegatedMutation, true);
@@ -62,7 +78,8 @@ test("Codex adapter uses a fresh read-only noninteractive transport without user
 
 test("degraded Codex transport is explicitly reduced-assurance and scrubs mutation credentials", () => {
   const invocation = buildCodexDegradedReviewInvocation({ view, schemaPath: "/tmp/result-schema.json", resultPath: "/tmp/result.json" });
-  assert.deepEqual(invocation.args.slice(0, 5), ["exec", "--sandbox", "read-only", "--ephemeral", "--ignore-user-config"]);
+  assert.equal(invocation.args[0], "exec");
+  assert.ok(invocation.args.includes("default_permissions=\"sealed-review\""));
   assert.equal(invocation.args.includes("--ephemeral"), true);
   assert.equal(invocation.environment.GH_TOKEN, "");
   const ledger = degradedCapabilityLedger();
@@ -83,7 +100,7 @@ test("degraded adapter seals reviewer findings into parent-owned exact-package e
   const resultPath = `${temporary}/result.json`;
   const payload = { schemaVersion: 1, findings: [], status: "passed" };
   const run = (_executable, args) => {
-    assert.ok(args.includes("read-only"));
+    assert.ok(args.includes("default_permissions=\"sealed-review\""));
     fs.writeFileSync(resultPath, JSON.stringify(payload));
     return { status: 0, signal: null, stdout: "", stderr: "" };
   };
