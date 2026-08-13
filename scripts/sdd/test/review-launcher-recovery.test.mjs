@@ -62,8 +62,8 @@ function hostRun(prepared, result = validResult(), viewHead = reviewPackage.head
   return { response, removed, invoked };
 }
 
-function runtimeEvidence(prepared, response) {
-  return { attestedBy: "trusted-runtime", outsideManagedSandbox: true, executionRef: "runtime:test:1", launcherId: launcher.id, launcherKind: launcher.kind, hostScript: launcher.hostScript, requestDigest: prepared.hostRequest.requestDigest, hostExecutionId: response.hostExecutionId };
+function runtimeEvidence(prepared, response, selectedLauncher = launcher) {
+  return { attestedBy: "trusted-runtime", outsideManagedSandbox: true, executionRef: "runtime:test:1", launcherId: selectedLauncher.id, launcherKind: selectedLauncher.kind, hostScript: selectedLauncher.hostScript, requestDigest: prepared.hostRequest.requestDigest, hostExecutionId: response.hostExecutionId };
 }
 
 test("recovery preflight requires exact authorization, fixed host, and runtime permission", () => {
@@ -83,7 +83,41 @@ test("controller prepares only a fixed external host request", () => {
   assert.match(prepared.hostRequest.requestDigest, /^[0-9a-f]{64}$/);
 });
 
-test("external host owns the detached view and acceptance requires trusted runtime evidence", () => {
+test("Claude launcher uses the same sealed host protocol with a read-tools-only boundary", () => {
+  const claudeStrict = {
+    ...strictResult,
+    reviewer: { type: "claude", identity: "strict-reviewer", adapter: "claude" },
+    unavailableCode: "independent-reviewer-claude-sandbox-unavailable"
+  };
+  const claudeLauncher = { id: "claude-review-launcher", kind: "claude-detached-restricted-v1", hostScript: "scripts/sdd/review-launcher-host.mjs", enabled: true, executable: "/opt/tools/claude", detachedView: true, readToolsOnly: true, ephemeral: true, sealedPackageOnly: true, credentialScrubbed: true, nonInteractive: true };
+  const claudeAuthorization = {
+    ...authorization,
+    reviewLauncher: { ...authorization.reviewLauncher, launcherId: claudeLauncher.id, boundary: "detached-exact-head-read-tools-only" }
+  };
+  const claudeInput = {
+    ...baseInput,
+    failureCode: claudeStrict.unavailableCode,
+    strictResult: claudeStrict,
+    authorization: claudeAuthorization,
+    launcher: claudeLauncher,
+    runtime: { permittedReviewLaunchers: [claudeLauncher.id] },
+    reviewer: { type: "claude-degraded", identity: "fresh-reviewer", attestation: { ref: "degraded-attestation" } }
+  };
+  const prepared = prepareReviewLauncherRecovery(claudeInput, { launchId: "claude-launch-1" });
+  assert.equal(prepared.allowed, true, JSON.stringify(prepared));
+  assert.equal(prepared.expectedRecovery.innerBoundary, "read-search-tools-only");
+  const result = {
+    ...validResult(),
+    reviewer: { type: "claude-degraded", identity: "fresh-reviewer", adapter: "claude" },
+    strictUnavailable: { ...validResult().strictUnavailable, adapter: "claude", unavailableCode: claudeStrict.unavailableCode },
+    capabilityLedger: { enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "disabledMutationTools"], unavailable: [], instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"] }
+  };
+  const { response } = hostRun(prepared, result);
+  const accepted = acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: runtimeEvidence(prepared, response, claudeLauncher) });
+  assert.equal(accepted.allowed, true, JSON.stringify(accepted));
+});
+
+test("external host owns the detached view and acceptance requires the recorded runtime evidence shape", () => {
   const prepared = prepareReviewLauncherRecovery(baseInput, { launchId: "launch-1" });
   const { response, removed, invoked } = hostRun(prepared);
   assert.equal(response.allowed, true, JSON.stringify(response));

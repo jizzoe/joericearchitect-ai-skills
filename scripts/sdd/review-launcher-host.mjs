@@ -6,10 +6,9 @@ import path from "node:path";
 import { createDetachedReviewView, removeDetachedReviewView } from "./detached-review-view.mjs";
 import { validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
-import { runCodexDegradedReviewAdapter, writeReviewPackageForView } from "./platform-review-adapters.mjs";
-import { reviewLauncherRequestDigest, validateReviewLauncherRecovery } from "./review-launcher-recovery.mjs";
+import { runClaudeDegradedReviewAdapter, runCodexDegradedReviewAdapter, writeReviewPackageForView } from "./platform-review-adapters.mjs";
+import { reviewLauncherDefinition, reviewLauncherRequestDigest, validateReviewLauncherRecovery } from "./review-launcher-recovery.mjs";
 
-const launcherKind = "codex-detached-read-only-v1";
 const hostScript = "scripts/sdd/review-launcher-host.mjs";
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const fail = (code, detail) => ({ allowed: false, status: "unavailable", code, ...(detail ? { detail } : {}) });
@@ -17,7 +16,7 @@ const fail = (code, detail) => ({ allowed: false, status: "unavailable", code, .
 export function executeReviewLauncherHost(hostRequest, {
   createView = createDetachedReviewView,
   removeView = removeDetachedReviewView,
-  invoke = runCodexDegradedReviewAdapter,
+  invoke,
   hostExecutionId = randomUUID(),
   now = new Date().toISOString()
 } = {}) {
@@ -26,6 +25,9 @@ export function executeReviewLauncherHost(hostRequest, {
   const request = hostRequest.request;
   const preflight = validateReviewLauncherRecovery({ ...request, now });
   if (!preflight.allowed) return preflight;
+  const definition = reviewLauncherDefinition(preflight.recovery.launcherKind);
+  const invokeAdapter = invoke ?? (preflight.recovery.launcherKind === "claude-detached-restricted-v1" ? runClaudeDegradedReviewAdapter : runCodexDegradedReviewAdapter);
+  if (!definition) return fail("review-launcher-capability-unavailable");
   if (!text(request.repositoryPath) || !request.reviewer || !text(request.reviewer.type) || !text(request.reviewer.identity) || !text(request.attestationRef)) return fail("review-launcher-input-incomplete");
   const created = createView({ repositoryPath: request.repositoryPath, headCommit: request.reviewPackage.headCommit });
   if (!created?.available) return fail("review-launcher-detached-view-unavailable", created?.code);
@@ -38,7 +40,7 @@ export function executeReviewLauncherHost(hostRequest, {
       writeReviewPackageForView(view, request.reviewPackage);
       const schemaPath = path.join(view.reviewPath, "schemas", "independent-review-findings-v1.schema.json");
       const resultPath = path.join(view.temporaryRoot, "independent-review-findings.json");
-      const execution = invoke({
+      const execution = invokeAdapter({
         reviewPackage: request.reviewPackage,
         view,
         schemaPath,
@@ -63,7 +65,7 @@ export function executeReviewLauncherHost(hostRequest, {
           launchId: hostRequest.launchId,
           requestDigest: digest,
           launcherId: preflight.recovery.launcherId,
-          launcherKind,
+          launcherKind: preflight.recovery.launcherKind,
           hostScript,
           hostExecutionId,
           result: execution.result,

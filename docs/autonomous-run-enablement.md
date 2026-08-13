@@ -9,6 +9,12 @@ review package and a disposable detached repository view. If the runtime cannot
 prove the required boundary, it returns `unavailable` and the delivery pauses.
 Do not replace that pause with self-review or a normal pull-request review.
 
+An explicitly authorized degraded fallback is a different assurance class. It
+still attempts a fresh separate review, but its parent-launch evidence and
+reviewer executable identity are not authenticated by an OS-protected key or
+capability. It is a best-effort quality signal and must never be described as
+strict, isolated, read-only-enforced, or security-verified.
+
 ## One-Time Readiness
 
 Install current Codex CLI and/or Claude Code normally and make sure Git and
@@ -51,6 +57,25 @@ capability check and pauses when the sandbox cannot start.
 Claude Code's OS sandbox is not available on native Windows. Run the Claude
 reviewer in WSL2 or another supported isolated environment. A native-Windows
 Claude adapter result is intentionally `unavailable`.
+
+### Authorized degraded launcher recovery
+
+After exact-package strict unavailability, a bounded `strict-first-degraded`
+authorization may permit external launcher recovery. Codex uses an ephemeral
+inner process with a requested read-only sandbox. Claude uses a fresh
+nonpersistent process with only `Read`, `Glob`, and `Grep`; Bash, edit/write,
+agents, web, and MCP tools are disabled. Both use a detached committed view,
+sealed package, credential scrubbing, fixed host script, expiration checks, and
+structured findings.
+
+The first release deliberately accepts two limitations for this reduced-
+assurance path: ordinary launcher evidence can be forged by a sufficiently
+adversarial implementation process, and the requested executable is checked by
+basename rather than pinned to a host-owned absolute path. A malicious program
+named `codex` or `claude` could therefore impersonate the reviewer. Eliminating
+those risks requires an external trusted launcher plus authenticated IPC or an
+OS-protected key/capability and host-owned executable configuration. That
+heavier setup is deferred; strict review is unaffected.
 
 ## Starting a Bounded Run
 

@@ -46,13 +46,14 @@ credential or scope changes, external messages, and unrelated mutations.
 `strict-only` pauses when strict OS-isolated independent review is unavailable.
 `strict-first-degraded` always attempts strict review first. After durable exact-
 package unavailability, it permits a fresh, separate, transition-bound degraded
-review and the configured review-launcher recovery for the same change, head,
-manifest, correction envelope, and expiration. Recovery prepares a structured
-request in the implementation sandbox; only the trusted runtime may invoke the
-fixed host launcher outside that sandbox, and acceptance requires runtime-
-supplied execution evidence. The selection is the owner's affirmative reduced-
-assurance risk choice; derive the exact authorization only when the package and
-transition exist.
+review and the configured Codex or Claude review-launcher recovery for the same
+change, head, manifest, correction envelope, and expiration. Recovery prepares
+a structured request in the implementation sandbox; the runtime invokes the
+host launcher outside that sandbox, and acceptance records runtime-supplied
+execution evidence. That evidence and the basename-checked executable identity
+are not cryptographically authenticated in the first release. The selection is
+the owner's affirmative reduced-assurance risk choice; derive the exact
+authorization only when the package and transition exist.
 
 The preset is authorization, not runtime permission. If the configured launcher
 cannot run under the platform's active permission policy, report that gap and

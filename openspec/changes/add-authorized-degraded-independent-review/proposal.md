@@ -23,6 +23,12 @@ Primary GitHub issue: [#84](https://github.com/jizzoe/joericearchitect-ai-skills
   package/base/head bindings.
 - Add deterministic schema, authorization, adapter, delivery-gate, recovery,
   portability, command-injection, secret, and thin-adapter-drift tests.
+- Support equivalent configured external-host degraded recovery through Codex
+  and Claude while preserving one assistant-neutral result and authorization
+  contract.
+- Record the owner's explicit acceptance that degraded parent-launch evidence
+  is forgeable and reviewer executable identity is basename-checked rather than
+  security-verified; retain these as known risks, not resolved findings.
 - Preserve existing finding disposition, correction-budget, verification,
   recovery, and strict fail-closed behavior for all un-authorized runs.
 
@@ -37,7 +43,9 @@ This change excludes standing fallback permission,
 credentials, external messages, deployment, release, and model selection.
 It also excludes silently guessing a missing risk-bearing delivery input or
 granting runtime elevation that the active execution environment has not
-permitted.
+permitted. Authenticated host IPC, OS-protected signing capabilities, and
+host-owned executable pinning are deferred because of their machine/CI setup
+and lifecycle cost.
 
 ## Capabilities
 
@@ -67,10 +75,12 @@ permitted.
   authorization retains the present fail-closed pause. No existing strict
   result is converted to degraded evidence. Existing fully specified run
   authorizations remain valid; the concise request resolver is additive.
-- **Security:** reviewers retain no Git, repository-write, GitHub, credential,
+- **Security:** strict review retains its verified boundary. Degraded reviewers
+  are configured without Git, repository-write, GitHub, credential,
   network-mutation, deployment, release, external-send, or delegated-mutation
-  authority. Product-specific values remain in run records, never reusable
-  assets.
+  tools, but the external launch evidence and executable identity are not
+  cryptographically verifiable against an adversarial implementation process.
+  Product-specific values remain in run records, never reusable assets.
 - **Reuse plan:** the contracts and validators are product-neutral; exact
   change, transition, SHA, expiration, reviewer identity, and risk reason are
   runtime evidence. Platform wrappers provide transport and accurately report

@@ -79,38 +79,63 @@ the existing result/finding logic. A new head or correction causes strict-first
 re-evaluation. The one-time queue-1 bootstrap record uses the same durable
 shape but is scoped in the run authorization and expires at Archive merge.
 
-### 5. Recover nested-reviewer startup through a separately authorized launcher
+### 5. Recover nested-reviewer startup through separately authorized Codex and Claude launchers
 
-Some managed outer sandboxes deny both Git worktree creation and the nested
-Codex app-server's local IPC initialization. A package-only retry outside that
-sandbox would not satisfy the detached committed-view contract. The recovery
-path therefore uses a configured, deterministic review launcher capability
-that, when runtime permission explicitly allows it, creates the owned detached
-exact-head view outside the outer sandbox and starts the *inner* reviewer with
-its own read-only sandbox, ephemeral session, and sealed package only.
+Some managed outer sandboxes deny Git worktree creation, the nested Codex app-
+server's local IPC initialization, or Claude's strict sandbox. A package-only
+same-session retry would not satisfy the detached committed-view contract. The
+recovery path therefore uses a configured review launcher capability that,
+when runtime permission explicitly allows it, creates the owned detached exact-
+head view outside the outer sandbox and starts either an ephemeral Codex process
+requesting its inner read-only sandbox or a nonpersistent Claude process with
+only read/search tools and sealed-package input.
 
 The runner never self-escalates. It first records the stable launcher-unavailable
 code and pauses unless the current run authorization and runtime permission
 explicitly permit the configured launcher. The in-sandbox recovery controller
 can only validate and prepare a digest-bound structured request. A separately
-configured fixed host script, invoked outside the failed sandbox by the trusted
-runtime, independently validates that request and alone owns review-view setup
-and the fixed reviewer invocation. The controller accepts the response only
-with runtime-supplied outside-sandbox execution evidence bound to the request
-digest and host execution. Host self-attestation is insufficient. The prepared
+configured host script, invoked outside the failed sandbox by the runtime,
+validates that request and owns review-view setup and reviewer invocation. The
+controller accepts the response only with runtime-supplied outside-sandbox
+execution data bound to the request digest and host execution. Under the
+accepted degraded-risk decision, this ordinary data is evidence of the intended
+launch but not cryptographic proof against an adversarial implementation
+process. The prepared
 host request omits the controller's caller-supplied clock; host execution and
 controller acceptance independently evaluate expiration using their current
 runtime clocks, preventing replay of a previously valid timestamp.
 
-Neither component can receive arbitrary shell text, implementation history,
-GitHub/deployment tools, credentials as review input, or any authority beyond
-the fixed recovery operation. Evidence records the external host launch
-separately from the inner reviewer's assurance ledger.
+Neither component receives arbitrary shell text, implementation history,
+GitHub/deployment tools, or credentials as review input. Evidence records the
+external host launch separately from the inner reviewer's assurance ledger.
 
 Alternative: run a package-only reviewer outside the outer sandbox. Rejected
 because it loses the detached committed view required by the review protocol.
 
-### 6. Resolve concise delivery requests through a closed preset vocabulary
+### 6. Treat degraded host evidence and executable identity as accepted, unverified risks
+
+The first release does not introduce a trusted service, OS-protected signing
+key/capability, authenticated IPC channel, or host-owned executable registry.
+The controller and host exchange ordinary digest-bound JSON, and the executable
+path is accepted when its basename matches the selected `codex`/`codex.exe` or
+`claude`/`claude.exe` launcher. A sufficiently adversarial implementation
+process can forge the runtime evidence or substitute a malicious executable
+with that basename.
+
+The owner explicitly accepts these two findings for authorized degraded review
+only. They remain recorded as accepted risks, not resolved controls. The result
+is a best-effort fresh independent quality signal and is never described as
+strict, OS-isolated, read-only-enforced, or security-verified. Strict review is
+unchanged, still attempted first, and still requires its verified adapter
+boundary. Any other blocker/high finding remains subject to the normal pause.
+
+Alternative: add a trusted launcher service, protected key/capability,
+authenticated IPC, executable pinning, rotation/audit lifecycle, and equivalent
+CI provisioning. Deferred because it adds platform-specific machine and CI
+setup that the owner judged disproportionate for an explicitly authorized
+degraded fallback.
+
+### 7. Resolve concise delivery requests through a closed preset vocabulary
 
 Add a pure request resolver in `scripts/sdd` and a canonical runner reference
 that define six required inputs: target, mode, quality profile, authorization
@@ -127,8 +152,8 @@ approval. `sdd-delivery` expands to the selected entry's normal linked SDD
 lifecycle and excludes deployments, releases, credentials, external messages,
 and unrelated mutations. `strict-first-degraded` is the affirmative owner
 choice that derives an exact degraded authorization only after strict
-unavailability and also permits the fixed launcher recovery when the active
-runtime separately permits that launcher. `strict-only` pauses at strict
+unavailability and also permits configured Codex or Claude launcher recovery
+when the active runtime separately permits that launcher. `strict-only` pauses at strict
 unavailability.
 
 The resolver does not parse arbitrary prose or execute commands. The assistant
@@ -152,9 +177,13 @@ behavior depend on individual memory.
   result, checkpoint, correction count, and transition from durable records;
   the correction count equals the already-recorded chain length.
 - **Nested runtime denied by outer sandbox** → Return a stable launcher
-  permission code; use only an explicitly authorized fixed external host with
-  trusted runtime execution evidence, preserving the inner read-only reviewer
-  and detached-view boundary.
+  permission code; use only an explicitly authorized external host, preserving
+  the detached view and strongest configured Codex/Claude reviewer restrictions.
+- **Forgeable degraded launch evidence or executable substitution** → Label the
+  result reduced-assurance, retain the exact owner risk acceptance, require
+  strict-first and bounded authorization, and never claim a security-verified
+  boundary. Authenticated host infrastructure remains a documented hardening
+  option.
 - **Preset hides a consequential choice** → Use a closed vocabulary, report the
   expanded effective authorization, and ask once for all missing or invalid
   required inputs before mutation.

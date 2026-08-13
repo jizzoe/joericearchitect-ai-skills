@@ -42,11 +42,12 @@ published choices, and perform no selection or mutation.
    evidence remains labelled `authorized-degraded` with the strict precursor
    and capability ledger and is never described as strict isolation. If the
    outer sandbox denies detached-view setup or nested reviewer startup, use the
-   fixed external-host review launcher only when the exact run authorization,
+   configured Codex or Claude external-host review launcher only when the exact run authorization,
    launcher configuration, and runtime permission permit it. The in-sandbox
    controller may only prepare and accept a digest-bound request; retain the
-   trusted runtime's outside-sandbox execution evidence and the inner ephemeral
-   read-only boundary.
+   runtime's outside-sandbox execution record and the inner Codex read-only or
+   Claude read/search-only boundary. Treat the degraded launch evidence and
+   executable identity as best-effort rather than security-verifiable.
 8. Run formal Verify after every task has current evidence.
 9. Deliver through a pull request only when the delivery gate passes and the
    active authorization permits the mutation.

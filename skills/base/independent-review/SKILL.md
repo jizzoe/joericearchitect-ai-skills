@@ -35,16 +35,19 @@ standing grants, noncanonical commits, or content outside the sealed package.
    authorization names the selected change, transition, expiration, risk
    reason, and `fresh-separated-reviewer-only` boundary. It MUST retain the
    strict record and capability ledger and MUST NOT be called strict-isolated.
-6. If detached-view creation or nested reviewer startup is denied by the outer
+6. If detached-view creation or strict reviewer startup is denied by the outer
    sandbox, use `scripts/sdd/review-launcher-recovery.mjs` to validate and
    prepare a sealed host request only when the exact degraded authorization,
-   configured fixed launcher, and active runtime permission all validate. The
-   trusted runtime invokes `scripts/sdd/review-launcher-host.mjs` outside the
-   failed sandbox; only that fixed host creates the detached exact-head view and
-   starts a fresh ephemeral inner `read-only` reviewer. Accept its response only
-   with runtime-supplied outside-sandbox execution evidence and exact request,
-   result, precursor, authorization, cleanup, and launcher bindings. Neither
-   component self-escalates or accepts arbitrary commands.
+   configured launcher, and active runtime permission all validate. The runtime
+   invokes `scripts/sdd/review-launcher-host.mjs` outside the failed sandbox;
+   that host creates the detached exact-head view and starts either a fresh
+   ephemeral Codex read-only reviewer or a fresh nonpersistent Claude reviewer
+   with read/search tools only. Record runtime-supplied outside-sandbox evidence
+   and exact request, result, precursor, authorization, cleanup, and launcher
+   bindings. For degraded review these ordinary records are not authenticated
+   by an OS-protected key and the executable is basename-checked rather than
+   host-pinned, so they are best-effort evidence, not security-verifiable proof.
+   Neither component self-escalates or accepts arbitrary shell commands.
 7. Preserve each finding and use the canonical finding state machine. Apply a
    bounded objective correction only when it is behavior-preserving and
    evidence-backed; rerun affected checks and obtain a fresh review for every

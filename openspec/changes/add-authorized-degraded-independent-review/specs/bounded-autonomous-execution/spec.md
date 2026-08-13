@@ -43,8 +43,10 @@ messages, or unrelated mutation.
 - **WHEN** `independentReviewPolicy` is `strict-first-degraded`
 - **THEN** the effective authorization requires strict review first and, only
   after exact-package strict unavailability, permits a fresh transition-bound
-  degraded reviewer and the configured permission-gated launcher recovery for
-  the same change, head, manifest, expiration, and correction envelope
+  degraded reviewer and the configured permission-gated Codex or Claude
+  launcher recovery for the same change, head, manifest, expiration, and
+  correction envelope; the degraded launch evidence remains explicitly
+  non-security-verifiable
 
 #### Scenario: Runtime permission remains unavailable
 - **WHEN** the selected review policy authorizes launcher recovery but the

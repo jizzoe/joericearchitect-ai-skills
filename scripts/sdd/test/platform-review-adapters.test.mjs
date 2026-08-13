@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, classifyCodexExecutionFailure, createClaudeReviewSettings, degradedCapabilityLedger, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, unavailableReviewResult } from "../platform-review-adapters.mjs";
+import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, createClaudeReviewSettings, degradedCapabilityLedger, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, unavailableReviewResult } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 
@@ -96,6 +96,43 @@ test("Claude adapter uses a temporary strict sandbox configuration without inher
   assert.ok(invocation.args.includes("--no-session-persistence"));
   const probe = probeClaudeReviewAdapter();
   assert.equal(typeof probe.available, "boolean");
+});
+
+test("degraded Claude transport is fresh, read/search-only, and truthfully reduced-assurance", () => {
+  const schema = JSON.parse(fs.readFileSync(new URL("../../../schemas/independent-review-findings-v1.schema.json", import.meta.url), "utf8"));
+  const invocation = buildClaudeDegradedReviewInvocation({ view, schema });
+  assert.ok(invocation.args.includes("--safe-mode"));
+  assert.ok(invocation.args.includes("--no-session-persistence"));
+  assert.equal(invocation.args[invocation.args.indexOf("--tools") + 1], "Read,Glob,Grep");
+  assert.match(invocation.args[invocation.args.indexOf("--disallowed-tools") + 1], /Bash/);
+  assert.equal(invocation.environment.GH_TOKEN, "");
+});
+
+test("degraded Claude adapter seals findings with Claude-specific reduced-assurance evidence", () => {
+  const reviewPackage = packageFixture();
+  const strictResult = unavailableReviewResult("independent-reviewer-claude-sandbox-unavailable", { reviewPackage, adapter: "claude", reviewer: { type: "claude", identity: "strict-reviewer" }, attestationRef: "strict-attestation" });
+  const run = () => ({ status: 0, signal: null, stdout: JSON.stringify({ structured_output: { schemaVersion: 1, findings: [], status: "passed" } }), stderr: "" });
+  const output = runClaudeDegradedReviewAdapter({
+    reviewPackage,
+    view,
+    schemaPath: new URL("../../../schemas/independent-review-findings-v1.schema.json", import.meta.url),
+    reviewer: { type: "claude-degraded", identity: "degraded-reviewer" },
+    attestationRef: "degraded-attestation",
+    strictResult,
+    degradedAuthorization: { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only" },
+    executable: "claude",
+    run,
+    probe: () => ({ available: true })
+  });
+  assert.equal(output.status, "passed");
+  assert.equal(output.result.reviewer.adapter, "claude");
+  assert.ok(output.result.capabilityLedger.enforced.includes("disabledMutationTools"));
+  assert.equal(output.result.attestation.readOnly, false);
+});
+
+test("Claude sandbox denial receives a stable launcher-recovery code", () => {
+  assert.equal(classifyClaudeExecutionFailure({ stderr: "sandbox unavailable because failIfUnavailable was set" }), "independent-reviewer-claude-sandbox-unavailable");
+  assert.equal(classifyClaudeExecutionFailure({ stderr: "authentication failed" }), "independent-reviewer-claude-execution-unavailable");
 });
 
 test("unavailable transport output remains exact-head data and cannot claim isolation", () => {

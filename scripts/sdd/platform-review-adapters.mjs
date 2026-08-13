@@ -111,6 +111,21 @@ export function buildClaudeReviewInvocation({ executable = "claude", view, setti
   };
 }
 
+// Claude's degraded transport deliberately does not claim an OS sandbox. It
+// starts a fresh non-persistent process with only read/search tools exposed and
+// records the remaining boundary as reduced assurance.
+export function buildClaudeDegradedReviewInvocation({ executable = "claude", view, schema }) {
+  return {
+    executable,
+    args: ["--print", "--safe-mode", "--no-session-persistence", "--setting-sources", "",
+      "--strict-mcp-config", "--mcp-config", "{}", "--tools", "Read,Glob,Grep",
+      "--disallowed-tools", "Bash,Edit,Write,NotebookEdit,Task,Agent,WebFetch,WebSearch,MCP",
+      "--permission-mode", "dontAsk", "--output-format", "json", "--json-schema", JSON.stringify(schema),
+      "Review only the sealed package in this disposable detached view. Inspect the exact base-to-head diff and relevant committed files. Do not modify files, Git, credentials, network state, or external systems. Return only the required JSON findings payload without an intended conclusion."],
+    environment: { CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1", NO_COLOR: "1", GITHUB_TOKEN: "", GH_TOKEN: "", SSH_AUTH_SOCK: "", AWS_ACCESS_KEY_ID: "", AWS_SECRET_ACCESS_KEY: "", AWS_SESSION_TOKEN: "", NPM_TOKEN: "" }
+  };
+}
+
 export function probeClaudeReviewAdapter({ executable = "claude", attestationRef = "attestations/claude-sandbox-v1.json" } = {}) {
   if (process.platform === "win32") return { available: false, code: "independent-reviewer-claude-native-windows-unsupported" };
   if (!helpIncludes(executable, ["--help"], ["--print", "--settings", "--setting-sources", "--no-session-persistence", "--tools"])) {
@@ -152,6 +167,14 @@ export function classifyCodexExecutionFailure(execution = {}) {
     return "independent-reviewer-nested-app-server-denied";
   }
   return "independent-reviewer-codex-execution-unavailable";
+}
+
+export function classifyClaudeExecutionFailure(execution = {}) {
+  const output = `${execution.stdout ?? ""}\n${execution.stderr ?? ""}`;
+  if (/sandbox.*(?:unavailable|denied|operation not permitted)|failIfUnavailable/i.test(output)) {
+    return "independent-reviewer-claude-sandbox-unavailable";
+  }
+  return "independent-reviewer-claude-execution-unavailable";
 }
 
 function invoke(invocation, view, run) {
@@ -227,6 +250,62 @@ export function runCodexDegradedReviewAdapter({ reviewPackage, view, schemaPath,
   return { status: result.status, result, execution: { status: 0, signal: null, emittedResult: true } };
 }
 
+export function runClaudeDegradedReviewAdapter({ reviewPackage, view, schemaPath, reviewer, attestationRef, strictResult, degradedAuthorization, executable, run = spawnSync, probe = probeClaudeReviewAdapter }) {
+  const probeResult = probe({ executable, attestationRef });
+  if (!probeResult.available) return { status: "unavailable", result: unavailable(probeResult.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }) };
+  const startedAt = now();
+  let schema = null;
+  try { schema = JSON.parse(fs.readFileSync(schemaPath, "utf8")); } catch { schema = null; }
+  if (!schema) return { status: "unavailable", result: unavailable("independent-reviewer-claude-schema-unavailable", { reviewPackage, adapter: "claude", reviewer, attestationRef, startedAt }) };
+  const invocation = buildClaudeDegradedReviewInvocation({ executable, view, schema });
+  const execution = invoke(invocation, view, run);
+  const payload = parseJsonResult(execution.stdout);
+  if (execution.status !== 0 || !validFindingPayload(payload)) {
+    const code = classifyClaudeExecutionFailure(execution);
+    return { status: "unavailable", result: unavailable(code, { reviewPackage, adapter: "claude", reviewer, attestationRef, startedAt }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
+  }
+  const executionId = randomUUID();
+  const result = {
+    schemaVersion: 1,
+    reviewRecordId: `degraded-${executionId}`,
+    executionId,
+    reviewer: { type: reviewer.type, identity: reviewer.identity, adapter: "claude" },
+    attestation: { ref: attestationRef, nonInteractive: true, isolatedContext: false, freshContext: true, readOnly: false },
+    assuranceLevel: "authorized-degraded",
+    capabilityLedger: {
+      enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "disabledMutationTools"],
+      unavailable: [],
+      instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"]
+    },
+    strictUnavailable: {
+      reviewRecordId: strictResult.reviewRecordId,
+      executionId: strictResult.executionId,
+      adapter: strictResult.reviewer?.adapter ?? strictResult.reviewer?.type ?? "strict",
+      status: "unavailable",
+      unavailableCode: strictResult.unavailableCode,
+      baseCommit: reviewPackage.baseCommit,
+      headCommit: reviewPackage.headCommit,
+      manifestDigest: reviewPackage.manifestDigest
+    },
+    degradedAuthorization: {
+      change: degradedAuthorization.change,
+      transition: degradedAuthorization.transition,
+      expiresAt: degradedAuthorization.expiresAt,
+      riskReason: degradedAuthorization.riskReason,
+      fallbackBoundary: degradedAuthorization.fallbackBoundary
+    },
+    baseCommit: reviewPackage.baseCommit,
+    headCommit: reviewPackage.headCommit,
+    manifestDigest: reviewPackage.manifestDigest,
+    startedAt,
+    completedAt: now(),
+    findings: payload.findings,
+    status: payload.status,
+    unavailableCode: ""
+  };
+  return { status: result.status, result, execution: { status: 0, signal: null, emittedResult: true } };
+}
+
 export function runClaudeReviewAdapter({ reviewPackage, view, settingsPath, schema, reviewer, attestationRef, executable, run = spawnSync }) {
   const probe = probeClaudeReviewAdapter({ executable, attestationRef });
   if (!probe.available) return { status: "unavailable", result: unavailable(probe.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }) };
@@ -235,7 +314,7 @@ export function runClaudeReviewAdapter({ reviewPackage, view, settingsPath, sche
   const execution = invoke(invocation, view, run);
   const result = parseJsonResult(execution.stdout);
   if (execution.status !== 0 || !result) {
-    return { status: "unavailable", result: unavailable("independent-reviewer-claude-execution-unavailable", { reviewPackage, adapter: "claude", reviewer, attestationRef }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
+    return { status: "unavailable", result: unavailable(classifyClaudeExecutionFailure(execution), { reviewPackage, adapter: "claude", reviewer, attestationRef }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
   }
   return { status: result.status, result, execution: { status: 0, signal: null, emittedResult: true } };
 }

@@ -25,28 +25,34 @@ unavailable. Neither path changes ordinary user settings.
 
 ### Outer-sandbox launcher recovery
 
-If the managed implementation sandbox denies owned worktree creation or the
-nested Codex app-server, record `independent-review-view-create-failed` or
-`independent-reviewer-nested-app-server-denied`. A package-only retry is not an
-acceptable substitute. The runner may invoke only the configured
-`codex-detached-read-only-v1` launcher when the current change, transition,
-base, head, manifest, expiration, degraded authorization, launcher ID, and
-runtime permission all match.
+If the managed implementation sandbox denies owned worktree creation, the
+nested Codex app-server, or Claude's strict sandbox, record the applicable
+stable unavailable code. A package-only same-session retry is not an acceptable
+substitute. The runner may invoke only the configured
+`codex-detached-read-only-v1` or `claude-detached-restricted-v1` launcher when
+the current change, transition, base, head, manifest, expiration, degraded
+authorization, launcher ID, and runtime permission all match.
 
 The in-sandbox recovery controller validates authorization and emits only a
 digest-bound structured host request; it cannot create a worktree or invoke the
-reviewer. The trusted runtime must invoke the separately configured fixed host
-launcher outside the failed sandbox. That host has one operation: independently
-revalidate the request, create the owned detached exact-head view, write the
-sealed package, and start a fresh ephemeral Codex process with its inner sandbox
-set to `read-only`. It accepts no arbitrary command or shell text, scrubs
+reviewer. The runtime invokes the host launcher outside the failed sandbox.
+That host revalidates the request, creates the owned detached exact-head view,
+writes the sealed package, and starts either a fresh ephemeral Codex process
+with `read-only` requested or a fresh nonpersistent Claude process exposing
+only read/search tools. It accepts no arbitrary shell text, scrubs known
 mutation credentials, returns a request-bound normalized response, and removes
 only its ownership-guarded view.
 
 The controller accepts the response only when runtime-supplied execution
-evidence identifies the configured launcher, fixed host script, request digest,
-host execution, and outside-managed-sandbox boundary. Host self-attestation is
-not sufficient. Preparation may use the controller's current time, but the
+evidence identifies the configured launcher, host script, request digest, host
+execution, and outside-managed-sandbox boundary. In authorized degraded mode,
+that evidence and the executable path are caller-readable ordinary data: they
+are not cryptographically authenticated or host-pinned and cannot prove the
+boundary against an adversarial implementation process. The executable path is
+restricted to the expected `codex`/`codex.exe` or `claude`/`claude.exe`
+basename, but a substituted executable can impersonate that name. This known
+risk must be explicitly accepted and must never be described as strict or
+security-verified. Preparation may use the controller's current time, but the
 sealed host request carries no caller-selected clock: host execution and
 controller acceptance each recheck expiration against their own current clock.
 The parent-launch evidence and inner reviewer controls are

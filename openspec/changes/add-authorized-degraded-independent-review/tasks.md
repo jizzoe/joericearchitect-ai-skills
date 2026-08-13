@@ -20,10 +20,13 @@
   - Evidence: checkpoint/operation-authorization tests cover current exact-head success and every required pause condition.
 - [x] 2.4 Add a deterministic, permission-gated review-launcher recovery that detects outer-sandbox review-view or nested-app-server denial, creates the owned detached exact-head view only through the configured launcher, and preserves the inner ephemeral read-only reviewer boundary.
   - Depends on: 2.1, 2.2, 2.3.
-  - Evidence: synthetic launcher-denied and launcher-permitted tests prove controller/host separation, trusted-runtime outside-sandbox attestation, no self-escalation, no package-only substitute, sealed input, detached view, guarded cleanup, stable recovery codes, and inner reviewer mutation restrictions.
+  - Evidence: synthetic launcher-denied and launcher-permitted tests prove controller/host separation, recorded runtime outside-sandbox evidence, no self-escalation, no package-only substitute, sealed input, detached view, guarded cleanup, stable recovery codes, and inner reviewer mutation restrictions; accepted-risk evidence records that the runtime record is not cryptographic attestation.
 - [x] 2.5 Add a pure concise SDD-delivery request resolver that requires target, mode, quality profile, authorization profile, independent-review policy, and expiration; expand recognized presets into complete effective authorization and return one structured clarification for all missing or invalid inputs.
   - Depends on: 1.1, 2.4.
   - Evidence: focused tests cover complete production-rapid expansion, three-correction default, strict-only and strict-first-degraded behavior, duration normalization, missing fields, invalid values, conflicting inputs, and no pre-resolution mutation.
+- [x] 2.6 Add Claude degraded-review parity through the external-host recovery boundary and record the explicitly accepted non-security-verifiable evidence and executable-identity limitations for both launchers.
+  - Depends on: 2.4, owner accepted-risk decision.
+  - Evidence: deterministic Codex/Claude adapter and launcher tests, canonical documentation, and durable accepted-risk evidence prove strict behavior is unchanged and both degraded transports remain distinctly labelled.
 
 ## 3. Canonical documentation and portability
 

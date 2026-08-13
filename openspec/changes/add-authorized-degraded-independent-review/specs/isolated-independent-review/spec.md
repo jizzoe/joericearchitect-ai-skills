@@ -13,6 +13,10 @@ for the exact sealed package MAY an explicit valid authorized-degraded review
 authorization permit a fresh separate fallback under the
 `authorized-degraded-independent-review` capability; that fallback MUST never
 be described as strict isolation and MUST report all unproven restrictions.
+The degraded external-host path MAY support Codex or Claude, but its ordinary
+parent-launch evidence and basename-checked executable identity MUST be recorded
+as non-security-verifiable accepted risks. This exception MUST NOT weaken or
+relabel the strict adapter's isolation requirements.
 
 #### Scenario: Enforced reviewer isolation is available
 - **WHEN** a configured adapter proves fresh context, a pinned read-only view,
@@ -37,3 +41,10 @@ be described as strict isolation and MUST report all unproven restrictions.
   strict or degraded boundary
 - **THEN** the system records reviewer unavailability and pauses without using
   self-review or ordinary pull-request review as a substitute
+
+#### Scenario: Degraded launcher authenticity remains unverified
+- **WHEN** an explicitly authorized degraded Codex or Claude launcher produces
+  a fresh sealed-package review but cannot cryptographically prove the parent
+  launch or executable identity
+- **THEN** the result remains `authorized-degraded`, retains the exact accepted
+  risk, and cannot satisfy or be described as strict isolation

@@ -10,8 +10,11 @@ three materially different fixes for one signature, or strict unavailability
 unless an exact active degraded authorization applies. A degraded transition
 MUST retain strict unavailable evidence, `authorized-degraded` assurance, the
 authorization/risk record, expiration, and capability ledger; it MUST never be
-normalized to strict isolation. A new head MUST invalidate both prior strict
-and degraded review and repeat strict-first evaluation.
+normalized to strict isolation. For external-host recovery it MUST also retain
+the selected Codex or Claude launcher kind and disclose that parent-launch
+evidence and executable identity are not security-verifiable. A new head MUST
+invalidate both prior strict and degraded review and repeat strict-first
+evaluation.
 
 #### Scenario: Rereview follows an objective fix
 - **WHEN** an independent-review finding is corrected without changing approved

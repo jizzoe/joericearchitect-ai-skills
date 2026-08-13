@@ -6,19 +6,34 @@ import { validateDegradedIndependentReviewAuthorization } from "./degraded-indep
 import { canonicalJson, validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 
-const recoverableFailures = new Set([
-  "independent-review-view-create-failed",
-  "independent-reviewer-nested-app-server-denied"
-]);
-const boundary = "detached-exact-head-inner-read-only";
-const launcherKind = "codex-detached-read-only-v1";
 const hostScript = "scripts/sdd/review-launcher-host.mjs";
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const fail = (code, detail) => ({ allowed: false, status: "unavailable", code, ...(detail ? { detail } : {}) });
 
-function executableIsCodex(value) {
+const launcherDefinitions = Object.freeze({
+  "codex-detached-read-only-v1": Object.freeze({
+    executableNames: Object.freeze(["codex", "codex.exe"]),
+    boundary: "detached-exact-head-inner-read-only",
+    recoverableFailures: Object.freeze(["independent-review-view-create-failed", "independent-reviewer-nested-app-server-denied"]),
+    requiredCapability: "innerReadOnlySandbox",
+    innerBoundary: "read-only-sandbox"
+  }),
+  "claude-detached-restricted-v1": Object.freeze({
+    executableNames: Object.freeze(["claude", "claude.exe"]),
+    boundary: "detached-exact-head-read-tools-only",
+    recoverableFailures: Object.freeze(["independent-review-view-create-failed", "independent-reviewer-claude-sandbox-unavailable"]),
+    requiredCapability: "readToolsOnly",
+    innerBoundary: "read-search-tools-only"
+  })
+});
+
+export function reviewLauncherDefinition(kind) {
+  return launcherDefinitions[kind] ?? null;
+}
+
+function executableMatches(value, definition) {
   if (!text(value) || /[\r\n\0]/.test(value)) return false;
-  return ["codex", "codex.exe"].includes(value.split(/[\\/]/).at(-1).toLowerCase());
+  return definition.executableNames.includes(value.split(/[\\/]/).at(-1).toLowerCase());
 }
 
 export function reviewLauncherRequestDigest({ schemaVersion, launchId, request } = {}) {
@@ -29,20 +44,21 @@ export function reviewLauncherRequestDigest({ schemaVersion, launchId, request }
 export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, strictResult, launcher, runtime, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
   const packageCheck = validateReviewPackage(reviewPackage);
   if (!packageCheck.valid) return fail(packageCheck.issues[0].code);
-  if (!recoverableFailures.has(failureCode)) return fail("review-launcher-failure-not-recoverable", failureCode);
+  const definition = reviewLauncherDefinition(launcher?.kind);
+  if (!definition || !definition.recoverableFailures.includes(failureCode)) return fail("review-launcher-failure-not-recoverable", failureCode);
   if (strictResult?.status !== "unavailable" || strictResult.unavailableCode !== failureCode) return fail("review-launcher-strict-unavailable-mismatch");
   const degradedCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts, derivedCorrection, correctionEvidence, now });
   if (!degradedCheck.allowed) return fail(degradedCheck.issues[0].code);
   const record = authorization?.reviewLauncher;
   if (record?.enabled !== true) return fail("review-launcher-not-authorized");
   if (record.change !== selectedEntry || !Array.isArray(record.transitions) || !record.transitions.includes(transition)) return fail("review-launcher-scope-mismatch");
-  if (record.boundary !== boundary || record.launcherId !== launcher?.id) return fail("review-launcher-boundary-mismatch");
+  if (record.boundary !== definition.boundary || record.launcherId !== launcher?.id) return fail("review-launcher-boundary-mismatch");
   if (record.baseCommit !== reviewPackage.baseCommit || record.headCommit !== reviewPackage.headCommit || record.manifestDigest !== reviewPackage.manifestDigest) return fail("review-launcher-package-mismatch");
   const expires = Date.parse(record.expiresAt);
   const current = Date.parse(now);
   if (Number.isNaN(expires) || Number.isNaN(current) || expires <= current) return fail("review-launcher-authorization-expired");
-  if (launcher?.enabled !== true || launcher.kind !== launcherKind || launcher.hostScript !== hostScript || !executableIsCodex(launcher.executable) ||
-      launcher.detachedView !== true || launcher.innerReadOnlySandbox !== true || launcher.ephemeral !== true ||
+  if (launcher?.enabled !== true || launcher.hostScript !== hostScript || !executableMatches(launcher.executable, definition) ||
+      launcher.detachedView !== true || launcher[definition.requiredCapability] !== true || launcher.ephemeral !== true ||
       launcher.sealedPackageOnly !== true || launcher.credentialScrubbed !== true || launcher.nonInteractive !== true) {
     return fail("review-launcher-capability-unavailable");
   }
@@ -56,9 +72,9 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
     degradedAuthorization: degradedCheck.authorization,
     recovery: Object.freeze({
       launcherId: launcher.id,
-      launcherKind,
+      launcherKind: launcher.kind,
       hostScript,
-      boundary,
+      boundary: definition.boundary,
       selectedEntry,
       transition,
       baseCommit: reviewPackage.baseCommit,
@@ -66,7 +82,7 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
       manifestDigest: reviewPackage.manifestDigest,
       expiresAt: new Date(expires).toISOString(),
       parentLaunchPermission: "runtime-permitted",
-      innerSandbox: "read-only",
+      innerBoundary: definition.innerBoundary,
       sealedPackageOnly: true
     })
   };
@@ -91,7 +107,7 @@ export function prepareReviewLauncherRecovery(request, { launchId = randomUUID()
 function validRuntimeLaunchEvidence(value, prepared, response) {
   return value?.attestedBy === "trusted-runtime" && value.outsideManagedSandbox === true &&
     text(value.executionRef) && value.launcherId === prepared.expectedRecovery.launcherId &&
-    value.launcherKind === launcherKind && value.hostScript === hostScript &&
+    value.launcherKind === prepared.expectedRecovery.launcherKind && value.hostScript === hostScript &&
     value.requestDigest === prepared.hostRequest.requestDigest &&
     value.hostExecutionId === response?.hostExecutionId;
 }
@@ -105,7 +121,7 @@ export function acceptReviewLauncherHostResponse({ prepared, response, runtimeLa
   if (!preflight.allowed) return preflight;
   if (response?.allowed !== true || response.code !== "review-launcher-host-complete" ||
       response.launchId !== hostRequest.launchId || response.requestDigest !== requestDigest ||
-      response.launcherId !== preflight.recovery.launcherId || response.launcherKind !== launcherKind ||
+      response.launcherId !== preflight.recovery.launcherId || response.launcherKind !== preflight.recovery.launcherKind ||
       response.hostScript !== hostScript || !text(response.hostExecutionId)) return fail("review-launcher-host-response-invalid");
   if (!validRuntimeLaunchEvidence(runtimeLaunchEvidence, prepared, response)) return fail("review-launcher-runtime-attestation-missing");
   const request = hostRequest.request;
