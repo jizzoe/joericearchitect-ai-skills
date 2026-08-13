@@ -46,9 +46,7 @@ export function codexAuthenticationEnvironment(parentEnvironment = process.env) 
 function codexRestrictedReviewArguments() {
   return [
     "--config", "default_permissions=\"sealed-review\"",
-    "--config", "permissions.sealed-review.filesystem.\":minimal\"=\"read\"",
-    "--config", "permissions.sealed-review.filesystem.\":workspace_roots\".\".\"=\"read\"",
-    "--config", "permissions.sealed-review.network.enabled=false",
+    "--config", "permissions.sealed-review={filesystem={\":minimal\"=\"read\",\":workspace_roots\"={\".\"=\"read\"}},network={enabled=false}}",
     "--config", "shell_environment_policy.inherit=\"none\""
   ];
 }

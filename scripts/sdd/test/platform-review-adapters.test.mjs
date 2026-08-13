@@ -42,7 +42,7 @@ test("strict and degraded reviewer subprocesses receive only allowlisted operati
     assert.equal(receivedEnvironment.HOME, expectedHome, `${label} uses only its required authentication boundary`);
     if (label.startsWith("Codex")) {
       assert.ok(invocation.args.includes("default_permissions=\"sealed-review\""), `${label} uses a restricted OS permission profile`);
-      assert.ok(invocation.args.includes("permissions.sealed-review.filesystem.\":workspace_roots\".\".\"=\"read\""), `${label} restricts reads to its workspace and minimal runtime paths`);
+      assert.ok(invocation.args.includes("permissions.sealed-review={filesystem={\":minimal\"=\"read\",\":workspace_roots\"={\".\"=\"read\"}},network={enabled=false}}"), `${label} restricts reads to its workspace and minimal runtime paths`);
       assert.ok(invocation.args.includes("shell_environment_policy.inherit=\"none\""), `${label} denies authentication variables to model-generated commands`);
     } else {
       assert.notEqual(receivedEnvironment.HOME, parentEnvironment.HOME, `${label} rejects the caller home`);
@@ -66,8 +66,7 @@ test("Codex adapter uses a fresh read-only noninteractive transport without user
   const invocation = buildCodexReviewInvocation({ view, schemaPath: "/tmp/result-schema.json", resultPath: "/tmp/result.json" });
   assert.equal(invocation.args[0], "exec");
   assert.ok(invocation.args.includes("default_permissions=\"sealed-review\""));
-  assert.ok(invocation.args.includes("permissions.sealed-review.filesystem.\":minimal\"=\"read\""));
-  assert.ok(invocation.args.includes("permissions.sealed-review.filesystem.\":workspace_roots\".\".\"=\"read\""));
+  assert.ok(invocation.args.includes("permissions.sealed-review={filesystem={\":minimal\"=\"read\",\":workspace_roots\"={\".\"=\"read\"}},network={enabled=false}}"));
   assert.equal(invocation.args.includes("--sandbox"), false);
   assert.ok(invocation.args.includes("--ephemeral"));
   assert.ok(invocation.args.includes("--ignore-user-config"));

@@ -57,3 +57,10 @@ signature budget. It is recorded in
 `evidence/review-correction-reviewer-home-access.md`; its corrected head
 requires fresh strict-first review and is the fourth globally ordered
 correction but only the first for this signature.
+The first runtime exercise of that profile failed closed before review because
+split inline filesystem overrides did not deserialize as Codex's permission
+profile type. The behavior-preserving serialization correction preserves the
+same boundary as one accepted strict-config TOML inline table and is recorded
+in `evidence/review-correction-permission-profile-serialization.md`. Its
+corrected head requires fresh strict-first review and is the fifth globally
+ordered correction, first for its startup failure signature.

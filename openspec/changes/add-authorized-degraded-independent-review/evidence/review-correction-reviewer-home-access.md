@@ -59,9 +59,9 @@ signature is accepted; a fourth correction for one signature is rejected.
 - `node --test` — 203 passed.
 - Focused launcher, request, adapter, and lifecycle suite — 53 passed.
 - Focused authorization, execution, and recovery suite — 15 passed.
-- Codex `exec --strict-config` accepted the fixed inline permission profile
-  keys for minimal runtime reads, detached workspace reads, disabled tool
-  network, and no shell-environment inheritance.
+- After the separately recorded serialization correction, Codex accepted the
+  fixed inline permission profile for minimal runtime reads, detached workspace
+  reads, disabled tool network, and no shell-environment inheritance.
 - An isolated-home Codex authentication probe returned `Not logged in`, proving
   that the implementation must not silently substitute an empty home without a
   protected authentication channel; the selected permission-profile boundary
