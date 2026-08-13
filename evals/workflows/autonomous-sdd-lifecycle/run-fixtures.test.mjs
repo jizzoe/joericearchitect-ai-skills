@@ -14,6 +14,10 @@ test("lifecycle scenarios cover required gates and outcomes", () => {
     assert.equal(gates.has(gate), true, `missing ${gate} gate`);
   }
 
+  for (const id of ["independent-review-rereview", "independent-review-unavailable"]) {
+    assert.equal(scenarios.some((scenario) => scenario.id === id), true, `missing ${id} scenario`);
+  }
+
   for (const kind of ["complete", "incomplete", "ambiguous", "no-op", "stop"]) {
     assert.equal(kinds.has(kind), true, `missing ${kind} outcome`);
   }

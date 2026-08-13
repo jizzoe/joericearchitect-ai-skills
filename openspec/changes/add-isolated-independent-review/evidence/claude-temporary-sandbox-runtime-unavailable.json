@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "reviewRecordId": "unavailable-live-claude-20260813-025400",
+  "executionId": "claude-print-20260813-025400",
+  "reviewer": {
+    "type": "claude",
+    "identity": "claude-code-2.1.220",
+    "adapter": "claude"
+  },
+  "attestation": {
+    "ref": "claude-temporary-strict-sandbox-v1",
+    "nonInteractive": false,
+    "isolatedContext": false,
+    "freshContext": false,
+    "readOnly": false
+  },
+  "baseCommit": "90f571533be06ab6c1d626647851a2147dce6d16",
+  "headCommit": "91d9a0119325e2cf44e0645bd8b61d3ca3456bed",
+  "manifestDigest": "6d62ade60028f221dd7349300f56c084404512596806d9917694ba97c7ab3549",
+  "startedAt": "2026-08-13T02:53:00.000Z",
+  "completedAt": "2026-08-13T02:53:31.000Z",
+  "findings": [],
+  "status": "unavailable",
+  "unavailableCode": "independent-reviewer-claude-execution-unavailable"
+}

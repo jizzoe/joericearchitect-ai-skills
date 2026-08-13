@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import { validateReviewResult } from "./independent-review-contract.mjs";
 
 function readJson(path) {
   return JSON.parse(fs.readFileSync(path, "utf8"));
@@ -38,6 +39,12 @@ function invalidReviewRecord(input) {
         typeof record.transition !== "string" || !record.transition || !record.evidence ||
         record.entry !== entry.name) return "invalid-independent-review-record";
     seen.add(record.id);
+    if (record.result !== undefined) {
+      const result = validateReviewResult(record.result);
+      if (!result.valid || record.result.reviewRecordId !== record.id) return "invalid-independent-review-v1-record";
+      if (!record.reviewPackage || record.reviewPackage.manifestDigest !== record.result.manifestDigest ||
+          record.reviewPackage.baseCommit !== record.result.baseCommit || record.reviewPackage.headCommit !== record.result.headCommit) return "independent-review-v1-binding-mismatch";
+    }
   }
   return null;
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { operationVocabulary } from "../validation/validate-base-skill-contracts.mjs";
 import { inspectCheckpoint } from "./checkpoint.mjs";
-import { canonicalGitCommit, immutableReviewManifest, reviewInputMatchesGitDiff, validateIndependentReviewEvidence } from "./independent-review.mjs";
+import { canonicalGitCommit, immutableReviewManifest, reviewInputMatchesGitDiff, validateIndependentReviewEvidence, validateIndependentReviewV1 } from "./independent-review.mjs";
 
 export const profileOperations = {
   "research-read-only": new Set(["read-source", "write-findings", "write-sources", "write-result", "notify-state"]),
@@ -112,6 +112,16 @@ function durableReviewMatches(request) {
   return JSON.stringify(record.evidence) === JSON.stringify(request.independentReviewEvidence);
 }
 
+function durableReviewV1Matches(request) {
+  const entry = request.checkpoint?.selectedEntry;
+  const records = entry?.reviewRecords?.filter((candidate) => candidate.id === request.independentReviewResult?.reviewRecordId) ?? [];
+  const record = records[0];
+  return records.length === 1 && record?.entry === request.selectedEntry && record.transition === request.lifecycleAction &&
+    JSON.stringify(record.reviewPackage) === JSON.stringify(request.independentReviewPackage) &&
+    JSON.stringify(record.result) === JSON.stringify(request.independentReviewResult) &&
+    JSON.stringify(record.dispositions ?? []) === JSON.stringify(request.reviewDispositions ?? []);
+}
+
 function durableApplyEvidenceMatches(request) {
   const records = request.checkpoint?.selectedEntry?.applyEvidenceRecords;
   const supplied = request.applyEvidence;
@@ -129,7 +139,7 @@ function configuredReviewer(config, requested) {
       attestation.isolatedContext !== true || attestation.readOnly !== true ||
       requested?.type !== reviewer.type || requested?.identity !== reviewer.identity) return null;
   return { available: true, type: reviewer.type, identity: reviewer.identity,
-    nonInteractive: true, isolatedContext: true, readOnly: true };
+    attestation: { ref: attestation.ref }, nonInteractive: true, isolatedContext: true, readOnly: true };
 }
 
 function canonicalLifecycleCheckpointMatches(request) {
@@ -174,6 +184,16 @@ export function checkOperationAuthorization(input) {
     if (!nonEmpty(request.recovery)) return fail("missing-recovery", request.lifecycleAction);
     if (request.evidenceCurrent !== true) return fail("incomplete-lifecycle-evidence", request.lifecycleAction);
     if (request.deliveryProfile === "production-rapid") {
+      if (request.independentReviewPackage || request.independentReviewResult) {
+        if (!request.independentReviewPackage || !request.independentReviewResult) return fail("independent-review-v1-input-incomplete");
+        if (!durableApplyEvidenceMatches(request)) return fail("independent-review-apply-evidence-not-durable");
+        if (!durableReviewV1Matches(request)) return fail("independent-review-evidence-not-durable");
+        const reviewer = configuredReviewer(config, request.reviewer);
+        if (!reviewer) return fail("independent-reviewer-not-configured");
+        return validateIndependentReviewV1({ reviewer, implementerSession: request.implementerSession, reviewPackage: request.independentReviewPackage,
+          reviewResult: request.independentReviewResult, applyEvidence: request.applyEvidence, dispositions: request.reviewDispositions ?? [],
+          correctionAttempts: request.correctionAttempts ?? 0, seenRecordIds: new Set(request.seenReviewRecordIds ?? []) });
+      }
       const reviewInput = request.independentReviewInput;
       const manifest = immutableReviewManifest(reviewInput);
       if (!manifest || reviewInput.baseCommit !== request.baseCommit || reviewInput.headCommit !== request.headCommit) return fail("independent-review-input-incomplete");

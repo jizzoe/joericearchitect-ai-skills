@@ -1,0 +1,74 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import test from "node:test";
+import { buildClaudeReviewInvocation, buildCodexReviewInvocation, createClaudeReviewSettings, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeReviewAdapter, runCodexReviewAdapter, unavailableReviewResult } from "../platform-review-adapters.mjs";
+import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
+import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
+
+const packageFixture = () => {
+  const value = JSON.parse(fs.readFileSync(new URL("../../../evals/skills/independent-review/fixtures/valid-package.json", import.meta.url), "utf8"));
+  value.manifestDigest = packageDigest(value);
+  return value;
+};
+const view = { reviewPath: "/tmp/ai-skills-review-fixture/repository" };
+
+test("Codex adapter uses a fresh read-only noninteractive transport without user configuration", () => {
+  const invocation = buildCodexReviewInvocation({ view, schemaPath: "/tmp/result-schema.json", resultPath: "/tmp/result.json" });
+  assert.deepEqual(invocation.args.slice(0, 11), ["exec", "--sandbox", "read-only", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--cd", view.reviewPath, "--output-schema", "/tmp/result-schema.json", "--output-last-message"]);
+  const probe = probeCodexReviewAdapter();
+  assert.equal(typeof probe.available, "boolean");
+  if (probe.available) assert.equal(probe.capability.denied.delegatedMutation, true);
+});
+
+test("Claude adapter uses a temporary strict sandbox configuration without inherited settings", () => {
+  const settings = createClaudeReviewSettings(view);
+  assert.equal(settings.sandbox.failIfUnavailable, true);
+  assert.equal(settings.sandbox.allowUnsandboxedCommands, false);
+  assert.deepEqual(settings.sandbox.network.allowedDomains, []);
+  assert.deepEqual(settings.sandbox.filesystem.denyWrite, [view.reviewPath]);
+  const invocation = buildClaudeReviewInvocation({ view, settingsPath: "/tmp/temporary-settings.json", schema: { type: "object" } });
+  assert.ok(invocation.args.includes("--setting-sources"));
+  assert.equal(invocation.args[invocation.args.indexOf("--setting-sources") + 1], "");
+  assert.equal(invocation.args.includes("--bare"), false);
+  assert.ok(invocation.args.includes("--no-session-persistence"));
+  const probe = probeClaudeReviewAdapter();
+  assert.equal(typeof probe.available, "boolean");
+});
+
+test("unavailable transport output remains exact-head data and cannot claim isolation", () => {
+  const reviewPackage = packageFixture();
+  const result = unavailableReviewResult("independent-reviewer-codex-runtime-unavailable", { reviewPackage, adapter: "codex", reviewer: { type: "codex", identity: "codex-reviewer" }, attestationRef: "attestations/codex-read-only-v1.json" });
+  assert.equal(result.status, "unavailable");
+  assert.equal(result.attestation.readOnly, false);
+  assert.equal(validateReviewResult(result, { expectedPackage: reviewPackage, configuredReviewer: { type: "codex", identity: "codex-reviewer", attestation: { ref: "attestations/codex-read-only-v1.json" } }, implementerSession: "implementer" }).valid, true);
+});
+
+test("both adapters record an exact fail-closed unavailable result when no structured output exists", () => {
+  const reviewPackage = packageFixture();
+  const run = () => ({ status: 1, signal: null, stdout: "", stderr: "runtime unavailable" });
+  const codex = runCodexReviewAdapter({ reviewPackage, view, schemaPath: "/tmp/schema.json", resultPath: "/tmp/no-result.json", executable: "/missing-codex", reviewer: { type: "codex", identity: "codex-reviewer" }, attestationRef: "attestations/codex-read-only-v1.json", run });
+  const claude = runClaudeReviewAdapter({ reviewPackage, view, settingsPath: "/tmp/claude-settings-test.json", schema: { type: "object" }, executable: "/missing-claude", reviewer: { type: "claude", identity: "claude-reviewer" }, attestationRef: "attestations/claude-sandbox-v1.json", run });
+  for (const item of [codex, claude]) {
+    assert.equal(item.status, "unavailable");
+    assert.equal(item.result.status, "unavailable");
+    assert.equal(item.result.baseCommit, reviewPackage.baseCommit);
+    assert.equal(item.result.attestation.readOnly, false);
+  }
+});
+
+test("Codex and Claude shaped results use one validator and thin wrappers contain no policy", () => {
+  const reviewPackage = packageFixture();
+  for (const [adapter, identity, ref] of [["codex", "codex-reviewer", "attestations/codex-read-only-v1.json"], ["claude", "claude-reviewer", "attestations/claude-sandbox-v1.json"]]) {
+    const result = JSON.parse(fs.readFileSync(new URL("../../../evals/skills/independent-review/fixtures/valid-result.json", import.meta.url), "utf8"));
+    result.reviewer = { type: adapter, identity, adapter };
+    result.attestation.ref = ref;
+    result.manifestDigest = reviewPackage.manifestDigest;
+    assert.equal(validateReviewResult(result, { expectedPackage: reviewPackage, configuredReviewer: { type: adapter, identity, attestation: { ref } }, implementerSession: "implementer" }).valid, true);
+    const capability = normalizedReviewAdapterCapabilities({ adapter, attestationRef: ref, probeReference: `${adapter}-probe`, runtimeEnforced: true, freshContext: true, nonInteractive: true, readOnlyView: true, denied: { workspaceWrite: true, gitWrite: true, githubMutation: true, credentialAccess: true, authenticatedNetwork: true, externalSend: true, deployment: true, release: true, delegatedMutation: true } });
+    assert.equal(capability.valid, true);
+  }
+  for (const relative of [".agents/skills/independent-review/SKILL.md", ".claude/skills/independent-review/SKILL.md"]) {
+    const text = fs.readFileSync(new URL(`../../../${relative}`, import.meta.url), "utf8");
+    assert.doesNotMatch(text, /authorization|severity|disposition|jizzoe/i);
+  }
+});

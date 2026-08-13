@@ -99,4 +99,8 @@ test("configuration fixtures enforce strict keys, paths, adapter operations, sec
   assert.equal(has(validateAiSkillsConfig(malformedAdapter), "invalid-adapter-enabled"), true);
   const invalidOperation = fixture("valid-config.json"); invalidOperation.adapters["synthetic-adapter"].operations = ["external-send"];
   assert.equal(has(validateAiSkillsConfig(invalidOperation), "invalid-adapter-operation"), true);
+  const reviewConfig = fixture("valid-config.json"); reviewConfig.independentReview = { enabled: true, adapter: "fixture-reviewer", attestationRef: "review/attestation.json", reviewPath: "review-view", allowedCommands: ["git-diff"], artifactPaths: ["openspec/changes/example/proposal.md"], evidenceRoot: "evidence/reviews" };
+  assert.equal(validateAiSkillsConfig(reviewConfig).valid, true);
+  reviewConfig.independentReview.reviewPath = "/tmp/writeable";
+  assert.equal(has(validateAiSkillsConfig(reviewConfig), "unsafe-independent-review-path"), true);
 });

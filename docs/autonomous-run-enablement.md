@@ -1,0 +1,95 @@
+# Enabling Autonomous Runs Safely
+
+This guide enables the bounded autonomous workflow only when you deliberately
+start one. It does not change ordinary Codex or Claude Code sessions: those
+retain their normal manual-authorization behavior.
+
+The independent reviewer is a separate process. It receives a sealed committed
+review package and a disposable detached repository view. If the runtime cannot
+prove the required boundary, it returns `unavailable` and the delivery pauses.
+Do not replace that pause with self-review or a normal pull-request review.
+
+## One-Time Readiness
+
+Install current Codex CLI and/or Claude Code normally and make sure Git and
+OpenSpec are available to the repository. Do not put credentials, tokens,
+account identifiers, or absolute machine paths in repository configuration.
+
+### Codex
+
+Codex needs no global reviewer setting. The adapter starts a separate
+noninteractive `codex exec` process with an ephemeral session, ignored user
+configuration, and a read-only sandbox. It capability-checks that executable at
+the time of review.
+
+On macOS, the CLI uses its platform sandbox. If a read-only sandbox cannot run
+a required deterministic inspection on the installed host, the adapter records
+an unavailable result. Resolve the local runtime constraint or use a supported
+environment; do not weaken the sandbox.
+
+### Claude Code on macOS
+
+Claude Code's Bash sandbox uses macOS Seatbelt, so no separate sandbox package
+is required. The autonomous adapter creates a temporary settings file for the
+review process. It enables sandboxing, requires startup failure when it is not
+available, disables unsandboxed retries, denies review-view writes and home
+reads, denies sensitive environment variables, uses an empty network allowlist,
+and removes mutation-capable tools. It does not edit `~/.claude/settings.json`
+or the project's normal Claude settings.
+
+### Claude Code on Linux or WSL2
+
+Use Linux or WSL2, not WSL1. Install `bubblewrap` and `socat` with the
+distribution package manager. On Ubuntu 24.04 or later, make sure the host
+permits bubblewrap user namespaces; Claude Code's sandbox documentation gives
+the required AppArmor profile. The optional Anthropic sandbox runtime provides
+additional Unix-socket filtering. The adapter still performs its own runtime
+capability check and pauses when the sandbox cannot start.
+
+### Native Windows
+
+Claude Code's OS sandbox is not available on native Windows. Run the Claude
+reviewer in WSL2 or another supported isolated environment. A native-Windows
+Claude adapter result is intentionally `unavailable`.
+
+## Starting a Bounded Run
+
+### Codex
+
+1. Start a Codex Goal with `/goal`.
+2. Give it one bounded objective, exact queue/change selection, allowed local
+   and external mutations, evidence gates, expiration, and stopping conditions.
+3. Allow the independent-review skill only after current Apply evidence. The
+   skill creates the separate read-only reviewer itself; do not run the
+   implementation session as its reviewer.
+
+### Claude Code
+
+1. Start the bounded workflow in Claude Code's noninteractive mode (`--print`)
+   through the repository's autonomous runner entrypoint.
+2. Supply the same explicit bounded authorization and stopping conditions as a
+   Codex Goal.
+3. Let the independent-review adapter launch its own temporary-configured
+   noninteractive reviewer. Do not enable `/sandbox` globally and do not copy
+   the temporary settings into regular project settings.
+
+## What the Reviewer May Do
+
+The reviewer may read the detached committed view and run only configured,
+deterministic review commands. It may not write the workspace or Git state,
+mutate GitHub, read credentials, use authenticated network access, send
+messages, deploy or release, or delegate a mutation.
+
+An independent review does not grant authorization to merge, Sync, Archive,
+close an issue, update a Project, or delete a branch. Those transitions still
+need their separate current authorization, runtime permission, checkpoint, and
+validation gates.
+
+## Recovery
+
+For `unavailable`, malformed, stale, or non-isolated evidence, keep the
+implementation branch and evidence intact. Inspect the recorded unavailable
+code and local capability prerequisites, correct only a safe runtime or
+configuration problem, rerun affected checks, and create a fresh sealed package
+for the current head. A changed head always requires a new independent review.
+Do not reuse an old pass or silently broaden access.
