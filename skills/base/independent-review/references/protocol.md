@@ -37,7 +37,10 @@ stable unavailable code. A package-only same-session retry is not an acceptable
 substitute. The runner may invoke only the configured
 `codex-detached-read-only-v1` or `claude-detached-restricted-v1` launcher when
 the current change, transition, base, head, manifest, expiration, degraded
-authorization, launcher ID, and runtime permission all match.
+authorization, launcher ID, runtime permission, and non-empty distinct
+implementer/reviewer identities all match. The implementer identity is sealed
+into the digest-bound request; missing identity or self-review fails before
+view creation and is rechecked before response acceptance.
 
 The in-sandbox recovery controller validates authorization and emits only a
 digest-bound structured host request; it cannot create a worktree or invoke the

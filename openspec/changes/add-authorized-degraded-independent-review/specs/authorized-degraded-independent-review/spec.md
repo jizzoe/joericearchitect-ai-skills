@@ -110,6 +110,10 @@ The host MUST derive every declared artifact from a regular blob in the exact
 head's Git tree without following filesystem symlinks, and MUST inject the
 sealed package with exclusive-create semantics that reject any pre-existing
 file or symlink at the reserved package path.
+The controller and host MUST require non-empty distinct implementer and
+reviewer identities, bind the implementer identity into the digest-sealed
+request, and reject a missing identity or self-review before invocation and
+again before response acceptance.
 
 #### Scenario: Launcher permission is unavailable
 - **WHEN** a strict or degraded attempt fails because the outer sandbox denies
@@ -143,6 +147,12 @@ file or symlink at the reserved package path.
   already exists as a file or symlink in the exact-head view
 - **THEN** package derivation or injection fails closed without reading or
   writing the referenced target
+
+#### Scenario: Implementer identity is absent or matches the reviewer
+- **WHEN** launcher recovery lacks a non-empty implementer identity or the
+  configured reviewer identity equals it
+- **THEN** preflight, host execution, and response acceptance reject the
+  request without treating the review as independent
 
 ### Requirement: Degraded review preserves finding and recovery gates
 The system SHALL apply the existing blocker, high, material-decision, finding

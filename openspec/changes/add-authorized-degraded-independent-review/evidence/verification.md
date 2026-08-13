@@ -5,13 +5,13 @@
 | Dimension | Status |
 |---|---|
 | Completeness | 14/14 tasks evidenced; 9/9 requirements mapped |
-| Correctness | 9/9 requirements and 32/32 scenarios covered by implementation, deterministic tests/evals, or exercised runtime evidence |
+| Correctness | 9/9 requirements and 33/33 scenarios covered by implementation, deterministic tests/evals, or exercised runtime evidence |
 | Coherence | Design decisions followed; canonical assets remain assistant-neutral and wrappers remain thin |
 
 ## Completeness
 
 All implementation and evidence tasks are complete. The four delta
-specifications contain nine requirements and 32 scenarios. Coverage is mapped
+specifications contain nine requirements and 33 scenarios. Coverage is mapped
 as follows:
 
 - Precise authorization and per-signature correction envelope:

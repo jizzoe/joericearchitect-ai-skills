@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { packageDigest } from "../independent-review-contract.mjs";
 import { executeReviewLauncherHost } from "../review-launcher-host.mjs";
-import { acceptReviewLauncherHostResponse, prepareReviewLauncherRecovery, validateReviewLauncherRecovery } from "../review-launcher-recovery.mjs";
+import { acceptReviewLauncherHostResponse, prepareReviewLauncherRecovery, reviewLauncherRequestDigest, validateReviewLauncherRecovery } from "../review-launcher-recovery.mjs";
 
 const reviewPackage = (() => {
   const draft = { schemaVersion: 1, baseCommit: "1".repeat(40), headCommit: "2".repeat(40), diff: "diff --git a/file b/file\n", artifacts: [{ path: "file", sha256: "3".repeat(64), bytes: 4 }], validationEvidence: ["node --test: passed"] };
@@ -75,10 +75,37 @@ function runtimeEvidence(prepared, response, selectedLauncher = launcher) {
 
 test("recovery preflight requires exact authorization, fixed host, and runtime permission", () => {
   assert.equal(validateReviewLauncherRecovery(baseInput).allowed, true);
+  assert.equal(validateReviewLauncherRecovery({ ...baseInput, authorization: { ...authorization, implementerSession: undefined } }).code, "review-launcher-identity-binding-missing");
+  assert.equal(validateReviewLauncherRecovery({ ...baseInput, reviewer: { ...reviewer, identity: authorization.implementerSession } }).code, "review-launcher-self-review");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, runtime: {} }).code, "review-launcher-runtime-permission-required");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, launcher: { ...launcher, hostScript: "scripts/sdd/other.mjs" } }).code, "review-launcher-capability-unavailable");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, launcher: { ...launcher, executable: "/bin/sh" } }).code, "review-launcher-capability-unavailable");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, failureCode: "independent-reviewer-codex-execution-unavailable" }).code, "review-launcher-failure-not-recoverable");
+});
+
+test("host and acceptance reject missing or self-review identity bindings before trust", () => {
+  for (const [label, changedRequest, expectedCode] of [
+    ["missing implementer", { authorization: { ...authorization, implementerSession: undefined } }, "review-launcher-identity-binding-missing"],
+    ["self review", { reviewer: { ...reviewer, identity: authorization.implementerSession } }, "review-launcher-self-review"]
+  ]) {
+    const prepared = prepareReviewLauncherRecovery({ ...baseInput, ...changedRequest }, { launchId: `invalid-${label}` });
+    assert.equal(prepared.allowed, false, label);
+    assert.equal(prepared.code, expectedCode, label);
+  }
+
+  const prepared = prepareReviewLauncherRecovery(baseInput, { launchId: "valid-identity-binding" });
+  const { response } = hostRun(prepared);
+  for (const [mutate, expectedCode] of [
+    [(request) => { delete request.authorization.implementerSession; }, "review-launcher-identity-binding-missing"],
+    [(request) => { request.reviewer.identity = request.authorization.implementerSession; }, "review-launcher-self-review"]
+  ]) {
+    const tampered = structuredClone(prepared);
+    mutate(tampered.hostRequest.request);
+    tampered.hostRequest.requestDigest = reviewLauncherRequestDigest(tampered.hostRequest);
+    const hostRejected = executeReviewLauncherHost(tampered.hostRequest, { createView: () => { throw new Error("must reject before view creation"); } });
+    assert.equal(hostRejected.code, expectedCode);
+    assert.equal(acceptReviewLauncherHostResponse({ prepared: tampered, response, runtimeLaunchEvidence: runtimeEvidence(prepared, response) }).code, expectedCode);
+  }
 });
 
 test("controller prepares only a fixed external host request", () => {

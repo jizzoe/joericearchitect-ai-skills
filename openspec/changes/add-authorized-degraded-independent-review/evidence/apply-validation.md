@@ -6,7 +6,7 @@ self-referential commit literal.
 
 Passed current evidence:
 
-- `node --test` — 206 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, restricted reviewer home/credential access, per-signature correction enforcement including checkpoint resume, host package rederivation, symlink-safe package injection and Git-object artifact derivation, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
+- `node --test` — 207 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock expiration, required distinct implementer/reviewer identity binding, restricted reviewer home/credential access, per-signature correction enforcement including checkpoint resume, host package rederivation, symlink-safe package injection and Git-object artifact derivation, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
 - `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 54 focused launcher, request, adapter, and lifecycle tests pass.
 - `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 15 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running and per-signature correction budget enforcement.
 - `node scripts/sdd/check-adapter-drift.mjs` — canonical wrappers have no policy drift.
@@ -68,6 +68,12 @@ The separately authorized `review-package-write-symlink-escape` correction
 exclusively creates the host-injected package path, failing closed on a
 committed file or symlink without altering its external target. It is recorded
 in `evidence/review-correction-package-write-symlink.md` and is the sixth
+globally ordered correction, first for its failure signature.
+The separately authorized `review-launcher-missing-implementer-identity`
+correction requires and digest-binds a non-empty implementer identity and
+rejects equality with the configured reviewer at controller, external-host,
+and response-acceptance preflight. It is recorded in
+`evidence/review-correction-launcher-implementer-identity.md` and is the ninth
 globally ordered correction, first for its failure signature.
 The separately authorized `review-artifact-symlink-read-escape` correction
 derives declared artifact bytes only from regular Git blobs at the exact head,

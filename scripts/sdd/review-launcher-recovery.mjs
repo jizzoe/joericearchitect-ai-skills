@@ -41,9 +41,11 @@ export function reviewLauncherRequestDigest({ schemaVersion, launchId, request }
   return createHash("sha256").update(canonicalJson({ schemaVersion, launchId, request })).digest("hex");
 }
 
-export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, strictResult, launcher, runtime, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
+export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, strictResult, launcher, runtime, reviewer, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
   const packageCheck = validateReviewPackage(reviewPackage);
   if (!packageCheck.valid) return fail(packageCheck.issues[0].code);
+  if (!text(authorization?.implementerSession) || !text(reviewer?.identity)) return fail("review-launcher-identity-binding-missing");
+  if (authorization.implementerSession === reviewer.identity) return fail("review-launcher-self-review");
   const definition = reviewLauncherDefinition(launcher?.kind);
   if (!definition || !definition.recoverableFailures.includes(failureCode)) return fail("review-launcher-failure-not-recoverable", failureCode);
   if (strictResult?.status !== "unavailable" || strictResult.unavailableCode !== failureCode) return fail("review-launcher-strict-unavailable-mismatch");
