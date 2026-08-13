@@ -126,11 +126,12 @@ test("checkpoint inspection detects durable-state conflict", () => {
 });
 
 test("checkpoint correction limits apply per failure signature rather than globally", () => {
-  const correctionRecords = ["signature-a", "signature-a", "signature-a", "signature-b"].map((failureSignature, index) => ({
+  const correctionRecords = ["signature-a", "signature-a", "signature-a", "signature-b"].map((findingId, index) => ({
     id: `correction-${index + 1}`,
     change: "change",
     attempt: index + 1,
-    failureSignature,
+    failureSource: { kind: "independent-review", reviewRecordId: `review-${index + 1}`, findingId, severity: "high", evidence: "scripts/sdd/checkpoint.mjs", transition: "merge-pr" },
+    failureSignature: `independent-review/${findingId}/scripts/sdd/checkpoint.mjs/merge-pr`,
     classification: "objective-fix",
     behaviorPreserving: true,
     current: true,
@@ -144,7 +145,7 @@ test("checkpoint correction limits apply per failure signature rather than globa
   }));
   const checkpoint = { selectedEntry: { name: "change", records: [], correctionRecords }, steps: [{ id: "apply", status: "pending" }] };
   assert.equal(inspectCheckpoint(checkpoint).classification, "continue");
-  const exhausted = { ...checkpoint, selectedEntry: { ...checkpoint.selectedEntry, correctionRecords: correctionRecords.map((record, index) => index === 3 ? { ...record, failureSignature: "signature-a" } : record) } };
+  const exhausted = { ...checkpoint, selectedEntry: { ...checkpoint.selectedEntry, correctionRecords: correctionRecords.map((record, index) => index === 3 ? { ...record, failureSource: { ...record.failureSource, findingId: "signature-a" }, failureSignature: "independent-review/signature-a/scripts/sdd/checkpoint.mjs/merge-pr" } : record) } };
   assert.equal(inspectCheckpoint(exhausted).reason, "selected-entry-invalid-correction-records");
 });
 

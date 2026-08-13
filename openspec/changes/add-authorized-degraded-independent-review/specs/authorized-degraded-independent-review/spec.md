@@ -155,9 +155,12 @@ again before response acceptance.
   request without treating the review as independent
 
 ### Requirement: Degraded review preserves finding and recovery gates
-The system SHALL apply the existing blocker, high, material-decision, finding
-disposition, correction-budget, current-evidence, and rereview gates to
-authorized-degraded results. Every new head MUST repeat the strict-first
+The system SHALL keep finding severity separate from disposition and SHALL
+apply the existing human-decision, finding-disposition, correction-budget,
+current-evidence, and rereview gates to authorized-degraded results. A blocker
+or high-severity finding MUST NOT require human input solely because of its
+severity when its durable disposition is an in-scope, behavior-preserving,
+evidence-backed objective fix inside the correction budget. Every new head MUST repeat the strict-first
 decision; prior strict unavailability and degraded approval MUST NOT become
 general permission. Recovery MUST re-derive authorization, strict record,
 package, result, checkpoint, and transition state from durable evidence.
@@ -168,7 +171,14 @@ package, result, checkpoint, and transition state from durable evidence.
 - **THEN** affected checks run and strict review is retried before an active
   derived authorization can permit a fresh degraded review
 
-#### Scenario: Material finding or expired acceptance appears
-- **WHEN** a result has a blocker, high, material finding, expired acceptance,
-  or unavailable degraded reviewer
+#### Scenario: Human judgment or unavailable acceptance appears
+- **WHEN** a result requires a material product, architecture, security,
+  compatibility, licensing, governance, data-ownership, or scope decision, or
+  has expired acceptance or an unavailable degraded reviewer
 - **THEN** the runner pauses and preserves the branch and durable evidence
+
+#### Scenario: High-severity finding has an objective correction
+- **WHEN** a blocker or high finding has an in-scope, behavior-preserving,
+  evidence-backed objective fix inside its per-signature budget
+- **THEN** the runner applies the correction without a conversational pause,
+  reruns affected evidence, and obtains a fresh exact-head strict-first review

@@ -5,8 +5,8 @@ The lifecycle SHALL invoke and validate strict isolated independent review
 after Apply and after every behavior-preserving objective fix before a
 `production-rapid` delivery transition. It MUST bind the record to the exact
 base/head and sealed manifest, retain execution evidence, findings, and
-dispositions under a unique transition record, and pause on material findings,
-three materially different fixes for one signature, or strict unavailability
+dispositions under a unique transition record, and pause on findings requiring
+human judgment, three materially different fixes for one signature, or strict unavailability
 unless an exact active degraded authorization applies. A degraded transition
 MUST retain strict unavailable evidence, `authorized-degraded` assurance, the
 authorization/risk record, expiration, and capability ledger; it MUST never be

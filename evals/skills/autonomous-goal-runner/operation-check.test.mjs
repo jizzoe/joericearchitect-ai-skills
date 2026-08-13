@@ -19,16 +19,23 @@ function input(profile, operation, overrides = {}) {
   };
 }
 function code(result) { return result.issues[0]?.code; }
-function correctionRecord(attempt, failureSignature) {
+function failureSource(findingId = "new-signature", reviewRecordId = "review-current") {
+  return { kind: "independent-review", reviewRecordId, findingId, severity: "high", evidence: "scripts/sdd/check-operation-authorization.mjs", transition: "merge-pr" };
+}
+function signature(source) { return `independent-review/${source.findingId}/${source.evidence}/${source.transition}`; }
+function correctionRecord(attempt, source) {
   const commit = String(attempt).repeat(40);
   const previousCommit = String(Math.max(0, attempt - 1)).repeat(40);
-  return { id: `correction-${attempt}`, change: "example", attempt, failureSignature, classification: "objective-fix", behaviorPreserving: true, current: true, ancestryVerified: true, evidenceReference: `evidence:${attempt}`, baseCommit: "a".repeat(40), previousHead: previousCommit, previousManifestDigest: `${attempt - 1}`.repeat(64), headCommit: commit, manifestDigest: `${attempt}`.repeat(64) };
+  return { id: `correction-${attempt}`, change: "example", attempt, failureSignature: signature(source), failureSource: source, classification: "objective-fix", behaviorPreserving: true, current: true, ancestryVerified: true, evidenceReference: `evidence:${attempt}`, baseCommit: "a".repeat(40), previousHead: previousCommit, previousManifestDigest: `${attempt - 1}`.repeat(64), headCommit: commit, manifestDigest: `${attempt}`.repeat(64) };
 }
 function correction(overrides = {}) {
   const correctionRecords = overrides.correctionRecords ?? [];
+  const source = overrides.request?.failureSource ?? failureSource();
+  const finding = { id: source.findingId, severity: source.severity, evidence: source.evidence, recommendation: "correct deterministic gate" };
+  const reviewRecord = { id: source.reviewRecordId, entry: "example", transition: source.transition, evidence: {}, findings: [finding] };
   return {
     authorization: { target: { kind: "change", entries: ["example"] }, correctionBudgetPerFailureSignature: 3, ...overrides.authorization },
-    request: { selectedEntry: "example", failureSignature: "new-signature", checkpoint: { selectedEntry: { name: "example", records: [], correctionRecords }, steps: [] }, ...overrides.request }
+    request: { selectedEntry: "example", failureSource: source, checkpoint: { selectedEntry: { name: "example", records: [], reviewRecords: [reviewRecord], correctionAnchor: { baseCommit: "a".repeat(40), headCommit: "0".repeat(40), manifestDigest: "0".repeat(64) }, correctionRecords }, steps: [] }, ...overrides.request }
   };
 }
 
@@ -52,17 +59,21 @@ test("operation checker pauses for profile, authorization, target, adapter, runt
   assert.equal(code(checkOperationAuthorization(input("tracker-maintenance", "read-tracker", { request: { target: "record:tracker-1", adapter: "fixture" }, authorization: { targets: ["record:tracker-1"] } }))), "unauthorized-adapter");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "local-edit", { runtime: { permissionGaps: ["sandbox"] } }))), "runtime-permission-gap");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "local-edit", { authorization: { expiresAt: "2026-08-11T12:00:00.000Z" } }))), "expired-authorization");
-  const exhaustedRecords = [1, 2, 3].map((attempt) => correctionRecord(attempt, "new-signature"));
+  const exhaustedSource = failureSource();
+  const exhaustedRecords = [1, 2, 3].map((attempt) => correctionRecord(attempt, exhaustedSource));
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: exhaustedRecords })))), "correction-limit-exhausted");
 });
 
 test("objective correction derives per-signature attempts from the durable checkpoint", () => {
-  const records = [correctionRecord(1, "old-signature"), correctionRecord(2, "old-signature"), correctionRecord(3, "new-signature")];
-  const valid = correction({ correctionRecords: records, request: { correctionAttempts: 3, correctionAttemptsForFailureSignature: 1 } });
+  const oldSource = failureSource("old-signature", "review-old");
+  const newSource = failureSource();
+  const records = [correctionRecord(1, oldSource), correctionRecord(2, oldSource), correctionRecord(3, newSource)];
+  const valid = correction({ correctionRecords: records, request: { failureSource: newSource, correctionAttempts: 3, correctionAttemptsForFailureSignature: 1 } });
   assert.equal(checkOperationAuthorization(input("local-implementation", "objective-correction", valid)).allowed, true);
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: records, request: { correctionAttemptsForFailureSignature: 0 } })))), "correction-attempt-count-mismatch");
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: records, request: { correctionAttempts: 1 } })))), "correction-chain-length-mismatch");
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSignature: "new-signature" } }))), "correction-budget-invalid");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: records, request: { failureSource: newSource, correctionAttemptsForFailureSignature: 0 } })))), "correction-attempt-count-mismatch");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: records, request: { failureSource: newSource, correctionAttempts: 1 } })))), "correction-chain-length-mismatch");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSource: newSource } }))), "correction-budget-invalid");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: records, request: { failureSource: newSource, failureSignature: "renamed-signature" } })))), "correction-failure-signature-mismatch");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ request: { checkpoint: { selectedEntry: { name: "other", records: [], correctionRecords: [] }, steps: [] } } })))), "correction-entry-not-authorized");
 });
 

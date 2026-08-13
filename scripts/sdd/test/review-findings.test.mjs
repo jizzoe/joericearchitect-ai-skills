@@ -6,8 +6,9 @@ test("every finding requires a durable evidence-backed disposition", () => {
   assert.equal(validateFindingDispositions({ findings: [finding], dispositions: [] }).allowed, false);
   assert.equal(validateFindingDispositions({ findings: [finding], dispositions: [{ findingId: "f-1", kind: "objective-fix", evidence: "test failure" }] }).allowed, true);
 });
-test("material findings pause and corrections require a new head review", () => {
-  assert.equal(validateFindingDispositions({ findings: [{ ...finding, severity: "high" }], dispositions: [{ findingId: "f-1", kind: "objective-fix", evidence: "test failure" }] }).allowed, false);
+test("disposition rather than severity determines whether human judgment is required", () => {
+  assert.equal(validateFindingDispositions({ findings: [{ ...finding, severity: "high" }], dispositions: [{ findingId: "f-1", kind: "objective-fix", evidence: "bounded deterministic failure" }] }).allowed, true);
+  assert.equal(validateFindingDispositions({ findings: [{ ...finding, severity: "warning" }], dispositions: [{ findingId: "f-1", kind: "human-decision", evidence: "product behavior choice" }] }).issues[0].code, "independent-review-human-decision");
   assert.equal(validateFindingDispositions({ findings: [finding], dispositions: [{ findingId: "f-1", kind: "objective-fix", evidence: "test failure" }], correctionAttempts: 3 }).allowed, false);
   assert.deepEqual(nextReviewState({ priorHead: "a", currentHead: "b", findings: [], dispositions: [] }), { state: "rereview-required", reason: "head-changed" });
 });

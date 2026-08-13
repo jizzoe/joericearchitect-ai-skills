@@ -65,8 +65,10 @@ a validated sealed package containing only immutable canonical base/head object
 IDs, the exact re-derived diff, relevant OpenSpec artifacts, and current
 validation evidence; it MUST NOT contain inherited implementation-session
 history or a desired conclusion. The runner MUST reject self-review, writable
-reviewers, malformed or stale evidence, and unresolved blocker, high, or
-`objective-fix` findings. If and only if strict review produces durable
+reviewers, malformed or stale evidence, unresolved objective fixes, and
+findings dispositioned as requiring human judgment. Finding severity MUST
+remain separate from disposition and MUST NOT alone require a conversational
+pause. If and only if strict review produces durable
 unavailability, the runner MAY accept `authorized-degraded` evidence under the
 exact bounded authorization defined by the degraded-review capability. It MUST
 retain the strict result, authorization, risk reason, capability ledger,
@@ -100,6 +102,13 @@ head rather than from symlink-following working-tree reads.
   from the selected entry's validated durable correction chain
 - **THEN** the runner rejects the request and derives the per-signature limit
   only from that chain and the resolved authorization budget
+
+#### Scenario: Caller renames a failure to reset its budget
+- **WHEN** an objective-correction request supplies a failure signature that
+  differs from the signature derived from its durable review finding
+- **THEN** the runner rejects the request and counts attempts using the finding
+  ID, repository-relative evidence path, and transition recorded in durable
+  correction evidence
 
 #### Scenario: Warning or false positive remains reviewable
 - **WHEN** the implementer records a warning or false-positive disposition with

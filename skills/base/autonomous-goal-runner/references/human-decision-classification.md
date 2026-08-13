@@ -1,6 +1,7 @@
 # Human Decision Classification
 
-Classify every blocker or review finding before continuing. Use durable
+Classify every blocker or review finding before continuing. Severity describes
+impact and does not alone decide whether to pause. Use durable
 evidence and the active authorization; do not infer permission from a prior
 chat message alone.
 
@@ -33,6 +34,8 @@ behavior-preserving, such as:
 - missing task evidence that can be produced without changing approved
   behavior
 - review findings with a narrow fix and no new product decision
+- blocker or high findings whose evidence supports a scoped,
+  behavior-preserving objective fix inside the correction budget
 - warnings that are explicitly accepted by the approved plan or verification
   evidence
 

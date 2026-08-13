@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { operationVocabulary } from "../validation/validate-base-skill-contracts.mjs";
 import { inspectCheckpoint } from "./checkpoint.mjs";
+import { canonicalFailureSignature } from "./correction-chain.mjs";
 import { canonicalGitCommit, immutableReviewManifest, reviewInputMatchesGitDiff, validateIndependentReviewEvidence, validateIndependentReviewV1 } from "./independent-review.mjs";
 
 export const profileOperations = {
@@ -182,7 +183,8 @@ function canonicalLifecycleCheckpointMatches(request) {
 function durableCorrectionState(authorization, request) {
   const budget = authorization.correctionBudgetPerFailureSignature;
   if (!Number.isInteger(budget) || budget < 0 || budget > 3) return fail("correction-budget-invalid");
-  if (!nonEmpty(request.selectedEntry) || !nonEmpty(request.failureSignature)) return fail("correction-context-incomplete");
+  const failureSignature = canonicalFailureSignature(request.failureSource);
+  if (!nonEmpty(request.selectedEntry) || !failureSignature) return fail("correction-context-incomplete");
   const authorizedEntries = new Set([
     ...(Array.isArray(authorization.target?.entries) ? authorization.target.entries : []),
     ...(nonEmpty(authorization.derivedTargets?.selectedEntry) ? [authorization.derivedTargets.selectedEntry] : [])
@@ -196,15 +198,26 @@ function durableCorrectionState(authorization, request) {
   }
   const records = request.checkpoint?.selectedEntry?.correctionRecords;
   if (!Array.isArray(records)) return fail("correction-checkpoint-not-valid", "selected-entry-invalid-correction-records");
-  const attemptsForSignature = records.filter((record) => record.failureSignature === request.failureSignature).length;
+  const reviewRecords = request.checkpoint?.selectedEntry?.reviewRecords ?? [];
+  const sourceRecords = reviewRecords.filter((record) => record?.id === request.failureSource.reviewRecordId &&
+    record.transition === request.failureSource.transition);
+  const durableFindings = sourceRecords[0]?.result?.findings ?? sourceRecords[0]?.findings;
+  const sourceFindings = durableFindings?.filter((finding) =>
+    finding.id === request.failureSource.findingId && finding.severity === request.failureSource.severity &&
+    finding.evidence === request.failureSource.evidence) ?? [];
+  if (sourceRecords.length !== 1 || sourceFindings.length !== 1) return fail("correction-failure-source-not-durable", failureSignature);
+  if (request.failureSignature !== undefined && request.failureSignature !== failureSignature) {
+    return fail("correction-failure-signature-mismatch", failureSignature);
+  }
+  const attemptsForSignature = records.filter((record) => record.failureSignature === failureSignature).length;
   if (request.correctionAttemptsForFailureSignature !== undefined &&
       request.correctionAttemptsForFailureSignature !== attemptsForSignature) {
-    return fail("correction-attempt-count-mismatch", request.failureSignature);
+    return fail("correction-attempt-count-mismatch", failureSignature);
   }
   if (request.correctionAttempts !== undefined && request.correctionAttempts !== records.length) {
-    return fail("correction-chain-length-mismatch", request.failureSignature);
+    return fail("correction-chain-length-mismatch", failureSignature);
   }
-  if (attemptsForSignature >= budget) return fail("correction-limit-exhausted", request.failureSignature);
+  if (attemptsForSignature >= budget) return fail("correction-limit-exhausted", failureSignature);
   return null;
 }
 

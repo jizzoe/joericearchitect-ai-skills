@@ -65,9 +65,12 @@ not select work or mutate local or external state first.
    sealed immutable v1 package; never supply inherited context or an intended
    conclusion. A current schema-validated result, durable dispositions, and a
    fresh exact-head review are required before the named delivery transition.
-   Reject unavailable, mutable, malformed, stale, self-review, blocker, high,
-   and unresolved objective-fix outcomes. GitHub review publication is optional
-   and cannot replace this gate.
+   Reject unavailable, mutable, malformed, stale, self-review, unresolved
+   objective-fix, and human-decision outcomes. Severity describes impact; it
+   does not independently require a conversational pause. Correct a high-
+   severity objective finding autonomously only when the fix is scoped,
+   behavior-preserving, evidence-backed, and inside the correction budget.
+   GitHub review publication is optional and cannot replace this gate.
 
 ## Progressive References
 

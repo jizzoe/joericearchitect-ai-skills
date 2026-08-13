@@ -1,4 +1,3 @@
-const materialTerms = /requirement|architecture|security|compatib|licens|governance|scope/i;
 const allowed = new Set(["objective-fix", "warning", "false-positive", "human-decision"]);
 const severity = new Set(["blocker", "high", "objective-fix", "warning", "false-positive"]);
 const text = (value) => typeof value === "string" && value.trim().length > 0;
@@ -12,7 +11,7 @@ export function validateFindingDispositions({ findings, dispositions, correction
     ids.add(finding.id);
     const disposition = dispositions.find((item) => item?.findingId === finding.id);
     if (!disposition || !allowed.has(disposition.kind) || !text(disposition.evidence)) return pause("independent-review-disposition-missing", finding.id);
-    if (finding.severity === "blocker" || finding.severity === "high" || materialTerms.test(`${finding.recommendation ?? ""} ${disposition.evidence}`) || disposition.kind === "human-decision") return pause("independent-review-human-decision", finding.id);
+    if (disposition.kind === "human-decision") return pause("independent-review-human-decision", finding.id);
     const signature = disposition.failureSignature ?? finding.id;
     const signatureAttempts = correctionAttemptsByFailureSignature?.[signature] ?? correctionAttempts;
     if (disposition.kind === "objective-fix" && Number(signatureAttempts) >= 3) return pause("correction-limit-exhausted", signature);

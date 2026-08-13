@@ -106,8 +106,11 @@ read-only repository adapter for the recorded base/head and reject mismatches;
 duplicate review record IDs are durable conflicts. After a behavior-preserving objective fix,
 rerun affected evidence and review the new head; stop after three materially
 different fixes for one failure signature or on a material decision. An
-unavailable, self, malformed, stale, wrong-head, mutable, blocker, or high
-objective-fix review pauses the transition. GitHub publication is optional.
+unavailable, self, malformed, stale, wrong-head, or mutable review pauses the
+transition. Findings pause for human input when their durable disposition
+requires human judgment; high-severity objective findings instead use the
+bounded correction and exact-head rereview loop. Unresolved objective fixes
+still block delivery. GitHub publication is optional.
 The delivery evaluator compares reviewer identity/type to configured
 adapter-attested non-interactive, isolated read-only capability; request flags
 do not create reviewer authority. It resolves supplied lowercase full object

@@ -1,3 +1,5 @@
+import { canonicalFailureSignature } from "./correction-chain.mjs";
+
 const commit = (value) => typeof value === "string" && /^[0-9a-f]{40}$/.test(value);
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const fail = (code) => ({ allowed: false, classification: "paused", issues: [{ code }] });
@@ -15,14 +17,15 @@ function validCorrectionChain(records, record, authorizationRecord, selectedEntr
   const attemptsByFailureSignature = new Map();
   for (let index = 0; index < records.length; index += 1) {
     const item = records[index];
+    const failureSignature = canonicalFailureSignature(item?.failureSource);
     if (!item || item.attempt !== index + 1 || item.change !== selectedEntry || item.classification !== "objective-fix" ||
         item.behaviorPreserving !== true || item.current !== true || item.ancestryVerified !== true ||
-        !text(item.id) || !text(item.failureSignature) || !text(item.evidenceReference) ||
+        !text(item.id) || !failureSignature || item.failureSignature !== failureSignature || !text(item.evidenceReference) ||
         item.baseCommit !== reviewPackage.baseCommit || item.previousHead !== priorHead ||
         item.previousManifestDigest !== priorManifest || !commit(item.headCommit) || !text(item.manifestDigest)) return false;
-    const signatureAttempts = (attemptsByFailureSignature.get(item.failureSignature) ?? 0) + 1;
+    const signatureAttempts = (attemptsByFailureSignature.get(failureSignature) ?? 0) + 1;
     if (signatureAttempts > 3) return false;
-    attemptsByFailureSignature.set(item.failureSignature, signatureAttempts);
+    attemptsByFailureSignature.set(failureSignature, signatureAttempts);
     priorHead = item.headCommit;
     priorManifest = item.manifestDigest;
   }

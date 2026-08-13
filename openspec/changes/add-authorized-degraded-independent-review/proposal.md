@@ -31,6 +31,10 @@ Primary GitHub issue: [#84](https://github.com/jizzoe/joericearchitect-ai-skills
   security-verified; retain these as known risks, not resolved findings.
 - Preserve existing finding disposition, correction-budget, verification,
   recovery, and strict fail-closed behavior for all un-authorized runs.
+- Make human-pause behavior disposition-driven: high-severity objective fixes
+  use the same bounded correction and rereview loop, while findings requiring
+  product, security, architecture, compatibility, licensing, governance,
+  data-ownership, or scope judgment pause for the owner.
 
 ## Scope
 

@@ -95,9 +95,11 @@ detached view, non-mutation boundary, authorization, or expiration returns
 ## Feedback and Recovery
 
 Keep reviewer findings immutable. Store an evidence-backed implementer
-disposition separately. Blocker, high, and material findings require a human
-decision. An objective fix must be in scope, behavior-preserving, and within
-the per-signature correction limit. A changed head invalidates every previous
+disposition separately. Severity and disposition are independent: severity
+describes impact, while `human-decision` identifies a finding that requires
+human judgment. A high-severity objective fix does not require a conversational
+pause when it is in scope, behavior-preserving, evidence-backed, and within the
+per-signature correction limit. A changed head invalidates every previous
 passing result, so rerun affected checks, rebuild the package, and invoke a
 fresh reviewer.
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import { validateReviewResult } from "./independent-review-contract.mjs";
+import { canonicalFailureSignature } from "./correction-chain.mjs";
 
 function readJson(path) {
   return JSON.parse(fs.readFileSync(path, "utf8"));
@@ -96,17 +97,18 @@ function invalidCorrectionRecord(input) {
   const attemptsByFailureSignature = new Map();
   for (let index = 0; index < entry.correctionRecords.length; index += 1) {
     const record = entry.correctionRecords[index];
+    const failureSignature = canonicalFailureSignature(record?.failureSource);
     if (!record || typeof record.id !== "string" || !record.id || seen.has(record.id) ||
         record.change !== entry.name || record.attempt !== index + 1 || record.classification !== "objective-fix" ||
         record.behaviorPreserving !== true || record.current !== true || record.ancestryVerified !== true ||
-        typeof record.failureSignature !== "string" || !record.failureSignature ||
+        !failureSignature || record.failureSignature !== failureSignature ||
         typeof record.evidenceReference !== "string" || !record.evidenceReference ||
         !commitReference(record.baseCommit) || !commitReference(record.previousHead) || !commitReference(record.headCommit) ||
         typeof record.previousManifestDigest !== "string" || !record.previousManifestDigest ||
         typeof record.manifestDigest !== "string" || !record.manifestDigest) return "invalid-objective-correction-record";
-    const signatureAttempts = (attemptsByFailureSignature.get(record.failureSignature) ?? 0) + 1;
+    const signatureAttempts = (attemptsByFailureSignature.get(failureSignature) ?? 0) + 1;
     if (signatureAttempts > 3) return "selected-entry-invalid-correction-records";
-    attemptsByFailureSignature.set(record.failureSignature, signatureAttempts);
+    attemptsByFailureSignature.set(failureSignature, signatureAttempts);
     seen.add(record.id);
   }
   return null;

@@ -144,7 +144,10 @@ only. They remain recorded as accepted risks, not resolved controls. The result
 is a best-effort fresh independent quality signal and is never described as
 strict, OS-isolated, read-only-enforced, or security-verified. Strict review is
 unchanged, still attempted first, and still requires its verified adapter
-boundary. Any other blocker/high finding remains subject to the normal pause.
+boundary. Finding severity remains separate from disposition: an objective,
+behavior-preserving correction may proceed within budget regardless of
+severity, while a finding classified `human-decision` remains subject to the
+normal pause.
 
 Alternative: add a trusted launcher service, protected key/capability,
 authenticated IPC, executable pinning, rotation/audit lifecycle, and equivalent
