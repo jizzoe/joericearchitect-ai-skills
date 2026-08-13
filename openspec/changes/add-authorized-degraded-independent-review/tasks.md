@@ -15,7 +15,7 @@
 - [x] 2.2 Add the degraded adapter boundary with a detached committed view, sealed-package-only input, fixed allowlisted inspection path, environment/tool scrubbing, and truthful enforced/unavailable/instruction-constrained capability ledger.
   - Depends on: 2.1.
   - Evidence: synthetic adapter tests reject same-session, mutable, credential, GitHub, deployment, release, external-send, and delegated-mutation paths.
-- [ ] 2.3 Extend checkpoint and delivery-gate validation to retain and re-derive assurance, strict precursor, authorization, findings, dispositions, and derived-head envelope evidence.
+- [x] 2.3 Extend checkpoint and delivery-gate validation to retain and re-derive assurance, strict precursor, authorization, findings, dispositions, and derived-head envelope evidence.
   - Depends on: 1.1, 1.2.
   - Evidence: checkpoint/operation-authorization tests cover current exact-head success and every required pause condition.
 
@@ -30,7 +30,7 @@
 
 ## 4. Verification and delivery evidence
 
-- [ ] 4.1 Run focused contract, adapter, checkpoint, authorization, eval, schema, secret, attribution, portability, and adapter-drift checks; record current Apply evidence and map each requirement/scenario to evidence.
+- [x] 4.1 Run focused contract, adapter, checkpoint, authorization, eval, schema, secret, attribution, portability, and adapter-drift checks; record current Apply evidence and map each requirement/scenario to evidence.
   - Depends on: 3.1, 3.2.
   - Evidence: current command output and requirements mapping under the change evidence directory.
 - [ ] 4.2 Obtain current-head independent review using strict first and the one-time queue-1 bootstrap only if strict isolation is unavailable; preserve the sealed package, strict unavailable record, exact authorization, degraded result/ledger, findings, dispositions, transition, and expiration.
