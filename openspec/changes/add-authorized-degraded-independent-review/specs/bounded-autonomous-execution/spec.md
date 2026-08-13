@@ -95,6 +95,12 @@ head rather than from symlink-following working-tree reads.
 - **THEN** the prior result is stale, strict review is attempted for the new
   exact head, and degraded review is eligible only inside its derived envelope
 
+#### Scenario: Caller understates prior correction attempts
+- **WHEN** an objective-correction request supplies a counter that differs
+  from the selected entry's validated durable correction chain
+- **THEN** the runner rejects the request and derives the per-signature limit
+  only from that chain and the resolved authorization budget
+
 #### Scenario: Warning or false positive remains reviewable
 - **WHEN** the implementer records a warning or false-positive disposition with
   cited evidence

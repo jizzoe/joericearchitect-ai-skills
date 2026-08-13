@@ -179,6 +179,35 @@ function canonicalLifecycleCheckpointMatches(request) {
   return requiredKinds.every((kind) => kinds.filter((value) => value === kind).length >= (kind === "branch" && request.lifecycleAction === "delete-merged-topic-branch" ? 2 : 1));
 }
 
+function durableCorrectionState(authorization, request) {
+  const budget = authorization.correctionBudgetPerFailureSignature;
+  if (!Number.isInteger(budget) || budget < 0 || budget > 3) return fail("correction-budget-invalid");
+  if (!nonEmpty(request.selectedEntry) || !nonEmpty(request.failureSignature)) return fail("correction-context-incomplete");
+  const authorizedEntries = new Set([
+    ...(Array.isArray(authorization.target?.entries) ? authorization.target.entries : []),
+    ...(nonEmpty(authorization.derivedTargets?.selectedEntry) ? [authorization.derivedTargets.selectedEntry] : [])
+  ]);
+  if (!authorizedEntries.has(request.selectedEntry) || request.checkpoint?.selectedEntry?.name !== request.selectedEntry) {
+    return fail("correction-entry-not-authorized", request.selectedEntry);
+  }
+  const checkpoint = inspectCheckpoint(request.checkpoint ?? {});
+  if (checkpoint.classification === "human-decision" || checkpoint.classification === "stale-evidence") {
+    return fail("correction-checkpoint-not-valid", checkpoint.reason);
+  }
+  const records = request.checkpoint?.selectedEntry?.correctionRecords;
+  if (!Array.isArray(records)) return fail("correction-checkpoint-not-valid", "selected-entry-invalid-correction-records");
+  const attemptsForSignature = records.filter((record) => record.failureSignature === request.failureSignature).length;
+  if (request.correctionAttemptsForFailureSignature !== undefined &&
+      request.correctionAttemptsForFailureSignature !== attemptsForSignature) {
+    return fail("correction-attempt-count-mismatch", request.failureSignature);
+  }
+  if (request.correctionAttempts !== undefined && request.correctionAttempts !== records.length) {
+    return fail("correction-chain-length-mismatch", request.failureSignature);
+  }
+  if (attemptsForSignature >= budget) return fail("correction-limit-exhausted", request.failureSignature);
+  return null;
+}
+
 export function checkOperationAuthorization(input) {
   const { authorization = {}, runtime = {}, config = {}, request = {} } = input;
   const profile = request.profile;
@@ -203,8 +232,10 @@ export function checkOperationAuthorization(input) {
   if (runtime.permissionGaps?.length || (Array.isArray(runtime.permittedOperations) && !runtime.permittedOperations.includes(operation))) return fail("runtime-permission-gap", operation);
   if (request.adapter && !authorization.targets?.includes(`adapter:${request.adapter}`)) return fail("unauthorized-adapter", request.adapter);
   if (request.adapter && !adapterAllows(config, runtime, request.adapter, operation)) return fail("adapter-capability-mismatch", request.adapter);
-  const correctionAttemptsForSignature = request.correctionAttemptsForFailureSignature ?? request.correctionAttempts ?? 0;
-  if (operation === "objective-correction" && Number(correctionAttemptsForSignature) >= 3) return fail("correction-limit-exhausted");
+  if (operation === "objective-correction") {
+    const correctionIssue = durableCorrectionState(authorization, request);
+    if (correctionIssue) return correctionIssue;
+  }
   if (operation === "run-lifecycle-action" && !lifecycleActions.has(request.lifecycleAction)) return fail("unnamed-or-unsupported-lifecycle-action");
   if (highImpactLifecycleActions.has(request.lifecycleAction)) {
     if (profile !== "sdd-delivery") return fail("high-impact-action-profile-mismatch", request.lifecycleAction);

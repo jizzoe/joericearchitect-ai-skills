@@ -60,6 +60,12 @@ authorized target, configured adapter capability when an adapter is used, and
 active runtime permission. A correction still stops after three materially
 different attempts for the same failure signature.
 
+Objective-correction authorization derives both the total chain length and
+the attempts for the named failure signature from the validated durable
+selected-entry checkpoint. Any supplied counters must match those derived
+values, and the limit comes from the resolved authorization's per-signature
+budget; caller-selected counters cannot reset or widen it.
+
 For every high-impact SDD transition, the checker also requires a supported
 delivery profile that exactly matches the quality profile in the resolved
 durable authorization. A caller cannot omit or substitute that field to bypass

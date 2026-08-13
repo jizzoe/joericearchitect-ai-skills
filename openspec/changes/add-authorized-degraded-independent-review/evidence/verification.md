@@ -5,13 +5,13 @@
 | Dimension | Status |
 |---|---|
 | Completeness | 14/14 tasks evidenced; 9/9 requirements mapped |
-| Correctness | 9/9 requirements and 33/33 scenarios covered by implementation, deterministic tests/evals, or exercised runtime evidence |
+| Correctness | 9/9 requirements and 35/35 scenarios covered by implementation, deterministic tests/evals, or exercised runtime evidence |
 | Coherence | Design decisions followed; canonical assets remain assistant-neutral and wrappers remain thin |
 
 ## Completeness
 
 All implementation and evidence tasks are complete. The four delta
-specifications contain nine requirements and 33 scenarios. Coverage is mapped
+specifications contain nine requirements and 35 scenarios. Coverage is mapped
 as follows:
 
 - Precise authorization and per-signature correction envelope:
@@ -42,18 +42,21 @@ as follows:
 
 ## Correctness
 
-The exact-head runtime review first recorded strict detached-view
+An earlier exact-head runtime review first recorded strict detached-view
 unavailability, then accepted one fresh `authorized-degraded` result under the
 owner's exact bounded authorization. The result was bound to base, head,
 manifest, transition, expiration, reviewer, capability ledger, request digest,
-host execution, and cleanup; it returned no findings. This evidence never
-describes degraded review as strict or security-verified.
+host execution, and cleanup. Later fresh reviews produced the immutable
+findings and authorized objective-correction chain recorded under `evidence/`;
+the current head therefore still requires its own fresh strict-first result.
+No evidence describes degraded review as strict or security-verified.
 
 Deterministic tests cover positive and negative scenarios for absent, expired,
 wrong-transition, stale, malformed, mutable, self-review, capability, runtime-
 permission, launcher, Claude/Codex, correction-envelope, secret, unsafe-path,
-symlink, and portability boundaries. `node --test` passed 206 tests at the
-verified implementation head. `openspec validate --all --strict` passed all 22
+symlink, durable delivery-profile, correction-counter, and portability
+boundaries. `node --test` passed 209 tests in a clean exact-head clone.
+`openspec validate --all --strict` passed all 22
 items. Adapter drift, skill metadata, shared guardrails, artifact quality,
 whitespace, secret-pattern, attribution, portability, and recovery reviews
 passed.
