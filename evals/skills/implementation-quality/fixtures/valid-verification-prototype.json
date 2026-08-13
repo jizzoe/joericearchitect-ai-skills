@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "skill": "base-verification-loop",
+  "status": "completed",
+  "mode": "interactive",
+  "summary": "Prototype evidence is ready for OpenSpec Verify.",
+  "artifacts": [{ "kind": "file", "operation": "updated", "subject": "src/widget.mjs" }],
+  "evidence": [
+    { "id": "focused", "type": "test", "subject": "focused widget tests", "result": "passed" },
+    { "id": "critical", "type": "test", "subject": "critical widget flow", "result": "passed" },
+    { "id": "local-review", "type": "review", "subject": "src/widget.mjs", "result": "passed" }
+  ],
+  "assumptions": [],
+  "openQuestions": [],
+  "nextAction": { "kind": "continue", "description": "Run formal OpenSpec Verify." },
+  "details": {
+    "profile": "prototype-rapid",
+    "intendedBehavior": "The widget returns a stable normalized value.",
+    "criticalPath": "Invoke the widget with the representative fixture and inspect the normalized result.",
+    "changedPaths": ["src/widget.mjs"],
+    "selectedChecks": [
+      { "id": "focused-unit-or-integration", "category": "focused", "required": true, "result": "passed", "evidenceId": "focused" },
+      { "id": "critical-flow", "category": "critical-flow", "required": true, "result": "passed", "evidenceId": "critical" },
+      { "id": "local-review", "category": "review", "required": true, "result": "passed", "evidenceId": "local-review" }
+    ],
+    "correctionAttempts": [],
+    "reviewedPaths": ["src/widget.mjs"],
+    "localReviewFindings": [],
+    "unresolvedGaps": [],
+    "recoverySteps": ["Rerun focused evidence if the workspace binding changes."],
+    "binding": { "kind": "workspace", "value": "workspace-state-1" },
+    "readiness": "ready-for-openspec-verify"
+  }
+}

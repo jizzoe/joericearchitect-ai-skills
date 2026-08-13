@@ -1,0 +1,449 @@
+import path from "node:path";
+
+import { checkOperationAuthorization } from "../../sdd/check-operation-authorization.mjs";
+import { validateSkillResult } from "../validate-base-skill-contracts.mjs";
+
+export const reviewSeverities = ["blocker", "high", "medium", "low"];
+export const reviewDispositions = ["objective-fix", "human-decision", "warning", "false-positive"];
+export const deliveryProfiles = ["prototype-rapid", "production-rapid"];
+export const verificationStages = [
+  "bind-inputs",
+  "identify-critical-path",
+  "select-checks",
+  "implement-approved-scope",
+  "run-focused-checks",
+  "run-profile-checks",
+  "run-local-review",
+  "apply-objective-corrections",
+  "emit-readiness"
+];
+
+const coverageStatuses = new Set(["reviewed", "gap", "not-applicable"]);
+const checkResults = new Set(["passed", "failed", "not-applicable", "pending"]);
+const readinessStates = new Set(["needs-implementation", "paused", "blocked", "ready-for-openspec-verify"]);
+const checkCategories = new Set([
+  "focused",
+  "critical-flow",
+  "regression",
+  "browser",
+  "device",
+  "repeatability",
+  "operational",
+  "release",
+  "accessibility",
+  "review",
+  "ci",
+  "independent-review"
+]);
+const secretKey = /^(?:password|secret|token|credential|api[_-]?key|authorization|otp|mfa|private[_-]?key|pii|personal[_-]?data)$/i;
+const secretValue = /(?:gh[pousr]_[A-Za-z0-9]{20,}|Bearer\s+\S+|AKIA[A-Z0-9]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/;
+
+function issue(code, subject, detail) {
+  return { code, subject, ...(detail === undefined ? {} : { detail }) };
+}
+
+function isObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function nonEmpty(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function workspacePath(value) {
+  return nonEmpty(value) && !path.isAbsolute(value) && !/^[A-Za-z]:[\\/]/.test(value) && !value.split(/[\\/]/).includes("..");
+}
+
+function exactKeys(value, allowed, subject, issues) {
+  if (!isObject(value)) {
+    issues.push(issue("invalid-object", subject));
+    return false;
+  }
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) issues.push(issue("unknown-key", `${subject}.${key}`));
+  }
+  return true;
+}
+
+function required(value, keys, subject, issues) {
+  if (!isObject(value)) return;
+  for (const key of keys) {
+    if (!(key in value)) issues.push(issue("missing-required", `${subject}.${key}`));
+  }
+}
+
+function validateStringArray(value, subject, issues, { paths = false, nonEmptyArray = false } = {}) {
+  if (!Array.isArray(value)) {
+    issues.push(issue("invalid-array", subject));
+    return;
+  }
+  if (nonEmptyArray && value.length === 0) issues.push(issue("empty-array", subject));
+  value.forEach((item, index) => {
+    if (!nonEmpty(item)) issues.push(issue("invalid-string", `${subject}[${index}]`));
+    else if (paths && !workspacePath(item)) issues.push(issue("unsafe-workspace-path", `${subject}[${index}]`));
+  });
+}
+
+function scanSensitive(value, subject, issues, seen = new Set()) {
+  if (value === null || typeof value !== "object") {
+    if (typeof value === "string" && secretValue.test(value)) issues.push(issue("sensitive-value", subject));
+    return;
+  }
+  if (seen.has(value)) return;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => scanSensitive(item, `${subject}[${index}]`, issues, seen));
+    return;
+  }
+  for (const [key, item] of Object.entries(value)) {
+    if (secretKey.test(key)) issues.push(issue("sensitive-key", `${subject}.${key}`));
+    scanSensitive(item, `${subject}.${key}`, issues, seen);
+  }
+}
+
+function validateEvidenceReferences(ids, subject, evidenceById, issues, { nonEmptyArray = false } = {}) {
+  validateStringArray(ids, subject, issues, { nonEmptyArray });
+  if (!Array.isArray(ids)) return;
+  for (const id of ids) {
+    if (nonEmpty(id) && !evidenceById.has(id)) issues.push(issue("unknown-evidence-reference", subject, id));
+  }
+}
+
+function validateFinding(finding, index, evidenceById, issues) {
+  const subject = `result.details.findings[${index}]`;
+  const keys = new Set(["id", "severity", "disposition", "subject", "evidenceIds", "impact", "recommendation"]);
+  if (!exactKeys(finding, keys, subject, issues)) return;
+  required(finding, [...keys], subject, issues);
+  if (!nonEmpty(finding.id)) issues.push(issue("invalid-finding-id", `${subject}.id`));
+  if (!reviewSeverities.includes(finding.severity)) issues.push(issue("invalid-finding-severity", `${subject}.severity`));
+  if (!reviewDispositions.includes(finding.disposition)) issues.push(issue("invalid-finding-disposition", `${subject}.disposition`));
+  if (!workspacePath(finding.subject)) issues.push(issue("unsafe-workspace-path", `${subject}.subject`));
+  validateEvidenceReferences(finding.evidenceIds, `${subject}.evidenceIds`, evidenceById, issues, { nonEmptyArray: true });
+  if (!nonEmpty(finding.impact)) issues.push(issue("invalid-finding-impact", `${subject}.impact`));
+  if (!nonEmpty(finding.recommendation)) issues.push(issue("invalid-finding-recommendation", `${subject}.recommendation`));
+}
+
+export function sortReviewFindings(findings = []) {
+  const rank = new Map(reviewSeverities.map((severity, index) => [severity, index]));
+  return [...findings].sort((left, right) => {
+    const severity = (rank.get(left.severity) ?? reviewSeverities.length) - (rank.get(right.severity) ?? reviewSeverities.length);
+    if (severity !== 0) return severity;
+    const subject = String(left.subject ?? "").localeCompare(String(right.subject ?? ""));
+    return subject !== 0 ? subject : String(left.id ?? "").localeCompare(String(right.id ?? ""));
+  });
+}
+
+function validateReviewDetails(result, issues) {
+  const details = result.details;
+  const subject = "result.details";
+  const keys = new Set(["reviewedScope", "findings", "coverage", "evidenceGaps", "scopeSummary"]);
+  if (!exactKeys(details, keys, subject, issues)) return;
+  required(details, [...keys], subject, issues);
+  const evidenceById = new Map((result.evidence ?? []).map((item) => [item.id, item]));
+
+  if (exactKeys(details.reviewedScope, new Set(["targets", "contextPaths", "evidenceIds"]), `${subject}.reviewedScope`, issues)) {
+    required(details.reviewedScope, ["targets", "contextPaths", "evidenceIds"], `${subject}.reviewedScope`, issues);
+    validateStringArray(details.reviewedScope.targets, `${subject}.reviewedScope.targets`, issues, { paths: true, nonEmptyArray: true });
+    validateStringArray(details.reviewedScope.contextPaths, `${subject}.reviewedScope.contextPaths`, issues, { paths: true });
+    validateEvidenceReferences(details.reviewedScope.evidenceIds, `${subject}.reviewedScope.evidenceIds`, evidenceById, issues);
+  }
+
+  if (!Array.isArray(details.findings)) issues.push(issue("invalid-array", `${subject}.findings`));
+  else {
+    const ids = new Set();
+    details.findings.forEach((finding, index) => {
+      validateFinding(finding, index, evidenceById, issues);
+      if (nonEmpty(finding?.id) && ids.has(finding.id)) issues.push(issue("duplicate-finding-id", `${subject}.findings[${index}].id`));
+      ids.add(finding?.id);
+    });
+    const sorted = sortReviewFindings(details.findings);
+    if (details.findings.some((finding, index) => finding !== sorted[index])) issues.push(issue("findings-not-deterministically-ordered", `${subject}.findings`));
+  }
+
+  if (!Array.isArray(details.coverage)) issues.push(issue("invalid-array", `${subject}.coverage`));
+  else details.coverage.forEach((entry, index) => {
+    const itemSubject = `${subject}.coverage[${index}]`;
+    if (!exactKeys(entry, new Set(["area", "status", "evidenceIds"]), itemSubject, issues)) return;
+    required(entry, ["area", "status", "evidenceIds"], itemSubject, issues);
+    if (!nonEmpty(entry.area)) issues.push(issue("invalid-coverage-area", `${itemSubject}.area`));
+    if (!coverageStatuses.has(entry.status)) issues.push(issue("invalid-coverage-status", `${itemSubject}.status`));
+    validateEvidenceReferences(entry.evidenceIds, `${itemSubject}.evidenceIds`, evidenceById, issues);
+  });
+
+  if (!Array.isArray(details.evidenceGaps)) issues.push(issue("invalid-array", `${subject}.evidenceGaps`));
+  else details.evidenceGaps.forEach((gap, index) => {
+    const itemSubject = `${subject}.evidenceGaps[${index}]`;
+    if (!exactKeys(gap, new Set(["id", "subject", "reason"]), itemSubject, issues)) return;
+    required(gap, ["id", "subject", "reason"], itemSubject, issues);
+    for (const key of ["id", "subject", "reason"]) if (!nonEmpty(gap[key])) issues.push(issue("invalid-evidence-gap", `${itemSubject}.${key}`));
+  });
+  if (!nonEmpty(details.scopeSummary)) issues.push(issue("invalid-scope-summary", `${subject}.scopeSummary`));
+}
+
+function validateCheck(check, index, evidenceById, issues) {
+  const subject = `result.details.selectedChecks[${index}]`;
+  if (!exactKeys(check, new Set(["id", "category", "required", "result", "evidenceId"]), subject, issues)) return;
+  required(check, ["id", "category", "required", "result"], subject, issues);
+  if (!nonEmpty(check.id)) issues.push(issue("invalid-check-id", `${subject}.id`));
+  if (!checkCategories.has(check.category)) issues.push(issue("invalid-check-category", `${subject}.category`));
+  if (typeof check.required !== "boolean") issues.push(issue("invalid-check-required", `${subject}.required`));
+  if (!checkResults.has(check.result)) issues.push(issue("invalid-check-result", `${subject}.result`));
+  if (check.result !== "pending") {
+    if (!nonEmpty(check.evidenceId)) issues.push(issue("missing-check-evidence", `${subject}.evidenceId`));
+    else if (!evidenceById.has(check.evidenceId)) issues.push(issue("unknown-evidence-reference", `${subject}.evidenceId`, check.evidenceId));
+  }
+}
+
+function validateBinding(binding, subject, issues) {
+  if (!exactKeys(binding, new Set(["kind", "value"]), subject, issues)) return;
+  required(binding, ["kind", "value"], subject, issues);
+  if (!new Set(["workspace", "commit"]).has(binding.kind)) issues.push(issue("invalid-binding-kind", `${subject}.kind`));
+  if (!nonEmpty(binding.value)) issues.push(issue("invalid-binding-value", `${subject}.value`));
+  if (binding.kind === "commit" && !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(binding.value ?? "")) issues.push(issue("noncanonical-commit-binding", `${subject}.value`));
+}
+
+function validateProductionGate(gate, details, evidenceById, issues) {
+  const subject = "result.details.productionGate";
+  const keys = new Set(["head", "ciEvidenceId", "independentReviewEvidenceId", "reviewStatus", "reviewHead", "reviewerSession", "implementerSession", "source", "assurance"]);
+  if (!exactKeys(gate, keys, subject, issues)) return { valid: false, ready: false };
+  required(gate, [...keys], subject, issues);
+  let valid = true;
+  const fail = (code, field, detail) => { valid = false; issues.push(issue(code, `${subject}.${field}`, detail)); };
+  if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(gate.head ?? "")) fail("noncanonical-production-head", "head");
+  if (gate.head !== details.binding?.value || gate.reviewHead !== gate.head) fail("production-head-mismatch", "reviewHead");
+  if (!new Set(["passed", "failed", "unavailable"]).has(gate.reviewStatus)) fail("invalid-review-status", "reviewStatus");
+  if (gate.source !== "isolated-independent-review") fail("invalid-review-source", "source");
+  if (gate.assurance !== "strict-isolated") fail("strict-review-required", "assurance");
+  if (!nonEmpty(gate.reviewerSession) || !nonEmpty(gate.implementerSession) || gate.reviewerSession === gate.implementerSession) fail("reviewer-not-independent", "reviewerSession");
+  const ci = evidenceById.get(gate.ciEvidenceId);
+  if (!ci) fail("ci-evidence-missing", "ciEvidenceId");
+  const review = evidenceById.get(gate.independentReviewEvidenceId);
+  if (!review || review.type !== "review") fail("independent-review-evidence-missing", "independentReviewEvidenceId");
+  return {
+    valid,
+    ready: valid && ci?.result === "passed" && review?.result === "passed" && gate.reviewStatus === "passed"
+  };
+}
+
+function validateVerificationDetails(result, issues) {
+  const details = result.details;
+  const subject = "result.details";
+  const keys = new Set(["profile", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness", "productionGate"]);
+  if (!exactKeys(details, keys, subject, issues)) return;
+  required(details, ["profile", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness"], subject, issues);
+  const evidenceById = new Map((result.evidence ?? []).map((item) => [item.id, item]));
+  if (!deliveryProfiles.includes(details.profile)) issues.push(issue("invalid-delivery-profile", `${subject}.profile`));
+  if (!nonEmpty(details.intendedBehavior)) issues.push(issue("invalid-intended-behavior", `${subject}.intendedBehavior`));
+  if (!nonEmpty(details.criticalPath)) issues.push(issue("invalid-critical-path", `${subject}.criticalPath`));
+  validateStringArray(details.changedPaths, `${subject}.changedPaths`, issues, { paths: true, nonEmptyArray: true });
+  validateStringArray(details.reviewedPaths, `${subject}.reviewedPaths`, issues, { paths: true });
+  validateStringArray(details.unresolvedGaps, `${subject}.unresolvedGaps`, issues);
+  validateStringArray(details.recoverySteps, `${subject}.recoverySteps`, issues, { nonEmptyArray: true });
+  validateBinding(details.binding, `${subject}.binding`, issues);
+  if (!readinessStates.has(details.readiness)) issues.push(issue("invalid-readiness", `${subject}.readiness`));
+
+  if (!Array.isArray(details.selectedChecks)) issues.push(issue("invalid-array", `${subject}.selectedChecks`));
+  else {
+    const ids = new Set();
+    details.selectedChecks.forEach((check, index) => {
+      validateCheck(check, index, evidenceById, issues);
+      if (nonEmpty(check?.id) && ids.has(check.id)) issues.push(issue("duplicate-check-id", `${subject}.selectedChecks[${index}].id`));
+      ids.add(check?.id);
+    });
+    let broaderSeen = false;
+    for (const [index, check] of details.selectedChecks.entries()) {
+      if (check.category === "focused" && broaderSeen) issues.push(issue("focused-check-after-broader-check", `${subject}.selectedChecks[${index}]`));
+      if (check.category !== "focused") broaderSeen = true;
+    }
+  }
+
+  if (!Array.isArray(details.localReviewFindings)) issues.push(issue("invalid-array", `${subject}.localReviewFindings`));
+  else {
+    const ids = new Set();
+    details.localReviewFindings.forEach((finding, index) => {
+      validateFinding(finding, index, evidenceById, issues);
+      if (nonEmpty(finding?.id) && ids.has(finding.id)) issues.push(issue("duplicate-finding-id", `${subject}.localReviewFindings[${index}].id`));
+      ids.add(finding?.id);
+    });
+    const sorted = sortReviewFindings(details.localReviewFindings);
+    if (details.localReviewFindings.some((finding, index) => finding !== sorted[index])) issues.push(issue("findings-not-deterministically-ordered", `${subject}.localReviewFindings`));
+  }
+
+  if (!Array.isArray(details.correctionAttempts)) issues.push(issue("invalid-array", `${subject}.correctionAttempts`));
+  else {
+    const attemptsBySignature = new Map();
+    details.correctionAttempts.forEach((attempt, index) => {
+      const itemSubject = `${subject}.correctionAttempts[${index}]`;
+      const keys = new Set(["failureSignature", "attempt", "kind", "result", "evidenceIds", "binding"]);
+      if (!exactKeys(attempt, keys, itemSubject, issues)) return;
+      required(attempt, [...keys], itemSubject, issues);
+      if (!nonEmpty(attempt.failureSignature)) issues.push(issue("invalid-failure-signature", `${itemSubject}.failureSignature`));
+      if (!Number.isInteger(attempt.attempt) || attempt.attempt < 1 || attempt.attempt > 3) issues.push(issue("invalid-correction-attempt", `${itemSubject}.attempt`));
+      if (attempt.kind !== "objective-fix") issues.push(issue("invalid-correction-kind", `${itemSubject}.kind`));
+      if (!new Set(["passed", "failed"]).has(attempt.result)) issues.push(issue("invalid-correction-result", `${itemSubject}.result`));
+      validateEvidenceReferences(attempt.evidenceIds, `${itemSubject}.evidenceIds`, evidenceById, issues, { nonEmptyArray: true });
+      if (!nonEmpty(attempt.binding)) issues.push(issue("invalid-correction-binding", `${itemSubject}.binding`));
+      const expected = (attemptsBySignature.get(attempt.failureSignature) ?? 0) + 1;
+      if (attempt.attempt !== expected) issues.push(issue("nonsequential-correction-attempt", `${itemSubject}.attempt`, expected));
+      attemptsBySignature.set(attempt.failureSignature, expected);
+    });
+  }
+
+  const requiredFailure = Array.isArray(details.selectedChecks) && details.selectedChecks.some((check) => check.required && !new Set(["passed", "not-applicable"]).has(check.result));
+  const hasGaps = Array.isArray(details.unresolvedGaps) && details.unresolvedGaps.length > 0;
+  let productionValid = true;
+  let productionReady = true;
+  if (details.profile === "production-rapid") {
+    if (details.binding?.kind !== "commit") issues.push(issue("production-requires-commit-binding", `${subject}.binding`));
+    if (!details.productionGate) {
+      issues.push(issue("missing-production-gate", `${subject}.productionGate`));
+      productionValid = false;
+      productionReady = false;
+    } else {
+      const gate = validateProductionGate(details.productionGate, details, evidenceById, issues);
+      productionValid = gate.valid;
+      productionReady = gate.ready;
+    }
+  }
+  if (details.readiness === "ready-for-openspec-verify" && (requiredFailure || hasGaps || !productionValid || !productionReady)) {
+    issues.push(issue("readiness-overclaim", `${subject}.readiness`));
+  }
+}
+
+export function validateImplementationQualityResult(result) {
+  const issues = [];
+  const shared = validateSkillResult(result);
+  issues.push(...shared.issues.map((item) => ({ ...item, code: `skill-result.${item.code}` })));
+  if (!isObject(result)) return { valid: false, issues };
+  scanSensitive(result.details, "result.details", issues);
+  if (result.skill === "base-code-review") validateReviewDetails(result, issues);
+  else if (result.skill === "base-verification-loop") validateVerificationDetails(result, issues);
+  else issues.push(issue("unsupported-implementation-quality-skill", "result.skill", result.skill));
+  return { valid: issues.length === 0, issues };
+}
+
+export function renderImplementationQualityMarkdown(result) {
+  const validation = validateImplementationQualityResult(result);
+  if (!validation.valid) throw new Error(`Cannot render invalid implementation-quality result: ${validation.issues.map((item) => item.code).join(", ")}`);
+  const lines = [`# ${result.skill}`, ""];
+  if (result.skill === "base-code-review") {
+    lines.push("## Findings");
+    if (!result.details.findings.length) lines.push("", "No findings.");
+    for (const finding of result.details.findings) {
+      lines.push("", `### ${finding.severity.toUpperCase()} ${finding.id}`, "", `${finding.subject}: ${finding.impact}`, "", `Disposition: ${finding.disposition}`, `Recommendation: ${finding.recommendation}`);
+    }
+    lines.push("", "## Evidence Gaps");
+    if (!result.details.evidenceGaps.length) lines.push("", "None.");
+    else for (const gap of result.details.evidenceGaps) lines.push("", `- ${gap.id}: ${gap.subject} — ${gap.reason}`);
+    lines.push("", "## Scope", "", result.details.scopeSummary);
+  } else {
+    lines.push("## Readiness", "", result.details.readiness, "", "## Selected Checks");
+    for (const check of result.details.selectedChecks) lines.push("", `- ${check.id}: ${check.result}`);
+    lines.push("", "## Unresolved Gaps", "", ...(result.details.unresolvedGaps.length ? result.details.unresolvedGaps.map((gap) => `- ${gap}`) : ["None."]));
+  }
+  lines.push("", "## Summary", "", result.summary, "", "## Next Action", "", `${result.nextAction.kind}: ${result.nextAction.description}`);
+  return `${lines.join("\n")}\n`;
+}
+
+export function validateTrustedCheckDefinitions(definitions) {
+  const issues = [];
+  if (!Array.isArray(definitions) || definitions.length === 0) return { valid: false, issues: [issue("invalid-check-definitions", "checks")] };
+  const ids = new Set();
+  definitions.forEach((definition, index) => {
+    const subject = `checks[${index}]`;
+    if (!exactKeys(definition, new Set(["id", "argv", "source", "targets"]), subject, issues)) return;
+    required(definition, ["id", "argv", "source", "targets"], subject, issues);
+    if (!nonEmpty(definition.id)) issues.push(issue("invalid-check-id", `${subject}.id`));
+    else if (ids.has(definition.id)) issues.push(issue("duplicate-check-id", `${subject}.id`));
+    ids.add(definition.id);
+    if (!new Set(["invocation", "product-config"]).has(definition.source)) issues.push(issue("untrusted-check-source", `${subject}.source`));
+    if (!Array.isArray(definition.argv) || definition.argv.length === 0 || !definition.argv.every(nonEmpty)) issues.push(issue("invalid-structured-argv", `${subject}.argv`));
+    validateStringArray(definition.targets, `${subject}.targets`, issues, { paths: true, nonEmptyArray: true });
+    scanSensitive(definition, subject, issues);
+  });
+  return { valid: issues.length === 0, issues };
+}
+
+export function selectVerificationChecks({ profile, hasUi = false, layoutChanged = false, materiallyChangedUi = false, mode = "interactive", tools = {} } = {}) {
+  if (!deliveryProfiles.includes(profile)) return { status: "paused", checks: [], issues: [issue("invalid-delivery-profile", "profile")] };
+  if (!new Set(["interactive", "autonomous"]).has(mode)) return { status: "paused", checks: [], issues: [issue("invalid-mode", "mode")] };
+  const checks = [
+    { id: "focused-unit-or-integration", category: "focused", required: true },
+    { id: "critical-flow", category: "critical-flow", required: true }
+  ];
+  if (profile === "production-rapid") {
+    checks.push(
+      { id: "regression-coverage", category: "regression", required: true },
+      { id: "repeatability", category: "repeatability", required: true },
+      { id: "operational-checks", category: "operational", required: true },
+      { id: "release-evidence", category: "release", required: true },
+      { id: "exact-head-ci", category: "ci", required: true },
+      { id: "strict-independent-review", category: "independent-review", required: true }
+    );
+  }
+  if (hasUi) {
+    checks.push(
+      { id: "chromium-desktop-1440x900", category: "browser", required: true },
+      { id: "chromium-mobile-web-390x844", category: "device", required: true },
+      { id: "critical-ui-interaction", category: "browser", required: true }
+    );
+    if (layoutChanged) checks.push(
+      { id: "desktop-current-screenshot", category: "browser", required: true },
+      { id: "mobile-current-screenshot", category: "browser", required: true }
+    );
+    if (materiallyChangedUi) checks.push(
+      { id: "axe-core", category: "accessibility", required: true },
+      { id: "manual-keyboard-semantics", category: "accessibility", required: true }
+    );
+  }
+  const missing = hasUi ? ["playwright", "chromium", "axeCore"].filter((tool) => tools[tool] !== true) : [];
+  if (missing.length) {
+    return {
+      status: mode === "autonomous" ? "paused" : "needs-authorization",
+      checks,
+      issues: missing.map((tool) => issue("missing-ui-prerequisite", `tools.${tool}`))
+    };
+  }
+  return { status: "ready", checks, issues: [] };
+}
+
+export function evaluateVerificationLoop({ completedStages = [], currentBinding, evidenceBindings = [], correctionAttemptsByFailureSignature = {}, correctionBudget = 3 } = {}) {
+  if (!Number.isInteger(correctionBudget) || correctionBudget < 1 || correctionBudget > 3) return { state: "paused", reason: "invalid-correction-budget" };
+  if (!nonEmpty(currentBinding)) return { state: "paused", reason: "missing-current-binding" };
+  if (!Array.isArray(completedStages) || completedStages.some((stage, index) => stage !== verificationStages[index])) return { state: "paused", reason: "stages-out-of-order" };
+  if (!Array.isArray(evidenceBindings) || evidenceBindings.some((binding) => binding !== currentBinding)) return { state: "paused", reason: "stale-evidence" };
+  if (Object.values(correctionAttemptsByFailureSignature).some((count) => !Number.isInteger(count) || count < 0 || count >= correctionBudget)) return { state: "blocked", reason: "correction-limit-exhausted" };
+  const nextStage = verificationStages[completedStages.length] ?? null;
+  return nextStage ? { state: "in-progress", nextStage } : { state: "complete", nextStage: null };
+}
+
+export function authorizeVerificationOperation({ authorization, runtime, config, operation, target, now, correctionAttemptsForFailureSignature, correctionAttempts, selectedEntry, failureSignature, checkpoint } = {}) {
+  return checkOperationAuthorization({
+    authorization,
+    runtime,
+    config,
+    now,
+    request: {
+      profile: "local-implementation",
+      operation,
+      target,
+      correctionAttemptsForFailureSignature,
+      correctionAttempts,
+      selectedEntry,
+      failureSignature,
+      checkpoint
+    }
+  });
+}
+
+export function evaluateProductionReadiness({ currentHead, ciEvidence, independentReviewGate } = {}) {
+  if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(currentHead ?? "")) return { ready: false, reason: "noncanonical-current-head" };
+  if (!ciEvidence || ciEvidence.status !== "passed" || ciEvidence.head !== currentHead) return { ready: false, reason: "ci-evidence-not-current" };
+  if (!independentReviewGate || independentReviewGate.source !== "isolated-independent-review") return { ready: false, reason: "strict-review-gate-malformed" };
+  if (independentReviewGate.assurance !== "strict-isolated") return { ready: false, reason: "strict-review-required" };
+  if (independentReviewGate.status !== "passed") return { ready: false, reason: independentReviewGate.status === "unavailable" ? "strict-review-unavailable" : "strict-review-not-passed" };
+  if (independentReviewGate.head !== currentHead) return { ready: false, reason: "strict-review-wrong-head" };
+  if (!nonEmpty(independentReviewGate.reviewerSession) || !nonEmpty(independentReviewGate.implementerSession) || independentReviewGate.reviewerSession === independentReviewGate.implementerSession) return { ready: false, reason: "strict-review-not-independent" };
+  if (!nonEmpty(independentReviewGate.evidenceId)) return { ready: false, reason: "strict-review-evidence-missing" };
+  return { ready: true, reason: "current-strict-evidence" };
+}

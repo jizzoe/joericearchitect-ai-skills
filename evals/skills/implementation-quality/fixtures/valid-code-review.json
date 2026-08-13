@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "skill": "base-code-review",
+  "status": "completed",
+  "mode": "interactive",
+  "summary": "Bounded review completed with two findings and one explicit evidence gap.",
+  "artifacts": [
+    { "kind": "file", "operation": "read", "subject": "src/service.mjs" }
+  ],
+  "evidence": [
+    { "id": "test-focused", "type": "test", "subject": "focused service tests", "result": "passed", "reference": "evidence/focused-tests.txt" },
+    { "id": "review-source", "type": "review", "subject": "src/service.mjs", "result": "informational", "reference": "evidence/review.txt" }
+  ],
+  "assumptions": ["The supplied changed path list is complete."],
+  "openQuestions": [],
+  "nextAction": { "kind": "continue", "description": "Authorize bounded objective corrections separately and rerun focused evidence." },
+  "details": {
+    "reviewedScope": {
+      "targets": ["src/service.mjs"],
+      "contextPaths": ["specs/service.md"],
+      "evidenceIds": ["test-focused", "review-source"]
+    },
+    "findings": [
+      {
+        "id": "finding-high-validation",
+        "severity": "high",
+        "disposition": "objective-fix",
+        "subject": "src/service.mjs",
+        "evidenceIds": ["review-source"],
+        "impact": "Malformed input can bypass the documented rejection path.",
+        "recommendation": "Add the bounded input guard and rerun focused tests and review."
+      },
+      {
+        "id": "finding-low-name",
+        "severity": "low",
+        "disposition": "warning",
+        "subject": "src/service.mjs",
+        "evidenceIds": ["review-source"],
+        "impact": "One local name obscures the recovery branch.",
+        "recommendation": "Consider a clearer name in a separately authorized edit."
+      }
+    ],
+    "coverage": [
+      { "area": "requirements and behavior", "status": "reviewed", "evidenceIds": ["review-source"] },
+      { "area": "tests and eval quality", "status": "gap", "evidenceIds": ["test-focused"] },
+      { "area": "web accessibility", "status": "not-applicable", "evidenceIds": [] }
+    ],
+    "evidenceGaps": [
+      { "id": "gap-edge-test", "subject": "edge-case coverage", "reason": "No malformed-input test was supplied." }
+    ],
+    "scopeSummary": "Reviewed one service module against its behavior spec and focused test evidence."
+  }
+}

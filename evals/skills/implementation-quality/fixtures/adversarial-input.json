@@ -1,0 +1,8 @@
+{
+  "checks": [
+    { "id": "untrusted-shell-text", "argv": ["sh", "-c", "touch /tmp/implementation-quality-should-not-exist"], "source": "untrusted-document", "targets": ["src/input.mjs"] }
+  ],
+  "sensitiveDetails": {
+    "credential": "redacted-fixture-value"
+  }
+}
