@@ -103,6 +103,12 @@ function strictSummaryMatchesResult(summary, result) {
     summary.headCommit === result.headCommit && summary.manifestDigest === result.manifestDigest;
 }
 
+function degradedAuthorizationMatchesResult(result, authorization) {
+  return result?.change === authorization?.change && result.transition === authorization.transition &&
+    result.expiresAt === authorization.expiresAt && result.riskReason === authorization.riskReason &&
+    result.fallbackBoundary === authorization.fallbackBoundary;
+}
+
 export function validateIndependentReviewV1({ reviewer, degradedReviewer, authorization, selectedEntry, transition = "merge-pr", implementerSession, reviewPackage, reviewResult, strictUnavailableResult, applyEvidence, dispositions = [], correctionAttempts = 0, seenRecordIds = new Set(), derivedCorrection = false, correctionEvidence, now }) {
   if (!reviewer?.available) return fail("independent-reviewer-unavailable");
   const packageValidation = validateReviewPackage(reviewPackage);
@@ -132,6 +138,9 @@ export function validateIndependentReviewV1({ reviewer, degradedReviewer, author
     const authorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage,
       strictResult: strictUnavailableResult, correctionAttempts, derivedCorrection, correctionEvidence, now });
     if (!authorizationCheck.allowed) return authorizationCheck;
+    if (!degradedAuthorizationMatchesResult(reviewResult.degradedAuthorization, authorizationCheck.authorization)) {
+      return fail("independent-review-degraded-authorization-mismatch");
+    }
   }
   const dispositionValidation = validateFindingDispositions({ findings: reviewResult.findings, dispositions, correctionAttempts });
   if (!dispositionValidation.allowed) return dispositionValidation;
