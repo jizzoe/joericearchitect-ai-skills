@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: add-base-implementation-quality-skills
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 85
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/85
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - openspec/changes/add-base-implementation-quality-skills/

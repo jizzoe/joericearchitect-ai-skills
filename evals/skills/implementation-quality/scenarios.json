@@ -1,0 +1,35 @@
+{
+  "scenarios": [
+    { "id": "review-bounded", "scenario": "Bounded review is requested", "fixture": "valid-code-review.json", "outcome": "completed-read-only" },
+    { "id": "review-mutation-refused", "scenario": "Request asks review to mutate or approve", "fixture": "skill-text", "outcome": "paused-read-only" },
+    { "id": "review-severity-order", "scenario": "Review finds multiple defects", "fixture": "valid-code-review.json", "outcome": "findings-first" },
+    { "id": "review-unsupported-gap", "scenario": "Finding lacks support", "fixture": "valid-code-review.json", "outcome": "gap-not-finding" },
+    { "id": "review-objective-fix", "scenario": "Objective bounded correction exists", "fixture": "valid-code-review.json", "outcome": "separate-authorization" },
+    { "id": "review-human-decision", "scenario": "Finding requires product judgment", "fixture": "skill-text", "outcome": "paused" },
+    { "id": "review-security-ui", "scenario": "Change has security and UI impact", "fixture": "skill-text", "outcome": "proportional-coverage" },
+    { "id": "review-missing-evidence", "scenario": "Evidence for an applicable area is absent", "fixture": "valid-code-review.json", "outcome": "explicit-gap" },
+    { "id": "review-result", "scenario": "Review completes with findings", "fixture": "valid-code-review.json", "outcome": "valid-skill-result" },
+    { "id": "review-safe-pause", "scenario": "Review cannot safely proceed", "fixture": "adversarial-input.json", "outcome": "paused" },
+    { "id": "review-portable", "scenario": "Another workspace uses the review capability", "fixture": "second-workspace.json", "outcome": "portable" },
+    { "id": "review-wrapper-parity", "scenario": "Platform wrappers are compared", "fixture": "wrappers", "outcome": "equivalent" },
+
+    { "id": "verify-authorized-start", "scenario": "Authorized bounded loop begins", "fixture": "valid-verification-prototype.json", "outcome": "in-progress" },
+    { "id": "verify-missing-authority", "scenario": "Mutation authority or behavior is incomplete", "fixture": "authorization", "outcome": "paused" },
+    { "id": "verify-objective-failure", "scenario": "Focused check fails objectively", "fixture": "state-machine", "outcome": "correct-and-rerun" },
+    { "id": "verify-material-decision", "scenario": "Failure needs a material decision", "fixture": "skill-text", "outcome": "paused" },
+    { "id": "verify-prototype-no-ui", "scenario": "Prototype has no UI behavior", "fixture": "profile-selection", "outcome": "browser-not-applicable" },
+    { "id": "verify-production-gap", "scenario": "Production evidence is incomplete", "fixture": "production-gate", "outcome": "not-ready" },
+    { "id": "verify-layout", "scenario": "Layout-changing web UI is verified", "fixture": "profile-selection", "outcome": "two-screenshots-and-interaction" },
+    { "id": "verify-accessibility", "scenario": "New UI accessibility is evaluated", "fixture": "profile-selection", "outcome": "axe-and-manual-review" },
+    { "id": "verify-autonomous-tools", "scenario": "Autonomous UI prerequisite is unavailable", "fixture": "profile-selection", "outcome": "paused" },
+    { "id": "verify-interactive-tools", "scenario": "Interactive prerequisite is unavailable", "fixture": "profile-selection", "outcome": "needs-authorization" },
+    { "id": "verify-correction-pass", "scenario": "Objective correction succeeds", "fixture": "state-machine", "outcome": "current-evidence" },
+    { "id": "verify-correction-exhausted", "scenario": "Correction budget is exhausted", "fixture": "state-machine", "outcome": "blocked" },
+    { "id": "verify-production-pass", "scenario": "Current production evidence passes", "fixture": "valid-verification-production.json", "outcome": "ready-for-openspec-verify" },
+    { "id": "verify-strict-unavailable", "scenario": "Strict independent review is unavailable", "fixture": "production-gate", "outcome": "paused" },
+    { "id": "verify-result-complete", "scenario": "Verification evidence is complete", "fixture": "valid-verification-prototype.json", "outcome": "ready-for-openspec-verify" },
+    { "id": "verify-result-stale", "scenario": "Required check is failed or stale", "fixture": "state-machine", "outcome": "another-cycle" },
+    { "id": "verify-second-product", "scenario": "Second product supplies different commands", "fixture": "second-workspace.json", "outcome": "portable" },
+    { "id": "verify-wrapper-parity", "scenario": "Platform wrappers are compared", "fixture": "wrappers", "outcome": "equivalent" }
+  ]
+}

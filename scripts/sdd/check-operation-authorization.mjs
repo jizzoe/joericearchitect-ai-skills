@@ -96,6 +96,33 @@ function authorizationExpired(authorization, now) {
   return Number.isNaN(when) || when <= Date.parse(now ?? new Date().toISOString());
 }
 
+function durableCorrectionCounts(request) {
+  const entry = request.checkpoint?.selectedEntry;
+  const records = entry?.correctionRecords;
+  if (!entry || entry.name !== request.selectedEntry || !Array.isArray(records)) return null;
+  const ids = new Set();
+  const counts = new Map();
+  for (const record of records) {
+    const expectedAttempt = (counts.get(record?.failureSignature) ?? 0) + 1;
+    const verification = record?.verification;
+    const verificationValid = verification === undefined || (verification &&
+      new Set(["passed", "failed"]).has(verification.result) &&
+      Array.isArray(verification.evidenceIds) && verification.evidenceIds.length > 0 &&
+      new Set(verification.evidenceIds).size === verification.evidenceIds.length &&
+      verification.evidenceIds.every(nonEmpty) && nonEmpty(verification.binding));
+    if (!nonEmpty(record?.id) || ids.has(record.id) || record.change !== request.selectedEntry ||
+        !nonEmpty(record.failureSignature) || record.attempt !== expectedAttempt ||
+        record.classification !== "objective-fix" || record.behaviorPreserving !== true ||
+        record.current !== true || record.ancestryVerified !== true || !nonEmpty(record.evidenceReference) ||
+        !commitReference(record.baseCommit) || !commitReference(record.previousHead) || !commitReference(record.headCommit) ||
+        !/^[0-9a-f]{64}$/i.test(record.previousManifestDigest ?? "") || !/^[0-9a-f]{64}$/i.test(record.manifestDigest ?? "") ||
+        !verificationValid) return null;
+    ids.add(record.id);
+    counts.set(record.failureSignature, expectedAttempt);
+  }
+  return { aggregate: records.length, perSignature: counts.get(request.failureSignature) ?? 0 };
+}
+
 function adapterAllows(config, runtime, adapterName, operation) {
   const adapter = config?.adapters?.[adapterName];
   if (!adapter?.enabled || !adapter.operations?.includes(operation)) return false;
@@ -176,7 +203,19 @@ export function checkOperationAuthorization(input) {
   if (runtime.permissionGaps?.length || (Array.isArray(runtime.permittedOperations) && !runtime.permittedOperations.includes(operation))) return fail("runtime-permission-gap", operation);
   if (request.adapter && !authorization.targets?.includes(`adapter:${request.adapter}`)) return fail("unauthorized-adapter", request.adapter);
   if (request.adapter && !adapterAllows(config, runtime, request.adapter, operation)) return fail("adapter-capability-mismatch", request.adapter);
-  if (operation === "objective-correction" && Number(request.correctionAttempts ?? 0) >= 3) return fail("correction-limit-exhausted");
+  if (operation === "objective-correction") {
+    if (!nonEmpty(request.failureSignature)) return fail("missing-correction-failure-signature");
+    const budget = authorization.correctionBudgetPerFailureSignature;
+    const perSignature = request.correctionAttemptsForFailureSignature;
+    const aggregate = request.correctionAttempts;
+    const durableCounts = durableCorrectionCounts(request);
+    if (!Number.isInteger(budget) || budget < 1 || budget > 3) return fail("invalid-correction-budget", "correctionBudgetPerFailureSignature");
+    if (!Number.isInteger(perSignature) || perSignature < 0) return fail("invalid-correction-attempt-count", "correctionAttemptsForFailureSignature");
+    if (!Number.isInteger(aggregate) || aggregate < perSignature) return fail("inconsistent-correction-attempt-count");
+    if (!durableCounts) return fail("invalid-correction-checkpoint");
+    if (perSignature !== durableCounts.perSignature || aggregate !== durableCounts.aggregate) return fail("correction-attempt-count-mismatch");
+    if (perSignature >= budget) return fail("correction-limit-exhausted", request.failureSignature);
+  }
   if (operation === "run-lifecycle-action" && !lifecycleActions.has(request.lifecycleAction)) return fail("unnamed-or-unsupported-lifecycle-action");
   if (highImpactLifecycleActions.has(request.lifecycleAction)) {
     if (profile !== "sdd-delivery") return fail("high-impact-action-profile-mismatch", request.lifecycleAction);

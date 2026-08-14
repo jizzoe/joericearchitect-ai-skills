@@ -32,6 +32,26 @@ const REQUIRED_ADAPTERS = [
     adapter: ".agents/skills/independent-review/SKILL.md",
     canonical: "skills/base/independent-review/SKILL.md",
     phrases: ["canonical instructions", "must not duplicate"]
+  },
+  {
+    adapter: ".claude/skills/base-code-review/SKILL.md",
+    canonical: "skills/base/base-code-review/SKILL.md",
+    phrases: ["canonical instructions", "must not duplicate canonical"]
+  },
+  {
+    adapter: ".agents/skills/base-code-review/SKILL.md",
+    canonical: "skills/base/base-code-review/SKILL.md",
+    phrases: ["canonical instructions", "must not duplicate canonical"]
+  },
+  {
+    adapter: ".claude/skills/base-verification-loop/SKILL.md",
+    canonical: "skills/base/base-verification-loop/SKILL.md",
+    phrases: ["canonical instructions", "must not duplicate canonical"]
+  },
+  {
+    adapter: ".agents/skills/base-verification-loop/SKILL.md",
+    canonical: "skills/base/base-verification-loop/SKILL.md",
+    phrases: ["canonical instructions", "must not duplicate canonical"]
   }
 ];
 

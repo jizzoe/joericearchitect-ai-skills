@@ -1,0 +1,8 @@
+{
+  "workspace": "workspace-b",
+  "paths": ["packages/core/source.mjs", "quality/spec.md"],
+  "checks": [
+    { "id": "focused-b", "argv": ["node", "--test", "packages/core/source.test.mjs"], "source": "product-config", "targets": ["packages/core/source.mjs"] },
+    { "id": "validate-b", "argv": ["node", "tools/validate.mjs"], "source": "product-config", "targets": ["quality/spec.md"] }
+  ]
+}
