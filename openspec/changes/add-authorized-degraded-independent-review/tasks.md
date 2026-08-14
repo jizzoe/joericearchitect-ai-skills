@@ -86,13 +86,13 @@
   - Depends on: 5.2, 5.3.
   - Evidence: deterministic end-to-end fixture with one objective correction
     and fresh review, plus denial/unavailable no-manual-fallback fixtures.
-- [ ] 5.5 Exercise the real strict-failure to parent launch to restricted inner
+- [x] 5.5 Exercise the real strict-failure to parent launch to restricted inner
   review path in this runtime, including owned detached-view cleanup and direct
   response acceptance. Record only runtime-produced, request-bound evidence
   and retain the two explicit non-security-verifiable limitations.
   - Depends on: 5.3, current exact-head Apply evidence.
   - Evidence: unique runtime rehearsal record proving zero owner actions.
-- [ ] 5.6 Run focused and full tests, security/secret, portability,
+- [x] 5.6 Run focused and full tests, security/secret, portability,
   attribution, requirements, recovery, formal Verify, current-head independent
   review, and `openspec validate --all --strict`; repeat after every objective
   correction or head change.

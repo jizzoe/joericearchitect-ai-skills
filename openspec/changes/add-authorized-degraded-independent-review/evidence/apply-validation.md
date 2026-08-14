@@ -6,8 +6,8 @@ self-referential commit literal.
 
 Passed current evidence:
 
-- `node --test` — 248 passing tests covering authorization, strict-first execution, durable resume, zero-touch Codex parent-runtime transport, Codex/Claude external-host launcher recovery, current-clock and enclosing-goal expiration, required distinct implementer/reviewer identity binding, restricted reviewer home/credential access, machine-required degraded authenticity limitations, durable-source per-signature correction enforcement for independent-review and verification-loop sources, delimiter-safe failure signatures, complete chain linkage, review status/finding consistency, disposition compatibility and unresolved-objective-fix routing, disposition-driven human pauses, host package rederivation, symlink-safe package injection and Git-object artifact derivation, authorized delivery-profile binding, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, implementation-quality integration, findings, detached and archived exact-head views, portability, secrets, and adapter boundaries.
-- `node --test scripts/sdd/test/detached-review-view.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/independent-review-contract.test.mjs scripts/sdd/test/independent-review-v1-gate.test.mjs` — 46 focused archive, launcher, parent-transport, adapter, result-contract, and delivery-gate tests pass after the zero-touch redesign and reviewer corrections.
+- `node --test` — 249 passing tests covering authorization, strict-first execution, durable resume, zero-touch Codex parent-runtime transport, Codex/Claude external-host launcher recovery, current-clock and enclosing-goal expiration, required distinct implementer/reviewer identity binding, restricted reviewer home/credential access, machine-required degraded authenticity limitations, durable-source per-signature correction enforcement for independent-review and verification-loop sources, delimiter-safe failure signatures, complete chain linkage, review status/finding consistency, disposition compatibility and unresolved-objective-fix routing, disposition-driven human pauses, host package rederivation, symlink-safe package injection and Git-object artifact derivation, authorized delivery-profile binding, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, implementation-quality integration, findings, detached and archived exact-head views, portability, secrets, and adapter boundaries.
+- `node --test scripts/sdd/test/detached-review-view.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/independent-review-contract.test.mjs scripts/sdd/test/independent-review-v1-gate.test.mjs` — 47 focused archive, launcher, parent-transport, adapter, result-contract, and delivery-gate tests pass after the zero-touch redesign and reviewer corrections.
 - `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 54 focused launcher, request, adapter, and lifecycle tests pass.
 - `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 15 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running and per-signature correction budget enforcement.
 - `node scripts/sdd/check-adapter-drift.mjs` — canonical wrappers have no policy drift.
@@ -18,14 +18,19 @@ Passed current evidence:
 - `openspec validate --all --strict` — 24 items pass.
 - `git diff --check` — no whitespace errors.
 - Secret-pattern review over all affected canonical, schema, script, eval, and
-  OpenSpec paths reports no token, private-key, or bearer-secret matches.
+  OpenSpec paths reports no token or private-key material. The only bearer-like
+  match is a deliberate synthetic invalid-package fixture that verifies secret
+  rejection and is not a credential; its test value is intentionally not
+  repeated in this evidence package.
 
 The production recovery API now turns the assistant-neutral prepared host
 request into a parent-runtime operation and consumes its response in the same
 call. The thin Codex adapter constructs only a fixed `exec_command` request for
-the repository-owned host script with `sandbox_permissions=require_escalated`,
-records a truthful `codex-exec-tool` receipt, and never claims that the parent
-launch or executable identity is security-verifiable. Missing, denied,
+host-owned `/usr/bin/env` and the configured reviewer executable with
+`sandbox_permissions=require_escalated`; repository-controlled code remains in
+the managed sandbox before and after that call. It records a truthful
+`codex-exec-tool` receipt and never claims that the parent launch or executable
+identity is security-verifiable. Missing, denied,
 timed-out, failed, or malformed parent transport is terminal and exposes no
 manual copy/paste fallback. Lifecycle evals cover the full first-head failure,
 objective correction, validation, and fresh corrected-head review sequence
@@ -180,3 +185,11 @@ enforces result chronology and requires both the selected review and degraded
 strict precursor to begin after durable Apply completion. It is recorded in
 `evidence/review-correction-review-after-apply.md`, is the first attempt for
 this signature, and requires a fresh exact-head review.
+The next exact-head reviewer identified
+`strict-unavailable-epoch-timestamp`: a strict startup failure synthesized its
+durable result at the Unix epoch, which the newly strengthened post-Apply gate
+correctly rejected. The bounded correction captures one current runtime clock
+value for both timestamps and adds an end-to-end persist/resume/delivery-gate
+regression. It is recorded in
+`evidence/review-correction-strict-unavailable-timestamp.md`, is the first
+attempt for this signature, and requires a fresh exact-head review.

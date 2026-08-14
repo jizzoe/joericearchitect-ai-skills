@@ -6,6 +6,11 @@ Decision time: 2026-08-13
 
 Expiration: 2026-08-13T20:57:51Z
 
+Current zero-touch delivery renewal: explicitly authorized for
+`add-authorized-degraded-independent-review` through
+`2026-08-14T11:22:00.000Z`. The earlier decision remains historical evidence;
+this renewal does not extend authorization to any other change.
+
 The owner explicitly accepts the following findings for authorized degraded
 independent review only:
 

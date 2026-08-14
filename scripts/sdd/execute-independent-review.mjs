@@ -28,7 +28,7 @@ export function probeDegradedIndependentReviewAdapter(adapter) {
   return { available: true, code: "degraded-independent-reviewer-ready" };
 }
 
-function strictUnavailableResult({ reviewPackage, configuredReviewer, code }) {
+function strictUnavailableResult({ reviewPackage, configuredReviewer, code, occurredAt }) {
   return {
     schemaVersion: 1,
     reviewRecordId: `strict-unavailable-${reviewPackage.manifestDigest.slice(0, 12)}`,
@@ -37,7 +37,7 @@ function strictUnavailableResult({ reviewPackage, configuredReviewer, code }) {
     attestation: { ref: configuredReviewer?.attestation?.ref ?? "strict-unavailable", nonInteractive: false, isolatedContext: false, freshContext: false, readOnly: false },
     assuranceLevel: "strict-isolated",
     baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest,
-    startedAt: new Date(0).toISOString(), completedAt: new Date(0).toISOString(), findings: [], status: "unavailable", unavailableCode: code
+    startedAt: occurredAt, completedAt: occurredAt, findings: [], status: "unavailable", unavailableCode: code
   };
 }
 
@@ -58,7 +58,12 @@ export async function executeAuthorizedIndependentReview({ package: reviewPackag
     ? { status: "unavailable", result: durable }
     : await executeIndependentReview({ package: reviewPackage, adapter: strictAdapter, configuredReviewer, implementerSession, invoke: invokeStrict });
   if (strict.status !== "unavailable") return { ...strict, assuranceLevel: "strict-isolated" };
-  const candidate = strict.result ?? strictUnavailableResult({ reviewPackage, configuredReviewer, code: strict.code ?? "independent-reviewer-unavailable" });
+  const candidate = strict.result ?? strictUnavailableResult({
+    reviewPackage,
+    configuredReviewer,
+    code: strict.code ?? "independent-reviewer-unavailable",
+    occurredAt: clock()
+  });
   if (!durable) {
     return { status: "unavailable", code: "strict-unavailable-evidence-not-durable", strictResult: candidate, requiresPersistence: true };
   }

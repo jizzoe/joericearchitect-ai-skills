@@ -56,3 +56,30 @@ evidence for task completion, not the final delivery gate by itself. The final
 implementation PR gate MUST contain a fresh strict-first result for the exact
 post-evidence commit and must preserve the same reduced-assurance disclosures
 if degraded fallback is used.
+
+## Zero-touch parent-runtime rehearsal
+
+The redesigned path was exercised without owner actions. Strict detached-view
+creation failed with `independent-review-view-create-failed`; the managed
+sandbox then validated the recovery request, materialized an exact-head archive
+containing only regular committed files, and produced the fixed parent tool
+request. Auto-review evaluated the actual escalation. Only host-owned
+`/usr/bin/env` and the configured Codex executable ran with parent authority;
+repository JavaScript remained inside the managed sandbox. The inner reviewer
+used the sealed archived view, disabled network/tool-environment inheritance,
+and returned schema-constrained findings. The parent adapter sealed those
+findings, the existing response validator accepted them directly, and cleanup
+removed the owned archive.
+
+Two accepted failed results demonstrate the full response path and triggered
+bounded objective corrections:
+
+- `degraded-9016eeb8-e609-420f-b179-8b21e4d44f3f` identified that delivery did
+  not yet enforce review-after-Apply chronology.
+- `degraded-c60eefa4-f43a-4800-993b-4acf2d3cfdcc` identified the epoch timestamp
+  on synthesized strict-unavailable evidence.
+
+Both remained labelled `authorized-degraded`; their runtime receipts explicitly
+set `securityVerifiable: false`, and neither resolves accepted risks `IR-001`
+or `IR-002`. The final delivery result is intentionally recorded at the PR gate
+after this evidence commit so that it can bind the immutable delivery head.

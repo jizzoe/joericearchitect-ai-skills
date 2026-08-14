@@ -4,14 +4,14 @@
 
 | Dimension | Status |
 |---|---|
-| Completeness | 14/14 tasks evidenced; 9/9 requirements mapped |
-| Correctness | 9/9 requirements and 38/38 scenarios covered by implementation, deterministic tests/evals, or exercised runtime evidence |
+| Completeness | 20/20 tasks evidenced; 46/46 requirements mapped |
+| Correctness | 46/46 requirements and 46/46 scenarios covered by implementation, deterministic tests/evals, or exercised runtime evidence |
 | Coherence | Design decisions followed; canonical assets remain assistant-neutral and wrappers remain thin |
 
 ## Completeness
 
 All implementation and evidence tasks are complete. The four delta
-specifications contain nine requirements and 38 scenarios. Coverage is mapped
+specifications contain 46 requirements and 46 scenarios. Coverage is mapped
 as follows:
 
 - Precise authorization and per-signature correction envelope:
@@ -43,14 +43,18 @@ as follows:
 
 ## Correctness
 
-An earlier exact-head runtime review first recorded strict detached-view
-unavailability, then accepted one fresh `authorized-degraded` result under the
-owner's exact bounded authorization. The result was bound to base, head,
-manifest, transition, expiration, reviewer, capability ledger, request digest,
-host execution, and cleanup. Later fresh reviews produced the immutable
-findings and authorized objective-correction chain recorded under `evidence/`;
-the current head therefore still requires its own fresh strict-first result.
-No evidence describes degraded review as strict or security-verified.
+The zero-touch runtime exercise recorded strict detached-view unavailability,
+prepared an exact-head regular-file archive in the managed sandbox, routed one
+fixed host-owned reviewer invocation through Auto-review, consumed the tool
+result directly, validated the response, and confirmed owned-view cleanup with
+an empty owner-action list. Accepted failed review records
+`degraded-9016eeb8-e609-420f-b179-8b21e4d44f3f` and
+`degraded-c60eefa4-f43a-4800-993b-4acf2d3cfdcc` prove that findings flow back
+through the production response validator without a human evidence relay. The
+findings drove the post-Apply chronology and current strict-unavailable
+timestamp corrections. The exact post-evidence delivery commit still requires
+a fresh result before merge. No evidence describes degraded review as strict
+or security-verified.
 
 Deterministic tests cover positive and negative scenarios for absent, expired,
 wrong-transition, stale, malformed, mutable, self-review, capability, runtime-
@@ -58,7 +62,7 @@ permission, launcher, Claude/Codex, correction-envelope, goal-expiration,
 authenticity-ledger, severity/disposition compatibility, unresolved-objective-
 fix routing, secret, unsafe-path,
 symlink, durable delivery-profile, correction-counter, and portability
-boundaries. `node --test` passed 240 tests in a clean exact-head clone.
+boundaries. `node --test` passed 249 tests in the owned clean worktree.
 `openspec validate --all --strict` passed all 24
 items. Adapter drift, skill metadata, shared guardrails, artifact quality,
 whitespace, secret-pattern, attribution, portability, and recovery reviews
@@ -66,10 +70,11 @@ passed.
 
 ## Coherence
 
-Implementation follows all seven design decisions: one extended v1 result,
+Implementation follows all eight design decisions: one extended v1 result,
 authorization outside the adapter, a distinct degraded path, exact re-
 evaluable delivery evidence, fixed Codex/Claude host recovery, explicit
-accepted-risk disclosure, and closed concise-request vocabulary. No third-
+accepted-risk disclosure, closed concise-request vocabulary, and terminal
+parent-runtime transport with no operator relay. No third-
 party dependency or code was added. Repository-specific identifiers remain in
 tracking and run evidence rather than reusable canonical assets.
 
