@@ -784,7 +784,17 @@ test("scenario inventory maps every delta-spec acceptance scenario", () => {
   const scenarioInventory = readJson("../scenarios.json").scenarios;
   const mapped = new Map();
   for (const item of scenarioInventory) mapped.set(item.scenario, (mapped.get(item.scenario) ?? 0) + 1);
-  const specRoot = path.join(root, "openspec/changes/add-base-implementation-quality-skills/specs");
+  const activeSpecRoot = path.join(root, "openspec/changes/add-base-implementation-quality-skills/specs");
+  const archiveRoot = path.join(root, "openspec/changes/archive");
+  const archivedChanges = fs.existsSync(archiveRoot)
+    ? fs.readdirSync(archiveRoot).filter((name) => name.endsWith("-add-base-implementation-quality-skills"))
+    : [];
+  const specRoot = fs.existsSync(activeSpecRoot)
+    ? activeSpecRoot
+    : archivedChanges.length === 1
+      ? path.join(archiveRoot, archivedChanges[0], "specs")
+      : null;
+  assert.ok(specRoot, `expected one active or archived implementation-quality change, found ${archivedChanges.length}`);
   const specFiles = ["base-code-review/spec.md", "base-verification-loop/spec.md"];
   const scenarios = specFiles.flatMap((file) => [...fs.readFileSync(path.join(specRoot, file), "utf8").matchAll(/^#### Scenario: (.+)$/gm)].map((match) => match[1]));
   assert.equal(scenarios.length, 30);
