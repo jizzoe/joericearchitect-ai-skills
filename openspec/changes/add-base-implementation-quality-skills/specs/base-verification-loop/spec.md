@@ -166,7 +166,9 @@ Archive is complete.
 - **WHEN** every required check for the selected profile has current passing or
   explicitly not-applicable evidence
 - **THEN** the structured result reports readiness for OpenSpec Verify and cites
-  the complete evidence set
+  the complete evidence set, every not-applicable result states a non-empty
+  scope reason, and no check derived as applicable by the profile and UI scope
+  is marked not applicable
 
 #### Scenario: Required check is failed or stale
 - **WHEN** any required result is failed, missing, stale, or tied to different

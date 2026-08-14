@@ -136,6 +136,17 @@ the latest passed correction attempt's evidence set. A regression proves an
 unrelated current local-review record cannot substantiate a different
 correction.
 
+### IQ-R12 — objective-fix / objective-fix
+
+Fresh strict review found that required checks could report `not-applicable`
+without the scope reason promised by the design, including checks derived as
+applicable by the selected profile. Selected checks now accept an applicability
+reason only for `not-applicable`, require that reason to be non-empty, and
+prevent any derived profile or UI minimum from using `not-applicable` to support
+readiness. Regressions cover an unjustified common check, a reasoned but still
+applicable UI check, and reasoned browser evidence that is genuinely outside an
+explicit non-UI scope.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -168,8 +179,8 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R9: 19 passed, 0 failed. The complete
-current-main Node suite passes 187 tests. Syntax checks, whitespace checks,
+Focused tests after IQ-R1 through IQ-R12: 21 passed, 0 failed. The complete
+current-main Node suite passes 189 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
 validation pass. A fresh exact-head strict independent review is the next gate.

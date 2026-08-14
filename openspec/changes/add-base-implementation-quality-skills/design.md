@@ -162,7 +162,9 @@ reference; they do not persist environment values or raw secret-bearing output.
 
 Focused checks run first. Broader checks are selected from changed behavior and
 the chosen profile. `not-applicable` requires an explicit reason tied to scope;
-it is never inferred from a missing tool or failed command.
+it is never inferred from a missing tool or failed command. A check derived as
+applicable from the delivery profile and explicit UI scope must pass and cannot
+be made non-applicable by supplying a reason.
 
 Alternative: let the model compose arbitrary shell command strings from review
 context. Rejected because untrusted content could become executable input and

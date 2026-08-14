@@ -348,6 +348,41 @@ test("profile readiness requires every common, production, and applicable UI che
     const result = validateImplementationQualityResult(value);
     assert.ok(result.issues.some((item) => item.code === "missing-required-profile-check" && item.detail === id), id);
   }
+
+  const inapplicableUi = clone(ui);
+  const uiCheck = inapplicableUi.details.selectedChecks.find((item) => item.id === "critical-ui-interaction");
+  uiCheck.result = "not-applicable";
+  uiCheck.applicabilityReason = "The interaction does not exist in this fixture.";
+  inapplicableUi.evidence.find((item) => item.id === uiCheck.evidenceId).result = "not-applicable";
+  const inapplicableUiResult = validateImplementationQualityResult(inapplicableUi);
+  assert.ok(inapplicableUiResult.issues.some((item) => item.code === "readiness-overclaim"));
+});
+
+test("not-applicable checks require scope reasons and cannot bypass applicable minimums", () => {
+  const unjustified = readJson("valid-verification-prototype.json");
+  const focused = unjustified.details.selectedChecks.find((item) => item.id === "focused-unit-or-integration");
+  focused.result = "not-applicable";
+  unjustified.evidence.find((item) => item.id === focused.evidenceId).result = "not-applicable";
+  const unjustifiedResult = validateImplementationQualityResult(unjustified);
+  assert.ok(unjustifiedResult.issues.some((item) => item.code === "missing-applicability-reason"));
+  assert.ok(unjustifiedResult.issues.some((item) => item.code === "readiness-overclaim"));
+
+  const scopedOut = readJson("valid-verification-prototype.json");
+  scopedOut.evidence.push({ id: "browser-not-applicable", type: "test", subject: "browser evidence", result: "not-applicable" });
+  scopedOut.details.selectedChecks.push({
+    id: "browser-not-in-scope",
+    category: "browser",
+    required: true,
+    result: "not-applicable",
+    evidenceId: "browser-not-applicable",
+    applicabilityReason: "The explicit UI scope is none."
+  });
+  scopedOut.details.evidenceBindings.push({
+    evidenceId: "browser-not-applicable",
+    binding: { kind: "workspace", value: "workspace-state-1" },
+    changedPaths: ["src/widget.mjs"]
+  });
+  assert.deepEqual(validateImplementationQualityResult(scopedOut), { valid: true, issues: [] });
 });
 
 test("readiness requires current evidence bindings for prototype and production checks", () => {

@@ -65,6 +65,9 @@ production gate summary in `details`. Each completed check, test, screenshot,
 accessibility check, and review references one stable top-level evidence ID
 whose result agrees with the selected-check result and whose details binding
 matches the current workspace or commit and changed-path set. Preserve each
+`not-applicable` result with a non-empty reason tied to explicit scope. A check
+derived as applicable by the selected profile and UI scope must pass; it cannot
+use `not-applicable` to establish readiness. Preserve each
 local finding with an explicit unresolved, corrected, accepted-warning, or
 false-positive resolution. Corrected findings use the exact evidence set from
 their latest current passed correction;

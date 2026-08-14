@@ -16,7 +16,9 @@ signature is blocked.
 The result records UI scope as `none` or `web`, plus layout-change and material-
 change flags. The validator derives the complete mandatory check inventory from
 that record and the delivery profile; callers cannot establish readiness by
-omitting a minimum check.
+omitting a minimum check or marking an applicable minimum `not-applicable`.
+Every selected check reported as `not-applicable` retains a non-empty reason
+tied to the explicit scope record.
 
 ## Prototype Rapid
 

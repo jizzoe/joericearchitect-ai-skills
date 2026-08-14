@@ -185,12 +185,17 @@ function validateReviewDetails(result, issues) {
 
 function validateCheck(check, index, evidenceById, issues) {
   const subject = `result.details.selectedChecks[${index}]`;
-  if (!exactKeys(check, new Set(["id", "category", "required", "result", "evidenceId"]), subject, issues)) return;
+  if (!exactKeys(check, new Set(["id", "category", "required", "result", "evidenceId", "applicabilityReason"]), subject, issues)) return;
   required(check, ["id", "category", "required", "result"], subject, issues);
   if (!nonEmpty(check.id)) issues.push(issue("invalid-check-id", `${subject}.id`));
   if (!checkCategories.has(check.category)) issues.push(issue("invalid-check-category", `${subject}.category`));
   if (typeof check.required !== "boolean") issues.push(issue("invalid-check-required", `${subject}.required`));
   if (!checkResults.has(check.result)) issues.push(issue("invalid-check-result", `${subject}.result`));
+  if (check.result === "not-applicable") {
+    if (!nonEmpty(check.applicabilityReason)) issues.push(issue("missing-applicability-reason", `${subject}.applicabilityReason`));
+  } else if ("applicabilityReason" in check) {
+    issues.push(issue("unexpected-applicability-reason", `${subject}.applicabilityReason`));
+  }
   if (check.result !== "pending") {
     if (!nonEmpty(check.evidenceId)) issues.push(issue("missing-check-evidence", `${subject}.evidenceId`));
     else if (!evidenceById.has(check.evidenceId)) issues.push(issue("unknown-evidence-reference", `${subject}.evidenceId`, check.evidenceId));
@@ -467,11 +472,8 @@ function validateVerificationDetails(result, issues) {
   if (exhaustedCorrection && result.status !== "blocked") issues.push(issue("exhausted-correction-requires-blocked-status", "result.status"));
   if (exhaustedCorrection && details.readiness !== "blocked") issues.push(issue("exhausted-correction-requires-blocked-readiness", `${subject}.readiness`));
 
-  const requiredFailure = Array.isArray(details.selectedChecks) && details.selectedChecks.some((check) => {
-    if (!check.required || check.result === "passed") return false;
-    const productionGateCheck = details.profile === "production-rapid" && new Set(["ci", "independent-review"]).has(check.category);
-    return check.result !== "not-applicable" || productionGateCheck;
-  });
+  const requiredFailure = Array.isArray(details.selectedChecks) && details.selectedChecks.some((check) =>
+    check.required && new Set(["failed", "pending"]).has(check.result));
   let missingProfileCheck = false;
   const selectedById = new Map((Array.isArray(details.selectedChecks) ? details.selectedChecks : []).map((check) => [check.id, check]));
   for (const [id, category] of requiredProfileChecks(details)) {
@@ -479,6 +481,8 @@ function validateVerificationDetails(result, issues) {
     if (!check || check.category !== category || check.required !== true) {
       missingProfileCheck = true;
       issues.push(issue("missing-required-profile-check", `${subject}.selectedChecks`, id));
+    } else if (check.result !== "passed") {
+      missingProfileCheck = true;
     }
   }
   const hasGaps = Array.isArray(details.unresolvedGaps) && details.unresolvedGaps.length > 0;
