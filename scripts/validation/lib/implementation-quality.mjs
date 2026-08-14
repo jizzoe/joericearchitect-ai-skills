@@ -332,7 +332,7 @@ function evidenceIsCurrent(evidenceId, bindings, details) {
 
 function validateProductionGate(gate, details, evidenceById, issues) {
   const subject = "result.details.productionGate";
-  const keys = new Set(["head", "ciEvidenceId", "independentReviewEvidenceId", "reviewStatus", "reviewHead", "reviewerSession", "implementerSession", "source", "assurance"]);
+  const keys = new Set(["head", "ciEvidenceId", "ciHead", "ciSource", "independentReviewEvidenceId", "reviewStatus", "reviewHead", "reviewerSession", "implementerSession", "source", "assurance"]);
   if (!exactKeys(gate, keys, subject, issues)) return { valid: false, ready: false };
   required(gate, [...keys], subject, issues);
   let valid = true;
@@ -344,7 +344,9 @@ function validateProductionGate(gate, details, evidenceById, issues) {
   if (gate.assurance !== "strict-isolated") fail("strict-review-required", "assurance");
   if (!nonEmpty(gate.reviewerSession) || !nonEmpty(gate.implementerSession) || gate.reviewerSession === gate.implementerSession) fail("reviewer-not-independent", "reviewerSession");
   const ci = evidenceById.get(gate.ciEvidenceId);
-  if (!ci) fail("ci-evidence-missing", "ciEvidenceId");
+  if (!ci || ci.type !== "validation") fail("ci-evidence-missing", "ciEvidenceId");
+  if (gate.ciSource !== "exact-head-ci") fail("invalid-ci-source", "ciSource");
+  if (gate.ciHead !== gate.head) fail("ci-head-mismatch", "ciHead");
   const review = evidenceById.get(gate.independentReviewEvidenceId);
   if (!review || review.type !== "review") fail("independent-review-evidence-missing", "independentReviewEvidenceId");
   return {
@@ -616,12 +618,19 @@ export function selectVerificationChecks({ profile, hasUi = false, layoutChanged
   return { status: "ready", checks, issues: [] };
 }
 
-export function evaluateVerificationLoop({ completedStages = [], currentBinding, evidenceBindings = [], correctionAttemptsByFailureSignature = {}, correctionBudget = 3 } = {}) {
+export function evaluateVerificationLoop({ completedStages = [], currentBinding, evidenceBindings = [], correctionStateByFailureSignature = {}, correctionBudget = 3 } = {}) {
   if (!Number.isInteger(correctionBudget) || correctionBudget < 1 || correctionBudget > 3) return { state: "paused", reason: "invalid-correction-budget" };
   if (!nonEmpty(currentBinding)) return { state: "paused", reason: "missing-current-binding" };
   if (!Array.isArray(completedStages) || completedStages.some((stage, index) => stage !== verificationStages[index])) return { state: "paused", reason: "stages-out-of-order" };
   if (!Array.isArray(evidenceBindings) || evidenceBindings.some((binding) => binding !== currentBinding)) return { state: "paused", reason: "stale-evidence" };
-  if (Object.values(correctionAttemptsByFailureSignature).some((count) => !Number.isInteger(count) || count < 0 || count >= correctionBudget)) return { state: "blocked", reason: "correction-limit-exhausted" };
+  for (const state of Object.values(correctionStateByFailureSignature)) {
+    if (!isObject(state) || !Number.isInteger(state.attempts) || state.attempts < 0 || !new Set(["passed", "failed", null]).has(state.latestResult) || (state.attempts === 0) !== (state.latestResult === null)) {
+      return { state: "paused", reason: "invalid-correction-state" };
+    }
+    if (state.attempts > correctionBudget || (state.attempts === correctionBudget && state.latestResult === "failed")) {
+      return { state: "blocked", reason: "correction-limit-exhausted" };
+    }
+  }
   const nextStage = verificationStages[completedStages.length] ?? null;
   return nextStage ? { state: "in-progress", nextStage } : { state: "complete", nextStage: null };
 }

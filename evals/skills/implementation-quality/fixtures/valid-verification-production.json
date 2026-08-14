@@ -58,6 +58,8 @@
     "productionGate": {
       "head": "1111111111111111111111111111111111111111",
       "ciEvidenceId": "ci-current",
+      "ciHead": "1111111111111111111111111111111111111111",
+      "ciSource": "exact-head-ci",
       "independentReviewEvidenceId": "strict-review",
       "reviewStatus": "passed",
       "reviewHead": "1111111111111111111111111111111111111111",

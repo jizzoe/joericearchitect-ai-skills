@@ -53,6 +53,8 @@ do not duplicate its package, adapter, or delivery logic. Local review,
 implementer self-review, ordinary pull-request review, and missing strict review
 cannot satisfy it. If the current strict gate is unavailable, pause production
 readiness without inventing a fallback or silently changing profiles.
+The production gate records CI provenance as `exact-head-ci` and binds its CI
+head to the same current commit as the strict review.
 
 ## Result
 

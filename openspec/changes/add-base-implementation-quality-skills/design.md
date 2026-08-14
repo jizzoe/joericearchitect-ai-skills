@@ -92,9 +92,10 @@ the following documented `details` shapes before rendering Markdown:
 - verification: selected profile, explicit UI applicability and change flags,
   complete mandatory check inventory, critical path, changed paths, current
   binding records for readiness evidence, correction budget and
-  attempts by failure signature, local findings with evidence-backed resolution
-  state, unresolved gaps, recovery steps, current head or workspace binding
-  when applicable, and readiness state.
+  attempts and latest outcomes by failure signature, local findings with
+  evidence-backed resolution state, unresolved gaps, recovery steps, current
+  head or workspace binding when applicable, exact-head CI provenance for
+  production, and readiness state.
 
 Finding objects use stable IDs; `blocker`, `high`, `medium`, or `low` severity;
 an independent `objective-fix`, `human-decision`, `warning`, or

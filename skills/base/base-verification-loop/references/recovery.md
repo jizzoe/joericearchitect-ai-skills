@@ -2,7 +2,8 @@
 
 Reread current authorization, runtime permission, intended behavior, changed
 paths, trusted check definitions, head or workspace binding, selected checks,
-correction attempts by failure signature, local findings, CI evidence, and the
+correction attempts and latest outcomes by failure signature, local findings,
+CI provenance and exact head, and the
 canonical strict-review gate. Resume at the first incomplete ordered stage.
 
 Do not reuse evidence whose workspace or commit binding or changed-path set has

@@ -174,6 +174,22 @@ selector now always requires Playwright and Chromium for UI and conditionally
 requires axe-core for material UI. A regression proves non-material UI is ready
 without axe-core while retaining browser and interaction checks.
 
+### IQ-R16 — objective-fix / objective-fix
+
+Fresh strict review found that the compact loop state treated any final-budget
+attempt as exhausted even when it passed. Per-signature loop state now includes
+the attempt count and latest result. Only a failed attempt at the budget (or any
+count beyond it) blocks; a passed final permitted attempt continues normally.
+Regressions cover passed, failed, and malformed final-attempt state.
+
+### IQ-R17 — objective-fix / objective-fix
+
+Fresh strict review found that generic passed evidence could satisfy the
+production CI gate. Production-gate details now require `exact-head-ci`
+provenance and a CI head equal to the production head, while the referenced
+top-level evidence must be validation evidence. Adversarial regressions reject
+review evidence, a different CI head, and a non-CI source.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 

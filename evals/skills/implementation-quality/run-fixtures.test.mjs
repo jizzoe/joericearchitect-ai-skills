@@ -99,8 +99,10 @@ test("verification state machine is ordered, idempotent, current, and correction
   assert.deepEqual(evaluateVerificationLoop({ completedStages: verificationStages, currentBinding: "state-1", evidenceBindings: ["state-1"] }), { state: "complete", nextStage: null });
   assert.equal(evaluateVerificationLoop({ completedStages: ["select-checks"], currentBinding: "state-1" }).reason, "stages-out-of-order");
   assert.equal(evaluateVerificationLoop({ currentBinding: "state-2", evidenceBindings: ["state-1"] }).reason, "stale-evidence");
-  assert.deepEqual(evaluateVerificationLoop({ currentBinding: "state-1", correctionAttemptsByFailureSignature: { validation: 3 } }), { state: "blocked", reason: "correction-limit-exhausted" });
-  assert.deepEqual(evaluateVerificationLoop({ currentBinding: "state-1", correctionBudget: 1, correctionAttemptsByFailureSignature: { validation: 1 } }), { state: "blocked", reason: "correction-limit-exhausted" });
+  assert.deepEqual(evaluateVerificationLoop({ currentBinding: "state-1", correctionStateByFailureSignature: { validation: { attempts: 3, latestResult: "failed" } } }), { state: "blocked", reason: "correction-limit-exhausted" });
+  assert.deepEqual(evaluateVerificationLoop({ currentBinding: "state-1", correctionBudget: 1, correctionStateByFailureSignature: { validation: { attempts: 1, latestResult: "failed" } } }), { state: "blocked", reason: "correction-limit-exhausted" });
+  assert.deepEqual(evaluateVerificationLoop({ currentBinding: "state-1", correctionStateByFailureSignature: { validation: { attempts: 3, latestResult: "passed" } } }), initial);
+  assert.deepEqual(evaluateVerificationLoop({ currentBinding: "state-1", correctionStateByFailureSignature: { validation: { attempts: 3 } } }), { state: "paused", reason: "invalid-correction-state" });
 });
 
 test("verification operations reuse exact local-implementation authorization", () => {
@@ -232,6 +234,18 @@ test("result validator rejects readiness overclaim, stale production head, and s
   const mismatchedEvidenceResult = validateImplementationQualityResult(mismatchedProductionEvidence);
   assert.ok(mismatchedEvidenceResult.issues.some((item) => item.code === "production-check-evidence-mismatch"));
   assert.ok(mismatchedEvidenceResult.issues.some((item) => item.code === "readiness-overclaim"));
+
+  const nonCiEvidence = readJson("valid-verification-production.json");
+  nonCiEvidence.evidence.find((item) => item.id === "ci-current").type = "review";
+  assert.ok(validateImplementationQualityResult(nonCiEvidence).issues.some((item) => item.code === "ci-evidence-missing"));
+
+  const staleCiHead = readJson("valid-verification-production.json");
+  staleCiHead.details.productionGate.ciHead = "2".repeat(40);
+  assert.ok(validateImplementationQualityResult(staleCiHead).issues.some((item) => item.code === "ci-head-mismatch"));
+
+  const invalidCiSource = readJson("valid-verification-production.json");
+  invalidCiSource.details.productionGate.ciSource = "local-validation";
+  assert.ok(validateImplementationQualityResult(invalidCiSource).issues.some((item) => item.code === "invalid-ci-source"));
 
   const staleCorrection = readJson("valid-verification-production.json");
   staleCorrection.details.correctionAttempts.push({
