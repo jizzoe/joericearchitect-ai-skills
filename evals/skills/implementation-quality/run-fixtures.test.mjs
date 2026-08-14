@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+import { packageDigest } from "../../../scripts/sdd/independent-review-contract.mjs";
 import { checkAdapterDrift } from "../../../scripts/sdd/check-adapter-drift.mjs";
 import {
   authorizeVerificationOperation,
@@ -20,6 +21,44 @@ const root = path.resolve(new URL("../../..", import.meta.url).pathname);
 const fixtures = path.join(root, "evals/skills/implementation-quality/fixtures");
 const readJson = (name) => JSON.parse(fs.readFileSync(path.join(fixtures, name), "utf8"));
 const clone = (value) => structuredClone(value);
+
+function productionReviewAuthorization(head) {
+  const baseCommit = "0".repeat(40);
+  const reviewPackage = readJson("../../independent-review/fixtures/valid-package.json");
+  reviewPackage.baseCommit = baseCommit;
+  reviewPackage.headCommit = head;
+  reviewPackage.validationEvidence = ["focused checks passed", "profile checks passed"];
+  reviewPackage.manifestDigest = packageDigest(reviewPackage);
+  const result = readJson("../../independent-review/fixtures/valid-result.json");
+  result.baseCommit = baseCommit;
+  result.headCommit = head;
+  result.manifestDigest = reviewPackage.manifestDigest;
+  const applyEvidence = {
+    reference: "apply-current",
+    current: true,
+    headCommit: head,
+    completedAt: "2026-08-13T03:00:00.000Z",
+    validationEvidence: [...reviewPackage.validationEvidence]
+  };
+  const pr = { entry: "change", kind: "pr", id: "7", repository: "owner/repository", baseBranch: "main", headCommit: head, evidence: { reference: "pr", current: true, headCommit: head } };
+  const issueRecord = { entry: "change", kind: "issue", id: "8", repository: "owner/repository", evidence: { reference: "issue", current: true } };
+  const branch = { entry: "change", kind: "branch", id: "feature/change", repository: "owner/repository", baseBranch: "main", headCommit: head, evidence: { reference: "branch", current: true, headCommit: head } };
+  const reviewRecord = { id: result.reviewRecordId, entry: "change", transition: "merge-pr", evidence: {}, reviewPackage, result, dispositions: [] };
+  const steps = ["issue", "branch", "pr", "merge-pr", "sync-change", "archive-change", "delete-merged-topic-branch"]
+    .map((id, index) => ({ id, status: index < 3 ? "complete" : "pending", evidence: index < 3 ? { present: true, current: true } : undefined }));
+  return {
+    authorization: { targets: ["workspace:reports"], allowedMutations: ["run-lifecycle-action"], derivedTargets: { queue: ["change"], selectedEntry: "change", repository: "owner/repository" } },
+    runtime: { permittedOperations: ["run-lifecycle-action"] },
+    config: { independentReviewer: { type: "fixture", identity: "fresh-reviewer", enabled: true, attestation: { ref: "fixture-attestation", nonInteractive: true, isolatedContext: true, readOnly: true } } },
+    request: {
+      profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", target: "pr:7", selectedEntry: "change", derivedRecord: pr,
+      headCommit: head, baseCommit, evidenceCurrent: true, evidenceReference: "pr", evidenceHeadCommit: head, recovery: "re-read state",
+      deliveryProfile: "production-rapid", implementerSession: "implementer", reviewer: { type: "fixture", identity: "fresh-reviewer" },
+      checkpoint: { selectedEntry: { name: "change", records: [issueRecord, branch, pr], applyEvidenceRecords: [applyEvidence], reviewRecords: [reviewRecord] }, steps },
+      applyEvidence, independentReviewPackage: reviewPackage, independentReviewResult: result, reviewDispositions: []
+    }
+  };
+}
 
 test("valid code-review result is findings-first and shared-contract compliant", () => {
   const result = readJson("valid-code-review.json");
@@ -258,13 +297,31 @@ test("paused production result can preserve valid unavailable strict-review evid
 test("production gate is exact-head, strict, fresh, and independent", () => {
   const head = "1".repeat(40);
   const ciEvidence = { status: "passed", head };
-  const gate = { source: "isolated-independent-review", assurance: "strict-isolated", status: "passed", head, reviewerSession: "reviewer-1", implementerSession: "implementer-1", evidenceId: "review-1" };
-  assert.deepEqual(evaluateProductionReadiness({ currentHead: head, ciEvidence, independentReviewGate: gate }), { ready: true, reason: "current-strict-evidence" });
-  assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence: { ...ciEvidence, head: "2".repeat(40) }, independentReviewGate: gate }).reason, "ci-evidence-not-current");
-  assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence, independentReviewGate: { ...gate, head: "2".repeat(40) } }).reason, "strict-review-wrong-head");
-  assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence, independentReviewGate: { ...gate, status: "unavailable" } }).reason, "strict-review-unavailable");
-  assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence, independentReviewGate: { ...gate, reviewerSession: "implementer-1" } }).reason, "strict-review-not-independent");
-  assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence, independentReviewGate: { ...gate, assurance: "unverified" } }).reason, "strict-review-required");
+  const gate = productionReviewAuthorization(head);
+  assert.deepEqual(evaluateProductionReadiness({ currentHead: head, ciEvidence, productionReviewAuthorization: gate }), { ready: true, reason: "current-strict-evidence" });
+  assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence: { ...ciEvidence, head: "2".repeat(40) }, productionReviewAuthorization: gate }).reason, "ci-evidence-not-current");
+
+  const wrongHead = clone(gate);
+  wrongHead.request.headCommit = "2".repeat(40);
+  assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence, productionReviewAuthorization: wrongHead }).reason, "strict-review-wrong-head");
+
+  const unavailable = clone(gate);
+  unavailable.request.independentReviewResult.status = "unavailable";
+  unavailable.request.independentReviewResult.unavailableCode = "independent-reviewer-runtime-unavailable";
+  unavailable.request.independentReviewResult.attestation = { ...unavailable.request.independentReviewResult.attestation, nonInteractive: false, isolatedContext: false, readOnly: false };
+  unavailable.request.checkpoint.selectedEntry.reviewRecords[0].result = unavailable.request.independentReviewResult;
+  assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence, productionReviewAuthorization: unavailable }).reason, "strict-review-unavailable");
+
+  const selfReview = clone(gate);
+  selfReview.request.implementerSession = "fresh-reviewer";
+  assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence, productionReviewAuthorization: selfReview }).reason, "strict-review-not-independent");
+
+  const fabricatedLabels = { request: { profile: "sdd-delivery", operation: "run-lifecycle-action", lifecycleAction: "merge-pr", deliveryProfile: "production-rapid", headCommit: head, status: "passed", assurance: "strict-isolated" } };
+  assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence, productionReviewAuthorization: fabricatedLabels }).reason, "strict-review-not-passed");
+
+  const nondurable = clone(gate);
+  nondurable.request.checkpoint.selectedEntry.reviewRecords = [];
+  assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence, productionReviewAuthorization: nondurable }).reason, "strict-review-not-passed");
 });
 
 test("result validator rejects readiness overclaim, stale production head, and self review", () => {

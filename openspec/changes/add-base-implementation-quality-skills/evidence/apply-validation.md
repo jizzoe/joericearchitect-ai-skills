@@ -13,7 +13,8 @@ Change: `add-base-implementation-quality-skills`
   not-applicable reasons that cannot bypass applicable checks, and historical
   correction bindings with current latest-attempt readiness, and complete
   reviewed-path coverage, consistent result status/readiness state, and
-  complete-result sensitive-value scanning.
+  complete-result sensitive-value scanning, Assumptions rendering, and
+  canonical durable production-review authorization.
 - `node scripts/validation/validate-implementation-quality.mjs
   evals/skills/implementation-quality/fixtures/valid-code-review.json` returned
   `valid: true`.

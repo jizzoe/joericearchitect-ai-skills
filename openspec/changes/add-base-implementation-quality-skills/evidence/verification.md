@@ -48,9 +48,9 @@ The validated strict independent review record
 `codex-review-d0fc9717c544-20260814T011625Z` reports zero findings for the sealed
 implementation head. All earlier objective findings are preserved with their
 corrections and rerun evidence in this change's `evidence/` directory.
-The later final-head review finding about top-level sensitive-value coverage is
-also corrected and covered by the refreshed suite, as is the subsequent
-Assumptions-section rendering finding.
+The later final-head findings about top-level sensitive-value coverage,
+Assumptions-section rendering, and unvalidated production-readiness claims are
+also corrected and covered by the refreshed suite.
 
 ## Coherence
 

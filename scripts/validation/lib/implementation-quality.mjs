@@ -684,14 +684,27 @@ export function authorizeVerificationOperation({ authorization, runtime, config,
   });
 }
 
-export function evaluateProductionReadiness({ currentHead, ciEvidence, independentReviewGate } = {}) {
+export function evaluateProductionReadiness({ currentHead, ciEvidence, productionReviewAuthorization } = {}) {
   if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(currentHead ?? "")) return { ready: false, reason: "noncanonical-current-head" };
   if (!ciEvidence || ciEvidence.status !== "passed" || ciEvidence.head !== currentHead) return { ready: false, reason: "ci-evidence-not-current" };
-  if (!independentReviewGate || independentReviewGate.source !== "isolated-independent-review") return { ready: false, reason: "strict-review-gate-malformed" };
-  if (independentReviewGate.assurance !== "strict-isolated") return { ready: false, reason: "strict-review-required" };
-  if (independentReviewGate.status !== "passed") return { ready: false, reason: independentReviewGate.status === "unavailable" ? "strict-review-unavailable" : "strict-review-not-passed" };
-  if (independentReviewGate.head !== currentHead) return { ready: false, reason: "strict-review-wrong-head" };
-  if (!nonEmpty(independentReviewGate.reviewerSession) || !nonEmpty(independentReviewGate.implementerSession) || independentReviewGate.reviewerSession === independentReviewGate.implementerSession) return { ready: false, reason: "strict-review-not-independent" };
-  if (!nonEmpty(independentReviewGate.evidenceId)) return { ready: false, reason: "strict-review-evidence-missing" };
+  const request = productionReviewAuthorization?.request;
+  if (!isObject(productionReviewAuthorization) || !isObject(request)) return { ready: false, reason: "strict-review-gate-malformed" };
+  if (request.profile !== "sdd-delivery" || request.operation !== "run-lifecycle-action" ||
+      request.lifecycleAction !== "merge-pr" || request.deliveryProfile !== "production-rapid") {
+    return { ready: false, reason: "strict-review-required" };
+  }
+  if (request.headCommit !== currentHead) return { ready: false, reason: "strict-review-wrong-head" };
+  const gate = checkOperationAuthorization(productionReviewAuthorization);
+  if (!gate.allowed) {
+    const code = gate.issues?.[0]?.code;
+    if (code === "independent-reviewer-unavailable" || code === "independent-reviewer-runtime-unavailable") {
+      return { ready: false, reason: "strict-review-unavailable" };
+    }
+    if (code === "independent-review-self-review") return { ready: false, reason: "strict-review-not-independent" };
+    if (["independent-review-result-stale-input", "independent-review-input-incomplete"].includes(code)) {
+      return { ready: false, reason: "strict-review-wrong-head" };
+    }
+    return { ready: false, reason: "strict-review-not-passed" };
+  }
   return { ready: true, reason: "current-strict-evidence" };
 }

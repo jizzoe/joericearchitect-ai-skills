@@ -19,7 +19,7 @@ Change: `add-base-implementation-quality-skills`
 | Initial web UI evidence is deterministic | Profile selector and profile reference | Exact `1440x900`, `390x844`, screenshot, interaction, axe-core, and manual-review assertions |
 | Missing verification tools fail visibly | Profile selector returns `needs-authorization` or `paused` | Interactive and autonomous missing-prerequisite tests |
 | Objective corrections and rereview are bounded | State evaluator plus existing durable local-operation checker | Narrower-budget, three-attempt, stale-binding, and durable correction tests |
-| Production readiness retains current strict review gates | `evaluateProductionReadiness` and structured production gate summary | Strict pass, unavailable, malformed, wrong-head, stale CI, non-strict assurance, and self-review tests |
+| Production readiness retains current strict review gates | `evaluateProductionReadiness`, the canonical production-rapid operation checker, and structured production gate summary | Canonical strict pass, unavailable, malformed, wrong-head, stale CI, self-review, fabricated-label, and nondurable-record tests |
 | Verification results are structured and lifecycle-limited | Verification details validator and renderer | Prototype/production results, paused result, readiness-overclaim, and no-delivery-overclaim tests |
 | Canonical verification behavior remains portable | Canonical skill, thin wrappers, structured product check definitions | Second-workspace, trusted-argv, adapter-drift, and cross-assistant tests |
 
@@ -249,6 +249,17 @@ order. The renderer now emits an Assumptions section between Evidence Gaps and
 Scope, with either every assumption or an explicit `None.` state. Focused
 regressions verify order, non-empty content, and empty-state rendering.
 
+### IQ-R25 — high / objective-fix
+
+Final exact-head strict review found that the production-readiness helper trusted
+caller-supplied labels without validating canonical independent-review evidence.
+The helper now delegates to the existing production-rapid lifecycle
+authorization gate and accepts readiness only when that owner validates the v1
+immutable package, normalized result and isolation attestation, configured
+reviewer, current Apply evidence, exact reviewed head, and exact durable review
+record. Adversarial regressions prove fabricated labels and a missing durable
+record cannot establish readiness.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -281,12 +292,12 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R24: 25 passed, 0 failed. The complete
+Focused tests after IQ-R1 through IQ-R25: 25 passed, 0 failed. The complete
 current-main Node suite passes 193 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
 validation pass. Strict review record
 `codex-review-d0fc9717c544-20260814T011625Z` passed with zero findings for sealed
 implementation head `d0fc9717c54487943566100afd80716bb6cd2976`; the later
-final-head findings IQ-R23 and IQ-R24 are corrected and require a fresh
+final-head findings IQ-R23 through IQ-R25 are corrected and require a fresh
 exact-head review.
