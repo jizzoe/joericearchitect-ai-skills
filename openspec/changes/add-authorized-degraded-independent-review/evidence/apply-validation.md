@@ -6,7 +6,7 @@ self-referential commit literal.
 
 Passed current evidence:
 
-- `node --test` in a clean exact-head clone — 213 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock and enclosing-goal expiration, required distinct implementer/reviewer identity binding, restricted reviewer home/credential access, machine-required degraded authenticity limitations, durable-source per-signature correction enforcement, delimiter-safe failure signatures, and complete chain linkage, disposition compatibility and unresolved-objective-fix routing, disposition-driven human pauses, host package rederivation, symlink-safe package injection and Git-object artifact derivation, authorized delivery-profile binding, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, findings, detached view, portability, secrets, and adapter boundaries.
+- `node --test` in a clean exact-head clone — 240 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock and enclosing-goal expiration, required distinct implementer/reviewer identity binding, restricted reviewer home/credential access, machine-required degraded authenticity limitations, durable-source per-signature correction enforcement for independent-review and verification-loop sources, delimiter-safe failure signatures, complete chain linkage, disposition compatibility and unresolved-objective-fix routing, disposition-driven human pauses, host package rederivation, symlink-safe package injection and Git-object artifact derivation, authorized delivery-profile binding, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, implementation-quality integration, findings, detached view, portability, secrets, and adapter boundaries.
 - `node --test scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/independent-review-v1-gate.test.mjs scripts/sdd/test/execute-independent-review.test.mjs` — 35 focused authorization, launcher, adapter, result-contract, and delivery-gate tests pass after the recorded review corrections.
 - `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 54 focused launcher, request, adapter, and lifecycle tests pass.
 - `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 15 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running and per-signature correction budget enforcement.
@@ -15,7 +15,7 @@ Passed current evidence:
 - `node scripts/validation/validate-shared-guardrails.mjs` — canonical guardrail linkage passes.
 - `node scripts/validation/validate-openspec-artifacts.mjs openspec/changes/add-authorized-degraded-independent-review` — planning artifact quality passes.
 - `openspec validate add-authorized-degraded-independent-review --strict` — change artifacts pass.
-- `openspec validate --all --strict` — 22 items pass.
+- `openspec validate --all --strict` — 24 items pass.
 - `git diff --check` — no whitespace errors.
 - Secret-pattern review over all affected canonical, schema, script, eval, and
   OpenSpec paths reports no token, private-key, or bearer-secret matches.
@@ -138,3 +138,10 @@ valued signatures. It is recorded in
 `evidence/review-correction-failure-signature-delimiter.md` and is the
 seventeenth globally ordered correction, first for its failure signature. The
 corrected head requires affected verification and fresh strict-first review.
+The `delivery-merge-conflict-current-main` correction integrates the current
+main branch while preserving both exact-finding independent-review correction
+authorization and exact-record verification-loop correction authorization. It
+is recorded in `evidence/review-correction-current-main-integration.md` and is
+the eighteenth globally ordered correction, first for its failure signature.
+The corrected head requires affected verification and fresh strict-first
+review.

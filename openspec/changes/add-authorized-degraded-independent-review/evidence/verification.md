@@ -58,8 +58,8 @@ permission, launcher, Claude/Codex, correction-envelope, goal-expiration,
 authenticity-ledger, severity/disposition compatibility, unresolved-objective-
 fix routing, secret, unsafe-path,
 symlink, durable delivery-profile, correction-counter, and portability
-boundaries. `node --test` passed 213 tests in a clean exact-head clone.
-`openspec validate --all --strict` passed all 22
+boundaries. `node --test` passed 240 tests in a clean exact-head clone.
+`openspec validate --all --strict` passed all 24
 items. Adapter drift, skill metadata, shared guardrails, artifact quality,
 whitespace, secret-pattern, attribution, portability, and recovery reviews
 passed.
