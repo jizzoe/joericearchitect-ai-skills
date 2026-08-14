@@ -23,6 +23,17 @@ test("review result binds a fresh configured reviewer to one package", () => {
   assert.equal(validateReviewResult({ ...result, headCommit: "cccccccccccccccccccccccccccccccccccccccc" }, { expectedPackage: pack, configuredReviewer, implementerSession: "implementer" }).valid, false);
 });
 
+test("passed review results cannot contain unresolved findings", () => {
+  const pack = fixture("valid-package.json"); pack.manifestDigest = packageDigest(pack);
+  const result = fixture("valid-result.json"); result.manifestDigest = pack.manifestDigest;
+  const finding = { id: "finding", severity: "objective-fix", evidence: "scripts/sdd/independent-review-contract.mjs", recommendation: "apply the objective correction" };
+  const invalid = validateReviewResult({ ...result, status: "passed", findings: [finding] }, { expectedPackage: pack });
+  assert.equal(invalid.valid, false);
+  assert.equal(invalid.issues[0].code, "independent-review-result-status-finding-inconsistent");
+  assert.equal(validateReviewResult({ ...result, status: "failed", findings: [finding] }, { expectedPackage: pack }).valid, true);
+  assert.equal(validateReviewResult({ ...result, status: "passed", findings: [{ ...finding, severity: "warning" }] }, { expectedPackage: pack }).valid, true);
+});
+
 test("strict unavailable results cannot claim successful isolation controls", () => {
   const reviewPackage = fixture("valid-package.json"); reviewPackage.manifestDigest = packageDigest(reviewPackage);
   const result = fixture("valid-result.json");

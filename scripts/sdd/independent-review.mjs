@@ -125,7 +125,6 @@ export function validateIndependentReviewV1({ reviewer, degradedReviewer, author
   });
   if (!resultValidation.valid) return fail(resultValidation.issues[0].code);
   if (reviewResult.status === "unavailable") return fail(reviewResult.unavailableCode);
-  if (reviewResult.status !== "passed") return fail("independent-review-findings-unresolved");
   if (reviewResult.assuranceLevel === "authorized-degraded") {
     const strictValidation = validateReviewResult(strictUnavailableResult, {
       expectedPackage: reviewPackage, configuredReviewer: reviewer, implementerSession
@@ -150,6 +149,7 @@ export function validateIndependentReviewV1({ reviewer, degradedReviewer, author
   }
   const dispositionValidation = validateFindingDispositions({ findings: reviewResult.findings, dispositions, correctionAttempts, correctionAttemptsByFailureSignature });
   if (!dispositionValidation.allowed) return dispositionValidation;
+  if (reviewResult.status !== "passed") return fail("independent-review-findings-unresolved");
   return { allowed: true, classification: "authorized", issues: [] };
 }
 

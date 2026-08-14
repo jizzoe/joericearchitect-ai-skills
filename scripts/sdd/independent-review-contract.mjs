@@ -13,6 +13,7 @@ const safePath = (value) => {
 const failure = (code, detail) => ({ valid: false, issues: [{ code, ...(detail ? { detail } : {}) }] });
 const secretLike = /(gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{16,}|-----BEGIN (?:[A-Z ]+)?PRIVATE KEY-----|Bearer\s+[A-Za-z0-9._-]{12,})/i;
 const degradedBoundary = "fresh-separated-reviewer-only";
+const unresolvedSeverities = new Set(["blocker", "high", "objective-fix"]);
 const protectedCapabilities = ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"];
 const degradedAuthenticityLimitations = ["authenticatedParentLaunchEvidence", "hostPinnedReviewerExecutableIdentity"];
 
@@ -88,5 +89,6 @@ export function validateReviewResult(value, { expectedPackage, configuredReviewe
   if (configuredReviewer && (value.reviewer.type !== configuredReviewer.type || value.reviewer.identity !== configuredReviewer.identity || value.attestation.ref !== configuredReviewer.attestation?.ref)) return failure("independent-review-result-attestation-mismatch");
   if (expectedPackage && (value.baseCommit !== expectedPackage.baseCommit || value.headCommit !== expectedPackage.headCommit || value.manifestDigest !== expectedPackage.manifestDigest)) return failure("independent-review-result-stale-input");
   if (!value.findings.every((finding) => text(finding?.id) && ["blocker", "high", "objective-fix", "warning", "false-positive"].includes(finding.severity) && safePath(finding.evidence) && text(finding.recommendation))) return failure("independent-review-result-finding-invalid");
+  if (value.status === "passed" && value.findings.some((finding) => unresolvedSeverities.has(finding.severity))) return failure("independent-review-result-status-finding-inconsistent");
   return { valid: true, issues: [] };
 }

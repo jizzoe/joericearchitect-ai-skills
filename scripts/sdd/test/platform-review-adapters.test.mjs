@@ -210,11 +210,12 @@ test("findings output schema is accepted by strict structured-output validators"
   assert.deepEqual(schema.properties.schemaVersion, { type: "integer", const: 1 });
   assert.equal(schema.additionalProperties, false);
   assert.deepEqual(new Set(schema.required), new Set(Object.keys(schema.properties)));
+  assert.equal("allOf" in schema, false);
 });
 
 test("strict result schema distinguishes unavailable from proven isolation", () => {
   const schema = JSON.parse(fs.readFileSync(new URL("../../../schemas/independent-review-result-v1.schema.json", import.meta.url), "utf8"));
-  assert.equal(schema.allOf.length, 3);
+  assert.equal(schema.allOf.length, 4);
   assert.equal(schema.allOf[0].if.properties.status.enum.includes("passed"), true);
   assert.equal(schema.allOf[1].if.properties.status.const, "unavailable");
   assert.equal(schema.allOf[1].then.properties.attestation.properties.readOnly.const, false);

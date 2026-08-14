@@ -29,11 +29,11 @@ test("normalized v1 review result requires current Apply evidence and preserves 
   assert.equal(validateIndependentReviewV1({ reviewer: configured, implementerSession: "implementer", reviewPackage, reviewResult: { ...result, findings: [finding] }, applyEvidence, dispositions: [] }).allowed, false);
   assert.equal(validateIndependentReviewV1({ reviewer: configured, implementerSession: "implementer", reviewPackage, reviewResult: { ...result, findings: [finding] }, applyEvidence, dispositions: [{ findingId: "finding-1", kind: "warning", evidence: "documented behavior" }] }).allowed, true);
   const objective = { ...finding, id: "objective-1", severity: "high", recommendation: "apply a bounded deterministic correction" };
-  const objectiveResult = validateIndependentReviewV1({ reviewer: configured, implementerSession: "implementer", reviewPackage, reviewResult: { ...result, findings: [objective] }, applyEvidence, dispositions: [{ findingId: "objective-1", kind: "objective-fix", evidence: "review evidence", failureSignature: "objective-signature" }] });
+  const objectiveResult = validateIndependentReviewV1({ reviewer: configured, implementerSession: "implementer", reviewPackage, reviewResult: { ...result, status: "failed", findings: [objective] }, applyEvidence, dispositions: [{ findingId: "objective-1", kind: "objective-fix", evidence: "review evidence", failureSignature: "objective-signature" }] });
   assert.equal(objectiveResult.allowed, false);
   assert.equal(objectiveResult.classification, "objective-fix");
   assert.equal(objectiveResult.issues[0].code, "independent-review-objective-fix-required");
-  assert.equal(validateIndependentReviewV1({ reviewer: configured, implementerSession: "implementer", reviewPackage, reviewResult: { ...result, findings: [objective] }, applyEvidence, dispositions: [{ findingId: "objective-1", kind: "warning", evidence: "unsupported relabel" }] }).issues[0].code, "independent-review-disposition-incompatible");
+  assert.equal(validateIndependentReviewV1({ reviewer: configured, implementerSession: "implementer", reviewPackage, reviewResult: { ...result, status: "failed", findings: [objective] }, applyEvidence, dispositions: [{ findingId: "objective-1", kind: "warning", evidence: "unsupported relabel" }] }).issues[0].code, "independent-review-disposition-incompatible");
 });
 
 test("operation checker accepts only a durable exact v1 record", () => {

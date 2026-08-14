@@ -24,6 +24,7 @@
   "allOf": [
     {"if": {"required": ["assuranceLevel", "status"], "properties": {"assuranceLevel": {"const": "strict-isolated"}, "status": {"enum": ["passed", "failed"]}}}, "then": {"properties": {"attestation": {"properties": {"nonInteractive": {"const": true}, "isolatedContext": {"const": true}, "freshContext": {"const": true}, "readOnly": {"const": true}}}}}},
     {"if": {"required": ["assuranceLevel", "status"], "properties": {"assuranceLevel": {"const": "strict-isolated"}, "status": {"const": "unavailable"}}}, "then": {"properties": {"attestation": {"properties": {"nonInteractive": {"const": false}, "isolatedContext": {"const": false}, "freshContext": {"const": false}, "readOnly": {"const": false}}}}}},
-    {"if": {"properties": {"assuranceLevel": {"const": "authorized-degraded"}}}, "then": {"required": ["capabilityLedger", "strictUnavailable", "degradedAuthorization"], "properties": {"attestation": {"properties": {"nonInteractive": {"const": true}, "freshContext": {"const": true}}}}}}
+    {"if": {"properties": {"assuranceLevel": {"const": "authorized-degraded"}}}, "then": {"required": ["capabilityLedger", "strictUnavailable", "degradedAuthorization"], "properties": {"attestation": {"properties": {"nonInteractive": {"const": true}, "freshContext": {"const": true}}}}}},
+    {"if": {"properties": {"status": {"const": "passed"}}}, "then": {"properties": {"findings": {"items": {"properties": {"severity": {"enum": ["warning", "false-positive"]}}}}}}}
   ]
 }

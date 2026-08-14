@@ -68,7 +68,7 @@
   - Depends on: 5.1.
   - Evidence: focused orchestration tests, including a regression that no
     production path returns `review-launcher-external-host-required`.
-- [ ] 5.3 Add the thin Codex-facing transport adapter that builds only the
+- [x] 5.3 Add the thin Codex-facing transport adapter that builds only the
   fixed validated host invocation, requests the actual escalated shell-tool
   boundary eligible for Auto-review, captures runtime result evidence, and
   leaves the inner reviewer at authorized-degraded assurance. Document the
@@ -76,7 +76,7 @@
   - Depends on: 5.2.
   - Evidence: adapter contract, command-injection/path tests, canonical/thin
     drift checks, and an actual Auto-reviewed launch receipt.
-- [ ] 5.4 Extend the bounded runner and lifecycle evaluation path so an
+- [x] 5.4 Extend the bounded runner and lifecycle evaluation path so an
   objective finding, correction, validation, package rebuild, strict retry,
   authorized recovery, disposition, and new-head rereview proceed without an
   operator retrigger and remain capped per failure signature.

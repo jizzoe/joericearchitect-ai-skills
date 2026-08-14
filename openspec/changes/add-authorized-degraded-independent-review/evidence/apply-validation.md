@@ -6,7 +6,7 @@ self-referential commit literal.
 
 Passed current evidence:
 
-- `node --test` — 246 passing tests covering authorization, strict-first execution, durable resume, zero-touch Codex parent-runtime transport, Codex/Claude external-host launcher recovery, current-clock and enclosing-goal expiration, required distinct implementer/reviewer identity binding, restricted reviewer home/credential access, machine-required degraded authenticity limitations, durable-source per-signature correction enforcement for independent-review and verification-loop sources, delimiter-safe failure signatures, complete chain linkage, disposition compatibility and unresolved-objective-fix routing, disposition-driven human pauses, host package rederivation, symlink-safe package injection and Git-object artifact derivation, authorized delivery-profile binding, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, implementation-quality integration, findings, detached view, portability, secrets, and adapter boundaries.
+- `node --test` — 247 passing tests covering authorization, strict-first execution, durable resume, zero-touch Codex parent-runtime transport, Codex/Claude external-host launcher recovery, current-clock and enclosing-goal expiration, required distinct implementer/reviewer identity binding, restricted reviewer home/credential access, machine-required degraded authenticity limitations, durable-source per-signature correction enforcement for independent-review and verification-loop sources, delimiter-safe failure signatures, complete chain linkage, review status/finding consistency, disposition compatibility and unresolved-objective-fix routing, disposition-driven human pauses, host package rederivation, symlink-safe package injection and Git-object artifact derivation, authorized delivery-profile binding, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, implementation-quality integration, findings, detached view, portability, secrets, and adapter boundaries.
 - `node --test scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/independent-review-v1-gate.test.mjs scripts/sdd/test/execute-independent-review.test.mjs` — 40 focused authorization, launcher, parent-transport, adapter, result-contract, and delivery-gate tests pass after the zero-touch redesign.
 - `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 54 focused launcher, request, adapter, and lifecycle tests pass.
 - `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 15 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running and per-signature correction budget enforcement.
@@ -157,3 +157,11 @@ is recorded in `evidence/review-correction-current-main-integration.md` and is
 the eighteenth globally ordered correction, first for its failure signature.
 The corrected head requires affected verification and fresh strict-first
 review.
+The zero-touch runtime reviewer then identified
+`review-result-status-finding-inconsistency`: the result validator could accept
+`status: passed` alongside an unresolved blocker, high, or objective-fix
+finding. The bounded correction enforces status/finding consistency in the
+canonical validator and complete-result JSON schema while retaining a
+structured-output-compatible model-facing schema, with regression coverage in
+`evidence/review-correction-status-finding-consistency.md`. It is the first
+attempt for this failure signature and requires a fresh exact-head review.
