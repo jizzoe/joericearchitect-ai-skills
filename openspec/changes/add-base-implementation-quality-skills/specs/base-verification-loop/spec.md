@@ -90,12 +90,13 @@ release rather than silently inferred.
   manual keyboard or semantic review gap
 
 ### Requirement: Missing verification tools fail visibly
-When UI evidence is required, the capability SHALL treat Playwright, Chromium,
-and axe-core as prerequisites. In interactive mode it MUST report a missing
-prerequisite and request installation or an approved environment; in autonomous
-mode it MUST pause. A missing tool MUST NOT justify skipping a required check,
-and a `production-rapid` UI change MUST remain not ready until all required
-browser and accessibility evidence exists.
+When UI evidence is required, the capability SHALL treat Playwright and
+Chromium as prerequisites and SHALL additionally require axe-core for new or
+materially changed UI. In interactive mode it MUST report a missing prerequisite
+and request installation or an approved environment; in autonomous mode it MUST
+pause. A missing tool MUST NOT justify skipping a required check, and a
+`production-rapid` UI change MUST remain not ready until all required browser
+and accessibility evidence exists.
 
 #### Scenario: Autonomous UI prerequisite is unavailable
 - **WHEN** an autonomous UI verification run lacks a required browser or

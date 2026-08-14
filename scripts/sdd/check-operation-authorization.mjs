@@ -178,11 +178,13 @@ export function checkOperationAuthorization(input) {
   if (request.adapter && !adapterAllows(config, runtime, request.adapter, operation)) return fail("adapter-capability-mismatch", request.adapter);
   if (operation === "objective-correction") {
     if (!nonEmpty(request.failureSignature)) return fail("missing-correction-failure-signature");
+    const budget = authorization.correctionBudgetPerFailureSignature;
     const perSignature = request.correctionAttemptsForFailureSignature;
     const aggregate = request.correctionAttempts;
+    if (!Number.isInteger(budget) || budget < 1 || budget > 3) return fail("invalid-correction-budget", "correctionBudgetPerFailureSignature");
     if (!Number.isInteger(perSignature) || perSignature < 0) return fail("invalid-correction-attempt-count", "correctionAttemptsForFailureSignature");
     if (aggregate !== undefined && (!Number.isInteger(aggregate) || aggregate < perSignature)) return fail("inconsistent-correction-attempt-count");
-    if (perSignature >= 3) return fail("correction-limit-exhausted", request.failureSignature);
+    if (perSignature >= budget) return fail("correction-limit-exhausted", request.failureSignature);
   }
   if (operation === "run-lifecycle-action" && !lifecycleActions.has(request.lifecycleAction)) return fail("unnamed-or-unsupported-lifecycle-action");
   if (highImpactLifecycleActions.has(request.lifecycleAction)) {

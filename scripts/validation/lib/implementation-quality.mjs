@@ -604,7 +604,8 @@ export function selectVerificationChecks({ profile, hasUi = false, layoutChanged
       { id: "manual-keyboard-semantics", category: "accessibility", required: true }
     );
   }
-  const missing = hasUi ? ["playwright", "chromium", "axeCore"].filter((tool) => tools[tool] !== true) : [];
+  const uiPrerequisites = hasUi ? ["playwright", "chromium", ...(materiallyChangedUi ? ["axeCore"] : [])] : [];
+  const missing = uiPrerequisites.filter((tool) => tools[tool] !== true);
   if (missing.length) {
     return {
       status: mode === "autonomous" ? "paused" : "needs-authorization",

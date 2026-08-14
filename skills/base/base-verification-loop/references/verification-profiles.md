@@ -44,7 +44,7 @@ axe-core through the browser integration and records applicable manual keyboard
 or semantic review. Native mobile is outside the first release and must not be
 silently inferred.
 
-Playwright, Chromium, and axe-core are prerequisites when UI evidence is
-required. Missing tools cause an interactive installation or approved-
-environment request and an autonomous pause. They never convert a required
-check to not applicable.
+Playwright and Chromium are prerequisites when UI evidence is required.
+axe-core is additionally required for new or materially changed UI. Missing
+tools cause an interactive installation or approved-environment request and an
+autonomous pause. They never convert a required check to not applicable.

@@ -9,6 +9,7 @@ function input(profile, operation, overrides = {}) {
     authorization: {
       targets: ["workspace:docs", "record:tracker-1", "adapter:fixture", "pr:42", "change:example", "branch:feature/example"],
       allowedMutations: [operation],
+      correctionBudgetPerFailureSignature: 3,
       expiresAt: "2026-08-13T12:00:00.000Z",
       ...overrides.authorization
     },
@@ -46,6 +47,9 @@ test("operation checker pauses for profile, authorization, target, adapter, runt
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSignature: "fresh-check", correctionAttempts: 3 } }))), "invalid-correction-attempt-count");
   assert.equal(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSignature: "fresh-check", correctionAttemptsForFailureSignature: 0, correctionAttempts: 3 } })).allowed, true);
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSignature: "failed-check", correctionAttemptsForFailureSignature: 2, correctionAttempts: 1 } }))), "inconsistent-correction-attempt-count");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { authorization: { correctionBudgetPerFailureSignature: 1 }, request: { failureSignature: "failed-check", correctionAttemptsForFailureSignature: 1, correctionAttempts: 1 } }))), "correction-limit-exhausted");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { authorization: { correctionBudgetPerFailureSignature: 2 }, request: { failureSignature: "failed-check", correctionAttemptsForFailureSignature: 2, correctionAttempts: 4 } }))), "correction-limit-exhausted");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { authorization: { correctionBudgetPerFailureSignature: 0 }, request: { failureSignature: "failed-check", correctionAttemptsForFailureSignature: 0, correctionAttempts: 0 } }))), "invalid-correction-budget");
 });
 
 test("sdd high-impact transitions require exact evidence and recovery boundaries", () => {

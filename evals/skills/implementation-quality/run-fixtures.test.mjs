@@ -84,6 +84,10 @@ test("profile selection covers prototype, production, UI viewports, accessibilit
     assert.ok(ui.checks.some((item) => item.id === id), id);
   }
 
+  const nonMaterialUi = selectVerificationChecks({ profile: "prototype-rapid", hasUi: true, tools: { playwright: true, chromium: true } });
+  assert.equal(nonMaterialUi.status, "ready");
+  assert.ok(!nonMaterialUi.checks.some((item) => item.id === "axe-core"));
+
   assert.equal(selectVerificationChecks({ profile: "prototype-rapid", hasUi: true, mode: "interactive" }).status, "needs-authorization");
   assert.equal(selectVerificationChecks({ profile: "prototype-rapid", hasUi: true, mode: "autonomous" }).status, "paused");
 });

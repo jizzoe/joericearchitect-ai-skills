@@ -289,12 +289,13 @@ scope expansion, material decisions, and exhausted correction budgets pause.
 
 ## Attribution and Licensing
 
-The design introduces no copied third-party code or asset. Playwright,
-Chromium, and axe-core are named interoperability prerequisites for applicable
-product environments, not bundled by the canonical skill. If Apply adds or
-updates a dependency, its version, license, source, and repository policy fit
-must be reviewed and recorded then. Canonical instructions, validators, and
-fixtures retain this repository's licensing and provenance conventions.
+The design introduces no copied third-party code or asset. Playwright and
+Chromium are named interoperability prerequisites for UI work, with axe-core
+additionally required for new or materially changed UI; they are not bundled by
+the canonical skill. If Apply adds or updates a dependency, its version,
+license, source, and repository policy fit must be reviewed and recorded then.
+Canonical instructions, validators, and fixtures retain this repository's
+licensing and provenance conventions.
 
 ## Migration Plan
 

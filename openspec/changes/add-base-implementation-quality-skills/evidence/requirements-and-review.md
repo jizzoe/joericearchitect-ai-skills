@@ -158,6 +158,22 @@ three-attempt ceiling only to the named signature. Asymmetric regressions prove
 that an exhausted signature is rejected while a fresh signature remains
 authorized after three aggregate attempts.
 
+### IQ-R14 — high / objective-fix
+
+Fresh strict review found that objective-correction authorization enforced a
+hard-coded ceiling but ignored a lower budget in the exact authorization. The
+operation checker now requires a configured integer budget from one through
+three and blocks when the named signature count reaches that budget. Focused
+regressions cover budgets of one and two plus invalid configuration.
+
+### IQ-R15 — objective-fix / objective-fix
+
+Fresh strict review found that check selection required axe-core for any UI even
+though the requirement applies it only to new or materially changed UI. The
+selector now always requires Playwright and Chromium for UI and conditionally
+requires axe-core for material UI. A regression proves non-material UI is ready
+without axe-core while retaining browser and interaction checks.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
