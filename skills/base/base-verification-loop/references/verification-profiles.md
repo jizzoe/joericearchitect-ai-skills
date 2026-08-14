@@ -23,7 +23,9 @@ The result's correction budget and attempt history match the applicable local-
 implementation authorization and its durable correction records. The validator
 replays each attempt boundary through the canonical operation checker; a caller
 cannot enlarge a budget, invent a correction, or reset a signature count in the
-result.
+result. Each durable record used for result validation also binds the reported
+outcome, ordered evidence IDs, and workspace or commit binding, so unrelated
+passing evidence cannot be substituted.
 
 ## Prototype Rapid
 

@@ -16,7 +16,7 @@ Change: `add-base-implementation-quality-skills`
   complete-result sensitive-value scanning, Assumptions rendering, and
   canonical durable production-review authorization in both the helper and
   result-validation paths, plus result-to-authorization correction-history
-  reconciliation.
+  reconciliation and exact durable outcome/evidence/binding provenance.
 - `node scripts/validation/validate-implementation-quality.mjs
   evals/skills/implementation-quality/fixtures/valid-code-review.json` returned
   `valid: true`.

@@ -429,7 +429,9 @@ function validateCorrectionAuthorization(details, localImplementationAuthorizati
   }
   for (const [index, attempt] of attempts.entries()) {
     const record = records[index];
-    if (record?.failureSignature !== attempt?.failureSignature || record?.attempt !== attempt?.attempt || record?.classification !== attempt?.kind) {
+    const expectedVerification = { result: attempt?.result, evidenceIds: attempt?.evidenceIds, binding: attempt?.binding };
+    if (record?.failureSignature !== attempt?.failureSignature || record?.attempt !== attempt?.attempt ||
+        record?.classification !== attempt?.kind || JSON.stringify(record?.verification) !== JSON.stringify(expectedVerification)) {
       issues.push(issue("correction-history-not-durable", `${subject}[${index}]`));
       valid = false;
       continue;

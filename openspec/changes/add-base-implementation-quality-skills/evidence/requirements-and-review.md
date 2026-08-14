@@ -285,6 +285,18 @@ the existing operation checker. An adversarial regression proves a result
 claiming two corrections against a one-attempt authorization is rejected as an
 authorization mismatch and readiness overclaim.
 
+### IQ-R28 — high / objective-fix
+
+The next exact-head strict review found that an authorized durable correction
+record was matched to a result only by signature, attempt number, and
+classification, allowing unrelated passing evidence to be attached. Durable
+correction records now support an additive validated verification binding for
+result, ordered evidence IDs, and workspace or commit binding. Result validation
+requires that binding to match exactly before replaying authorization. Focused
+regressions reject unrelated evidence and malformed final records while legacy
+records without a result-validation binding remain compatible with existing
+operation checks.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -317,12 +329,12 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R27: 26 passed, 0 failed. The complete
+Focused tests after IQ-R1 through IQ-R28: 26 passed, 0 failed. The complete
 current-main Node suite passes 194 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
 validation pass. Strict review record
 `codex-review-d0fc9717c544-20260814T011625Z` passed with zero findings for sealed
 implementation head `d0fc9717c54487943566100afd80716bb6cd2976`; the later
-final-head findings IQ-R23 through IQ-R27 are corrected and require a fresh
+final-head findings IQ-R23 through IQ-R28 are corrected and require a fresh
 exact-head review.

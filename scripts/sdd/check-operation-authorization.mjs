@@ -104,12 +104,19 @@ function durableCorrectionCounts(request) {
   const counts = new Map();
   for (const record of records) {
     const expectedAttempt = (counts.get(record?.failureSignature) ?? 0) + 1;
+    const verification = record?.verification;
+    const verificationValid = verification === undefined || (verification &&
+      new Set(["passed", "failed"]).has(verification.result) &&
+      Array.isArray(verification.evidenceIds) && verification.evidenceIds.length > 0 &&
+      new Set(verification.evidenceIds).size === verification.evidenceIds.length &&
+      verification.evidenceIds.every(nonEmpty) && nonEmpty(verification.binding));
     if (!nonEmpty(record?.id) || ids.has(record.id) || record.change !== request.selectedEntry ||
         !nonEmpty(record.failureSignature) || record.attempt !== expectedAttempt ||
         record.classification !== "objective-fix" || record.behaviorPreserving !== true ||
         record.current !== true || record.ancestryVerified !== true || !nonEmpty(record.evidenceReference) ||
         !commitReference(record.baseCommit) || !commitReference(record.previousHead) || !commitReference(record.headCommit) ||
-        !/^[0-9a-f]{64}$/i.test(record.previousManifestDigest ?? "") || !/^[0-9a-f]{64}$/i.test(record.manifestDigest ?? "")) return null;
+        !/^[0-9a-f]{64}$/i.test(record.previousManifestDigest ?? "") || !/^[0-9a-f]{64}$/i.test(record.manifestDigest ?? "") ||
+        !verificationValid) return null;
     ids.add(record.id);
     counts.set(record.failureSignature, expectedAttempt);
   }

@@ -55,8 +55,12 @@ Implementation is expected to add these canonical assets:
 Existing `schemas/skill-result-v1.schema.json`,
 `schemas/ai-skills-config-v1.schema.json`,
 `skills/base/_shared/guardrails.md`, and
-`scripts/sdd/check-operation-authorization.mjs` remain owned by their current
-capabilities and are consumed without semantic changes. The strict
+the local-implementation profile remain owned by their current capabilities.
+The implementation-quality validator consumes them through
+`scripts/sdd/check-operation-authorization.mjs`. Objective corrections found
+during strict review require narrow additive hardening there for per-signature
+budget reconciliation and optional durable verification bindings; no operation,
+profile, target, or external-mutation authority is added. The strict
 independent-review skill, schemas, adapters, delivery evaluator, and the active
 degraded-review change are read-only dependencies and are not affected files.
 

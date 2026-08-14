@@ -78,7 +78,8 @@ function localImplementationAuthorization(value) {
     previousHead: String(index + 1).repeat(40),
     headCommit: String(index + 2).repeat(40),
     previousManifestDigest: String(index + 3).repeat(64),
-    manifestDigest: String(index + 4).repeat(64)
+    manifestDigest: String(index + 4).repeat(64),
+    verification: { result: attempt.result, evidenceIds: [...attempt.evidenceIds], binding: attempt.binding }
   }));
   return {
     authorization: {
@@ -525,6 +526,11 @@ test("local findings require an evidence-backed nonblocking resolution", () => {
   malformedDurableRecord.checkpoint.selectedEntry.correctionRecords[0].current = false;
   const malformedDurableResult = validateImplementationQualityResultRaw(corrected, { localImplementationAuthorization: malformedDurableRecord });
   assert.ok(malformedDurableResult.issues.some((item) => item.code === "local-implementation-authorization-invalid"));
+
+  const unrelatedDurableEvidence = localImplementationAuthorization(corrected);
+  unrelatedDurableEvidence.checkpoint.selectedEntry.correctionRecords[0].verification.evidenceIds = ["local-review"];
+  const unrelatedDurableResult = validateImplementationQualityResultRaw(corrected, { localImplementationAuthorization: unrelatedDurableEvidence });
+  assert.ok(unrelatedDurableResult.issues.some((item) => item.code === "correction-history-not-durable"));
 
   const falsePassedCorrection = clone(corrected);
   falsePassedCorrection.evidence.find((item) => item.id === "focused").result = "failed";

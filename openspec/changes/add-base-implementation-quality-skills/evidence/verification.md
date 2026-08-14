@@ -51,7 +51,7 @@ corrections and rerun evidence in this change's `evidence/` directory.
 The later final-head findings about top-level sensitive-value coverage,
 Assumptions-section rendering, helper-level unvalidated production readiness,
 result-level self-asserted review summaries, and unbound result correction
-histories are also corrected and covered by the refreshed suite.
+histories and evidence are also corrected and covered by the refreshed suite.
 
 ## Coherence
 
