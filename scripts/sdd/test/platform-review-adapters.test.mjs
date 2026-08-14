@@ -116,13 +116,21 @@ test("Codex nested app-server denial receives a stable launcher-recovery code", 
 
 test("Codex parent transport builds only the fixed escalated host tool request and consumes its result", () => {
   const digest = "a".repeat(64);
+  const reviewPackage = packageFixture();
+  const strictResult = unavailableReviewResult("independent-review-view-create-failed", { reviewPackage, adapter: "codex", reviewer: { type: "codex", identity: "strict-reviewer" }, attestationRef: "strict-attestation" });
+  const degradedAuthorization = { change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only" };
   const prepared = {
     allowed: true,
     code: "review-launcher-external-host-required",
-    hostRequest: { requestDigest: digest },
-    expectedRecovery: { hostScript: "scripts/sdd/review-launcher-host.mjs" }
+    hostRequest: { launchId: "launch", requestDigest: digest, request: { reviewPackage, strictResult, transition: "merge-pr", reviewer: { type: "codex-degraded", identity: "degraded-reviewer", attestation: { ref: "degraded-attestation" } }, attestationRef: "degraded-attestation", launcher: { executable: "/opt/tools/codex" }, authorization: { implementerSession: "implementer", degradedIndependentReview: degradedAuthorization } } },
+    expectedRecovery: { hostScript: "scripts/sdd/review-launcher-host.mjs", launcherId: "codex-review-launcher", launcherKind: "codex-detached-read-only-v1" }
   };
   const temporary = fs.mkdtempSync("/tmp/codex-parent-transport-");
+  const reviewPath = `${temporary}/repository`;
+  fs.mkdirSync(reviewPath);
+  fs.mkdirSync(`${reviewPath}/schemas`);
+  fs.writeFileSync(`${reviewPath}/schemas/independent-review-findings-v1.schema.json`, "{}\n");
+  const viewForTransport = { kind: "archived-review-view-v1", reviewPath, temporaryRoot: temporary, headCommit: reviewPackage.headCommit, ownershipToken: "fixture" };
   try {
     const written = writePreparedReviewHostRequest(prepared, temporary);
     assert.equal(written.available, true, JSON.stringify(written));
@@ -133,24 +141,30 @@ test("Codex parent transport builds only the fixed escalated host tool request a
       prepared,
       preparedRequestPath: written.requestPath,
       repositoryPath: process.cwd()
+    }, {
+      createView: () => ({ available: true, view: viewForTransport }),
+      rebuildPackage: () => ({ valid: true, package: reviewPackage }),
+      injectPackage: () => `${reviewPath}/.ai-independent-review-package.json`
     });
     assert.equal(toolRequest.available, true, JSON.stringify(toolRequest));
     assert.equal(toolRequest.tool, "exec_command");
     assert.equal(toolRequest.sandboxPermissions, "require_escalated");
     assert.equal(toolRequest.approvalPolicyRequirement, "interactive");
     assert.equal(toolRequest.approvalReviewer, "auto_review");
-    assert.deepEqual(toolRequest.arguments.slice(1), [written.requestPath]);
+    assert.equal(toolRequest.executable, "/usr/bin/env");
+    assert.ok(toolRequest.arguments.includes("/opt/tools/codex"));
+    assert.ok(toolRequest.arguments.includes("--skip-git-repo-check"));
+    assert.equal(toolRequest.arguments.some((value) => value.endsWith("review-launcher-host.mjs")), false);
     assert.equal(toolRequest.arguments.some((value) => /host-debug|danger-full-access|--yolo/.test(value)), false);
 
-    const response = {
-      requestDigest: digest,
-      hostExecutionId: "host-execution",
-      launcherId: "codex-review-launcher",
-      launcherKind: "codex-detached-read-only-v1"
-    };
+    fs.writeFileSync(toolRequest.runtimeState.resultPath, JSON.stringify({ schemaVersion: 1, findings: [], status: "passed" }));
     const consumed = consumeCodexParentReviewHostToolResult({
+      prepared,
       toolRequest,
-      toolResult: { exit_code: 0, output: JSON.stringify(response) }
+      toolResult: { exit_code: 0, output: "review completed" }
+    }, {
+      removeView: (received) => ({ removed: received === viewForTransport }),
+      hostExecutionId: "host-execution"
     });
     assert.equal(consumed.status, "executed");
     assert.equal(consumed.runtimeReceipt.source, "codex-exec-tool");

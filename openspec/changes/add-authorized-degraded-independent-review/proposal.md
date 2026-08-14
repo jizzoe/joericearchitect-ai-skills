@@ -27,8 +27,9 @@ Primary GitHub issue: [#84](https://github.com/jizzoe/joericearchitect-ai-skills
   and Claude while preserving one assistant-neutral result and authorization
   contract.
 - Add a parent-runtime transport that consumes a validated prepared request,
-  invokes the fixed host entrypoint through the strongest policy-governed
-  noninteractive boundary available, captures the host result directly, and
+  materializes a sealed exact-head archive inside the managed sandbox, invokes
+  only the configured host-owned reviewer executable through the strongest
+  policy-governed noninteractive boundary available, captures the result directly, and
   returns it to the canonical response validator without operator relay.
 - Make zero operator mediation an acceptance condition for the normal bounded
   correction and exact-head rereview loop: the workflow never asks the owner

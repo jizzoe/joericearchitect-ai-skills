@@ -99,23 +99,23 @@ Some managed outer sandboxes deny Git worktree creation, the nested Codex app-
 server's local IPC initialization, or Claude's strict sandbox. A package-only
 same-session retry would not satisfy the detached committed-view contract. The
 recovery path therefore uses a configured review launcher capability that,
-when runtime permission explicitly allows it, creates the owned detached exact-
-head view outside the outer sandbox and starts either an ephemeral Codex process
+when runtime permission explicitly allows it, creates an owned exact-head view
+and starts either an ephemeral Codex process
 requesting its inner read-only sandbox or a nonpersistent Claude process with
 only read/search tools and sealed-package input.
 
 The pure controller and host never self-escalate. The runner first records the
 stable launcher-unavailable code and proceeds only when the current run
 authorization and runtime permission explicitly permit the configured
-launcher. The in-sandbox recovery controller can only validate and prepare a
-digest-bound structured request. A separately configured host script, invoked
-outside the failed sandbox by the parent runtime transport,
-validates that request, reconstructs the full diff and every declared artifact
-hash directly from regular Git blobs in its detached committed view, rejects
-symlinks and other non-regular artifact entries, rejects any canonical package
-mismatch, and exclusively creates the sealed-package file so a committed file
-or symlink at that reserved path fails closed. The host owns review-view setup
-and reviewer invocation. The
+launcher. The in-sandbox recovery controller validates the digest-bound
+request, rejects non-regular Git tree entries, materializes an exact-head Git
+archive with no Git metadata, rederives the package from canonical Git objects,
+and exclusively injects the sealed package. The Codex parent transport then
+elevates only `/usr/bin/env` and the configured reviewer executable with fixed
+structured arguments; it never executes the repository's host script or any
+other repository-controlled code with parent authority. Other trusted runtimes
+may provide an independently installed immutable host implementation for the
+same assistant-neutral protocol. The
 controller accepts the response only with runtime-supplied outside-sandbox
 execution data bound to the request digest and host execution. Under the
 accepted degraded-risk decision, this ordinary data is evidence of the intended
@@ -203,8 +203,10 @@ a terminal stable unavailable record. It never returns
 `review-launcher-external-host-required` as an instruction for an operator.
 
 The Codex-facing adapter translates the operation into one shell-tool call for
-the fixed Node host entrypoint with `sandbox_permissions` set to
-`require_escalated`. Under `approval_policy = "on-request"` (or an equivalent
+the host-owned environment utility and configured reviewer executable with
+`sandbox_permissions` set to `require_escalated`. Repository-controlled code
+runs only before and after that call inside the managed sandbox. Under
+`approval_policy = "on-request"` (or an equivalent
 granular interactive policy) and `approvals_reviewer = "auto_review"`, Codex
 routes that eligible boundary request to its separate approval reviewer. The
 adapter captures the tool result directly. It does not change user settings,
@@ -212,8 +214,8 @@ use `danger-full-access`, add a broad prefix rule, or pass elevation to the
 inner reviewer. Other assistants or CI implement the same operation with their
 strongest policy-governed noninteractive transport.
 
-The runtime receipt states the actual transport kind, request digest, fixed
-host entrypoint, execution reference, completion status, and host execution
+The runtime receipt states the actual transport kind, request digest, logical
+host protocol, host-owned invocation model, execution reference, completion status, and host execution
 binding. Because the first release lacks authenticated IPC, the receipt remains
 ordinary reduced-assurance evidence and must not use a misleading
 `attestedBy: trusted-runtime` assertion. Missing transport, denial, timeout,
@@ -243,8 +245,8 @@ exact head would require manual retriggering.
   the correction count equals the already-recorded chain length, and every
   record links to one canonical base/head/manifest anchor and its predecessor.
 - **Nested runtime denied by outer sandbox** → Return a stable launcher
-  permission code; route an explicitly authorized fixed host launch through the
-  configured parent runtime transport, preserving the detached view and
+  permission code; route an explicitly authorized host-owned reviewer launch
+  through the configured parent runtime transport, preserving the exact-head view and
   strongest configured Codex/Claude reviewer restrictions.
 - **Parent transport absent or denied** → Record terminal machine-readable
   unavailable evidence and stop without a command or evidence-relay request.
@@ -292,7 +294,8 @@ unavailability into a standing exception.
    cleanup, and inner read-
    only-boundary tests; record stable unavailable behavior when it is absent.
 4. Add the parent-runtime transport contract, Codex escalated-tool adapter,
-   direct response acceptance, and terminal unavailable behavior.
+   sandbox-prepared archived view, no elevated repository code, direct response
+   acceptance, and terminal unavailable behavior.
 5. Add the concise request resolver, canonical preset reference, and missing-
    input/invalid-combination tests.
 6. Exercise strict failure, actual automatic parent launch, restricted inner

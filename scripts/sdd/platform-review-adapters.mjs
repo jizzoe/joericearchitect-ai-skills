@@ -3,6 +3,9 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { createArchivedReviewView, removeArchivedReviewView } from "./detached-review-view.mjs";
+import { buildReviewPackage, canonicalJson, validateReviewResult } from "./independent-review-contract.mjs";
+import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { requiredReviewDenials } from "./review-adapter-contract.mjs";
 
 const now = () => new Date().toISOString();
@@ -42,7 +45,12 @@ export function writePreparedReviewHostRequest(prepared, directoryPath) {
   return { available: true, code: "review-launcher-runtime-request-written", requestPath };
 }
 
-export function buildCodexParentReviewHostToolRequest({ prepared, preparedRequestPath, repositoryPath } = {}) {
+export function buildCodexParentReviewHostToolRequest({ prepared, preparedRequestPath, repositoryPath } = {}, {
+  createView = createArchivedReviewView,
+  removeView = removeArchivedReviewView,
+  rebuildPackage = buildReviewPackage,
+  injectPackage = writeReviewPackageForView
+} = {}) {
   if (!validPreparedRecovery(prepared) || !runtimePath(preparedRequestPath) || !runtimePath(repositoryPath)) {
     return { available: false, code: "review-launcher-codex-tool-request-invalid" };
   }
@@ -59,37 +67,108 @@ export function buildCodexParentReviewHostToolRequest({ prepared, preparedReques
   } catch {
     return { available: false, code: "review-launcher-codex-tool-request-invalid" };
   }
-  return {
-    available: true,
-    code: "review-launcher-codex-tool-request-ready",
-    transport: "codex-exec-tool",
-    tool: "exec_command",
-    executable: process.execPath,
-    arguments: Object.freeze([hostPath, preparedRequestPath]),
-    workingDirectory: repositoryPath,
-    sandboxPermissions: "require_escalated",
-    approvalPolicyRequirement: "interactive",
-    approvalReviewer: "auto_review",
-    requestDigest: prepared.hostRequest.requestDigest,
-    hostScript: reviewLauncherHostScript
-  };
+  const request = prepared.hostRequest.request;
+  const created = createView({ repositoryPath, headCommit: request?.reviewPackage?.headCommit });
+  if (!created?.available) return { available: false, code: "review-launcher-codex-view-unavailable", detail: created?.code };
+  const { view } = created;
+  try {
+    const rebuilt = rebuildPackage({
+      repositoryPath,
+      baseCommit: request.reviewPackage.baseCommit,
+      headCommit: request.reviewPackage.headCommit,
+      artifactPaths: request.reviewPackage.artifacts.map((artifact) => artifact.path),
+      validationEvidence: request.reviewPackage.validationEvidence
+    });
+    if (!rebuilt?.valid || canonicalJson(rebuilt.package) !== canonicalJson(request.reviewPackage)) throw new Error("package-mismatch");
+    injectPackage(view, rebuilt.package);
+    const schemaPath = path.join(view.reviewPath, "schemas", "independent-review-findings-v1.schema.json");
+    const resultPath = path.join(view.temporaryRoot, "independent-review-findings.json");
+    const invocation = buildCodexDegradedReviewInvocation({
+      executable: request.launcher.executable,
+      view,
+      schemaPath,
+      resultPath,
+      authenticationEnvironment: codexAuthenticationEnvironment()
+    });
+    const environmentArguments = Object.entries(invocation.environment)
+      .filter(([name, value]) => /^[A-Z_][A-Z0-9_]*$/.test(name) && typeof value === "string" && !/[\r\n\0]/.test(value))
+      .map(([name, value]) => `${name}=${value}`);
+    return {
+      available: true,
+      code: "review-launcher-codex-tool-request-ready",
+      transport: "codex-exec-tool",
+      tool: "exec_command",
+      executable: "/usr/bin/env",
+      arguments: Object.freeze(["-i", ...environmentArguments, invocation.executable, ...invocation.args]),
+      workingDirectory: view.reviewPath,
+      sandboxPermissions: "require_escalated",
+      approvalPolicyRequirement: "interactive",
+      approvalReviewer: "auto_review",
+      requestDigest: prepared.hostRequest.requestDigest,
+      hostScript: reviewLauncherHostScript,
+      hostExecutionModel: "sandbox-prepared-host-owned-executable",
+      runtimeState: Object.freeze({ view, resultPath, preparedRequestPath })
+    };
+  } catch {
+    removeView(view);
+    return { available: false, code: "review-launcher-codex-tool-request-invalid" };
+  }
 }
 
-export function consumeCodexParentReviewHostToolResult({ toolRequest, toolResult } = {}) {
+export function consumeCodexParentReviewHostToolResult({ prepared, toolRequest, toolResult } = {}, {
+  removeView = removeArchivedReviewView,
+  hostExecutionId = randomUUID()
+} = {}) {
+  const cleanupView = () => toolRequest?.runtimeState?.view ? removeView(toolRequest.runtimeState.view) : { removed: false };
   if (toolRequest?.available !== true || toolRequest.transport !== "codex-exec-tool" ||
       toolRequest.sandboxPermissions !== "require_escalated" || toolRequest.hostScript !== reviewLauncherHostScript ||
-      !textOutput(toolResult?.output)) {
+      toolRequest.hostExecutionModel !== "sandbox-prepared-host-owned-executable" ||
+      toolRequest.executable !== "/usr/bin/env" || toolResult?.exit_code !== 0 || !validPreparedRecovery(prepared)) {
+    cleanupView();
     return { status: "unavailable", code: "review-launcher-codex-tool-result-invalid" };
   }
-  let response;
+  let payload;
   try {
-    response = JSON.parse(toolResult.output);
+    payload = parseJsonResult(fs.readFileSync(toolRequest.runtimeState.resultPath, "utf8"));
   } catch {
+    payload = null;
+  }
+  const request = prepared.hostRequest.request;
+  const sealed = sealCodexDegradedReviewPayload({
+    payload,
+    reviewPackage: request.reviewPackage,
+    reviewer: request.reviewer,
+    attestationRef: request.attestationRef,
+    strictResult: request.strictResult,
+    degradedAuthorization: {
+      change: request.authorization.degradedIndependentReview.change,
+      transition: request.transition,
+      expiresAt: request.authorization.degradedIndependentReview.expiresAt,
+      riskReason: request.authorization.degradedIndependentReview.riskReason,
+      fallbackBoundary: request.authorization.degradedIndependentReview.fallbackBoundary
+    }
+  });
+  const configuredReviewer = { ...request.reviewer, attestation: request.reviewer.attestation ?? { ref: request.attestationRef } };
+  const validation = validateReviewResult(sealed?.result, { expectedPackage: request.reviewPackage, configuredReviewer, implementerSession: request.authorization.implementerSession });
+  const cleanup = cleanupView();
+  if (!sealed || !validation.valid || !strictSummaryMatchesResult(sealed.result.strictUnavailable, request.strictResult) ||
+      !degradedAuthorizationMatchesResult(sealed.result.degradedAuthorization, sealed.degradedAuthorization) || cleanup?.removed !== true) {
     return { status: "unavailable", code: "review-launcher-codex-tool-result-invalid" };
   }
-  if (!response?.hostExecutionId || response.requestDigest !== toolRequest.requestDigest) {
-    return { status: "unavailable", code: "review-launcher-codex-tool-result-invalid" };
-  }
+  const response = {
+    allowed: true,
+    status: sealed.result.status,
+    code: "review-launcher-host-complete",
+    launchId: prepared.hostRequest.launchId,
+    requestDigest: toolRequest.requestDigest,
+    launcherId: prepared.expectedRecovery.launcherId,
+    launcherKind: prepared.expectedRecovery.launcherKind,
+    hostScript: reviewLauncherHostScript,
+    hostExecutionId,
+    result: sealed.result,
+    launcherEvidence: prepared.expectedRecovery,
+    cleanup: { removed: true }
+  };
   return {
     status: "executed",
     response,
@@ -107,10 +186,6 @@ export function consumeCodexParentReviewHostToolResult({ toolRequest, toolResult
       hostExecutionId: response.hostExecutionId
     }
   };
-}
-
-function textOutput(value) {
-  return typeof value === "string" && value.trim().length > 0;
 }
 
 export function sanitizedReviewEnvironment(parentEnvironment = process.env, overrides = {}) {
@@ -216,7 +291,7 @@ export function buildCodexReviewInvocation({ executable = "codex", view, schemaP
 export function buildCodexDegradedReviewInvocation({ executable = "codex", view, schemaPath, resultPath, authenticationEnvironment = {} }) {
   return {
     executable,
-    args: ["exec", "--strict-config", ...codexRestrictedReviewArguments(), "--ephemeral", "--ignore-user-config", "--ignore-rules", "--cd", view.reviewPath, "--output-schema", schemaPath, "--output-last-message", resultPath,
+    args: ["exec", "--strict-config", ...codexRestrictedReviewArguments(), "--ephemeral", "--ignore-user-config", "--ignore-rules", "--skip-git-repo-check", "--cd", view.reviewPath, "--output-schema", schemaPath, "--output-last-message", resultPath,
       "Review only the sealed package in this disposable detached view. Inspect the exact base-to-head diff and relevant committed files. Do not modify files, Git, credentials, network state, or external systems. Return only the required JSON findings payload without an intended conclusion."],
     environment: { ...authenticationEnvironment, NO_COLOR: "1", GITHUB_TOKEN: "", GH_TOKEN: "", SSH_AUTH_SOCK: "", AWS_ACCESS_KEY_ID: "", AWS_SECRET_ACCESS_KEY: "", AWS_SESSION_TOKEN: "", NPM_TOKEN: "" }
   };
@@ -374,6 +449,12 @@ export function runCodexDegradedReviewAdapter({ reviewPackage, view, schemaPath,
     const code = classifyCodexExecutionFailure(execution);
     return { status: "unavailable", result: unavailable(code, { reviewPackage, adapter: "codex", reviewer, attestationRef, startedAt }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
   }
+  const sealed = sealCodexDegradedReviewPayload({ payload, reviewPackage, reviewer, attestationRef, strictResult, degradedAuthorization, startedAt });
+  return { status: sealed.result.status, result: sealed.result, execution: { status: 0, signal: null, emittedResult: true } };
+}
+
+export function sealCodexDegradedReviewPayload({ payload, reviewPackage, reviewer, attestationRef, strictResult, degradedAuthorization, startedAt = now() } = {}) {
+  if (!validFindingPayload(payload)) return null;
   const executionId = randomUUID();
   const result = {
     schemaVersion: 1,
@@ -409,7 +490,7 @@ export function runCodexDegradedReviewAdapter({ reviewPackage, view, schemaPath,
     status: payload.status,
     unavailableCode: ""
   };
-  return { status: result.status, result, execution: { status: 0, signal: null, emittedResult: true } };
+  return { status: result.status, result, degradedAuthorization: result.degradedAuthorization };
 }
 
 export function runClaudeDegradedReviewAdapter({ reviewPackage, view, schemaPath, reviewer, attestationRef, strictResult, degradedAuthorization, executable, run = spawnSync, probe = probeClaudeReviewAdapter }) {

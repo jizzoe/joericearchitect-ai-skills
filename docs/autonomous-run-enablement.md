@@ -64,16 +64,19 @@ After exact-package strict unavailability, a bounded `strict-first-degraded`
 authorization may permit external launcher recovery. Codex uses an ephemeral
 inner process with a requested read-only sandbox. Claude uses a fresh
 nonpersistent process with only `Read`, `Glob`, and `Grep`; Bash, edit/write,
-agents, web, and MCP tools are disabled. Both use a detached committed view,
-sealed package, credential scrubbing, fixed host script, expiration checks, and
+agents, web, and MCP tools are disabled. Both use an exact-head committed
+archive or detached view, sealed package, credential scrubbing, a fixed logical
+host protocol, expiration checks, and
 structured findings.
 
 The parent runtime transport is separate from the inner reviewer. In Codex it
-issues the fixed host launch as a shell-tool request with escalated sandbox
+prepares the exact-head archive inside the sandbox, then issues only the fixed
+host-owned reviewer invocation as a shell-tool request with escalated sandbox
 permissions. When the active policy is interactive and
 `approvals_reviewer = "auto_review"`, Auto-review evaluates that request
 without handing it to the owner. This does not broaden the sandbox or elevate
-the inner reviewer. If the request is denied or the transport is unavailable,
+the inner reviewer, and repository-controlled JavaScript is never executed
+with parent authority. If the request is denied or the transport is unavailable,
 the run records terminal unavailable evidence and stops; there is no
 `host-debug`, copy/paste, approval-prompt, or owner-attestation fallback.
 

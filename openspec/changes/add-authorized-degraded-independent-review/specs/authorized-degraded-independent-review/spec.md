@@ -167,9 +167,11 @@ again before response acceptance.
 ### Requirement: Parent runtime transport requires zero operator mediation
 After the controller prepares a valid host request, the system SHALL route it
 through a configured parent-runtime transport without returning an actionable
-command or payload-relay instruction to the owner. The transport MUST construct
-the host invocation from fixed code, the validated repository root, and one
-validated prepared-request path; it MUST NOT accept arbitrary shell text. A
+command or payload-relay instruction to the owner. The transport MUST
+materialize and validate the exact-head review input inside the managed
+sandbox, then construct the elevated invocation only from host-owned
+executables and fixed structured arguments; it MUST NOT execute repository-
+controlled code with parent authority or accept arbitrary shell text. A
 Codex parent adapter MUST issue an actual escalated shell-tool request under an
 interactive approval policy so configured Auto-review can evaluate it while
 the inner reviewer remains separately restricted. The parent MUST capture the
@@ -185,9 +187,16 @@ unavailable result and stop without exposing
 - **WHEN** strict review has the recoverable exact-package failure, the
   prepared host request validates, and the active Codex runtime provides an
   interactive approval boundary with Auto-review
-- **THEN** the parent emits the fixed escalated host-launch tool request,
+- **THEN** the parent emits the fixed escalated host-owned reviewer tool request,
   captures its response and runtime receipt, and continues without asking the
   owner to approve or transport anything
+
+#### Scenario: Repository-controlled launcher cannot receive parent authority
+- **WHEN** the reviewed change modifies the logical host script, adapter, or
+  any repository module
+- **THEN** the Codex transport still elevates only host-owned executables over
+  a sandbox-prepared exact-head archive and never executes those modules with
+  parent authority
 
 #### Scenario: Runtime transport denies or cannot execute
 - **WHEN** Auto-review, runtime policy, configuration, timeout, or the trusted

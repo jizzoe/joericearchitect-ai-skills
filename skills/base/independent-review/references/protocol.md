@@ -43,33 +43,37 @@ into the digest-bound request; missing identity or self-review fails before
 view creation and is rechecked before response acceptance.
 
 The in-sandbox recovery controller validates authorization and emits only a
-digest-bound structured host request; it cannot create a worktree or invoke the
-reviewer. Production orchestration immediately consumes that intermediate
-state through one configured parent-runtime transport. The Codex transport
-writes the validated request to an exclusively created runtime-owned file,
-builds only the fixed host entrypoint and request-path invocation, and asks the
-shell tool for `require_escalated` execution. Under an interactive approval
-policy with Auto-review configured, the runtime's separate approval reviewer
-evaluates that boundary request without owner mediation. A denied or
-unavailable transport returns terminal evidence; it never prints a command for
-an operator. The approved runtime invokes the host launcher outside the failed
-sandbox. That host revalidates the request, creates the owned detached exact-head view,
-independently reconstructs the exact base-to-head diff and every declared
-artifact hash from Git objects in that view, rejects any canonical package
-mismatch, exclusively creates the reconstructed sealed-package file so a
-pre-existing file or symlink fails closed, and starts either a fresh ephemeral Codex process
-with `read-only` requested or a fresh nonpersistent Claude process exposing
-only read/search tools. It accepts no arbitrary shell text. Every adapter probe
+digest-bound structured host request. It can safely materialize an exact-head
+archive in an owned temporary root but cannot invoke the reviewer across the
+parent boundary. Production orchestration immediately consumes that
+intermediate state through one configured parent-runtime transport. The Codex
+transport writes the validated request to an exclusively created runtime-owned
+file, rejects non-regular tree entries, materializes and package-validates the
+exact-head archive, and builds only a host-owned environment/reviewer
+invocation. It asks the shell tool for `require_escalated` execution and never
+executes repository-controlled code with parent authority. Under an
+interactive approval policy with Auto-review configured, the runtime's
+separate approval reviewer evaluates that boundary request without owner
+mediation. A denied or unavailable transport returns terminal evidence; it
+never prints a command for an operator. The approved runtime invokes the
+configured host-owned reviewer executable against the sandbox-prepared
+archive. The controller has already reconstructed the exact base-to-head diff
+and every declared artifact hash from Git objects, rejected any canonical
+package mismatch, and exclusively created the sealed-package file so a pre-
+existing file or symlink fails closed. The transport starts either a fresh
+ephemeral Codex process with `read-only` requested or a fresh nonpersistent
+Claude process exposing only read/search tools. It accepts no arbitrary shell
+text. Every adapter probe
 and strict or degraded reviewer subprocess receives only allowlisted
 cross-platform operational environment variables and fixed adapter overrides,
 not the caller's ambient credential values or process-injection variables.
 Codex retains only the home/profile locations needed by its parent CLI for
 authentication, while a strict-config OS permission profile limits model-
-generated commands to minimal runtime paths and the detached workspace,
+generated commands to minimal runtime paths and the archived workspace,
 disables tool network access, and inherits no parent environment. Claude uses
-an empty launcher-owned temporary home and isolated config/cache/data paths. The host
-returns a request-bound normalized response and removes only its
-ownership-guarded view.
+an empty launcher-owned temporary home and isolated config/cache/data paths.
+The in-sandbox controller seals the request-bound normalized response and
+removes only its ownership-guarded view after the tool result returns.
 
 The controller accepts the response only when the directly captured runtime
 receipt identifies the configured launcher, host script, request digest, host
