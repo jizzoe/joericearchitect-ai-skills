@@ -163,6 +163,9 @@ whether another implementation cycle is needed or the work is ready for
 OpenSpec Verify. It MUST NOT claim that OpenSpec Verify, CI delivery, merge, or
 Archive is complete.
 Readiness MUST require the unique reviewed-path set to cover every changed path.
+The top-level shared result status MUST agree with readiness: paused and blocked
+use their same-named statuses, needs-implementation uses completed, and ready
+uses completed or no-op.
 
 #### Scenario: Verification evidence is complete
 - **WHEN** every required check for the selected profile has current passing or

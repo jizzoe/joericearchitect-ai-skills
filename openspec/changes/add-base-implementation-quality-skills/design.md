@@ -97,6 +97,11 @@ the following documented `details` shapes before rendering Markdown:
   head or workspace binding when applicable, exact-head CI provenance for
   production, and readiness state.
 
+Verification readiness maps to the shared result status without contradiction:
+paused and blocked map to their same-named statuses, needs-implementation maps
+to completed execution of the current loop, and ready maps to completed or an
+evidence-equivalent no-op.
+
 Finding objects use stable IDs; `blocker`, `high`, `medium`, or `low` severity;
 an independent `objective-fix`, `human-decision`, `warning`, or
 `false-positive` disposition; repository-relative evidence subjects; impact;

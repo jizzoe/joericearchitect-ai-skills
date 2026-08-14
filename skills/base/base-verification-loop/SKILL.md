@@ -83,6 +83,9 @@ Validate with `scripts/validation/validate-implementation-quality.mjs`. Report
 only `needs-implementation`, `paused`, `blocked`, or
 `ready-for-openspec-verify`; never claim that OpenSpec Verify, CI delivery,
 merge, Sync, or Archive completed.
+Map readiness deterministically to the shared result status: `paused` to
+`paused`, `blocked` to `blocked`, `needs-implementation` to `completed`, and
+ready to `completed` or an evidence-equivalent `no-op`.
 
 ## Guardrails
 

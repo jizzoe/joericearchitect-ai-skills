@@ -21,6 +21,12 @@ export const verificationStages = [
 const coverageStatuses = new Set(["reviewed", "gap", "not-applicable"]);
 const checkResults = new Set(["passed", "failed", "not-applicable", "pending"]);
 const readinessStates = new Set(["needs-implementation", "paused", "blocked", "ready-for-openspec-verify"]);
+const resultStatusesByReadiness = {
+  "needs-implementation": new Set(["completed"]),
+  paused: new Set(["paused"]),
+  blocked: new Set(["blocked"]),
+  "ready-for-openspec-verify": new Set(["completed", "no-op"])
+};
 const checkCategories = new Set([
   "focused",
   "critical-flow",
@@ -378,6 +384,7 @@ function validateVerificationDetails(result, issues) {
   const evidenceBindings = validateEvidenceBindings(details.evidenceBindings, details, evidenceById, issues);
   if (!Number.isInteger(details.correctionBudget) || details.correctionBudget < 1 || details.correctionBudget > 3) issues.push(issue("invalid-correction-budget", `${subject}.correctionBudget`));
   if (!readinessStates.has(details.readiness)) issues.push(issue("invalid-readiness", `${subject}.readiness`));
+  else if (!resultStatusesByReadiness[details.readiness].has(result.status)) issues.push(issue("status-readiness-mismatch", "result.status", details.readiness));
 
   let currentCheckEvidence = true;
   if (!Array.isArray(details.selectedChecks)) issues.push(issue("invalid-array", `${subject}.selectedChecks`));

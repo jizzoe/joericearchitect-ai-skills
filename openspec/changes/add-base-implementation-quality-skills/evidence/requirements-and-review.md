@@ -207,6 +207,14 @@ Readiness now requires the unique reviewed-path set to cover every changed path.
 Focused regressions reject empty, partial, stale-path, and duplicate review
 coverage.
 
+### IQ-R20 — objective-fix / objective-fix
+
+Fresh strict review found that top-level result status could contradict details
+readiness. Verification now enforces a deterministic mapping: paused and
+blocked are same-named, needs-implementation uses completed, and ready uses
+completed or no-op. Focused regressions reject contradictory paused, blocked,
+completed, and no-op combinations.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -239,8 +247,8 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R19: 23 passed, 0 failed. The complete
-current-main Node suite passes 191 tests. Syntax checks, whitespace checks,
+Focused tests after IQ-R1 through IQ-R20: 24 passed, 0 failed. The complete
+current-main Node suite passes 192 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
 validation pass. A fresh exact-head strict independent review is the next gate.

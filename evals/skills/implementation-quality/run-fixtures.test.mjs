@@ -181,6 +181,31 @@ test("prototype and strict production results validate without lifecycle overcla
   }
 });
 
+test("verification result status and readiness remain consistent", () => {
+  for (const status of ["paused", "blocked"]) {
+    const value = readJson("valid-verification-prototype.json");
+    value.status = status;
+    assert.ok(validateImplementationQualityResult(value).issues.some((item) => item.code === "status-readiness-mismatch"), status);
+  }
+
+  for (const readiness of ["paused", "blocked"]) {
+    const value = readJson("valid-verification-prototype.json");
+    value.details.readiness = readiness;
+    assert.ok(validateImplementationQualityResult(value).issues.some((item) => item.code === "status-readiness-mismatch"), readiness);
+  }
+
+  const needsImplementation = readJson("valid-verification-prototype.json");
+  needsImplementation.details.readiness = "needs-implementation";
+  assert.ok(!validateImplementationQualityResult(needsImplementation).issues.some((item) => item.code === "status-readiness-mismatch"));
+
+  const noOpReady = readJson("valid-verification-prototype.json");
+  noOpReady.status = "no-op";
+  assert.deepEqual(validateImplementationQualityResult(noOpReady), { valid: true, issues: [] });
+
+  noOpReady.details.readiness = "paused";
+  assert.ok(validateImplementationQualityResult(noOpReady).issues.some((item) => item.code === "status-readiness-mismatch"));
+});
+
 test("paused production result can preserve valid unavailable strict-review evidence", () => {
   const value = readJson("valid-verification-production.json");
   value.status = "paused";
