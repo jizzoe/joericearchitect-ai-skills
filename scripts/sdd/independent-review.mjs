@@ -124,6 +124,8 @@ export function validateIndependentReviewV1({ reviewer, degradedReviewer, author
     seenRecordIds
   });
   if (!resultValidation.valid) return fail(resultValidation.issues[0].code);
+  const applyCompletedAt = Date.parse(applyEvidence.completedAt);
+  if (Number.isNaN(applyCompletedAt) || Date.parse(reviewResult.startedAt) < applyCompletedAt) return fail("independent-review-result-before-apply");
   if (reviewResult.status === "unavailable") return fail(reviewResult.unavailableCode);
   if (reviewResult.assuranceLevel === "authorized-degraded") {
     const strictValidation = validateReviewResult(strictUnavailableResult, {
@@ -131,6 +133,7 @@ export function validateIndependentReviewV1({ reviewer, degradedReviewer, author
     });
     if (!strictValidation.valid || strictUnavailableResult.status !== "unavailable" ||
         strictUnavailableResult.assuranceLevel !== "strict-isolated" ||
+        Date.parse(strictUnavailableResult.startedAt) < applyCompletedAt ||
         !strictSummaryMatchesResult(reviewResult.strictUnavailable, strictUnavailableResult)) {
       return fail("independent-review-strict-unavailable-not-durable");
     }

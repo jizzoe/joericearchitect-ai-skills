@@ -89,6 +89,7 @@ export function validateReviewResult(value, { expectedPackage, configuredReviewe
   if (configuredReviewer && (value.reviewer.type !== configuredReviewer.type || value.reviewer.identity !== configuredReviewer.identity || value.attestation.ref !== configuredReviewer.attestation?.ref)) return failure("independent-review-result-attestation-mismatch");
   if (expectedPackage && (value.baseCommit !== expectedPackage.baseCommit || value.headCommit !== expectedPackage.headCommit || value.manifestDigest !== expectedPackage.manifestDigest)) return failure("independent-review-result-stale-input");
   if (!value.findings.every((finding) => text(finding?.id) && ["blocker", "high", "objective-fix", "warning", "false-positive"].includes(finding.severity) && safePath(finding.evidence) && text(finding.recommendation))) return failure("independent-review-result-finding-invalid");
+  if (Date.parse(value.completedAt) < Date.parse(value.startedAt)) return failure("independent-review-result-chronology-invalid");
   if (value.status === "passed" && value.findings.some((finding) => unresolvedSeverities.has(finding.severity))) return failure("independent-review-result-status-finding-inconsistent");
   return { valid: true, issues: [] };
 }

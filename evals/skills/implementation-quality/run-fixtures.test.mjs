@@ -35,6 +35,8 @@ function productionReviewAuthorization(head) {
   result.baseCommit = baseCommit;
   result.headCommit = head;
   result.manifestDigest = reviewPackage.manifestDigest;
+  result.startedAt = "2026-08-13T03:01:00.000Z";
+  result.completedAt = "2026-08-13T03:02:00.000Z";
   const applyEvidence = {
     reference: "apply-current",
     current: true,

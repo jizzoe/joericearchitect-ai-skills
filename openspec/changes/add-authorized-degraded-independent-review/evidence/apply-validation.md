@@ -173,3 +173,10 @@ sandbox and elevates only host-owned environment/reviewer executables with
 fixed structured arguments. It is recorded in
 `evidence/review-correction-parent-authority-provenance.md`, is the first
 attempt for this signature, and requires a fresh exact-head review.
+The first host-owned-executable review then identified
+`review-after-apply-not-enforced`: exact head/evidence equality did not prove
+the review occurred after current Apply validation. The bounded correction
+enforces result chronology and requires both the selected review and degraded
+strict precursor to begin after durable Apply completion. It is recorded in
+`evidence/review-correction-review-after-apply.md`, is the first attempt for
+this signature, and requires a fresh exact-head review.

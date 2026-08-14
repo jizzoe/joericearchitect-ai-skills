@@ -16,6 +16,7 @@ const make = () => {
   reviewPackage.manifestDigest = packageDigest(reviewPackage);
   const result = fixture("valid-result.json");
   result.baseCommit = baseCommit; result.headCommit = headCommit; result.manifestDigest = reviewPackage.manifestDigest;
+  result.startedAt = "2026-08-13T03:01:00.000Z"; result.completedAt = "2026-08-13T03:02:00.000Z";
   return { reviewPackage, result };
 };
 
@@ -24,6 +25,7 @@ test("normalized v1 review result requires current Apply evidence and preserves 
   const applyEvidence = { reference: "apply-v1", current: true, headCommit, completedAt: "2026-08-13T03:00:00.000Z", validationEvidence: ["tests"] };
   const configured = { ...reviewer, available: true, nonInteractive: true, isolatedContext: true, readOnly: true };
   assert.equal(validateIndependentReviewV1({ reviewer: configured, implementerSession: "implementer", reviewPackage, reviewResult: result, applyEvidence }).allowed, true);
+  assert.equal(validateIndependentReviewV1({ reviewer: configured, implementerSession: "implementer", reviewPackage, reviewResult: { ...result, startedAt: "2026-08-13T02:59:59.000Z" }, applyEvidence }).issues[0].code, "independent-review-result-before-apply");
   assert.equal(validateIndependentReviewV1({ reviewer: configured, implementerSession: "implementer", reviewPackage, reviewResult: { ...result, status: "unavailable", unavailableCode: "independent-reviewer-runtime-unavailable", attestation: { ...result.attestation, nonInteractive: false, isolatedContext: false, readOnly: false } }, applyEvidence }).allowed, false);
   const finding = { id: "finding-1", severity: "warning", evidence: "scripts/sdd/test/independent-review-v1-gate.test.mjs", recommendation: "document expected state" };
   assert.equal(validateIndependentReviewV1({ reviewer: configured, implementerSession: "implementer", reviewPackage, reviewResult: { ...result, findings: [finding] }, applyEvidence, dispositions: [] }).allowed, false);
