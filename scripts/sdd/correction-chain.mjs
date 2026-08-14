@@ -1,12 +1,17 @@
 const commit = (value) => typeof value === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(value);
 const digest = (value) => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
 const text = (value) => typeof value === "string" && value.trim().length > 0;
+const encodeBoundary = (value) => value.replaceAll("%", "%25").replaceAll("/", "%2F");
 
 export function canonicalFailureSignature(source) {
   if (!source || source.kind !== "independent-review" || !text(source.reviewRecordId) ||
       !text(source.findingId) || !text(source.severity) || !text(source.evidence) ||
       !text(source.transition)) return null;
-  return `independent-review/${source.findingId}/${source.evidence}/${source.transition}`;
+  // Evidence is intentionally preserved for compatibility with durable v1
+  // correction chains. Escaping the two boundary fields makes the framing
+  // unambiguous even when finding IDs or transitions contain the delimiter;
+  // escaping '%' first prevents encoded and literal values from colliding.
+  return `independent-review/${encodeBoundary(source.findingId)}/${source.evidence}/${encodeBoundary(source.transition)}`;
 }
 
 export function inspectCorrectionChain(records, { selectedEntry, anchor, maxPerFailureSignature = 3 } = {}) {
