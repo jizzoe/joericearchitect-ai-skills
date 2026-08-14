@@ -215,6 +215,15 @@ blocked are same-named, needs-implementation uses completed, and ready uses
 completed or no-op. Focused regressions reject contradictory paused, blocked,
 completed, and no-op combinations.
 
+### IQ-R21 — high / objective-fix
+
+Fresh strict review found that correction authorization trusted the caller's
+per-signature count without reconciling durable checkpoint history. The shared
+operation checker now validates the selected entry's ordered correction records,
+derives aggregate and named-signature counts, and rejects any caller mismatch.
+Focused regressions prove that reporting zero cannot bypass an exhausted durable
+history.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -247,7 +256,7 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R20: 24 passed, 0 failed. The complete
+Focused tests after IQ-R1 through IQ-R21: 24 passed, 0 failed. The complete
 current-main Node suite passes 192 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec

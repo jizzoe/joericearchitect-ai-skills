@@ -23,6 +23,9 @@ In autonomous mode, call the existing deterministic operation checker under
 `local-implementation` before every edit, test, validation, or objective
 correction. Treat authorization, runtime permission, evidence, and material
 decisions as separate gates in every mode.
+For an objective correction, the checker derives aggregate and named-signature
+attempt counts from the selected entry's validated durable correction records;
+caller-reported counts must match and cannot reset the budget.
 
 ## Required Loop
 

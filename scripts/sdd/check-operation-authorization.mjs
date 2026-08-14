@@ -96,6 +96,26 @@ function authorizationExpired(authorization, now) {
   return Number.isNaN(when) || when <= Date.parse(now ?? new Date().toISOString());
 }
 
+function durableCorrectionCounts(request) {
+  const entry = request.checkpoint?.selectedEntry;
+  const records = entry?.correctionRecords;
+  if (!entry || entry.name !== request.selectedEntry || !Array.isArray(records)) return null;
+  const ids = new Set();
+  const counts = new Map();
+  for (const record of records) {
+    const expectedAttempt = (counts.get(record?.failureSignature) ?? 0) + 1;
+    if (!nonEmpty(record?.id) || ids.has(record.id) || record.change !== request.selectedEntry ||
+        !nonEmpty(record.failureSignature) || record.attempt !== expectedAttempt ||
+        record.classification !== "objective-fix" || record.behaviorPreserving !== true ||
+        record.current !== true || record.ancestryVerified !== true || !nonEmpty(record.evidenceReference) ||
+        !commitReference(record.baseCommit) || !commitReference(record.previousHead) || !commitReference(record.headCommit) ||
+        !/^[0-9a-f]{64}$/i.test(record.previousManifestDigest ?? "") || !/^[0-9a-f]{64}$/i.test(record.manifestDigest ?? "")) return null;
+    ids.add(record.id);
+    counts.set(record.failureSignature, expectedAttempt);
+  }
+  return { aggregate: records.length, perSignature: counts.get(request.failureSignature) ?? 0 };
+}
+
 function adapterAllows(config, runtime, adapterName, operation) {
   const adapter = config?.adapters?.[adapterName];
   if (!adapter?.enabled || !adapter.operations?.includes(operation)) return false;
@@ -181,9 +201,12 @@ export function checkOperationAuthorization(input) {
     const budget = authorization.correctionBudgetPerFailureSignature;
     const perSignature = request.correctionAttemptsForFailureSignature;
     const aggregate = request.correctionAttempts;
+    const durableCounts = durableCorrectionCounts(request);
     if (!Number.isInteger(budget) || budget < 1 || budget > 3) return fail("invalid-correction-budget", "correctionBudgetPerFailureSignature");
     if (!Number.isInteger(perSignature) || perSignature < 0) return fail("invalid-correction-attempt-count", "correctionAttemptsForFailureSignature");
-    if (aggregate !== undefined && (!Number.isInteger(aggregate) || aggregate < perSignature)) return fail("inconsistent-correction-attempt-count");
+    if (!Number.isInteger(aggregate) || aggregate < perSignature) return fail("inconsistent-correction-attempt-count");
+    if (!durableCounts) return fail("invalid-correction-checkpoint");
+    if (perSignature !== durableCounts.perSignature || aggregate !== durableCounts.aggregate) return fail("correction-attempt-count-mismatch");
     if (perSignature >= budget) return fail("correction-limit-exhausted", request.failureSignature);
   }
   if (operation === "run-lifecycle-action" && !lifecycleActions.has(request.lifecycleAction)) return fail("unnamed-or-unsupported-lifecycle-action");
