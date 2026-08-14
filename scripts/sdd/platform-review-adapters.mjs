@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -10,6 +10,7 @@ import { requiredReviewDenials } from "./review-adapter-contract.mjs";
 
 const now = () => new Date().toISOString();
 const reviewLauncherHostScript = "scripts/sdd/review-launcher-host.mjs";
+const maximumReviewResultArtifactBytes = 1024 * 1024;
 const operationalReviewEnvironmentNames = Object.freeze([
   "PATH", "Path", "SYSTEMROOT", "SystemRoot", "COMSPEC", "PATHEXT", "PROGRAMDATA",
   "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE", "TERM",
@@ -25,6 +26,59 @@ function validPreparedRecovery(prepared) {
     prepared.code === "review-launcher-external-host-required" &&
     /^[0-9a-f]{64}$/.test(prepared?.hostRequest?.requestDigest ?? "") &&
     prepared?.expectedRecovery?.hostScript === reviewLauncherHostScript;
+}
+
+function resultArtifactDiagnostics({ present = false, bytes = 0, sha256 = "", parse = "not-attempted", payload = "not-attempted", validation = "not-attempted", cleanup = "not-attempted" } = {}) {
+  return { resultArtifactPresent: present, resultArtifactBytes: bytes, resultArtifactSha256: sha256, parse, payload, validation, cleanup };
+}
+
+export function inspectCodexReviewResultArtifact(resultPath) {
+  if (!runtimePath(resultPath)) {
+    return { available: false, code: "review-launcher-codex-result-artifact-path-invalid", diagnostics: resultArtifactDiagnostics() };
+  }
+  let entry;
+  try {
+    entry = fs.lstatSync(resultPath);
+  } catch {
+    return { available: false, code: "review-launcher-codex-result-artifact-missing", diagnostics: resultArtifactDiagnostics() };
+  }
+  if (!entry.isFile() || entry.isSymbolicLink()) {
+    return { available: false, code: "review-launcher-codex-result-artifact-invalid", diagnostics: resultArtifactDiagnostics({ present: true }) };
+  }
+  if (entry.size === 0) {
+    return { available: false, code: "review-launcher-codex-result-artifact-empty", diagnostics: resultArtifactDiagnostics({ present: true }) };
+  }
+  if (entry.size > maximumReviewResultArtifactBytes) {
+    return { available: false, code: "review-launcher-codex-result-artifact-oversized", diagnostics: resultArtifactDiagnostics({ present: true, bytes: entry.size }) };
+  }
+  let raw;
+  try {
+    raw = fs.readFileSync(resultPath);
+  } catch {
+    return { available: false, code: "review-launcher-codex-result-artifact-unreadable", diagnostics: resultArtifactDiagnostics({ present: true, bytes: entry.size }) };
+  }
+  const diagnostics = resultArtifactDiagnostics({
+    present: true,
+    bytes: raw.length,
+    sha256: createHash("sha256").update(raw).digest("hex"),
+    parse: "attempted"
+  });
+  const payload = parseJsonResult(raw.toString("utf8"));
+  if (!payload) {
+    return { available: false, code: "review-launcher-codex-result-artifact-malformed", diagnostics: { ...diagnostics, parse: "invalid" } };
+  }
+  if (!validFindingPayload(payload)) {
+    return { available: false, code: "review-launcher-codex-result-payload-invalid", diagnostics: { ...diagnostics, parse: "valid", payload: "invalid" } };
+  }
+  return { available: true, payload, diagnostics: { ...diagnostics, parse: "valid", payload: "valid" } };
+}
+
+function unavailableCodexParentResult(code, diagnostics, cleanup) {
+  return {
+    status: "unavailable",
+    code,
+    diagnostics: { ...diagnostics, cleanup: cleanup?.removed === true ? "removed" : cleanup?.code ?? "failed" }
+  };
 }
 
 export function writePreparedReviewHostRequest(prepared, directoryPath) {
@@ -117,25 +171,28 @@ export function buildCodexParentReviewHostToolRequest({ prepared, preparedReques
 
 export function consumeCodexParentReviewHostToolResult({ prepared, toolRequest, toolResult } = {}, {
   removeView = removeArchivedReviewView,
-  hostExecutionId = randomUUID()
+  hostExecutionId = randomUUID(),
+  sealPayload = sealCodexDegradedReviewPayload,
+  validateResult = validateReviewResult,
+  strictMatches = strictSummaryMatchesResult,
+  degradedAuthorizationMatches = degradedAuthorizationMatchesResult
 } = {}) {
   const cleanupView = () => toolRequest?.runtimeState?.view ? removeView(toolRequest.runtimeState.view) : { removed: false };
   if (toolRequest?.available !== true || toolRequest.transport !== "codex-exec-tool" ||
       toolRequest.sandboxPermissions !== "require_escalated" || toolRequest.hostScript !== reviewLauncherHostScript ||
       toolRequest.hostExecutionModel !== "sandbox-prepared-host-owned-executable" ||
       toolRequest.executable !== "/usr/bin/env" || toolResult?.exit_code !== 0 || !validPreparedRecovery(prepared)) {
-    cleanupView();
-    return { status: "unavailable", code: "review-launcher-codex-tool-result-invalid" };
+    const cleanup = cleanupView();
+    return unavailableCodexParentResult("review-launcher-codex-tool-receipt-invalid", resultArtifactDiagnostics(), cleanup);
   }
-  let payload;
-  try {
-    payload = parseJsonResult(fs.readFileSync(toolRequest.runtimeState.resultPath, "utf8"));
-  } catch {
-    payload = null;
+  const inspected = inspectCodexReviewResultArtifact(toolRequest.runtimeState.resultPath);
+  if (!inspected.available) {
+    const cleanup = cleanupView();
+    return unavailableCodexParentResult(inspected.code, inspected.diagnostics, cleanup);
   }
   const request = prepared.hostRequest.request;
-  const sealed = sealCodexDegradedReviewPayload({
-    payload,
+  const sealed = sealPayload({
+    payload: inspected.payload,
     reviewPackage: request.reviewPackage,
     reviewer: request.reviewer,
     attestationRef: request.attestationRef,
@@ -149,11 +206,22 @@ export function consumeCodexParentReviewHostToolResult({ prepared, toolRequest, 
     }
   });
   const configuredReviewer = { ...request.reviewer, attestation: request.reviewer.attestation ?? { ref: request.attestationRef } };
-  const validation = validateReviewResult(sealed?.result, { expectedPackage: request.reviewPackage, configuredReviewer, implementerSession: request.authorization.implementerSession });
+  const validation = validateResult(sealed?.result, { expectedPackage: request.reviewPackage, configuredReviewer, implementerSession: request.authorization.implementerSession });
   const cleanup = cleanupView();
-  if (!sealed || !validation.valid || !strictSummaryMatchesResult(sealed.result.strictUnavailable, request.strictResult) ||
-      !degradedAuthorizationMatchesResult(sealed.result.degradedAuthorization, sealed.degradedAuthorization) || cleanup?.removed !== true) {
-    return { status: "unavailable", code: "review-launcher-codex-tool-result-invalid" };
+  if (!sealed) {
+    return unavailableCodexParentResult("review-launcher-codex-result-normalization-invalid", inspected.diagnostics, cleanup);
+  }
+  if (!validation.valid) {
+    return unavailableCodexParentResult("review-launcher-codex-result-validation-invalid", { ...inspected.diagnostics, validation: validation.issues?.[0]?.code ?? "invalid" }, cleanup);
+  }
+  if (!strictMatches(sealed.result.strictUnavailable, request.strictResult)) {
+    return unavailableCodexParentResult("review-launcher-codex-strict-unavailable-mismatch", inspected.diagnostics, cleanup);
+  }
+  if (!degradedAuthorizationMatches(sealed.result.degradedAuthorization, sealed.degradedAuthorization)) {
+    return unavailableCodexParentResult("review-launcher-codex-degraded-authorization-mismatch", inspected.diagnostics, cleanup);
+  }
+  if (cleanup?.removed !== true) {
+    return unavailableCodexParentResult("review-launcher-codex-result-cleanup-failed", inspected.diagnostics, cleanup);
   }
   const response = {
     allowed: true,
@@ -214,9 +282,13 @@ export function isolatedReviewerEnvironment(homePath) {
 }
 
 export function codexAuthenticationEnvironment(parentEnvironment = process.env) {
-  return Object.fromEntries(["HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA"]
+  const environment = Object.fromEntries(["HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA"]
     .filter((name) => typeof parentEnvironment[name] === "string")
     .map((name) => [name, parentEnvironment[name]]));
+  const platformPath = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
+    .filter((entry) => fs.existsSync(entry))
+    .join(path.delimiter);
+  return platformPath ? { ...environment, PATH: platformPath } : environment;
 }
 
 function codexRestrictedReviewArguments() {
