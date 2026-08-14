@@ -49,7 +49,10 @@ the brief to claim approval that was not given.
 
 Autonomous execution is permitted only under the `local-implementation`
 bounded-autonomous-execution profile, writing only the brief file within the
-run's authorized workspace and paths.
+run's authorized workspace and paths. Before every autonomous brief write,
+validate the exact profile, workspace, path, and operation through
+`scripts/sdd/check-operation-authorization.mjs`; pause without writing when
+that deterministic check denies the operation.
 
 ## Guardrails
 

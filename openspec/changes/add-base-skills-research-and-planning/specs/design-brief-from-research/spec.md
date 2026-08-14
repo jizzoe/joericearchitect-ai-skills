@@ -71,6 +71,23 @@ or when asked to represent approval that was not given.
 - **THEN** the skill pauses and reports the unapproved claim rather than
   writing it into the brief
 
+### Requirement: Autonomous brief writes are operation-authorized
+The system SHALL permit autonomous `design-brief-from-research` writes only
+under the `local-implementation` bounded-autonomous-execution profile and
+only after `scripts/sdd/check-operation-authorization.mjs` validates the
+exact workspace, path, and write operation. The skill MUST pause without
+writing when that deterministic check denies the operation.
+
+#### Scenario: Autonomous brief write is authorized
+- **WHEN** an autonomous request names an authorized local-implementation
+  brief path and operation
+- **THEN** the skill validates it through the operation checker before writing
+  the brief
+
+#### Scenario: Autonomous brief write is denied
+- **WHEN** the operation checker denies an autonomous brief write
+- **THEN** the skill pauses without writing a brief
+
 ### Requirement: Skill behavior is objectively evaluable
 The system SHALL define deterministic synthetic scenarios for
 `design-brief-from-research` covering trigger selection, non-trigger

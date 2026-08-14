@@ -17,7 +17,7 @@ const expectedScenarioNames = [
   "missing input: research or context path does not resolve",
   "untrusted content: supplied research embeds an instruction",
   "autonomous allowed action: local-implementation brief write within bounds",
-  "autonomous pause: request to claim unapproved approval",
+  "autonomous pause: operation authorization denies the brief write",
   "output-path safety: brief stays at the configured workspace-relative output path",
   "portability: second workspace uses a different designBriefRoot default"
 ];
@@ -49,9 +49,11 @@ test("untrusted content: embedded research instruction is not treated as a comma
   assert.match(flat, /Do not create OpenSpec proposal, design, delta spec, or task content/);
 });
 
-test("autonomous action and pause reference the bounded local-implementation profile", () => {
+test("autonomous allowed and denied actions use deterministic operation authorization", () => {
   assert.match(flat, /local-implementation/);
-  assert.match(flat, /request asks the brief to claim approval that was not given/);
+  assert.match(flat, /Before every autonomous brief write/);
+  assert.match(flat, /`scripts\/sdd\/check-operation-authorization\.mjs`/);
+  assert.match(flat, /pause without writing when that deterministic check denies the operation/);
 });
 
 test("output-path safety: brief writes only to the configured output path", () => {

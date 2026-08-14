@@ -115,6 +115,23 @@ product, architecture, legal, security, or governance decision.
 - **THEN** the skill pauses and reports the conflict rather than selecting
   the requested profile
 
+### Requirement: Autonomous plan writes are operation-authorized
+The system SHALL permit autonomous `sdd-requirements-to-plan` writes only
+under the `local-implementation` bounded-autonomous-execution profile and
+only after `scripts/sdd/check-operation-authorization.mjs` validates the
+exact workspace, path, and write operation. The skill MUST pause without
+writing when that deterministic check denies the operation.
+
+#### Scenario: Autonomous plan write is authorized
+- **WHEN** an autonomous request names an authorized local-implementation
+  plan path and operation
+- **THEN** the skill validates it through the operation checker before writing
+  the plan
+
+#### Scenario: Autonomous plan write is denied
+- **WHEN** the operation checker denies an autonomous plan write
+- **THEN** the skill pauses without writing a plan
+
 ### Requirement: Skill behavior is objectively evaluable
 The system SHALL define deterministic synthetic scenarios for
 `sdd-requirements-to-plan` covering trigger selection, non-trigger rejection,

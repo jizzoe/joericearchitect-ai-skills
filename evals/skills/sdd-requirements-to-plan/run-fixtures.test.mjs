@@ -17,7 +17,7 @@ const expectedScenarioNames = [
   "missing input: requirements or approved design-brief path absent",
   "untrusted content: supplied requirement embeds an instruction",
   "autonomous allowed action: local-implementation plan write within bounds",
-  "autonomous pause: requested profile conflicts with risk or data constraints",
+  "autonomous pause: operation authorization denies the plan write",
   "output-path safety: plan stays at the configured workspace-relative output path",
   "portability: second workspace uses a different planRoot default"
 ];
@@ -61,9 +61,11 @@ test("dependency-aware-work-selection is reused rather than re-derived", () => {
   assert.match(flat, /Do not generate OpenSpec proposal, design, delta spec, or task content/);
 });
 
-test("autonomous action and pause reference the bounded local-implementation profile and profile-risk conflicts", () => {
+test("autonomous allowed and denied actions use deterministic operation authorization", () => {
   assert.match(flat, /local-implementation/);
-  assert.match(flat, /requested profile conflicts with risk or data constraints/);
+  assert.match(flat, /Before every autonomous plan write/);
+  assert.match(flat, /`scripts\/sdd\/check-operation-authorization\.mjs`/);
+  assert.match(flat, /pause without writing when that deterministic check denies the operation/);
 });
 
 test("delivery authority is named per candidate, never implied by profile alone", () => {
