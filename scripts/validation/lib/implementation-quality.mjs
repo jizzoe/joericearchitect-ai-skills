@@ -212,7 +212,15 @@ function validateCheck(check, index, evidenceById, issues) {
   }
 }
 
-function validateLocalFindingResolution(finding, index, correctionAttempts, issues) {
+function correctionEvidenceMatches(attempt, evidenceById) {
+  const evidence = (attempt?.evidenceIds ?? []).map((evidenceId) => evidenceById.get(evidenceId)).filter(Boolean);
+  if (evidence.length !== (attempt?.evidenceIds?.length ?? 0)) return false;
+  return attempt?.result === "passed"
+    ? evidence.every((item) => item.result === "passed")
+    : attempt?.result === "failed" && evidence.some((item) => item.result === "failed");
+}
+
+function validateLocalFindingResolution(finding, index, correctionAttempts, evidenceById, issues) {
   const subject = `result.details.localReviewFindings[${index}].resolution`;
   const resolution = finding?.resolution;
   if (!exactKeys(resolution, new Set(["status", "correctionFailureSignature", "evidenceIds"]), subject, issues)) return { blocking: true };
@@ -228,7 +236,7 @@ function validateLocalFindingResolution(finding, index, correctionAttempts, issu
     if (!nonEmpty(resolution.correctionFailureSignature)) issues.push(issue("missing-finding-correction-signature", `${subject}.correctionFailureSignature`));
     const matching = correctionAttempts.filter((attempt) => attempt.failureSignature === resolution.correctionFailureSignature);
     const latest = matching.at(-1);
-    if (!latest || latest.result !== "passed") issues.push(issue("finding-correction-not-passed", subject, finding?.id));
+    if (!latest || latest.result !== "passed" || !correctionEvidenceMatches(latest, evidenceById)) issues.push(issue("finding-correction-not-passed", subject, finding?.id));
     else if (!sameStringSet(resolution.evidenceIds, latest.evidenceIds)) issues.push(issue("finding-correction-evidence-mismatch", `${subject}.evidenceIds`, finding?.id));
   } else if (resolution.correctionFailureSignature !== null) {
     issues.push(issue("unexpected-finding-correction-signature", `${subject}.correctionFailureSignature`));
@@ -442,6 +450,10 @@ function validateVerificationDetails(result, issues) {
       if (attempt.kind !== "objective-fix") issues.push(issue("invalid-correction-kind", `${itemSubject}.kind`));
       if (!new Set(["passed", "failed"]).has(attempt.result)) issues.push(issue("invalid-correction-result", `${itemSubject}.result`));
       validateEvidenceReferences(attempt.evidenceIds, `${itemSubject}.evidenceIds`, evidenceById, issues, { nonEmptyArray: true });
+      if (!correctionEvidenceMatches(attempt, evidenceById)) {
+        currentCorrectionEvidence = false;
+        issues.push(issue("correction-evidence-result-mismatch", `${itemSubject}.evidenceIds`, attempt.result));
+      }
       for (const evidenceId of attempt.evidenceIds ?? []) {
         const evidenceBinding = evidenceBindings.get(evidenceId);
         if (evidenceBinding?.binding?.value !== attempt.binding) issues.push(issue("correction-evidence-binding-mismatch", `${itemSubject}.evidenceIds`, evidenceId));
@@ -474,7 +486,7 @@ function validateVerificationDetails(result, issues) {
 
   if (Array.isArray(details.localReviewFindings) && Array.isArray(details.correctionAttempts)) {
     details.localReviewFindings.forEach((finding, index) => {
-      const resolution = validateLocalFindingResolution(finding, index, details.correctionAttempts, issues);
+      const resolution = validateLocalFindingResolution(finding, index, details.correctionAttempts, evidenceById, issues);
       if (resolution.blocking) blockingLocalFinding = true;
       for (const evidenceId of finding?.resolution?.evidenceIds ?? []) {
         if (!evidenceById.has(evidenceId)) issues.push(issue("unknown-evidence-reference", `${subject}.localReviewFindings[${index}].resolution.evidenceIds`, evidenceId));

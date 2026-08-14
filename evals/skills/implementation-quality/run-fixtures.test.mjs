@@ -350,6 +350,14 @@ test("local findings require an evidence-backed nonblocking resolution", () => {
   }];
   assert.deepEqual(validateImplementationQualityResult(corrected), { valid: true, issues: [] });
 
+  const falsePassedCorrection = clone(corrected);
+  falsePassedCorrection.evidence.find((item) => item.id === "focused").result = "failed";
+  falsePassedCorrection.details.selectedChecks.find((item) => item.evidenceId === "focused").result = "failed";
+  const falsePassedResult = validateImplementationQualityResult(falsePassedCorrection);
+  assert.ok(falsePassedResult.issues.some((item) => item.code === "correction-evidence-result-mismatch"));
+  assert.ok(falsePassedResult.issues.some((item) => item.code === "finding-correction-not-passed"));
+  assert.ok(falsePassedResult.issues.some((item) => item.code === "readiness-overclaim"));
+
   const unrelatedCorrectionEvidence = clone(corrected);
   unrelatedCorrectionEvidence.details.localReviewFindings[0].resolution.evidenceIds = ["local-review"];
   assert.ok(validateImplementationQualityResult(unrelatedCorrectionEvidence).issues.some((item) => item.code === "finding-correction-evidence-mismatch"));
@@ -506,15 +514,19 @@ test("failed and exhausted correction histories cannot report readiness", () => 
     attempt: number,
     kind: "objective-fix",
     result: "failed",
-    evidenceIds: ["focused"],
+    evidenceIds: ["correction-failed"],
     binding: "workspace-state-1"
   });
 
   const failed = readJson("valid-verification-prototype.json");
+  failed.evidence.push({ id: "correction-failed", type: "test", subject: "failed correction", result: "failed" });
+  failed.details.evidenceBindings.push({ evidenceId: "correction-failed", binding: { kind: "workspace", value: "workspace-state-1" }, changedPaths: ["src/widget.mjs"] });
   failed.details.correctionAttempts = [attempt(1)];
   assert.ok(validateImplementationQualityResult(failed).issues.some((item) => item.code === "readiness-overclaim"));
 
   const exhausted = readJson("valid-verification-prototype.json");
+  exhausted.evidence.push({ id: "correction-failed", type: "test", subject: "failed correction", result: "failed" });
+  exhausted.details.evidenceBindings.push({ evidenceId: "correction-failed", binding: { kind: "workspace", value: "workspace-state-1" }, changedPaths: ["src/widget.mjs"] });
   exhausted.details.correctionAttempts = [attempt(1), attempt(2), attempt(3)];
   const invalidExhausted = validateImplementationQualityResult(exhausted);
   assert.ok(invalidExhausted.issues.some((item) => item.code === "exhausted-correction-requires-blocked-status"));
@@ -527,6 +539,8 @@ test("failed and exhausted correction histories cannot report readiness", () => 
   assert.deepEqual(validateImplementationQualityResult(exhausted), { valid: true, issues: [] });
 
   const narrowBudget = readJson("valid-verification-prototype.json");
+  narrowBudget.evidence.push({ id: "correction-failed", type: "test", subject: "failed correction", result: "failed" });
+  narrowBudget.details.evidenceBindings.push({ evidenceId: "correction-failed", binding: { kind: "workspace", value: "workspace-state-1" }, changedPaths: ["src/widget.mjs"] });
   narrowBudget.status = "blocked";
   narrowBudget.summary = "Verification is blocked after the configured correction budget was exhausted.";
   narrowBudget.details.readiness = "blocked";

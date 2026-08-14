@@ -159,6 +159,8 @@ Correction history retains each attempt and evidence against the workspace or
 commit binding recorded for that attempt. Only the latest passed correction for
 each failure signature and its rerun evidence must match the final current
 binding to support readiness; historical records are not rewritten as current.
+An attempt marked passed requires its complete evidence set to pass, while an
+attempt marked failed retains at least one failed evidence record.
 Before authorizing another autonomous correction, the shared operation checker
 derives aggregate and named-signature counts from validated durable correction
 records and rejects caller/count mismatches.

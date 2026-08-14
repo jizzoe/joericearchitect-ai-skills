@@ -75,7 +75,9 @@ derived as applicable by the selected profile and UI scope must pass; it cannot
 use `not-applicable` to establish readiness. Preserve each
 local finding with an explicit unresolved, corrected, accepted-warning, or
 false-positive resolution. Corrected findings use the exact evidence set from
-their latest current passed correction;
+their latest current passed correction. Every passed correction requires all
+of its evidence to pass; every failed correction retains at least one failed
+evidence record;
 unresolved findings prevent readiness. A latest failed correction prevents
 readiness; an exhausted failed signature requires blocked status and recovery.
 Historical attempts retain evidence bound to their recorded workspace or head;

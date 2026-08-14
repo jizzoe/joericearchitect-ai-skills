@@ -224,6 +224,15 @@ derives aggregate and named-signature counts, and rejects any caller mismatch.
 Focused regressions prove that reporting zero cannot bypass an exhausted durable
 history.
 
+### IQ-R22 — high / objective-fix
+
+Fresh strict review found that correction outcomes were not compared with their
+evidence results. A passed attempt now requires its complete evidence set to be
+passed; a failed attempt requires at least one failed evidence record. Mismatch
+invalidates readiness and prevents a local finding from being considered
+corrected. Focused regressions cover false-passed correction and resolution
+claims plus evidence-backed failed histories.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -256,7 +265,7 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R21: 24 passed, 0 failed. The complete
+Focused tests after IQ-R1 through IQ-R22: 24 passed, 0 failed. The complete
 current-main Node suite passes 192 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
