@@ -40,8 +40,8 @@
   `openspec validate --all --strict`, and whitespace/scope review; record
   non-sensitive results. Depends on: 3.1, 3.2.
   Evidence: all recorded checks passed in `evidence/verification.md`.
-- [ ] 4.2 Open the owner-authorized human-reviewed bootstrap PR after local
+- [x] 4.2 Open the owner-authorized human-reviewed bootstrap PR after local
   validation, clearly linking this change and documenting that the exception is
   limited to this repair; do not waive independent review for
   `add-base-skills-research-and-planning`. Depends on: 4.1.
-  Evidence: pending GitHub issue and PR URL.
+  Evidence: issue #93 and human-reviewed bootstrap PR #94.

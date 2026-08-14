@@ -17,4 +17,6 @@ The configured account can access the repository and GitHub REST API. The
 repository helper's `gh issue list` and `gh issue view` paths returned HTTP 401,
 so exact-title lookup and issue creation used the equivalent REST-backed GitHub
 commands. Issue #93 is now the authoritative delivery record. Branch push and
-pull-request creation remain the next delivery task.
+pull-request creation are complete at
+https://github.com/jizzoe/joericearchitect-ai-skills/pull/94. Human review and
+approval are required for that repair PR before any merge.
