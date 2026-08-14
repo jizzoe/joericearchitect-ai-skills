@@ -75,6 +75,9 @@ false-positive resolution. Corrected findings use the exact evidence set from
 their latest current passed correction;
 unresolved findings prevent readiness. A latest failed correction prevents
 readiness; an exhausted failed signature requires blocked status and recovery.
+Historical attempts retain evidence bound to their recorded workspace or head;
+only the latest passed attempt for each signature must bind to current rerun
+evidence for readiness.
 
 Validate with `scripts/validation/validate-implementation-quality.mjs`. Report
 only `needs-implementation`, `paused`, `blocked`, or

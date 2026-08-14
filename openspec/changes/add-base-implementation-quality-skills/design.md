@@ -149,6 +149,11 @@ halts readiness at the earliest unmet stage. A restart re-reads current changed
 paths, authorization, evidence, and head or workspace binding instead of
 trusting conversation state.
 
+Correction history retains each attempt and evidence against the workspace or
+commit binding recorded for that attempt. Only the latest passed correction for
+each failure signature and its rerun evidence must match the final current
+binding to support readiness; historical records are not rewritten as current.
+
 Alternative: use an informal checklist in the skill prompt. Rejected because it
 cannot deterministically prove ordering, stale-evidence invalidation, retry
 limits, or safe resume behavior.

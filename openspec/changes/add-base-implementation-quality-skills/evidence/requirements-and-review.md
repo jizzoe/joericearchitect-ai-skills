@@ -190,6 +190,15 @@ provenance and a CI head equal to the production head, while the referenced
 top-level evidence must be validation evidence. Adversarial regressions reject
 review evidence, a different CI head, and a non-CI source.
 
+### IQ-R18 — objective-fix / objective-fix
+
+Fresh strict review found that every preserved correction attempt was required
+to match the final current binding. Correction evidence is now checked against
+the binding recorded by its own attempt, while only the latest passed attempt
+for each signature must bind to current evidence for readiness. A regression
+proves that a failed old-head attempt followed by a passed current-head attempt
+is valid and that falsifying the historical binding is rejected.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -222,8 +231,8 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R12: 21 passed, 0 failed. The complete
-current-main Node suite passes 189 tests. Syntax checks, whitespace checks,
+Focused tests after IQ-R1 through IQ-R18: 22 passed, 0 failed. The complete
+current-main Node suite passes 190 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
 validation pass. A fresh exact-head strict independent review is the next gate.

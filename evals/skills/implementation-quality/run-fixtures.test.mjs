@@ -478,6 +478,27 @@ test("failed and exhausted correction histories cannot report readiness", () => 
   assert.deepEqual(validateImplementationQualityResult(narrowBudget), { valid: true, issues: [] });
 });
 
+test("historical correction evidence retains its own binding while latest passed evidence is current", () => {
+  const value = readJson("valid-verification-prototype.json");
+  value.evidence.push(
+    { id: "correction-old", type: "test", subject: "first correction attempt", result: "failed" },
+    { id: "correction-current", type: "test", subject: "second correction attempt", result: "passed" }
+  );
+  value.details.evidenceBindings.push(
+    { evidenceId: "correction-old", binding: { kind: "workspace", value: "workspace-state-old" }, changedPaths: ["src/widget.mjs"] },
+    { evidenceId: "correction-current", binding: { kind: "workspace", value: "workspace-state-1" }, changedPaths: ["src/widget.mjs"] }
+  );
+  value.details.correctionAttempts = [
+    { failureSignature: "focused-regression", attempt: 1, kind: "objective-fix", result: "failed", evidenceIds: ["correction-old"], binding: "workspace-state-old" },
+    { failureSignature: "focused-regression", attempt: 2, kind: "objective-fix", result: "passed", evidenceIds: ["correction-current"], binding: "workspace-state-1" }
+  ];
+  assert.deepEqual(validateImplementationQualityResult(value), { valid: true, issues: [] });
+
+  const mismatchedHistory = clone(value);
+  mismatchedHistory.details.correctionAttempts[0].binding = "workspace-state-unrelated";
+  assert.ok(validateImplementationQualityResult(mismatchedHistory).issues.some((item) => item.code === "correction-evidence-binding-mismatch"));
+});
+
 test("canonical skills expose read-only, correction, strict-review, recovery, and profile boundaries", () => {
   const review = fs.readFileSync(path.join(root, "skills/base/base-code-review/SKILL.md"), "utf8");
   assert.match(review, /Remain read-only in interactive and autonomous modes/);

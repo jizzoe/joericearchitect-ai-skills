@@ -432,18 +432,10 @@ function validateVerificationDetails(result, issues) {
       if (!new Set(["passed", "failed"]).has(attempt.result)) issues.push(issue("invalid-correction-result", `${itemSubject}.result`));
       validateEvidenceReferences(attempt.evidenceIds, `${itemSubject}.evidenceIds`, evidenceById, issues, { nonEmptyArray: true });
       for (const evidenceId of attempt.evidenceIds ?? []) {
-        if (!evidenceIsCurrent(evidenceId, evidenceBindings, details)) {
-          currentCorrectionEvidence = false;
-          issues.push(issue("stale-evidence-binding", `${itemSubject}.evidenceIds`, evidenceId));
-        }
+        const evidenceBinding = evidenceBindings.get(evidenceId);
+        if (evidenceBinding?.binding?.value !== attempt.binding) issues.push(issue("correction-evidence-binding-mismatch", `${itemSubject}.evidenceIds`, evidenceId));
       }
       if (!nonEmpty(attempt.binding)) issues.push(issue("invalid-correction-binding", `${itemSubject}.binding`));
-      if (attempt.result === "passed" && nonEmpty(attempt.binding) && attempt.binding !== details.binding?.value) {
-        currentCorrectionEvidence = false;
-        if (details.readiness === "ready-for-openspec-verify") {
-          issues.push(issue("stale-correction-binding", `${itemSubject}.binding`, details.binding?.value));
-        }
-      }
       const expected = (attemptsBySignature.get(attempt.failureSignature) ?? 0) + 1;
       if (attempt.attempt !== expected) issues.push(issue("nonsequential-correction-attempt", `${itemSubject}.attempt`, expected));
       if (Number.isInteger(details.correctionBudget) && attempt.attempt > details.correctionBudget) issues.push(issue("correction-budget-exceeded", `${itemSubject}.attempt`, details.correctionBudget));
@@ -451,9 +443,21 @@ function validateVerificationDetails(result, issues) {
       latestBySignature.set(attempt.failureSignature, attempt);
     });
     for (const attempt of latestBySignature.values()) {
-      if (attempt.result !== "failed") continue;
-      failedCorrection = true;
-      if (attempt.attempt >= details.correctionBudget) exhaustedCorrection = true;
+      if (attempt.result === "failed") {
+        failedCorrection = true;
+        if (attempt.attempt >= details.correctionBudget) exhaustedCorrection = true;
+        continue;
+      }
+      for (const evidenceId of attempt.evidenceIds ?? []) {
+        if (!evidenceIsCurrent(evidenceId, evidenceBindings, details)) {
+          currentCorrectionEvidence = false;
+          issues.push(issue("stale-evidence-binding", `${subject}.correctionAttempts`, evidenceId));
+        }
+      }
+      if (nonEmpty(attempt.binding) && attempt.binding !== details.binding?.value) {
+        currentCorrectionEvidence = false;
+        if (details.readiness === "ready-for-openspec-verify") issues.push(issue("stale-correction-binding", `${subject}.correctionAttempts`, details.binding?.value));
+      }
     }
   }
 
