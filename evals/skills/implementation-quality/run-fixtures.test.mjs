@@ -161,7 +161,7 @@ test("paused production result can preserve valid unavailable strict-review evid
   value.nextAction = { kind: "resume", description: "Retry the configured strict isolated reviewer." };
   value.details.readiness = "paused";
   value.details.productionGate.reviewStatus = "unavailable";
-  value.evidence.find((item) => item.id === "strict-review").result = "informational";
+  value.evidence.find((item) => item.id === "strict-review").result = "failed";
   value.details.selectedChecks.find((item) => item.id === "strict-independent-review").result = "failed";
   assert.deepEqual(validateImplementationQualityResult(value), { valid: true, issues: [] });
 });
@@ -229,10 +229,80 @@ test("result validator rejects readiness overclaim, stale production head, and s
 
   const localFindings = readJson("valid-verification-prototype.json");
   localFindings.details.localReviewFindings = [
-    { "id": "low", "severity": "low", "disposition": "warning", "subject": "src/widget.mjs", "evidenceIds": ["local-review"], "impact": "Limited issue.", "recommendation": "Review later." },
-    { "id": "high", "severity": "high", "disposition": "objective-fix", "subject": "src/widget.mjs", "evidenceIds": ["local-review"], "impact": "Material issue.", "recommendation": "Correct separately." }
+    { "id": "low", "severity": "low", "disposition": "warning", "subject": "src/widget.mjs", "evidenceIds": ["local-review"], "impact": "Limited issue.", "recommendation": "Review later.", "resolution": { "status": "accepted-warning", "correctionFailureSignature": null, "evidenceIds": ["local-review"] } },
+    { "id": "high", "severity": "high", "disposition": "objective-fix", "subject": "src/widget.mjs", "evidenceIds": ["local-review"], "impact": "Material issue.", "recommendation": "Correct separately.", "resolution": { "status": "unresolved", "correctionFailureSignature": null, "evidenceIds": [] } }
   ];
   assert.ok(validateImplementationQualityResult(localFindings).issues.some((item) => item.code === "findings-not-deterministically-ordered"));
+});
+
+test("selected-check results must agree with their referenced evidence", () => {
+  for (const evidenceResult of ["failed", "informational"]) {
+    const value = readJson("valid-verification-prototype.json");
+    value.evidence.find((item) => item.id === "focused").result = evidenceResult;
+    const result = validateImplementationQualityResult(value);
+    assert.ok(result.issues.some((item) => item.code === "check-evidence-result-mismatch"), evidenceResult);
+  }
+});
+
+test("local findings require an evidence-backed nonblocking resolution", () => {
+  const finding = {
+    id: "local-high",
+    severity: "high",
+    disposition: "objective-fix",
+    subject: "src/widget.mjs",
+    evidenceIds: ["local-review"],
+    impact: "The implementation can return the wrong value.",
+    recommendation: "Apply and verify the bounded correction.",
+    resolution: { status: "unresolved", correctionFailureSignature: null, evidenceIds: [] }
+  };
+
+  const unresolved = readJson("valid-verification-prototype.json");
+  unresolved.details.localReviewFindings = [finding];
+  assert.ok(validateImplementationQualityResult(unresolved).issues.some((item) => item.code === "readiness-overclaim"));
+
+  const corrected = readJson("valid-verification-prototype.json");
+  corrected.details.localReviewFindings = [{
+    ...finding,
+    resolution: { status: "corrected", correctionFailureSignature: "local-high", evidenceIds: ["focused"] }
+  }];
+  corrected.details.correctionAttempts = [{
+    failureSignature: "local-high",
+    attempt: 1,
+    kind: "objective-fix",
+    result: "passed",
+    evidenceIds: ["focused"],
+    binding: "workspace-state-1"
+  }];
+  assert.deepEqual(validateImplementationQualityResult(corrected), { valid: true, issues: [] });
+
+  const warning = readJson("valid-verification-prototype.json");
+  warning.details.localReviewFindings = [{
+    ...finding,
+    id: "local-warning",
+    severity: "low",
+    disposition: "warning",
+    resolution: { status: "accepted-warning", correctionFailureSignature: null, evidenceIds: ["local-review"] }
+  }];
+  assert.deepEqual(validateImplementationQualityResult(warning), { valid: true, issues: [] });
+
+  const highWarning = readJson("valid-verification-prototype.json");
+  highWarning.details.localReviewFindings = [{
+    ...finding,
+    id: "high-warning",
+    disposition: "warning",
+    resolution: { status: "accepted-warning", correctionFailureSignature: null, evidenceIds: ["local-review"] }
+  }];
+  assert.ok(validateImplementationQualityResult(highWarning).issues.some((item) => item.code === "readiness-overclaim"));
+
+  const humanDecision = readJson("valid-verification-prototype.json");
+  humanDecision.details.localReviewFindings = [{
+    ...finding,
+    id: "human-decision",
+    disposition: "human-decision",
+    resolution: { status: "corrected", correctionFailureSignature: "local-high", evidenceIds: ["focused"] }
+  }];
+  humanDecision.details.correctionAttempts = corrected.details.correctionAttempts;
+  assert.ok(validateImplementationQualityResult(humanDecision).issues.some((item) => item.code === "finding-resolution-disposition-mismatch"));
 });
 
 test("readiness requires current evidence bindings for prototype and production checks", () => {

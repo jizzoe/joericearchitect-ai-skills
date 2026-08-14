@@ -91,9 +91,9 @@ the following documented `details` shapes before rendering Markdown:
   gaps, and concise scope summary;
 - verification: selected profile and checks, critical path, changed paths,
   current binding records for readiness evidence, correction budget and
-  attempts by failure signature, local review summary, unresolved gaps,
-  recovery steps, current head or workspace binding when applicable, and
-  readiness state.
+  attempts by failure signature, local findings with evidence-backed resolution
+  state, unresolved gaps, recovery steps, current head or workspace binding
+  when applicable, and readiness state.
 
 Finding objects use stable IDs; `blocker`, `high`, `medium`, or `low` severity;
 an independent `objective-fix`, `human-decision`, `warning`, or

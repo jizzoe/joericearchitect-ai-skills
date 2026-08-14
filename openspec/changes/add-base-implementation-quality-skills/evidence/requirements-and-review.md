@@ -102,6 +102,23 @@ attempt correction budget, prevents readiness while any latest correction is
 failed, and requires blocked result status and readiness when a failed signature
 reaches its budget. Full-budget and narrower-budget regressions pass.
 
+### IQ-R8 — high / objective-fix
+
+Fresh strict review found that selected-check results could disagree with their
+referenced top-level evidence results. Completed checks now require exact result
+agreement, and focused regressions reject passed checks backed by failed or
+informational evidence.
+
+### IQ-R9 — high / objective-fix
+
+Fresh strict review found that unresolved local findings did not affect
+readiness. Every local finding now carries a resolution matched to its
+disposition. Corrected objective findings link a current passed correction;
+human decisions remain unresolved; false positives retain evidence; warnings
+are accepted only as advisory, and blocker/high warnings still prevent
+readiness. Focused regressions cover unresolved, corrected, warning, severe
+warning, and human-decision states.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -134,8 +151,8 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R7: 17 passed, 0 failed. The complete
-current-main Node suite passes 185 tests. Syntax checks, whitespace checks,
+Focused tests after IQ-R1 through IQ-R9: 19 passed, 0 failed. The complete
+current-main Node suite passes 187 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
 validation pass. A fresh exact-head strict independent review is the next gate.

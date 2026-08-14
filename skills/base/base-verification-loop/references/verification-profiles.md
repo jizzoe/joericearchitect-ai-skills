@@ -6,8 +6,12 @@ Both profiles retain shared guardrails, core data-integrity checks, the critical
 flow, focused deterministic evidence, local code and security review, explicit
 gaps, and bounded corrections. Every completed readiness check and local-review
 finding carries a details record matching the current workspace or commit and
-the current changed-path list. A latest failed correction prevents readiness;
-an exhausted failed signature is blocked.
+the current changed-path list, and each selected-check result agrees with its
+referenced evidence result. Local findings retain an explicit resolution;
+unresolved findings prevent readiness, corrected findings link a current passed
+correction, and accepted warnings or false positives preserve their disposition
+evidence. A latest failed correction prevents readiness; an exhausted failed
+signature is blocked.
 
 ## Prototype Rapid
 

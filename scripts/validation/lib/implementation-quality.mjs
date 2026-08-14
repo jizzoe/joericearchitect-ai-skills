@@ -109,11 +109,11 @@ function validateEvidenceReferences(ids, subject, evidenceById, issues, { nonEmp
   }
 }
 
-function validateFinding(finding, index, evidenceById, issues) {
-  const subject = `result.details.findings[${index}]`;
-  const keys = new Set(["id", "severity", "disposition", "subject", "evidenceIds", "impact", "recommendation"]);
+function validateFinding(finding, index, evidenceById, issues, { subjectRoot = "result.details.findings", allowResolution = false } = {}) {
+  const subject = `${subjectRoot}[${index}]`;
+  const keys = new Set(["id", "severity", "disposition", "subject", "evidenceIds", "impact", "recommendation", ...(allowResolution ? ["resolution"] : [])]);
   if (!exactKeys(finding, keys, subject, issues)) return;
-  required(finding, [...keys], subject, issues);
+  required(finding, ["id", "severity", "disposition", "subject", "evidenceIds", "impact", "recommendation", ...(allowResolution ? ["resolution"] : [])], subject, issues);
   if (!nonEmpty(finding.id)) issues.push(issue("invalid-finding-id", `${subject}.id`));
   if (!reviewSeverities.includes(finding.severity)) issues.push(issue("invalid-finding-severity", `${subject}.severity`));
   if (!reviewDispositions.includes(finding.disposition)) issues.push(issue("invalid-finding-disposition", `${subject}.disposition`));
@@ -191,7 +191,43 @@ function validateCheck(check, index, evidenceById, issues) {
   if (check.result !== "pending") {
     if (!nonEmpty(check.evidenceId)) issues.push(issue("missing-check-evidence", `${subject}.evidenceId`));
     else if (!evidenceById.has(check.evidenceId)) issues.push(issue("unknown-evidence-reference", `${subject}.evidenceId`, check.evidenceId));
+    else {
+      const evidence = evidenceById.get(check.evidenceId);
+      if (check.result !== evidence.result) issues.push(issue("check-evidence-result-mismatch", `${subject}.result`, check.evidenceId));
+    }
   }
+}
+
+function validateLocalFindingResolution(finding, index, correctionAttempts, issues) {
+  const subject = `result.details.localReviewFindings[${index}].resolution`;
+  const resolution = finding?.resolution;
+  if (!exactKeys(resolution, new Set(["status", "correctionFailureSignature", "evidenceIds"]), subject, issues)) return { blocking: true };
+  required(resolution, ["status", "correctionFailureSignature", "evidenceIds"], subject, issues);
+  const statuses = new Set(["unresolved", "corrected", "accepted-warning", "false-positive"]);
+  if (!statuses.has(resolution.status)) issues.push(issue("invalid-finding-resolution", `${subject}.status`));
+  validateStringArray(resolution.evidenceIds, `${subject}.evidenceIds`, issues, { nonEmptyArray: resolution.status !== "unresolved" });
+
+  if (resolution.status === "corrected") {
+    if (!nonEmpty(resolution.correctionFailureSignature)) issues.push(issue("missing-finding-correction-signature", `${subject}.correctionFailureSignature`));
+    const matching = correctionAttempts.filter((attempt) => attempt.failureSignature === resolution.correctionFailureSignature);
+    const latest = matching.at(-1);
+    if (!latest || latest.result !== "passed") issues.push(issue("finding-correction-not-passed", subject, finding?.id));
+  } else if (resolution.correctionFailureSignature !== null) {
+    issues.push(issue("unexpected-finding-correction-signature", `${subject}.correctionFailureSignature`));
+  }
+
+  const allowedByDisposition = {
+    "objective-fix": new Set(["unresolved", "corrected"]),
+    "human-decision": new Set(["unresolved"]),
+    warning: new Set(["accepted-warning"]),
+    "false-positive": new Set(["false-positive"])
+  };
+  if (!allowedByDisposition[finding?.disposition]?.has(resolution.status)) {
+    issues.push(issue("finding-resolution-disposition-mismatch", `${subject}.status`, finding?.disposition));
+  }
+  const materiallySevere = new Set(["blocker", "high"]).has(finding?.severity);
+  const blocking = resolution.status === "unresolved" || (materiallySevere && resolution.status !== "corrected" && resolution.status !== "false-positive");
+  return { blocking };
 }
 
 function validateBinding(binding, subject, issues) {
@@ -295,11 +331,12 @@ function validateVerificationDetails(result, issues) {
     }
   }
 
+  let blockingLocalFinding = false;
   if (!Array.isArray(details.localReviewFindings)) issues.push(issue("invalid-array", `${subject}.localReviewFindings`));
   else {
     const ids = new Set();
     details.localReviewFindings.forEach((finding, index) => {
-      validateFinding(finding, index, evidenceById, issues);
+      validateFinding(finding, index, evidenceById, issues, { subjectRoot: `${subject}.localReviewFindings`, allowResolution: true });
       for (const evidenceId of finding?.evidenceIds ?? []) {
         if (!evidenceIsCurrent(evidenceId, evidenceBindings, details)) {
           currentCheckEvidence = false;
@@ -356,6 +393,20 @@ function validateVerificationDetails(result, issues) {
     }
   }
 
+  if (Array.isArray(details.localReviewFindings) && Array.isArray(details.correctionAttempts)) {
+    details.localReviewFindings.forEach((finding, index) => {
+      const resolution = validateLocalFindingResolution(finding, index, details.correctionAttempts, issues);
+      if (resolution.blocking) blockingLocalFinding = true;
+      for (const evidenceId of finding?.resolution?.evidenceIds ?? []) {
+        if (!evidenceById.has(evidenceId)) issues.push(issue("unknown-evidence-reference", `${subject}.localReviewFindings[${index}].resolution.evidenceIds`, evidenceId));
+        else if (!evidenceIsCurrent(evidenceId, evidenceBindings, details)) {
+          currentCheckEvidence = false;
+          issues.push(issue("stale-evidence-binding", `${subject}.localReviewFindings[${index}].resolution.evidenceIds`, evidenceId));
+        }
+      }
+    });
+  }
+
   if (exhaustedCorrection && result.status !== "blocked") issues.push(issue("exhausted-correction-requires-blocked-status", "result.status"));
   if (exhaustedCorrection && details.readiness !== "blocked") issues.push(issue("exhausted-correction-requires-blocked-readiness", `${subject}.readiness`));
 
@@ -392,7 +443,7 @@ function validateVerificationDetails(result, issues) {
       productionReady = productionReady && gate.ready;
     }
   }
-  if (details.readiness === "ready-for-openspec-verify" && (requiredFailure || hasGaps || !currentCheckEvidence || !currentCorrectionEvidence || failedCorrection || !productionValid || !productionReady)) {
+  if (details.readiness === "ready-for-openspec-verify" && (requiredFailure || hasGaps || !currentCheckEvidence || !currentCorrectionEvidence || failedCorrection || blockingLocalFinding || !productionValid || !productionReady)) {
     issues.push(issue("readiness-overclaim", `${subject}.readiness`));
   }
 }
