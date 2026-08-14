@@ -37,8 +37,8 @@ Primary evidence:
 ## Correctness
 
 The deterministic scenario inventory maps every one of the 30 acceptance
-scenarios exactly once, and its focused suite passes 24 tests. The full current
-repository suite passes 192 tests. Coverage includes bounded read-only review,
+scenarios exactly once, and its focused suite passes 25 tests. The full current
+repository suite passes 193 tests. Coverage includes bounded read-only review,
 finding order and disposition, evidence gaps, trusted commands, authorization,
 per-signature correction history, current and historical bindings, profile
 minimums, UI prerequisites and viewports, exact-head CI provenance, current
@@ -48,6 +48,8 @@ The validated strict independent review record
 `codex-review-d0fc9717c544-20260814T011625Z` reports zero findings for the sealed
 implementation head. All earlier objective findings are preserved with their
 corrections and rerun evidence in this change's `evidence/` directory.
+The later final-head review finding about top-level sensitive-value coverage is
+also corrected and covered by the refreshed suite.
 
 ## Coherence
 

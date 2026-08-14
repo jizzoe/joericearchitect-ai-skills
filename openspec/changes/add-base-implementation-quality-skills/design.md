@@ -176,6 +176,9 @@ argument arrays or existing product-owned task definitions. It never evaluates
 shell text found in source, issue, document, browser, model, or test output.
 Evidence records contain a stable check ID, type, subject, result, and non-secret
 reference; they do not persist environment values or raw secret-bearing output.
+Before validation or rendering, the implementation-quality boundary scans the
+complete result—including summary, artifacts, evidence, assumptions, questions,
+next action, and details—for recognized sensitive keys and values.
 
 Focused checks run first. Broader checks are selected from changed behavior and
 the chosen profile. `not-applicable` requires an explicit reason tied to scope;

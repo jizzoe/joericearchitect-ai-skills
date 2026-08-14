@@ -551,7 +551,7 @@ export function validateImplementationQualityResult(result) {
   const shared = validateSkillResult(result);
   issues.push(...shared.issues.map((item) => ({ ...item, code: `skill-result.${item.code}` })));
   if (!isObject(result)) return { valid: false, issues };
-  scanSensitive(result.details, "result.details", issues);
+  scanSensitive(result, "result", issues);
   if (result.skill === "base-code-review") validateReviewDetails(result, issues);
   else if (result.skill === "base-verification-loop") validateVerificationDetails(result, issues);
   else issues.push(issue("unsupported-implementation-quality-skill", "result.skill", result.skill));

@@ -52,6 +52,25 @@ test("review validator rejects malformed, duplicate, unsafe, unsupported, and mi
   }
 });
 
+test("implementation-quality results reject sensitive values in every rendered top-level field", () => {
+  const credential = ["ghp_", "A".repeat(20)].join("");
+  const cases = [
+    ["summary", (value) => { value.summary = credential; }],
+    ["artifacts", (value) => { value.artifacts[0].subject = credential; }],
+    ["evidence", (value) => { value.evidence[0].subject = credential; }],
+    ["assumptions", (value) => { value.assumptions = [credential]; }],
+    ["openQuestions", (value) => { value.openQuestions = [{ id: "sensitive-question", question: credential, blocking: true }]; }],
+    ["nextAction", (value) => { value.nextAction.description = credential; }],
+    ["details", (value) => { value.details.scopeSummary = credential; }]
+  ];
+  for (const [field, mutate] of cases) {
+    const value = readJson("valid-code-review.json");
+    mutate(value);
+    const result = validateImplementationQualityResult(value);
+    assert.ok(result.issues.some((item) => item.code === "sensitive-value"), field);
+  }
+});
+
 test("finding sort keeps severity and disposition independent", () => {
   const findings = readJson("invalid-code-review-misordered.json").details.findings;
   const sorted = sortReviewFindings(findings);

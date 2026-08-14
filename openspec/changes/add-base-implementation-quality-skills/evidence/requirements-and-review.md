@@ -233,6 +233,14 @@ invalidates readiness and prevents a local finding from being considered
 corrected. Focused regressions cover false-passed correction and resolution
 claims plus evidence-backed failed histories.
 
+### IQ-R23 — high / objective-fix
+
+Final exact-head strict review found that recognized sensitive values were
+scanned only inside details even though several top-level fields are rendered or
+persisted. The validator now scans the complete implementation-quality result.
+Field-by-field adversarial regressions cover summary, artifacts, evidence,
+assumptions, open questions, next action, and details.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -265,10 +273,11 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R22: 24 passed, 0 failed. The complete
-current-main Node suite passes 192 tests. Syntax checks, whitespace checks,
+Focused tests after IQ-R1 through IQ-R23: 25 passed, 0 failed. The complete
+current-main Node suite passes 193 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
 validation pass. Strict review record
 `codex-review-d0fc9717c544-20260814T011625Z` passed with zero findings for sealed
-implementation head `d0fc9717c54487943566100afd80716bb6cd2976`.
+implementation head `d0fc9717c54487943566100afd80716bb6cd2976`; the later
+final-head finding IQ-R23 is corrected and requires a fresh exact-head review.
