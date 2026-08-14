@@ -147,6 +147,17 @@ readiness. Regressions cover an unjustified common check, a reasoned but still
 applicable UI check, and reasoned browser evidence that is genuinely outside an
 explicit non-UI scope.
 
+### IQ-R13 — objective-fix / objective-fix
+
+Fresh strict review found that the verification helper supplied both aggregate
+and per-failure-signature correction counts while the shared operation checker
+enforced only the aggregate count. Objective-correction authorization now
+requires a named failure signature and a non-negative per-signature count,
+rejects a missing or aggregate-lower-than-per-signature count, and applies the
+three-attempt ceiling only to the named signature. Asymmetric regressions prove
+that an exhausted signature is rejected while a fresh signature remains
+authorized after three aggregate attempts.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 

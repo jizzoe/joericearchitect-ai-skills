@@ -23,7 +23,11 @@ test("each profile permits its fixed operations with authorized workspace or rec
   for (const [profile, operations] of Object.entries(profileOperations)) {
     for (const operation of operations) {
       const target = operation.includes("tracker") || operation === "upsert-allowlisted-record" || operation === "write-reconciliation-report" ? "record:tracker-1" : operation === "run-lifecycle-action" ? "change:example" : "workspace:docs/file.md";
-      const request = operation === "run-lifecycle-action" ? { target, lifecycleAction: "sync-change" } : { target };
+      const request = operation === "run-lifecycle-action"
+        ? { target, lifecycleAction: "sync-change" }
+        : operation === "objective-correction"
+          ? { target, failureSignature: "focused-check", correctionAttemptsForFailureSignature: 0, correctionAttempts: 0 }
+          : { target };
       const result = checkOperationAuthorization(input(profile, operation, { request }));
       assert.equal(result.allowed, true, `${profile}:${operation}:${JSON.stringify(result)}`);
     }
@@ -38,7 +42,10 @@ test("operation checker pauses for profile, authorization, target, adapter, runt
   assert.equal(code(checkOperationAuthorization(input("tracker-maintenance", "read-tracker", { request: { target: "record:tracker-1", adapter: "fixture" }, authorization: { targets: ["record:tracker-1"] } }))), "unauthorized-adapter");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "local-edit", { runtime: { permissionGaps: ["sandbox"] } }))), "runtime-permission-gap");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "local-edit", { authorization: { expiresAt: "2026-08-11T12:00:00.000Z" } }))), "expired-authorization");
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { correctionAttempts: 3 } }))), "correction-limit-exhausted");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSignature: "failed-check", correctionAttemptsForFailureSignature: 3, correctionAttempts: 3 } }))), "correction-limit-exhausted");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSignature: "fresh-check", correctionAttempts: 3 } }))), "invalid-correction-attempt-count");
+  assert.equal(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSignature: "fresh-check", correctionAttemptsForFailureSignature: 0, correctionAttempts: 3 } })).allowed, true);
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSignature: "failed-check", correctionAttemptsForFailureSignature: 2, correctionAttempts: 1 } }))), "inconsistent-correction-attempt-count");
 });
 
 test("sdd high-impact transitions require exact evidence and recovery boundaries", () => {

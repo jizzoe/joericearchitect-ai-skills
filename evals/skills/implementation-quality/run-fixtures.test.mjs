@@ -142,6 +142,27 @@ test("verification operations reuse exact local-implementation authorization", (
     checkpoint: { selectedEntry: { name: "quality-change", records: [], correctionRecords }, steps: [] }
   });
   assert.equal(correction.issues[0].code, "correction-limit-exhausted");
+  const freshSignature = authorizeVerificationOperation({
+    ...input,
+    authorization: correctionAuthorization,
+    operation: "objective-correction",
+    selectedEntry: "quality-change",
+    failureSignature: "fresh-failure",
+    correctionAttemptsForFailureSignature: 0,
+    correctionAttempts: 3,
+    checkpoint: { selectedEntry: { name: "quality-change", records: [], correctionRecords }, steps: [] }
+  });
+  assert.equal(freshSignature.allowed, true);
+  const missingPerSignature = authorizeVerificationOperation({
+    ...input,
+    authorization: correctionAuthorization,
+    operation: "objective-correction",
+    selectedEntry: "quality-change",
+    failureSignature: "fresh-failure",
+    correctionAttempts: 3,
+    checkpoint: { selectedEntry: { name: "quality-change", records: [], correctionRecords }, steps: [] }
+  });
+  assert.equal(missingPerSignature.issues[0].code, "invalid-correction-attempt-count");
   assert.equal(authorizeVerificationOperation({ ...input, runtime: { permissionGaps: ["local-edit"] } }).issues[0].code, "runtime-permission-gap");
 });
 
