@@ -21,6 +21,7 @@ const strictResult = {
   findings: [], status: "unavailable", unavailableCode: "independent-reviewer-nested-app-server-denied"
 };
 const authorization = {
+  expiresAt: "2026-08-14T00:00:00.000Z",
   implementerSession: "implementer",
   degradedIndependentReview: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic owner risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
   reviewLauncher: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", boundary: "detached-exact-head-inner-read-only", launcherId: "codex-review-launcher", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest }
@@ -36,7 +37,7 @@ function validResult() {
     reviewer: { type: "codex-degraded", identity: "fresh-reviewer", adapter: "codex" },
     attestation: { ref: "degraded-attestation", nonInteractive: true, isolatedContext: false, freshContext: true, readOnly: false },
     assuranceLevel: "authorized-degraded",
-    capabilityLedger: { enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "innerReadOnlySandbox"], unavailable: [], instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"] },
+    capabilityLedger: { enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "innerReadOnlySandbox"], unavailable: ["authenticatedParentLaunchEvidence", "hostPinnedReviewerExecutableIdentity"], instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"] },
     strictUnavailable: { reviewRecordId: strictResult.reviewRecordId, executionId: strictResult.executionId, adapter: "codex", status: "unavailable", unavailableCode: strictResult.unavailableCode, baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
     degradedAuthorization: { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic owner risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only" },
     baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest,
@@ -78,6 +79,8 @@ test("recovery preflight requires exact authorization, fixed host, and runtime p
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, authorization: { ...authorization, implementerSession: undefined } }).code, "review-launcher-identity-binding-missing");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, reviewer: { ...reviewer, identity: authorization.implementerSession } }).code, "review-launcher-self-review");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, runtime: {} }).code, "review-launcher-runtime-permission-required");
+  assert.equal(validateReviewLauncherRecovery({ ...baseInput, authorization: { ...authorization, expiresAt: "2026-08-13T23:59:59.000Z" } }).code, "degraded-independent-review-expiration-exceeds-goal");
+  assert.equal(validateReviewLauncherRecovery({ ...baseInput, authorization: { ...authorization, reviewLauncher: { ...authorization.reviewLauncher, expiresAt: "2026-08-14T00:00:01.000Z" } } }).code, "review-launcher-expiration-exceeds-goal");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, launcher: { ...launcher, hostScript: "scripts/sdd/other.mjs" } }).code, "review-launcher-capability-unavailable");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, launcher: { ...launcher, executable: "/bin/sh" } }).code, "review-launcher-capability-unavailable");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, failureCode: "independent-reviewer-codex-execution-unavailable" }).code, "review-launcher-failure-not-recoverable");
@@ -144,10 +147,10 @@ test("Claude launcher uses the same sealed host protocol with a read-tools-only 
     ...validResult(),
     reviewer: { type: "claude-degraded", identity: "fresh-reviewer", adapter: "claude" },
     strictUnavailable: { ...validResult().strictUnavailable, adapter: "claude", unavailableCode: claudeStrict.unavailableCode },
-    capabilityLedger: { enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "disabledMutationTools"], unavailable: [], instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"] }
+    capabilityLedger: { enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "disabledMutationTools"], unavailable: ["authenticatedParentLaunchEvidence", "hostPinnedReviewerExecutableIdentity"], instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"] }
   };
   const { response } = hostRun(prepared, result);
-  const accepted = acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: runtimeEvidence(prepared, response, claudeLauncher) });
+  const accepted = acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: runtimeEvidence(prepared, response, claudeLauncher), now: "2026-08-13T13:00:00.000Z" });
   assert.equal(accepted.allowed, true, JSON.stringify(accepted));
 });
 
@@ -157,8 +160,8 @@ test("external host owns the detached view and acceptance requires the recorded 
   assert.equal(response.allowed, true, JSON.stringify(response));
   assert.equal(invoked, true);
   assert.equal(removed, true);
-  assert.equal(acceptReviewLauncherHostResponse({ prepared, response }).code, "review-launcher-runtime-attestation-missing");
-  const accepted = acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: runtimeEvidence(prepared, response) });
+  assert.equal(acceptReviewLauncherHostResponse({ prepared, response, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-runtime-attestation-missing");
+  const accepted = acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: runtimeEvidence(prepared, response), now: "2026-08-13T13:00:00.000Z" });
   assert.equal(accepted.allowed, true, JSON.stringify(accepted));
   assert.equal(accepted.status, "passed");
 });
@@ -191,15 +194,15 @@ test("acceptance authenticates exact precursor, authorization, and host executio
     { ...response.result.strictUnavailable, executionId: "different-execution" },
     { ...response.result.strictUnavailable, adapter: "different-adapter" }
   ]) {
-    assert.equal(acceptReviewLauncherHostResponse({ prepared, response: { ...response, result: { ...response.result, strictUnavailable } }, runtimeLaunchEvidence: evidence }).code, "review-launcher-strict-unavailable-mismatch");
+    assert.equal(acceptReviewLauncherHostResponse({ prepared, response: { ...response, result: { ...response.result, strictUnavailable } }, runtimeLaunchEvidence: evidence, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-strict-unavailable-mismatch");
   }
   for (const degradedAuthorization of [
     { ...response.result.degradedAuthorization, expiresAt: "2026-08-14T00:00:01.000Z" },
     { ...response.result.degradedAuthorization, riskReason: "different risk" }
   ]) {
-    assert.equal(acceptReviewLauncherHostResponse({ prepared, response: { ...response, result: { ...response.result, degradedAuthorization } }, runtimeLaunchEvidence: evidence }).code, "review-launcher-degraded-authorization-mismatch");
+    assert.equal(acceptReviewLauncherHostResponse({ prepared, response: { ...response, result: { ...response.result, degradedAuthorization } }, runtimeLaunchEvidence: evidence, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-degraded-authorization-mismatch");
   }
-  assert.equal(acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: { ...evidence, outsideManagedSandbox: false } }).code, "review-launcher-runtime-attestation-missing");
+  assert.equal(acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: { ...evidence, outsideManagedSandbox: false }, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-runtime-attestation-missing");
 });
 
 test("host execution and controller acceptance each use their current clock", () => {

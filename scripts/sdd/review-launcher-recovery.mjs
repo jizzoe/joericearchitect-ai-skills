@@ -57,8 +57,10 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
   if (record.boundary !== definition.boundary || record.launcherId !== launcher?.id) return fail("review-launcher-boundary-mismatch");
   if (record.baseCommit !== reviewPackage.baseCommit || record.headCommit !== reviewPackage.headCommit || record.manifestDigest !== reviewPackage.manifestDigest) return fail("review-launcher-package-mismatch");
   const expires = Date.parse(record.expiresAt);
+  const goalExpires = Date.parse(authorization?.expiresAt ?? authorization?.stoppingConditions?.expiresAt);
   const current = Date.parse(now);
   if (Number.isNaN(expires) || Number.isNaN(current) || expires <= current) return fail("review-launcher-authorization-expired");
+  if (Number.isNaN(goalExpires) || expires > goalExpires) return fail("review-launcher-expiration-exceeds-goal");
   if (launcher?.enabled !== true || launcher.hostScript !== hostScript || !executableMatches(launcher.executable, definition) ||
       launcher.detachedView !== true || launcher[definition.requiredCapability] !== true || launcher.ephemeral !== true ||
       launcher.sealedPackageOnly !== true || launcher.credentialScrubbed !== true || launcher.nonInteractive !== true) {

@@ -29,8 +29,10 @@ export function validateDegradedIndependentReviewAuthorization({ authorization, 
   if (transition !== "merge-pr" || !Array.isArray(record.transitions) || !record.transitions.includes(transition)) return fail("degraded-independent-review-transition-mismatch");
   if (record.fallbackBoundary !== "fresh-separated-reviewer-only" || !text(record.riskReason)) return fail("degraded-independent-review-authorization-malformed");
   const expiresAt = Date.parse(record.expiresAt);
+  const goalExpiresAt = Date.parse(authorization?.expiresAt ?? authorization?.stoppingConditions?.expiresAt);
   const currentTime = Date.parse(now);
   if (Number.isNaN(expiresAt) || Number.isNaN(currentTime) || expiresAt <= currentTime) return fail("degraded-independent-review-authorization-expired");
+  if (Number.isNaN(goalExpiresAt) || expiresAt > goalExpiresAt) return fail("degraded-independent-review-expiration-exceeds-goal");
   if (!reviewPackage || !commit(reviewPackage.baseCommit) || !commit(reviewPackage.headCommit) || !text(reviewPackage.manifestDigest)) return fail("degraded-independent-review-package-invalid");
   if (!strictResult || strictResult.status !== "unavailable" || !text(strictResult.unavailableCode) || strictResult.baseCommit !== reviewPackage.baseCommit || strictResult.headCommit !== reviewPackage.headCommit || strictResult.manifestDigest !== reviewPackage.manifestDigest) return fail("degraded-independent-review-strict-unavailable-missing");
   const exact = record.baseCommit === reviewPackage.baseCommit && record.headCommit === reviewPackage.headCommit && record.manifestDigest === reviewPackage.manifestDigest;
