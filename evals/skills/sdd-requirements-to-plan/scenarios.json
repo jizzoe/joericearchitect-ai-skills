@@ -3,7 +3,7 @@
     { "name": "trigger: accepted requirements ready to organize into delivery work", "kind": "positive" },
     { "name": "non-trigger: choose a product direction or infer missing acceptance behavior", "kind": "negative" },
     { "name": "missing input: requirements or approved design-brief path absent", "kind": "negative" },
-    { "name": "untrusted content: candidate readiness gap becomes an open question, not a guess", "kind": "negative" },
+    { "name": "untrusted content: supplied requirement embeds an instruction", "kind": "negative" },
     { "name": "autonomous allowed action: local-implementation plan write within bounds", "kind": "positive" },
     { "name": "autonomous pause: requested profile conflicts with risk or data constraints", "kind": "negative" },
     { "name": "output-path safety: plan stays at the configured workspace-relative output path", "kind": "positive" },
