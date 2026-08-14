@@ -21,7 +21,8 @@ as follows:
 - Assurance discriminator, strict precursor, capability ledger, package and
   result binding: `schemas/independent-review-result-v1.schema.json` and
   `scripts/sdd/independent-review-contract.mjs` with schema, contract, and gate
-  tests.
+  tests. Validation requires explicit unavailable entries for unauthenticated
+  parent-launch evidence and non-host-pinned reviewer executable identity.
 - Strict-first execution, finding/disposition behavior, expiry recheck, and
   current-head rereview: `scripts/sdd/execute-independent-review.mjs`,
   `scripts/sdd/independent-review.mjs`, and `scripts/sdd/review-findings.mjs`.
@@ -30,7 +31,7 @@ as follows:
   and adapter tests.
 - External-host recovery, independent package rederivation, request/response
   binding, symlink-safe Git-blob artifact reads, exclusive package injection,
-  current-clock expiration, and guarded cleanup:
+  current-clock and enclosing-goal expiration, and guarded cleanup:
   `scripts/sdd/review-launcher-recovery.mjs`,
   `scripts/sdd/review-launcher-host.mjs`,
   `scripts/sdd/detached-review-view.mjs`, and recovery/contract tests.
@@ -53,7 +54,8 @@ No evidence describes degraded review as strict or security-verified.
 
 Deterministic tests cover positive and negative scenarios for absent, expired,
 wrong-transition, stale, malformed, mutable, self-review, capability, runtime-
-permission, launcher, Claude/Codex, correction-envelope, secret, unsafe-path,
+permission, launcher, Claude/Codex, correction-envelope, goal-expiration,
+authenticity-ledger, secret, unsafe-path,
 symlink, durable delivery-profile, correction-counter, and portability
 boundaries. `node --test` passed 209 tests in a clean exact-head clone.
 `openspec validate --all --strict` passed all 22

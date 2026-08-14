@@ -124,7 +124,7 @@ export function buildCodexDegradedReviewInvocation({ executable = "codex", view,
 export function degradedCapabilityLedger() {
   return {
     enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "innerReadOnlySandbox", "credentialAccess"],
-    unavailable: [],
+    unavailable: ["authenticatedParentLaunchEvidence", "hostPinnedReviewerExecutableIdentity"],
     instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"]
   };
 }
@@ -335,7 +335,7 @@ export function runClaudeDegradedReviewAdapter({ reviewPackage, view, schemaPath
     assuranceLevel: "authorized-degraded",
     capabilityLedger: {
       enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "disabledMutationTools"],
-      unavailable: [],
+      unavailable: ["authenticatedParentLaunchEvidence", "hostPinnedReviewerExecutableIdentity"],
       instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"]
     },
     strictUnavailable: {

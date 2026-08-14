@@ -103,6 +103,8 @@ test("degraded Codex transport is explicitly reduced-assurance and scrubs mutati
   assert.equal(invocation.environment.GH_TOKEN, "");
   const ledger = degradedCapabilityLedger();
   assert.ok(ledger.enforced.includes("innerReadOnlySandbox"));
+  assert.ok(ledger.unavailable.includes("authenticatedParentLaunchEvidence"));
+  assert.ok(ledger.unavailable.includes("hostPinnedReviewerExecutableIdentity"));
   assert.ok(ledger.instructionConstrained.includes("gitWrite"));
   assert.ok(ledger.instructionConstrained.includes("githubMutation"));
 });
@@ -137,6 +139,8 @@ test("degraded adapter seals reviewer findings into parent-owned exact-package e
     });
     assert.equal(output.status, "passed");
     assert.equal(output.result.assuranceLevel, "authorized-degraded");
+    assert.ok(output.result.capabilityLedger.unavailable.includes("authenticatedParentLaunchEvidence"));
+    assert.ok(output.result.capabilityLedger.unavailable.includes("hostPinnedReviewerExecutableIdentity"));
     assert.equal(output.result.strictUnavailable.unavailableCode, "independent-reviewer-nested-app-server-denied");
     assert.deepEqual(output.result.findings, []);
   } finally {
@@ -203,6 +207,8 @@ test("degraded Claude adapter seals findings with Claude-specific reduced-assura
   assert.equal(output.status, "passed");
   assert.equal(output.result.reviewer.adapter, "claude");
   assert.ok(output.result.capabilityLedger.enforced.includes("disabledMutationTools"));
+  assert.ok(output.result.capabilityLedger.unavailable.includes("authenticatedParentLaunchEvidence"));
+  assert.ok(output.result.capabilityLedger.unavailable.includes("hostPinnedReviewerExecutableIdentity"));
   assert.equal(output.result.attestation.readOnly, false);
 });
 

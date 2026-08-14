@@ -14,6 +14,7 @@ const failure = (code, detail) => ({ valid: false, issues: [{ code, ...(detail ?
 const secretLike = /(gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{16,}|-----BEGIN (?:[A-Z ]+)?PRIVATE KEY-----|Bearer\s+[A-Za-z0-9._-]{12,})/i;
 const degradedBoundary = "fresh-separated-reviewer-only";
 const protectedCapabilities = ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"];
+const degradedAuthenticityLimitations = ["authenticatedParentLaunchEvidence", "hostPinnedReviewerExecutableIdentity"];
 
 export function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -63,7 +64,8 @@ export function buildReviewPackage({ repositoryPath, baseCommit, headCommit, art
 function validLedger(value) {
   if (!value || !["enforced", "unavailable", "instructionConstrained"].every((key) => Array.isArray(value[key]) && value[key].every(text))) return false;
   const entries = Object.values(value).flat();
-  return new Set(entries).size === entries.length && protectedCapabilities.every((capability) => entries.includes(capability));
+  return new Set(entries).size === entries.length && protectedCapabilities.every((capability) => entries.includes(capability)) &&
+    degradedAuthenticityLimitations.every((capability) => value.unavailable.includes(capability));
 }
 
 function validDegradedBindings(value, expectedPackage) {
