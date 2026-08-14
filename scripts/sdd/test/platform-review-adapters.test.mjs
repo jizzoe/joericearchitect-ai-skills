@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, createClaudeReviewSettings, degradedCapabilityLedger, invokeReviewProcess, isolatedReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult, writeReviewPackageForView } from "../platform-review-adapters.mjs";
+import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, createClaudeReviewSettings, degradedCapabilityLedger, invokeReviewProcess, isolatedReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 
@@ -112,6 +112,63 @@ test("degraded Codex transport is explicitly reduced-assurance and scrubs mutati
 test("Codex nested app-server denial receives a stable launcher-recovery code", () => {
   assert.equal(classifyCodexExecutionFailure({ stderr: "failed to initialize in-process app-server client: Operation not permitted" }), "independent-reviewer-nested-app-server-denied");
   assert.equal(classifyCodexExecutionFailure({ stderr: "other failure" }), "independent-reviewer-codex-execution-unavailable");
+});
+
+test("Codex parent transport builds only the fixed escalated host tool request and consumes its result", () => {
+  const digest = "a".repeat(64);
+  const prepared = {
+    allowed: true,
+    code: "review-launcher-external-host-required",
+    hostRequest: { requestDigest: digest },
+    expectedRecovery: { hostScript: "scripts/sdd/review-launcher-host.mjs" }
+  };
+  const temporary = fs.mkdtempSync("/tmp/codex-parent-transport-");
+  try {
+    const written = writePreparedReviewHostRequest(prepared, temporary);
+    assert.equal(written.available, true, JSON.stringify(written));
+    assert.equal(fs.lstatSync(written.requestPath).isSymbolicLink(), false);
+    assert.equal(writePreparedReviewHostRequest(prepared, temporary).code, "review-launcher-runtime-request-write-failed");
+
+    const toolRequest = buildCodexParentReviewHostToolRequest({
+      prepared,
+      preparedRequestPath: written.requestPath,
+      repositoryPath: process.cwd()
+    });
+    assert.equal(toolRequest.available, true, JSON.stringify(toolRequest));
+    assert.equal(toolRequest.tool, "exec_command");
+    assert.equal(toolRequest.sandboxPermissions, "require_escalated");
+    assert.equal(toolRequest.approvalPolicyRequirement, "interactive");
+    assert.equal(toolRequest.approvalReviewer, "auto_review");
+    assert.deepEqual(toolRequest.arguments.slice(1), [written.requestPath]);
+    assert.equal(toolRequest.arguments.some((value) => /host-debug|danger-full-access|--yolo/.test(value)), false);
+
+    const response = {
+      requestDigest: digest,
+      hostExecutionId: "host-execution",
+      launcherId: "codex-review-launcher",
+      launcherKind: "codex-detached-read-only-v1"
+    };
+    const consumed = consumeCodexParentReviewHostToolResult({
+      toolRequest,
+      toolResult: { exit_code: 0, output: JSON.stringify(response) }
+    });
+    assert.equal(consumed.status, "executed");
+    assert.equal(consumed.runtimeReceipt.source, "codex-exec-tool");
+    assert.equal(consumed.runtimeReceipt.securityVerifiable, false);
+    assert.equal("attestedBy" in consumed.runtimeReceipt, false);
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test("Codex parent transport rejects unvalidated request paths and arbitrary payloads", () => {
+  const invalid = buildCodexParentReviewHostToolRequest({
+    prepared: { allowed: true, code: "review-launcher-external-host-required", hostRequest: { requestDigest: "a".repeat(64) }, expectedRecovery: { hostScript: "scripts/sdd/review-launcher-host.mjs" } },
+    preparedRequestPath: "$(touch /tmp/untrusted)",
+    repositoryPath: process.cwd()
+  });
+  assert.equal(invalid.code, "review-launcher-codex-tool-request-invalid");
+  assert.equal(consumeCodexParentReviewHostToolResult({ toolRequest: invalid, toolResult: { output: "{}" } }).status, "unavailable");
 });
 
 test("degraded adapter seals reviewer findings into parent-owned exact-package evidence", () => {

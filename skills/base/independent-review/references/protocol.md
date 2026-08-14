@@ -44,8 +44,16 @@ view creation and is rechecked before response acceptance.
 
 The in-sandbox recovery controller validates authorization and emits only a
 digest-bound structured host request; it cannot create a worktree or invoke the
-reviewer. The runtime invokes the host launcher outside the failed sandbox.
-That host revalidates the request, creates the owned detached exact-head view,
+reviewer. Production orchestration immediately consumes that intermediate
+state through one configured parent-runtime transport. The Codex transport
+writes the validated request to an exclusively created runtime-owned file,
+builds only the fixed host entrypoint and request-path invocation, and asks the
+shell tool for `require_escalated` execution. Under an interactive approval
+policy with Auto-review configured, the runtime's separate approval reviewer
+evaluates that boundary request without owner mediation. A denied or
+unavailable transport returns terminal evidence; it never prints a command for
+an operator. The approved runtime invokes the host launcher outside the failed
+sandbox. That host revalidates the request, creates the owned detached exact-head view,
 independently reconstructs the exact base-to-head diff and every declared
 artifact hash from Git objects in that view, rejects any canonical package
 mismatch, exclusively creates the reconstructed sealed-package file so a
@@ -63,10 +71,10 @@ an empty launcher-owned temporary home and isolated config/cache/data paths. The
 returns a request-bound normalized response and removes only its
 ownership-guarded view.
 
-The controller accepts the response only when runtime-supplied execution
-evidence identifies the configured launcher, host script, request digest, host
+The controller accepts the response only when the directly captured runtime
+receipt identifies the configured launcher, host script, request digest, host
 execution, and outside-managed-sandbox boundary. In authorized degraded mode,
-that evidence and the executable path are caller-readable ordinary data: they
+that receipt and the executable path are caller-readable ordinary data: they
 are not cryptographically authenticated or host-pinned and cannot prove the
 boundary against an adversarial implementation process. The executable path is
 restricted to the expected `codex`/`codex.exe` or `claude`/`claude.exe`
@@ -75,10 +83,11 @@ risk must be explicitly accepted and must never be described as strict or
 security-verified. Preparation may use the controller's current time, but the
 sealed host request carries no caller-selected clock: host execution and
 controller acceptance each recheck expiration against their own current clock.
-The parent-launch evidence and inner reviewer controls are
-recorded separately. If permission, configuration, runtime attestation,
+The parent-launch receipt and inner reviewer controls are
+recorded separately. The receipt names its real transport source and never uses
+a misleading trusted-runtime attestation. If permission, configuration, runtime receipt,
 detached setup, inner startup, result validation, or cleanup fails, return the
-stable unavailable code and pause.
+stable terminal unavailable code and pause without a manual fallback.
 
 ## Authorized Degraded Path
 
@@ -107,6 +116,10 @@ Preserve the implementation branch and evidence after any failure. Record one
 stable unavailable/validation code, clean only the owned temporary view, and
 resume from durable Git/OpenSpec/checkpoint state. Never substitute self-review
 or a regular pull-request review for this protocol.
+An objective finding or changed head automatically reruns affected validation,
+rebuilds the package, retries strict review, invokes eligible parent recovery,
+and dispositions the fresh result inside the per-signature budget; it does not
+wait for the owner to retrigger review.
 
 `correctionAttempts` is the total count of objective corrections already
 present in the durable correction chain and exists to validate chain ordering.

@@ -48,14 +48,18 @@ credential or scope changes, external messages, and unrelated mutations.
 package unavailability, it permits a fresh, separate, transition-bound degraded
 review and the configured Codex or Claude review-launcher recovery for the same
 change, head, manifest, correction envelope, and expiration. Recovery prepares
-a structured request in the implementation sandbox; the runtime invokes the
-host launcher outside that sandbox, and acceptance records runtime-supplied
-execution evidence. That evidence and the basename-checked executable identity
+a structured request in the implementation sandbox; production orchestration
+passes it directly to the configured parent-runtime transport, and acceptance
+records the directly captured runtime receipt. Codex maps the fixed operation
+to an actual escalated shell-tool request eligible for Auto-review under an
+interactive approval policy. That receipt and the basename-checked executable identity
 are not cryptographically authenticated in the first release. The selection is
 the owner's affirmative reduced-assurance risk choice; derive the exact
 authorization only when the package and transition exist.
 
 The preset is authorization, not runtime permission. If the configured launcher
-cannot run under the platform's active permission policy, report that gap and
-pause. Never self-escalate or replace the detached inner read-only reviewer with
-an unsandboxed or package-only reviewer.
+cannot run under the platform's active permission policy, record terminal
+unavailable evidence and pause without asking the owner to run or relay
+anything. The controller and host never self-escalate; the parent transport
+uses the runtime's policy-governed approval boundary and never replaces the
+detached inner read-only reviewer with an unsandboxed or package-only reviewer.

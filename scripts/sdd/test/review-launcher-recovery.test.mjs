@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { packageDigest } from "../independent-review-contract.mjs";
 import { executeReviewLauncherHost } from "../review-launcher-host.mjs";
-import { acceptReviewLauncherHostResponse, prepareReviewLauncherRecovery, reviewLauncherRequestDigest, validateReviewLauncherRecovery } from "../review-launcher-recovery.mjs";
+import { acceptReviewLauncherHostResponse, executePreparedReviewLauncherRecovery, executeReviewLauncherRecovery, prepareReviewLauncherRecovery, reviewLauncherRequestDigest, validateReviewLauncherRecovery } from "../review-launcher-recovery.mjs";
 
 const reviewPackage = (() => {
   const draft = { schemaVersion: 1, baseCommit: "1".repeat(40), headCommit: "2".repeat(40), diff: "diff --git a/file b/file\n", artifacts: [{ path: "file", sha256: "3".repeat(64), bytes: 4 }], validationEvidence: ["node --test: passed"] };
@@ -71,7 +71,7 @@ function hostRun(prepared, result = validResult(), viewHead = reviewPackage.head
 }
 
 function runtimeEvidence(prepared, response, selectedLauncher = launcher) {
-  return { attestedBy: "trusted-runtime", outsideManagedSandbox: true, executionRef: "runtime:test:1", launcherId: selectedLauncher.id, launcherKind: selectedLauncher.kind, hostScript: selectedLauncher.hostScript, requestDigest: prepared.hostRequest.requestDigest, hostExecutionId: response.hostExecutionId };
+  return { schemaVersion: 1, source: selectedLauncher.kind.startsWith("claude-") ? "claude-parent-runtime" : "codex-exec-tool", status: "executed", securityVerifiable: false, outsideManagedSandbox: true, executionRef: "runtime:test:1", launcherId: selectedLauncher.id, launcherKind: selectedLauncher.kind, hostScript: selectedLauncher.hostScript, requestDigest: prepared.hostRequest.requestDigest, hostExecutionId: response.hostExecutionId };
 }
 
 test("recovery preflight requires exact authorization, fixed host, and runtime permission", () => {
@@ -120,6 +120,44 @@ test("controller prepares only a fixed external host request", () => {
   assert.match(prepared.hostRequest.requestDigest, /^[0-9a-f]{64}$/);
 });
 
+test("production recovery consumes the prepared action or returns terminal unavailable evidence", async () => {
+  const prepared = prepareReviewLauncherRecovery(baseInput, { launchId: "transport-terminal" });
+  const absent = await executePreparedReviewLauncherRecovery(prepared);
+  assert.equal(absent.code, "review-launcher-runtime-transport-unavailable");
+  assert.equal(absent.terminal, true);
+  assert.equal(absent.manualFallback, false);
+  assert.notEqual(absent.code, "review-launcher-external-host-required");
+
+  for (const [status, code] of [
+    ["denied", "review-launcher-runtime-transport-denied"],
+    ["timed-out", "review-launcher-runtime-transport-timed-out"],
+    ["unavailable", "review-launcher-runtime-transport-unavailable"]
+  ]) {
+    const result = await executePreparedReviewLauncherRecovery(prepared, { invokePreparedReviewHost: async () => ({ status }) });
+    assert.equal(result.code, code);
+    assert.equal(result.terminal, true);
+    assert.equal(result.manualFallback, false);
+  }
+});
+
+test("production recovery invokes its transport and accepts the response directly", async () => {
+  let calls = 0;
+  const accepted = await executeReviewLauncherRecovery(baseInput, {
+    launchId: "transport-executed",
+    now: () => "2026-08-13T13:00:00.000Z",
+    invokePreparedReviewHost: async (prepared) => {
+      calls += 1;
+      const { response } = hostRun(prepared);
+      return { status: "executed", response, runtimeReceipt: runtimeEvidence(prepared, response) };
+    }
+  });
+  assert.equal(calls, 1);
+  assert.equal(accepted.allowed, true, JSON.stringify(accepted));
+  assert.equal(accepted.code, "review-launcher-recovery-complete");
+  assert.equal(accepted.runtimeReceipt.source, "codex-exec-tool");
+  assert.equal(accepted.runtimeReceipt.securityVerifiable, false);
+});
+
 test("Claude launcher uses the same sealed host protocol with a read-tools-only boundary", () => {
   const claudeStrict = {
     ...strictResult,
@@ -160,7 +198,7 @@ test("external host owns the detached view and acceptance requires the recorded 
   assert.equal(response.allowed, true, JSON.stringify(response));
   assert.equal(invoked, true);
   assert.equal(removed, true);
-  assert.equal(acceptReviewLauncherHostResponse({ prepared, response, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-runtime-attestation-missing");
+  assert.equal(acceptReviewLauncherHostResponse({ prepared, response, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-runtime-receipt-invalid");
   const accepted = acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: runtimeEvidence(prepared, response), now: "2026-08-13T13:00:00.000Z" });
   assert.equal(accepted.allowed, true, JSON.stringify(accepted));
   assert.equal(accepted.status, "passed");
@@ -202,7 +240,7 @@ test("acceptance authenticates exact precursor, authorization, and host executio
   ]) {
     assert.equal(acceptReviewLauncherHostResponse({ prepared, response: { ...response, result: { ...response.result, degradedAuthorization } }, runtimeLaunchEvidence: evidence, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-degraded-authorization-mismatch");
   }
-  assert.equal(acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: { ...evidence, outsideManagedSandbox: false }, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-runtime-attestation-missing");
+  assert.equal(acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: { ...evidence, outsideManagedSandbox: false }, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-runtime-receipt-invalid");
 });
 
 test("host execution and controller acceptance each use their current clock", () => {

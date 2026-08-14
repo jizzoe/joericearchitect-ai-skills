@@ -2,6 +2,7 @@ import { validateReviewPackage, validateReviewResult } from "./independent-revie
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { validateReviewAdapterCapabilities } from "./review-adapter-contract.mjs";
 import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
+import { executeReviewLauncherRecovery, recoverableReviewLauncherFailure } from "./review-launcher-recovery.mjs";
 
 export function probeIndependentReviewAdapter(adapter) {
   const result = validateReviewAdapterCapabilities(adapter);
@@ -51,7 +52,7 @@ function validatedDurableStrictUnavailable(record, reviewPackage, configuredRevi
 
 /** Strict is always attempted first. Degraded review is an explicit second
  * transport and receives only an immutable copy of the sealed package. */
-export async function executeAuthorizedIndependentReview({ package: reviewPackage, strictAdapter, degradedAdapter, configuredReviewer, degradedReviewer, implementerSession, authorization, selectedEntry, transition = "merge-pr", invokeStrict, invokeDegraded, durableStrictUnavailable, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now, clock = () => new Date().toISOString() } = {}) {
+export async function executeAuthorizedIndependentReview({ package: reviewPackage, strictAdapter, degradedAdapter, configuredReviewer, degradedReviewer, implementerSession, authorization, selectedEntry, transition = "merge-pr", invokeStrict, invokeDegraded, durableStrictUnavailable, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, launcherRecovery, invokePreparedReviewHost, now, clock = () => new Date().toISOString() } = {}) {
   const durable = validatedDurableStrictUnavailable(durableStrictUnavailable, reviewPackage, configuredReviewer, implementerSession);
   const strict = durable
     ? { status: "unavailable", result: durable }
@@ -64,6 +65,34 @@ export async function executeAuthorizedIndependentReview({ package: reviewPackag
   const strictResult = durable;
   const authorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts, derivedCorrection, correctionEvidence, now });
   if (!authorizationCheck.allowed) return { status: "unavailable", code: authorizationCheck.issues[0].code, strictResult };
+  if (recoverableReviewLauncherFailure(strictResult.unavailableCode) && !launcherRecovery) {
+    return {
+      status: "unavailable",
+      code: "review-launcher-runtime-transport-unavailable",
+      terminal: true,
+      manualFallback: false,
+      strictResult
+    };
+  }
+  if (recoverableReviewLauncherFailure(strictResult.unavailableCode) && launcherRecovery) {
+    const recovered = await executeReviewLauncherRecovery({
+      ...launcherRecovery,
+      failureCode: strictResult.unavailableCode,
+      authorization,
+      selectedEntry,
+      transition,
+      reviewPackage,
+      strictResult,
+      reviewer: degradedReviewer,
+      correctionAttempts,
+      derivedCorrection,
+      correctionEvidence,
+      now
+    }, { invokePreparedReviewHost, now: clock });
+    return recovered.allowed
+      ? { status: recovered.status, result: recovered.result, strictResult, assuranceLevel: "authorized-degraded", launcherEvidence: recovered.launcherEvidence, runtimeReceipt: recovered.runtimeReceipt }
+      : { ...recovered, strictResult };
+  }
   const probe = probeDegradedIndependentReviewAdapter(degradedAdapter);
   if (!probe.available || typeof invokeDegraded !== "function") return { status: "unavailable", code: probe.available ? "degraded-independent-reviewer-invocation-unavailable" : probe.code, strictResult };
   const result = await invokeDegraded(Object.freeze(structuredClone(reviewPackage)));

@@ -144,6 +144,15 @@ ordinary request/evidence files and basename-checked executable path are not
 authenticated by an OS-protected key or capability. This limitation is an
 explicit accepted risk only for authorized degraded review and never applies
 to strict review.
+The production orchestrator must consume a valid prepared launcher request
+through the configured parent-runtime transport without owner relay. For
+Codex, that transport is an actual `require_escalated` shell-tool request
+eligible for Auto-review under an interactive approval policy; the inner
+reviewer does not inherit that authority. Missing, denied, timed-out, malformed,
+or failed transport returns terminal durable unavailable evidence and no
+manual command. Every objective correction or changed head automatically
+repeats affected validation and the complete strict-first review path inside
+the per-signature budget.
 
 ## Always Forbidden Without Separate Explicit Approval
 

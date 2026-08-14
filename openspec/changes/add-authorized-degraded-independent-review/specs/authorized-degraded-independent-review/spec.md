@@ -164,6 +164,44 @@ again before response acceptance.
 - **THEN** preflight, host execution, and response acceptance reject the
   request without treating the review as independent
 
+### Requirement: Parent runtime transport requires zero operator mediation
+After the controller prepares a valid host request, the system SHALL route it
+through a configured parent-runtime transport without returning an actionable
+command or payload-relay instruction to the owner. The transport MUST construct
+the host invocation from fixed code, the validated repository root, and one
+validated prepared-request path; it MUST NOT accept arbitrary shell text. A
+Codex parent adapter MUST issue an actual escalated shell-tool request under an
+interactive approval policy so configured Auto-review can evaluate it while
+the inner reviewer remains separately restricted. The parent MUST capture the
+host response and runtime-originated execution receipt directly and pass both
+to the canonical response validator. The receipt MUST accurately identify its
+source and MUST NOT claim cryptographic trust or security-verifiable elevation.
+If the transport is absent, denied, times out, returns malformed evidence, or
+cannot execute, the system MUST record one terminal machine-readable
+unavailable result and stop without exposing
+`review-launcher-external-host-required` as an operator action.
+
+#### Scenario: Codex Auto-review evaluates the parent launch
+- **WHEN** strict review has the recoverable exact-package failure, the
+  prepared host request validates, and the active Codex runtime provides an
+  interactive approval boundary with Auto-review
+- **THEN** the parent emits the fixed escalated host-launch tool request,
+  captures its response and runtime receipt, and continues without asking the
+  owner to approve or transport anything
+
+#### Scenario: Runtime transport denies or cannot execute
+- **WHEN** Auto-review, runtime policy, configuration, timeout, or the trusted
+  service prevents the parent host launch
+- **THEN** the workflow records a stable terminal unavailable result and stops
+  without printing a fallback command or asking for manual execution
+
+#### Scenario: Production orchestration has no dangling host action
+- **WHEN** production orchestration receives a prepared result with code
+  `review-launcher-external-host-required`
+- **THEN** it either invokes its configured transport and validates the result
+  or converts the condition into terminal unavailable evidence before
+  returning to the lifecycle
+
 ### Requirement: Degraded review preserves finding and recovery gates
 The system SHALL keep finding severity separate from disposition and SHALL
 apply the existing human-decision, finding-disposition, correction-budget,
@@ -192,3 +230,11 @@ package, result, checkpoint, and transition state from durable evidence.
   evidence-backed objective fix inside its per-signature budget
 - **THEN** the runner applies the correction without a conversational pause,
   reruns affected evidence, and obtains a fresh exact-head strict-first review
+
+#### Scenario: Correction and rereview require no retrigger
+- **WHEN** a fresh reviewer returns an in-scope objective finding or a
+  correction or main integration changes the exact head
+- **THEN** the bounded runner automatically reruns affected validation,
+  rebuilds the sealed package, retries strict review, uses the authorized
+  parent transport when eligible, dispositions the fresh result, and repeats
+  inside the per-signature budget without asking the owner to retrigger review

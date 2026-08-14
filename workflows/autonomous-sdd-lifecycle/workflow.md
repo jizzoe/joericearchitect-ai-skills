@@ -44,8 +44,13 @@ published choices, and perform no selection or mutation.
    outer sandbox denies detached-view setup or nested reviewer startup, use the
    configured Codex or Claude external-host review launcher only when the exact run authorization,
    launcher configuration, and runtime permission permit it. The in-sandbox
-   controller may only prepare and accept a digest-bound request; retain the
-   runtime's outside-sandbox execution record and the inner Codex read-only or
+   controller may only prepare and accept a digest-bound request. The
+   production orchestrator must consume that request through its configured
+   parent-runtime transport in the same bounded run, capture the response
+   directly, and return terminal unavailable evidence on denial or failure;
+   it never delegates execution, approval, payload relay, evidence attestation,
+   or a changed-head retrigger to the owner. Retain the runtime's
+   outside-sandbox execution receipt and the inner Codex read-only or
    Claude read/search-only boundary. Treat the degraded launch evidence and
    executable identity as best-effort rather than security-verifiable.
 8. Run formal Verify after every task has current evidence.

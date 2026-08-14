@@ -17,6 +17,8 @@ turning a runtime limitation into silent policy.
 - Bind reduced assurance and all remaining capability restrictions to durable
   checkpoint and delivery evidence.
 - Keep canonical policy adapter-neutral and platform wrappers transport-only.
+- Require zero operator mediation after a bounded run begins, including every
+  correction and exact-head rereview.
 - Let users select the complete safe policy through a small stable vocabulary,
   with deterministic expansion and one useful clarification when required
   inputs are missing.
@@ -102,11 +104,12 @@ head view outside the outer sandbox and starts either an ephemeral Codex process
 requesting its inner read-only sandbox or a nonpersistent Claude process with
 only read/search tools and sealed-package input.
 
-The runner never self-escalates. It first records the stable launcher-unavailable
-code and pauses unless the current run authorization and runtime permission
-explicitly permit the configured launcher. The in-sandbox recovery controller
-can only validate and prepare a digest-bound structured request. A separately
-configured host script, invoked outside the failed sandbox by the runtime,
+The pure controller and host never self-escalate. The runner first records the
+stable launcher-unavailable code and proceeds only when the current run
+authorization and runtime permission explicitly permit the configured
+launcher. The in-sandbox recovery controller can only validate and prepare a
+digest-bound structured request. A separately configured host script, invoked
+outside the failed sandbox by the parent runtime transport,
 validates that request, reconstructs the full diff and every declared artifact
 hash directly from regular Git blobs in its detached committed view, rejects
 symlinks and other non-regular artifact entries, rejects any canonical package
@@ -187,6 +190,46 @@ Alternative: require every caller to restate all lifecycle and review safety
 details. Rejected because duplicated prompt policy drifts and makes safe
 behavior depend on individual memory.
 
+### 8. Make the parent runtime transport explicit and terminal
+
+Add one assistant-neutral orchestration operation:
+
+`invokePreparedReviewHost(preparedRequest) -> hostResponse + runtimeReceipt`.
+
+The production review orchestrator owns the complete state transition. It
+prepares the request, invokes exactly one configured transport, validates the
+returned response and receipt, and returns either the accepted review result or
+a terminal stable unavailable record. It never returns
+`review-launcher-external-host-required` as an instruction for an operator.
+
+The Codex-facing adapter translates the operation into one shell-tool call for
+the fixed Node host entrypoint with `sandbox_permissions` set to
+`require_escalated`. Under `approval_policy = "on-request"` (or an equivalent
+granular interactive policy) and `approvals_reviewer = "auto_review"`, Codex
+routes that eligible boundary request to its separate approval reviewer. The
+adapter captures the tool result directly. It does not change user settings,
+use `danger-full-access`, add a broad prefix rule, or pass elevation to the
+inner reviewer. Other assistants or CI implement the same operation with their
+strongest policy-governed noninteractive transport.
+
+The runtime receipt states the actual transport kind, request digest, fixed
+host entrypoint, execution reference, completion status, and host execution
+binding. Because the first release lacks authenticated IPC, the receipt remains
+ordinary reduced-assurance evidence and must not use a misleading
+`attestedBy: trusted-runtime` assertion. Missing transport, denial, timeout,
+malformed output, or failed acceptance becomes a stable terminal unavailable
+result with no manual command or copy/paste fallback.
+
+Official OpenAI documentation describes Auto-review as a reviewer replacement
+for eligible interactive approval requests, including escalated shell calls;
+it does not expand the sandbox or run under `approval_policy = "never"`:
+https://learn.chatgpt.com/docs/sandboxing/auto-review and
+https://learn.chatgpt.com/docs/agent-approvals-security.
+
+Alternative: keep the prepared request as a handoff artifact for a person.
+Rejected because the owner would remain the workflow transport and every new
+exact head would require manual retriggering.
+
 ## Risks / Trade-offs
 
 - **Reduced enforcement on some hosts** → Require affirmative, exact,
@@ -200,8 +243,11 @@ behavior depend on individual memory.
   the correction count equals the already-recorded chain length, and every
   record links to one canonical base/head/manifest anchor and its predecessor.
 - **Nested runtime denied by outer sandbox** → Return a stable launcher
-  permission code; use only an explicitly authorized external host, preserving
-  the detached view and strongest configured Codex/Claude reviewer restrictions.
+  permission code; route an explicitly authorized fixed host launch through the
+  configured parent runtime transport, preserving the detached view and
+  strongest configured Codex/Claude reviewer restrictions.
+- **Parent transport absent or denied** → Record terminal machine-readable
+  unavailable evidence and stop without a command or evidence-relay request.
 - **Forgeable degraded launch evidence or executable substitution** → Label the
   result reduced-assurance, retain the exact owner risk acceptance, require
   strict-first and bounded authorization, and never claim a security-verified
@@ -242,12 +288,19 @@ unavailability into a standing exception.
 2. Extend canonical review execution, adapters, checkpoint, delivery gate, and
    canonical documentation without changing strict behavior.
 3. Add the permission-gated controller/external-host launcher recovery with
-   request-digest, runtime-attestation, detached-view, cleanup, and inner read-
+   request-digest, non-security-verifiable runtime receipt, detached-view,
+   cleanup, and inner read-
    only-boundary tests; record stable unavailable behavior when it is absent.
-4. Add the concise request resolver, canonical preset reference, and missing-
+4. Add the parent-runtime transport contract, Codex escalated-tool adapter,
+   direct response acceptance, and terminal unavailable behavior.
+5. Add the concise request resolver, canonical preset reference, and missing-
    input/invalid-combination tests.
-5. Add focused deterministic tests and recorded planning/Apply evidence.
-6. Use the bootstrap authorization only for this change's delivery review;
+6. Exercise strict failure, actual automatic parent launch, restricted inner
+   review, objective correction, and exact-head rereview with no operator
+   relay; add deterministic regression coverage for denial and missing
+   transport.
+7. Add focused deterministic tests and recorded planning/Apply evidence.
+8. Use the bootstrap authorization only for this change's delivery review;
    archive terminates it. Revert by removing the feature from a future change;
    existing strict records and fail-closed behavior remain intact.
 

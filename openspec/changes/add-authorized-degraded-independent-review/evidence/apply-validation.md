@@ -6,8 +6,8 @@ self-referential commit literal.
 
 Passed current evidence:
 
-- `node --test` in a clean exact-head clone — 240 passing tests covering authorization, strict-first execution, durable resume, Codex/Claude external-host launcher recovery, current-clock and enclosing-goal expiration, required distinct implementer/reviewer identity binding, restricted reviewer home/credential access, machine-required degraded authenticity limitations, durable-source per-signature correction enforcement for independent-review and verification-loop sources, delimiter-safe failure signatures, complete chain linkage, disposition compatibility and unresolved-objective-fix routing, disposition-driven human pauses, host package rederivation, symlink-safe package injection and Git-object artifact derivation, authorized delivery-profile binding, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, implementation-quality integration, findings, detached view, portability, secrets, and adapter boundaries.
-- `node --test scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/independent-review-v1-gate.test.mjs scripts/sdd/test/execute-independent-review.test.mjs` — 35 focused authorization, launcher, adapter, result-contract, and delivery-gate tests pass after the recorded review corrections.
+- `node --test` — 246 passing tests covering authorization, strict-first execution, durable resume, zero-touch Codex parent-runtime transport, Codex/Claude external-host launcher recovery, current-clock and enclosing-goal expiration, required distinct implementer/reviewer identity binding, restricted reviewer home/credential access, machine-required degraded authenticity limitations, durable-source per-signature correction enforcement for independent-review and verification-loop sources, delimiter-safe failure signatures, complete chain linkage, disposition compatibility and unresolved-objective-fix routing, disposition-driven human pauses, host package rederivation, symlink-safe package injection and Git-object artifact derivation, authorized delivery-profile binding, corrected-head delivery, concise-request resolution, checkpoint/delivery bindings, implementation-quality integration, findings, detached view, portability, secrets, and adapter boundaries.
+- `node --test scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/independent-review-v1-gate.test.mjs scripts/sdd/test/execute-independent-review.test.mjs` — 40 focused authorization, launcher, parent-transport, adapter, result-contract, and delivery-gate tests pass after the zero-touch redesign.
 - `node --test scripts/sdd/test/review-launcher-recovery.test.mjs scripts/sdd/test/platform-review-adapters.test.mjs scripts/sdd/test/resolve-sdd-delivery-request.test.mjs evals/skills/autonomous-goal-runner/run-fixtures.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs` — 54 focused launcher, request, adapter, and lifecycle tests pass.
 - `node --test scripts/sdd/test/execute-independent-review.test.mjs scripts/sdd/test/degraded-independent-review-authorization.test.mjs scripts/sdd/test/review-launcher-recovery.test.mjs` — 15 focused authorization/execution tests pass, including rejection when authorization expires while the degraded reviewer is running and per-signature correction budget enforcement.
 - `node scripts/sdd/check-adapter-drift.mjs` — canonical wrappers have no policy drift.
@@ -20,11 +20,23 @@ Passed current evidence:
 - Secret-pattern review over all affected canonical, schema, script, eval, and
   OpenSpec paths reports no token, private-key, or bearer-secret matches.
 
+The production recovery API now turns the assistant-neutral prepared host
+request into a parent-runtime operation and consumes its response in the same
+call. The thin Codex adapter constructs only a fixed `exec_command` request for
+the repository-owned host script with `sandbox_permissions=require_escalated`,
+records a truthful `codex-exec-tool` receipt, and never claims that the parent
+launch or executable identity is security-verifiable. Missing, denied,
+timed-out, failed, or malformed parent transport is terminal and exposes no
+manual copy/paste fallback. Lifecycle evals cover the full first-head failure,
+objective correction, validation, and fresh corrected-head review sequence
+with an empty owner-action list.
+
 Requirements mapping: authorization rejection and correction envelope (1.1);
 assurance/ledger/strict precursor (1.2); strict-first separate fallback (2.1,
 2.2); durable delivery bindings (2.3); permission-gated launcher and inner
 restricted review (2.4); Codex/Claude degraded parity and the durable accepted-
-risk record for non-verifiable launch/executable identity (2.6); concise request expansion, missing-input prompt,
+risk record for non-verifiable launch/executable identity (2.6); zero-touch
+parent-runtime transport and terminal unavailable behavior (2.7); concise request expansion, missing-input prompt,
 quality and authorization presets (2.5, 3.3); portability, secret handling, and
 untrusted package boundaries (3.1, 3.2). No third-party code, dependency, or
 license attribution was introduced. Recovery remains idempotent: the resolver

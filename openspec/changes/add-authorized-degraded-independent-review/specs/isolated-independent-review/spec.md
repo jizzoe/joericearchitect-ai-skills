@@ -17,6 +17,9 @@ The degraded external-host path MAY support Codex or Claude, but its ordinary
 parent-launch evidence and basename-checked executable identity MUST be recorded
 as non-security-verifiable accepted risks. This exception MUST NOT weaken or
 relabel the strict adapter's isolation requirements.
+The outer parent-runtime transport MAY request policy-governed execution of the
+fixed host launcher, but that request MUST NOT be inherited by or represented
+as additional authority for the inner reviewer.
 
 #### Scenario: Enforced reviewer isolation is available
 - **WHEN** a configured adapter proves fresh context, a pinned read-only view,
@@ -48,3 +51,9 @@ relabel the strict adapter's isolation requirements.
   launch or executable identity
 - **THEN** the result remains `authorized-degraded`, retains the exact accepted
   risk, and cannot satisfy or be described as strict isolation
+
+#### Scenario: Parent launch does not elevate the reviewer
+- **WHEN** a parent runtime approves and executes the fixed recovery host
+- **THEN** the inner reviewer still starts with its configured ephemeral
+  read-only or read/search-only boundary and the result remains
+  `authorized-degraded`

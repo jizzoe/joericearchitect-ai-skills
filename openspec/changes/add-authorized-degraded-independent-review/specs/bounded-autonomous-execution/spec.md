@@ -78,6 +78,11 @@ strict review first for every new head and MUST pause on an absent, expired,
 mismatched, malformed, broad, or out-of-envelope degraded authorization.
 Declared artifact hashes MUST be derived from regular Git blobs at the exact
 head rather than from symlink-following working-tree reads.
+For a recoverable outer-sandbox failure, production orchestration MUST consume
+the prepared request through its configured parent-runtime transport in the
+same bounded run. It MUST NOT make the owner the execution, approval, payload,
+or evidence relay. A denied or unavailable transport MUST produce terminal
+durable unavailable evidence rather than a manual recovery instruction.
 
 #### Scenario: Clean independent review authorizes exact-head delivery
 - **WHEN** an isolated configured reviewer returns current passed evidence for
@@ -127,3 +132,10 @@ head rather than from symlink-following working-tree reads.
   authorization permits a fresh separate fallback result for the same package
 - **THEN** the runner may use only `authorized-degraded` evidence for that
   named transition while preserving the reduced-assurance record
+
+#### Scenario: Objective correction loop remains autonomous
+- **WHEN** review identifies an objective, behavior-preserving correction
+  inside the per-signature budget
+- **THEN** the runner applies it, reruns affected validation, rebuilds the
+  exact-head package, and completes a fresh strict-first review path without
+  operator relay before reconsidering delivery

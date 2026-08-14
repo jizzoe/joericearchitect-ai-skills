@@ -26,6 +26,14 @@ Primary GitHub issue: [#84](https://github.com/jizzoe/joericearchitect-ai-skills
 - Support equivalent configured external-host degraded recovery through Codex
   and Claude while preserving one assistant-neutral result and authorization
   contract.
+- Add a parent-runtime transport that consumes a validated prepared request,
+  invokes the fixed host entrypoint through the strongest policy-governed
+  noninteractive boundary available, captures the host result directly, and
+  returns it to the canonical response validator without operator relay.
+- Make zero operator mediation an acceptance condition for the normal bounded
+  correction and exact-head rereview loop: the workflow never asks the owner
+  to execute a command, approve a prompt, copy a payload, retrigger a review,
+  or attest runtime evidence after the run starts.
 - Record the owner's explicit acceptance that degraded parent-launch evidence
   is forgeable and reviewer executable identity is basename-checked rather than
   security-verified; retain these as known risks, not resolved findings.
@@ -46,8 +54,10 @@ lifecycle evidence boundary.
 This change excludes standing fallback permission,
 credentials, external messages, deployment, release, and model selection.
 It also excludes silently guessing a missing risk-bearing delivery input or
-granting runtime elevation that the active execution environment has not
-permitted. Authenticated host IPC, OS-protected signing capabilities, and
+bypassing runtime policy when an eligible parent launch is denied. The pure
+controller and host never grant themselves authority; a platform-facing parent
+adapter may request the exact host launch through the runtime's normal approval
+boundary. Authenticated host IPC, OS-protected signing capabilities, and
 host-owned executable pinning are deferred because of their machine/CI setup
 and lifecycle cost.
 
@@ -72,9 +82,11 @@ and lifecycle cost.
 
 - **Canonical assets:** independent-review schemas, deterministic package/result
   validation and adapter orchestration, the autonomous authorization checker,
-  durable checkpoints, and focused fixtures/evaluations.
+  durable checkpoints, parent-runtime transport contract, and focused
+  fixtures/evaluations.
 - **Assistant exposure:** existing Claude and Codex wrappers remain thin and
-  delegate to the canonical skill; neither chooses a reviewer or fallback.
+  delegate to the canonical skill; platform adapters translate only the fixed
+  prepared-host operation and neither chooses a reviewer or fallback.
 - **Compatibility:** an absent, malformed, expired, mismatched, or broad
   authorization retains the present fail-closed pause. No existing strict
   result is converted to degraded evidence. Existing fully specified run

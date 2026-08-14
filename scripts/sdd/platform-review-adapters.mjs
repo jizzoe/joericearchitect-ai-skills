@@ -6,11 +6,112 @@ import path from "node:path";
 import { requiredReviewDenials } from "./review-adapter-contract.mjs";
 
 const now = () => new Date().toISOString();
+const reviewLauncherHostScript = "scripts/sdd/review-launcher-host.mjs";
 const operationalReviewEnvironmentNames = Object.freeze([
   "PATH", "Path", "SYSTEMROOT", "SystemRoot", "COMSPEC", "PATHEXT", "PROGRAMDATA",
   "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE", "TERM",
   "COLORTERM", "SHELL"
 ]);
+
+function runtimePath(value) {
+  return typeof value === "string" && path.isAbsolute(value) && !/[\r\n\0]/.test(value);
+}
+
+function validPreparedRecovery(prepared) {
+  return prepared?.allowed === true &&
+    prepared.code === "review-launcher-external-host-required" &&
+    /^[0-9a-f]{64}$/.test(prepared?.hostRequest?.requestDigest ?? "") &&
+    prepared?.expectedRecovery?.hostScript === reviewLauncherHostScript;
+}
+
+export function writePreparedReviewHostRequest(prepared, directoryPath) {
+  if (!validPreparedRecovery(prepared) || !runtimePath(directoryPath)) return { available: false, code: "review-launcher-runtime-request-path-invalid" };
+  let directory;
+  try {
+    directory = fs.lstatSync(directoryPath);
+  } catch {
+    return { available: false, code: "review-launcher-runtime-request-directory-unavailable" };
+  }
+  if (!directory.isDirectory() || directory.isSymbolicLink()) return { available: false, code: "review-launcher-runtime-request-directory-invalid" };
+  const requestPath = path.join(directoryPath, `review-launcher-${prepared.hostRequest.requestDigest}.json`);
+  try {
+    fs.writeFileSync(requestPath, `${JSON.stringify(prepared)}\n`, { flag: "wx", mode: 0o400 });
+  } catch {
+    return { available: false, code: "review-launcher-runtime-request-write-failed" };
+  }
+  return { available: true, code: "review-launcher-runtime-request-written", requestPath };
+}
+
+export function buildCodexParentReviewHostToolRequest({ prepared, preparedRequestPath, repositoryPath } = {}) {
+  if (!validPreparedRecovery(prepared) || !runtimePath(preparedRequestPath) || !runtimePath(repositoryPath)) {
+    return { available: false, code: "review-launcher-codex-tool-request-invalid" };
+  }
+  const expectedName = `review-launcher-${prepared.hostRequest.requestDigest}.json`;
+  const hostPath = path.join(repositoryPath, reviewLauncherHostScript);
+  try {
+    const requestEntry = fs.lstatSync(preparedRequestPath);
+    const hostEntry = fs.lstatSync(hostPath);
+    const stored = JSON.parse(fs.readFileSync(preparedRequestPath, "utf8"));
+    if (path.basename(preparedRequestPath) !== expectedName || !requestEntry.isFile() || requestEntry.isSymbolicLink() ||
+        !hostEntry.isFile() || hostEntry.isSymbolicLink() || JSON.stringify(stored) !== JSON.stringify(prepared)) {
+      return { available: false, code: "review-launcher-codex-tool-request-invalid" };
+    }
+  } catch {
+    return { available: false, code: "review-launcher-codex-tool-request-invalid" };
+  }
+  return {
+    available: true,
+    code: "review-launcher-codex-tool-request-ready",
+    transport: "codex-exec-tool",
+    tool: "exec_command",
+    executable: process.execPath,
+    arguments: Object.freeze([hostPath, preparedRequestPath]),
+    workingDirectory: repositoryPath,
+    sandboxPermissions: "require_escalated",
+    approvalPolicyRequirement: "interactive",
+    approvalReviewer: "auto_review",
+    requestDigest: prepared.hostRequest.requestDigest,
+    hostScript: reviewLauncherHostScript
+  };
+}
+
+export function consumeCodexParentReviewHostToolResult({ toolRequest, toolResult } = {}) {
+  if (toolRequest?.available !== true || toolRequest.transport !== "codex-exec-tool" ||
+      toolRequest.sandboxPermissions !== "require_escalated" || toolRequest.hostScript !== reviewLauncherHostScript ||
+      !textOutput(toolResult?.output)) {
+    return { status: "unavailable", code: "review-launcher-codex-tool-result-invalid" };
+  }
+  let response;
+  try {
+    response = JSON.parse(toolResult.output);
+  } catch {
+    return { status: "unavailable", code: "review-launcher-codex-tool-result-invalid" };
+  }
+  if (!response?.hostExecutionId || response.requestDigest !== toolRequest.requestDigest) {
+    return { status: "unavailable", code: "review-launcher-codex-tool-result-invalid" };
+  }
+  return {
+    status: "executed",
+    response,
+    runtimeReceipt: {
+      schemaVersion: 1,
+      source: "codex-exec-tool",
+      status: "executed",
+      securityVerifiable: false,
+      outsideManagedSandbox: true,
+      executionRef: `codex-exec-tool:${toolRequest.requestDigest}:${response.hostExecutionId}`,
+      launcherId: response.launcherId,
+      launcherKind: response.launcherKind,
+      hostScript: reviewLauncherHostScript,
+      requestDigest: toolRequest.requestDigest,
+      hostExecutionId: response.hostExecutionId
+    }
+  };
+}
+
+function textOutput(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
 
 export function sanitizedReviewEnvironment(parentEnvironment = process.env, overrides = {}) {
   const environment = {};

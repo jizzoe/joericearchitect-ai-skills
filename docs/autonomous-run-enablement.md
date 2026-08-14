@@ -68,6 +68,15 @@ agents, web, and MCP tools are disabled. Both use a detached committed view,
 sealed package, credential scrubbing, fixed host script, expiration checks, and
 structured findings.
 
+The parent runtime transport is separate from the inner reviewer. In Codex it
+issues the fixed host launch as a shell-tool request with escalated sandbox
+permissions. When the active policy is interactive and
+`approvals_reviewer = "auto_review"`, Auto-review evaluates that request
+without handing it to the owner. This does not broaden the sandbox or elevate
+the inner reviewer. If the request is denied or the transport is unavailable,
+the run records terminal unavailable evidence and stops; there is no
+`host-debug`, copy/paste, approval-prompt, or owner-attestation fallback.
+
 The first release deliberately accepts two limitations for this reduced-
 assurance path: ordinary launcher evidence can be forged by a sufficiently
 adversarial implementation process, and the requested executable is checked by
@@ -117,4 +126,6 @@ implementation branch and evidence intact. Inspect the recorded unavailable
 code and local capability prerequisites, correct only a safe runtime or
 configuration problem, rerun affected checks, and create a fresh sealed package
 for the current head. A changed head always requires a new independent review.
-Do not reuse an old pass or silently broaden access.
+Within an active autonomous run, the runner performs those affected checks and
+fresh review automatically for objective corrections. Do not reuse an old pass,
+ask the owner to retrigger review, or silently broaden access.

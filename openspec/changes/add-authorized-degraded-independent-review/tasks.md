@@ -51,3 +51,48 @@
 - [x] 4.3 Run formal OpenSpec Verify and `openspec validate --all --strict`; correct only evidence-backed behavior-preserving objective findings and repeat affected checks and review for a new head.
   - Depends on: 4.2.
   - Evidence: Verify report, strict validation output, and transition-gate record.
+
+## 5. Zero-touch parent-runtime redesign
+
+- [x] 5.1 Reopen and review the proposal, delta specs, design, and task plan so
+  zero operator mediation, reduced-assurance labeling, parent/inner boundary
+  separation, terminal denial behavior, and exact-head automatic rereview are
+  explicit acceptance criteria.
+  - Depends on: owner redesign authorization and the prior 4.3 evidence.
+  - Evidence: strict OpenSpec validation and updated planning-review mapping.
+- [x] 5.2 Integrate one assistant-neutral parent-runtime transport operation
+  into production independent-review orchestration. It must consume prepared
+  requests internally, accept host responses directly, and convert missing,
+  denied, timed-out, malformed, or rejected transports into stable terminal
+  unavailable results without exposing a manual host action.
+  - Depends on: 5.1.
+  - Evidence: focused orchestration tests, including a regression that no
+    production path returns `review-launcher-external-host-required`.
+- [ ] 5.3 Add the thin Codex-facing transport adapter that builds only the
+  fixed validated host invocation, requests the actual escalated shell-tool
+  boundary eligible for Auto-review, captures runtime result evidence, and
+  leaves the inner reviewer at authorized-degraded assurance. Document the
+  equivalent contract for other trusted runtimes without duplicating policy.
+  - Depends on: 5.2.
+  - Evidence: adapter contract, command-injection/path tests, canonical/thin
+    drift checks, and an actual Auto-reviewed launch receipt.
+- [ ] 5.4 Extend the bounded runner and lifecycle evaluation path so an
+  objective finding, correction, validation, package rebuild, strict retry,
+  authorized recovery, disposition, and new-head rereview proceed without an
+  operator retrigger and remain capped per failure signature.
+  - Depends on: 5.2, 5.3.
+  - Evidence: deterministic end-to-end fixture with one objective correction
+    and fresh review, plus denial/unavailable no-manual-fallback fixtures.
+- [ ] 5.5 Exercise the real strict-failure to parent launch to restricted inner
+  review path in this runtime, including owned detached-view cleanup and direct
+  response acceptance. Record only runtime-produced, request-bound evidence
+  and retain the two explicit non-security-verifiable limitations.
+  - Depends on: 5.3, current exact-head Apply evidence.
+  - Evidence: unique runtime rehearsal record proving zero owner actions.
+- [ ] 5.6 Run focused and full tests, security/secret, portability,
+  attribution, requirements, recovery, formal Verify, current-head independent
+  review, and `openspec validate --all --strict`; repeat after every objective
+  correction or head change.
+  - Depends on: 5.4, 5.5.
+  - Evidence: refreshed Apply, runtime review, and verification reports bound
+  to the delivery head.

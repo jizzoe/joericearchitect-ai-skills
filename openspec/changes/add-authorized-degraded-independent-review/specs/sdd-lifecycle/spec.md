@@ -15,6 +15,13 @@ the selected Codex or Claude launcher kind and disclose that parent-launch
 evidence and executable identity are not security-verifiable. A new head MUST
 invalidate both prior strict and degraded review and repeat strict-first
 evaluation.
+The lifecycle MUST automatically hand a valid prepared recovery request to its
+configured parent-runtime transport, capture and validate the response, and
+continue the bounded finding/correction/rereview loop. It MUST NOT ask the
+owner to execute a command, approve a prompt, copy a request or response,
+retrigger review for a new head, or manufacture runtime evidence. Transport
+denial or unavailability MUST fail closed with durable machine-readable
+evidence.
 
 #### Scenario: Rereview follows an objective fix
 - **WHEN** an independent-review finding is corrected without changing approved
@@ -37,3 +44,11 @@ evaluation.
 - **WHEN** strict review is unavailable and no valid degraded authorization or
   constrained fresh fallback can be established
 - **THEN** the lifecycle pauses without self-review or a silent downgrade
+
+#### Scenario: New head retriggers the complete review path
+- **WHEN** an objective correction or main integration changes the delivery
+  head
+- **THEN** the lifecycle automatically reruns affected checks, rebuilds the
+  sealed package, attempts strict review, invokes eligible parent recovery,
+  accepts and dispositions the result, and repeats within budget without
+  operator mediation

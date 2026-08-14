@@ -115,3 +115,81 @@ test("degraded execution resumes from the durable adapter-emitted strict result"
   assert.equal(resumed.status, "passed", JSON.stringify(resumed));
   assert.equal(strictCalls, 1, "resume must reuse the authenticated durable exact-package strict result");
 });
+
+test("production orchestration automatically consumes recoverable host requests", async () => {
+  const reviewPackage = file("valid-package.json"); reviewPackage.manifestDigest = packageDigest(reviewPackage);
+  const configuredReviewer = { type: "codex", identity: "strict-reviewer", attestation: { ref: "strict-attestation" } };
+  const degradedReviewer = { type: "codex-degraded", identity: "fresh-reviewer", attestation: { ref: "degraded-attestation" } };
+  const strictUnavailable = {
+    schemaVersion: 1, reviewRecordId: "strict-runtime-record", executionId: "strict-runtime-execution",
+    reviewer: { type: "codex", identity: "strict-reviewer", adapter: "codex" },
+    attestation: { ref: "strict-attestation", nonInteractive: false, isolatedContext: false, freshContext: false, readOnly: false },
+    assuranceLevel: "strict-isolated", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit,
+    manifestDigest: reviewPackage.manifestDigest, startedAt: "2026-08-13T00:00:00.000Z",
+    completedAt: "2026-08-13T00:00:01.000Z", findings: [], status: "unavailable",
+    unavailableCode: "independent-reviewer-nested-app-server-denied"
+  };
+  const authorization = {
+    expiresAt: "2026-08-14T00:00:00.000Z",
+    implementerSession: "implementer",
+    degradedIndependentReview: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic exact fallback", fallbackBoundary: "fresh-separated-reviewer-only", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
+    reviewLauncher: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", boundary: "detached-exact-head-inner-read-only", launcherId: "codex-review-launcher", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest }
+  };
+  const launcherRecovery = {
+    launcher: { id: "codex-review-launcher", kind: "codex-detached-read-only-v1", hostScript: "scripts/sdd/review-launcher-host.mjs", enabled: true, executable: "/opt/tools/codex", detachedView: true, innerReadOnlySandbox: true, ephemeral: true, sealedPackageOnly: true, credentialScrubbed: true, nonInteractive: true },
+    runtime: { permittedReviewLaunchers: ["codex-review-launcher"] },
+    repositoryPath: "/fixture",
+    attestationRef: "degraded-attestation"
+  };
+  const result = file("valid-result.json");
+  Object.assign(result, {
+    reviewRecordId: "runtime-degraded-record", executionId: "runtime-degraded-execution",
+    reviewer: { type: "codex-degraded", identity: "fresh-reviewer", adapter: "codex" },
+    attestation: { ref: "degraded-attestation", nonInteractive: true, isolatedContext: false, freshContext: true, readOnly: false },
+    assuranceLevel: "authorized-degraded", manifestDigest: reviewPackage.manifestDigest,
+    capabilityLedger: { enforced: ["freshContext", "nonInteractive", "sealedPackageOnly", "detachedView", "innerReadOnlySandbox"], unavailable: ["authenticatedParentLaunchEvidence", "hostPinnedReviewerExecutableIdentity"], instructionConstrained: ["workspaceWrite", "gitWrite", "githubMutation", "credentialAccess", "authenticatedNetwork", "externalSend", "deployment", "release", "delegatedMutation"] },
+    strictUnavailable: { reviewRecordId: strictUnavailable.reviewRecordId, executionId: strictUnavailable.executionId, adapter: "codex", status: "unavailable", unavailableCode: strictUnavailable.unavailableCode, baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
+    degradedAuthorization: { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic exact fallback", fallbackBoundary: "fresh-separated-reviewer-only" }
+  });
+  const common = {
+    package: reviewPackage, strictAdapter: {}, configuredReviewer, degradedReviewer,
+    implementerSession: "implementer", authorization, selectedEntry: "change",
+    durableStrictUnavailable: { reference: "checkpoint:strict", current: true, result: strictUnavailable },
+    launcherRecovery, now: "2026-08-13T00:00:00.000Z", clock: () => "2026-08-13T00:00:01.000Z",
+    invokeDegraded: async () => { throw new Error("direct degraded invocation must not run"); }
+  };
+  let transportCalls = 0;
+  const completed = await executeAuthorizedIndependentReview({
+    ...common,
+    invokePreparedReviewHost: async (prepared) => {
+      transportCalls += 1;
+      const response = {
+        allowed: true, status: "passed", code: "review-launcher-host-complete",
+        launchId: prepared.hostRequest.launchId, requestDigest: prepared.hostRequest.requestDigest,
+        launcherId: "codex-review-launcher", launcherKind: "codex-detached-read-only-v1",
+        hostScript: "scripts/sdd/review-launcher-host.mjs", hostExecutionId: "host-runtime-execution",
+        result, launcherEvidence: prepared.expectedRecovery, cleanup: { removed: true }
+      };
+      return {
+        status: "executed",
+        response,
+        runtimeReceipt: { schemaVersion: 1, source: "codex-exec-tool", status: "executed", securityVerifiable: false, outsideManagedSandbox: true, executionRef: "codex-exec-tool:fixture", launcherId: response.launcherId, launcherKind: response.launcherKind, hostScript: response.hostScript, requestDigest: response.requestDigest, hostExecutionId: response.hostExecutionId }
+      };
+    }
+  });
+  assert.equal(transportCalls, 1);
+  assert.equal(completed.status, "passed", JSON.stringify(completed));
+  assert.equal(completed.runtimeReceipt.source, "codex-exec-tool");
+  assert.equal(completed.assuranceLevel, "authorized-degraded");
+
+  const unavailable = await executeAuthorizedIndependentReview(common);
+  assert.equal(unavailable.code, "review-launcher-runtime-transport-unavailable");
+  assert.equal(unavailable.terminal, true);
+  assert.equal(unavailable.manualFallback, false);
+  assert.notEqual(unavailable.code, "review-launcher-external-host-required");
+
+  const unconfigured = await executeAuthorizedIndependentReview({ ...common, launcherRecovery: undefined });
+  assert.equal(unconfigured.code, "review-launcher-runtime-transport-unavailable");
+  assert.equal(unconfigured.terminal, true);
+  assert.equal(unconfigured.manualFallback, false);
+});

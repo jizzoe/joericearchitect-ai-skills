@@ -38,3 +38,26 @@ test("Claude and Codex adapters identify canonical sources", () => {
   const result = checkAdapterDrift(new URL("../../..", import.meta.url).pathname);
   assert.equal(result.valid, true, JSON.stringify(result.issues));
 });
+
+test("zero-touch review fixtures cover objective correction, changed-head rereview, and terminal denial", () => {
+  const cases = JSON.parse(
+    fs.readFileSync(new URL("./fixtures/zero-touch-independent-review.json", import.meta.url), "utf8")
+  ).cases;
+  const corrected = cases.find((item) => item.id === "objective-correction-and-rereview");
+  assert.deepEqual(corrected.ownerActions, []);
+  const reviews = corrected.steps.filter((step) => step.kind === "degraded-review");
+  assert.equal(reviews.length, 2);
+  assert.notEqual(reviews[0].head, reviews[1].head);
+  assert.equal(corrected.steps.filter((step) => step.kind === "parent-transport").every((step) => step.sandboxPermissions === "require_escalated"), true);
+  const correction = corrected.steps.find((step) => step.kind === "objective-correction");
+  assert.ok(correction.attempt <= corrected.correctionBudgetPerFailureSignature);
+  assert.equal(corrected.steps.at(-1).status, "passed");
+
+  const denied = cases.find((item) => item.id === "parent-transport-denied");
+  assert.deepEqual(denied.ownerActions, []);
+  assert.deepEqual(denied.steps.at(-1), {
+    kind: "terminal",
+    code: "review-launcher-runtime-transport-denied",
+    manualFallback: false
+  });
+});

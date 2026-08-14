@@ -9,6 +9,15 @@ import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "
 const hostScript = "scripts/sdd/review-launcher-host.mjs";
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const fail = (code, detail) => ({ allowed: false, status: "unavailable", code, ...(detail ? { detail } : {}) });
+const terminal = (code, prepared, detail) => ({
+  allowed: false,
+  status: "unavailable",
+  code,
+  terminal: true,
+  manualFallback: false,
+  ...(prepared?.hostRequest?.requestDigest ? { requestDigest: prepared.hostRequest.requestDigest } : {}),
+  ...(detail ? { detail } : {})
+});
 
 const launcherDefinitions = Object.freeze({
   "codex-detached-read-only-v1": Object.freeze({
@@ -29,6 +38,10 @@ const launcherDefinitions = Object.freeze({
 
 export function reviewLauncherDefinition(kind) {
   return launcherDefinitions[kind] ?? null;
+}
+
+export function recoverableReviewLauncherFailure(code) {
+  return Object.values(launcherDefinitions).some((definition) => definition.recoverableFailures.includes(code));
 }
 
 function executableMatches(value, definition) {
@@ -108,15 +121,17 @@ export function prepareReviewLauncherRecovery(request, { launchId = randomUUID()
   };
 }
 
-function validRuntimeLaunchEvidence(value, prepared, response) {
-  return value?.attestedBy === "trusted-runtime" && value.outsideManagedSandbox === true &&
+function validRuntimeReceipt(value, prepared, response) {
+  return value?.schemaVersion === 1 && value.status === "executed" &&
+    ["codex-exec-tool", "claude-parent-runtime", "ci-review-service"].includes(value.source) &&
+    value.outsideManagedSandbox === true && value.securityVerifiable === false &&
     text(value.executionRef) && value.launcherId === prepared.expectedRecovery.launcherId &&
     value.launcherKind === prepared.expectedRecovery.launcherKind && value.hostScript === hostScript &&
     value.requestDigest === prepared.hostRequest.requestDigest &&
     value.hostExecutionId === response?.hostExecutionId;
 }
 
-export function acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence, now = new Date().toISOString() } = {}) {
+export function acceptReviewLauncherHostResponse({ prepared, response, runtimeReceipt, runtimeLaunchEvidence, now = new Date().toISOString() } = {}) {
   const hostRequest = prepared?.hostRequest;
   const requestDigest = reviewLauncherRequestDigest(hostRequest);
   if (prepared?.allowed !== true || prepared.code !== "review-launcher-external-host-required" ||
@@ -127,7 +142,8 @@ export function acceptReviewLauncherHostResponse({ prepared, response, runtimeLa
       response.launchId !== hostRequest.launchId || response.requestDigest !== requestDigest ||
       response.launcherId !== preflight.recovery.launcherId || response.launcherKind !== preflight.recovery.launcherKind ||
       response.hostScript !== hostScript || !text(response.hostExecutionId)) return fail("review-launcher-host-response-invalid");
-  if (!validRuntimeLaunchEvidence(runtimeLaunchEvidence, prepared, response)) return fail("review-launcher-runtime-attestation-missing");
+  const receipt = runtimeReceipt ?? runtimeLaunchEvidence;
+  if (!validRuntimeReceipt(receipt, prepared, response)) return fail("review-launcher-runtime-receipt-invalid");
   const request = hostRequest.request;
   const configuredReviewer = { ...request.reviewer, attestation: request.reviewer?.attestation ?? { ref: request.attestationRef } };
   const validation = validateReviewResult(response.result, { expectedPackage: request.reviewPackage, configuredReviewer, implementerSession: request.authorization?.implementerSession });
@@ -141,8 +157,48 @@ export function acceptReviewLauncherHostResponse({ prepared, response, runtimeLa
     code: "review-launcher-recovery-complete",
     result: response.result,
     launcherEvidence: response.launcherEvidence,
-    runtimeLaunchEvidence: { ...runtimeLaunchEvidence }
+    runtimeReceipt: { ...receipt }
   };
+}
+
+export async function executePreparedReviewLauncherRecovery(prepared, {
+  invokePreparedReviewHost,
+  now = () => new Date().toISOString()
+} = {}) {
+  if (prepared?.allowed !== true || prepared.code !== "review-launcher-external-host-required") {
+    return terminal("review-launcher-prepared-request-invalid", prepared);
+  }
+  if (typeof invokePreparedReviewHost !== "function") {
+    return terminal("review-launcher-runtime-transport-unavailable", prepared);
+  }
+  let transportResult;
+  try {
+    transportResult = await invokePreparedReviewHost(Object.freeze(structuredClone(prepared)));
+  } catch {
+    return terminal("review-launcher-runtime-transport-failed", prepared);
+  }
+  if (transportResult?.status === "denied") {
+    return terminal("review-launcher-runtime-transport-denied", prepared);
+  }
+  if (transportResult?.status === "timed-out") {
+    return terminal("review-launcher-runtime-transport-timed-out", prepared);
+  }
+  if (transportResult?.status !== "executed") {
+    return terminal("review-launcher-runtime-transport-unavailable", prepared);
+  }
+  const accepted = acceptReviewLauncherHostResponse({
+    prepared,
+    response: transportResult.response,
+    runtimeReceipt: transportResult.runtimeReceipt,
+    now: now()
+  });
+  return accepted.allowed ? accepted : terminal(accepted.code, prepared, accepted.detail);
+}
+
+export async function executeReviewLauncherRecovery(request, options = {}) {
+  const prepared = prepareReviewLauncherRecovery(request, options);
+  if (!prepared.allowed) return terminal(prepared.code, prepared, prepared.detail);
+  return executePreparedReviewLauncherRecovery(prepared, options);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -154,10 +210,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     result = acceptReviewLauncherHostResponse({
       prepared: JSON.parse(fs.readFileSync(paths[0], "utf8")),
       response: JSON.parse(fs.readFileSync(paths[1], "utf8")),
-      runtimeLaunchEvidence: JSON.parse(fs.readFileSync(paths[2], "utf8"))
+      runtimeReceipt: JSON.parse(fs.readFileSync(paths[2], "utf8"))
     });
   } else {
-    console.error("Usage: review-launcher-recovery.mjs prepare <request.json> | accept <prepared.json> <response.json> <runtime-evidence.json>");
+    console.error("Usage: review-launcher-recovery.mjs prepare <request.json> | accept <prepared.json> <response.json> <runtime-receipt.json>");
     process.exit(2);
   }
   console.log(JSON.stringify(result, null, 2));
