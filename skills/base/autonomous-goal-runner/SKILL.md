@@ -26,6 +26,12 @@ Before selecting work, establish and report:
 If any material boundary is missing, pause before selecting work or mutating
 state.
 
+For a named SDD delivery, use the concise request contract in
+`references/sdd-delivery-request.md`. Normalize it before selection. If any
+required field is missing, invalid, or conflicting, send one concise message
+covering every affected field, what it controls, and its supported values; do
+not select work or mutate local or external state first.
+
 ## Operating Rules
 
 1. Treat authorization, runtime permission, evidence, and human decisions as
@@ -59,9 +65,12 @@ state.
    sealed immutable v1 package; never supply inherited context or an intended
    conclusion. A current schema-validated result, durable dispositions, and a
    fresh exact-head review are required before the named delivery transition.
-   Reject unavailable, mutable, malformed, stale, self-review, blocker, high,
-   and unresolved objective-fix outcomes. GitHub review publication is optional
-   and cannot replace this gate.
+   Reject unavailable, mutable, malformed, stale, self-review, unresolved
+   objective-fix, and human-decision outcomes. Severity describes impact; it
+   does not independently require a conversational pause. Correct a high-
+   severity objective finding autonomously only when the fix is scoped,
+   behavior-preserving, evidence-backed, and inside the correction budget.
+   GitHub review publication is optional and cannot replace this gate.
 
 ## Progressive References
 
@@ -69,6 +78,8 @@ Load only the references needed for the current decision:
 
 - `references/authorization-policy.md` for run authorization and external
   mutation boundaries
+- `references/sdd-delivery-request.md` for concise SDD delivery presets and
+  missing-input handling
 - `references/human-decision-classification.md` for pause and non-pause
   classification
 - `scripts/sdd/check-operation-authorization.mjs` for deterministic profile

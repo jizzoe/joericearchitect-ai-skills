@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { operationVocabulary } from "../validation/validate-base-skill-contracts.mjs";
 import { inspectCheckpoint } from "./checkpoint.mjs";
+import { canonicalFailureSignature } from "./correction-chain.mjs";
 import { canonicalGitCommit, immutableReviewManifest, reviewInputMatchesGitDiff, validateIndependentReviewEvidence, validateIndependentReviewV1 } from "./independent-review.mjs";
 
 export const profileOperations = {
@@ -11,6 +12,7 @@ export const profileOperations = {
 };
 
 export const highImpactLifecycleActions = new Set(["merge-pr", "archive-change", "delete-merged-topic-branch"]);
+const deliveryProfiles = new Set(["production-rapid", "prototype-rapid"]);
 const lifecycleActions = new Set(["sync-change", ...highImpactLifecycleActions]);
 const lifecycleTargetPrefixes = {
   "merge-pr": "pr:",
@@ -96,33 +98,6 @@ function authorizationExpired(authorization, now) {
   return Number.isNaN(when) || when <= Date.parse(now ?? new Date().toISOString());
 }
 
-function durableCorrectionCounts(request) {
-  const entry = request.checkpoint?.selectedEntry;
-  const records = entry?.correctionRecords;
-  if (!entry || entry.name !== request.selectedEntry || !Array.isArray(records)) return null;
-  const ids = new Set();
-  const counts = new Map();
-  for (const record of records) {
-    const expectedAttempt = (counts.get(record?.failureSignature) ?? 0) + 1;
-    const verification = record?.verification;
-    const verificationValid = verification === undefined || (verification &&
-      new Set(["passed", "failed"]).has(verification.result) &&
-      Array.isArray(verification.evidenceIds) && verification.evidenceIds.length > 0 &&
-      new Set(verification.evidenceIds).size === verification.evidenceIds.length &&
-      verification.evidenceIds.every(nonEmpty) && nonEmpty(verification.binding));
-    if (!nonEmpty(record?.id) || ids.has(record.id) || record.change !== request.selectedEntry ||
-        !nonEmpty(record.failureSignature) || record.attempt !== expectedAttempt ||
-        record.classification !== "objective-fix" || record.behaviorPreserving !== true ||
-        record.current !== true || record.ancestryVerified !== true || !nonEmpty(record.evidenceReference) ||
-        !commitReference(record.baseCommit) || !commitReference(record.previousHead) || !commitReference(record.headCommit) ||
-        !/^[0-9a-f]{64}$/i.test(record.previousManifestDigest ?? "") || !/^[0-9a-f]{64}$/i.test(record.manifestDigest ?? "") ||
-        !verificationValid) return null;
-    ids.add(record.id);
-    counts.set(record.failureSignature, expectedAttempt);
-  }
-  return { aggregate: records.length, perSignature: counts.get(request.failureSignature) ?? 0 };
-}
-
 function adapterAllows(config, runtime, adapterName, operation) {
   const adapter = config?.adapters?.[adapterName];
   if (!adapter?.enabled || !adapter.operations?.includes(operation)) return false;
@@ -146,7 +121,21 @@ function durableReviewV1Matches(request) {
   return records.length === 1 && record?.entry === request.selectedEntry && record.transition === request.lifecycleAction &&
     JSON.stringify(record.reviewPackage) === JSON.stringify(request.independentReviewPackage) &&
     JSON.stringify(record.result) === JSON.stringify(request.independentReviewResult) &&
-    JSON.stringify(record.dispositions ?? []) === JSON.stringify(request.reviewDispositions ?? []);
+    JSON.stringify(record.dispositions ?? []) === JSON.stringify(request.reviewDispositions ?? []) &&
+    (request.independentReviewResult?.assuranceLevel !== "authorized-degraded" ||
+      (JSON.stringify(record.strictUnavailable) === JSON.stringify(request.independentReviewResult.strictUnavailable) &&
+       JSON.stringify(record.degradedAuthorization) === JSON.stringify(request.independentReviewResult.degradedAuthorization) &&
+       JSON.stringify(record.capabilityLedger) === JSON.stringify(request.independentReviewResult.capabilityLedger)));
+}
+
+function durableStrictUnavailableRecord(request) {
+  if (request.independentReviewResult?.assuranceLevel !== "authorized-degraded") return null;
+  const summary = request.independentReviewResult.strictUnavailable;
+  const records = request.checkpoint?.selectedEntry?.strictUnavailableRecords ?? [];
+  const matching = records.filter((record) => record.id === summary?.reviewRecordId && record.entry === request.selectedEntry &&
+    record.transition === request.lifecycleAction && record.current === true &&
+    JSON.stringify(record.reviewPackage) === JSON.stringify(request.independentReviewPackage));
+  return matching.length === 1 ? matching[0] : null;
 }
 
 function durableApplyEvidenceMatches(request) {
@@ -169,6 +158,18 @@ function configuredReviewer(config, requested) {
     attestation: { ref: attestation.ref }, nonInteractive: true, isolatedContext: true, readOnly: true };
 }
 
+function configuredDegradedReviewer(config, requested) {
+  const reviewer = config?.degradedIndependentReviewer;
+  const attestation = reviewer?.attestation;
+  if (!reviewer?.enabled || !nonEmpty(reviewer.type) || !nonEmpty(reviewer.identity) ||
+      !nonEmpty(attestation?.ref) || attestation.nonInteractive !== true ||
+      attestation.freshContext !== true || requested?.type !== reviewer.type ||
+      requested?.identity !== reviewer.identity) return null;
+  return { available: true, type: reviewer.type, identity: reviewer.identity,
+    attestation: { ref: attestation.ref }, nonInteractive: true,
+    isolatedContext: false, readOnly: false };
+}
+
 function canonicalLifecycleCheckpointMatches(request) {
   const entry = request.checkpoint?.selectedEntry;
   const steps = request.checkpoint?.steps;
@@ -177,6 +178,59 @@ function canonicalLifecycleCheckpointMatches(request) {
   const requiredKinds = prerequisiteRecordKinds[request.lifecycleAction] ?? [];
   const kinds = entry.records?.map((record) => record.kind) ?? [];
   return requiredKinds.every((kind) => kinds.filter((value) => value === kind).length >= (kind === "branch" && request.lifecycleAction === "delete-merged-topic-branch" ? 2 : 1));
+}
+
+function durableCorrectionState(authorization, request) {
+  const budget = authorization.correctionBudgetPerFailureSignature;
+  if (!Number.isInteger(budget) || budget < 0 || budget > 3) return fail("correction-budget-invalid");
+  const failureSignature = canonicalFailureSignature(request.failureSource);
+  if (!nonEmpty(request.selectedEntry) || !failureSignature) return fail("correction-context-incomplete");
+  const authorizedEntries = new Set([
+    ...(Array.isArray(authorization.target?.entries) ? authorization.target.entries : []),
+    ...(nonEmpty(authorization.derivedTargets?.selectedEntry) ? [authorization.derivedTargets.selectedEntry] : [])
+  ]);
+  if (!authorizedEntries.has(request.selectedEntry) || request.checkpoint?.selectedEntry?.name !== request.selectedEntry) {
+    return fail("correction-entry-not-authorized", request.selectedEntry);
+  }
+  const checkpoint = inspectCheckpoint(request.checkpoint ?? {});
+  if (checkpoint.classification === "human-decision" || checkpoint.classification === "stale-evidence") {
+    return fail("correction-checkpoint-not-valid", checkpoint.reason);
+  }
+  const records = request.checkpoint?.selectedEntry?.correctionRecords;
+  if (!Array.isArray(records)) return fail("correction-checkpoint-not-valid", "selected-entry-invalid-correction-records");
+  let sourceDurable = false;
+  if (request.failureSource.kind === "independent-review") {
+    const reviewRecords = request.checkpoint?.selectedEntry?.reviewRecords ?? [];
+    const sourceRecords = reviewRecords.filter((record) => record?.id === request.failureSource.reviewRecordId &&
+      record.transition === request.failureSource.transition);
+    const durableFindings = sourceRecords[0]?.result?.findings ?? sourceRecords[0]?.findings;
+    const sourceFindings = durableFindings?.filter((finding) =>
+      finding.id === request.failureSource.findingId && finding.severity === request.failureSource.severity &&
+      finding.evidence === request.failureSource.evidence) ?? [];
+    sourceDurable = sourceRecords.length === 1 && sourceFindings.length === 1;
+  } else if (request.failureSource.kind === "verification") {
+    const verificationRecords = request.checkpoint?.selectedEntry?.verificationRecords ?? [];
+    const matches = verificationRecords.filter((record) =>
+      record?.id === request.failureSource.verificationRecordId && record.entry === request.selectedEntry &&
+      record.transition === request.failureSource.transition && record.current === true &&
+      record.failureSignature === request.failureSource.failureSignature &&
+      record.evidence === request.failureSource.evidence);
+    sourceDurable = matches.length === 1;
+  }
+  if (!sourceDurable) return fail("correction-failure-source-not-durable", failureSignature);
+  if (request.failureSignature !== undefined && request.failureSignature !== failureSignature) {
+    return fail("correction-failure-signature-mismatch", failureSignature);
+  }
+  const attemptsForSignature = records.filter((record) => record.failureSignature === failureSignature).length;
+  if (request.correctionAttemptsForFailureSignature !== undefined &&
+      request.correctionAttemptsForFailureSignature !== attemptsForSignature) {
+    return fail("correction-attempt-count-mismatch", failureSignature);
+  }
+  if (request.correctionAttempts !== undefined && request.correctionAttempts !== records.length) {
+    return fail("correction-chain-length-mismatch", failureSignature);
+  }
+  if (attemptsForSignature >= budget) return fail("correction-limit-exhausted", failureSignature);
+  return null;
 }
 
 export function checkOperationAuthorization(input) {
@@ -204,17 +258,8 @@ export function checkOperationAuthorization(input) {
   if (request.adapter && !authorization.targets?.includes(`adapter:${request.adapter}`)) return fail("unauthorized-adapter", request.adapter);
   if (request.adapter && !adapterAllows(config, runtime, request.adapter, operation)) return fail("adapter-capability-mismatch", request.adapter);
   if (operation === "objective-correction") {
-    if (!nonEmpty(request.failureSignature)) return fail("missing-correction-failure-signature");
-    const budget = authorization.correctionBudgetPerFailureSignature;
-    const perSignature = request.correctionAttemptsForFailureSignature;
-    const aggregate = request.correctionAttempts;
-    const durableCounts = durableCorrectionCounts(request);
-    if (!Number.isInteger(budget) || budget < 1 || budget > 3) return fail("invalid-correction-budget", "correctionBudgetPerFailureSignature");
-    if (!Number.isInteger(perSignature) || perSignature < 0) return fail("invalid-correction-attempt-count", "correctionAttemptsForFailureSignature");
-    if (!Number.isInteger(aggregate) || aggregate < perSignature) return fail("inconsistent-correction-attempt-count");
-    if (!durableCounts) return fail("invalid-correction-checkpoint");
-    if (perSignature !== durableCounts.perSignature || aggregate !== durableCounts.aggregate) return fail("correction-attempt-count-mismatch");
-    if (perSignature >= budget) return fail("correction-limit-exhausted", request.failureSignature);
+    const correctionIssue = durableCorrectionState(authorization, request);
+    if (correctionIssue) return correctionIssue;
   }
   if (operation === "run-lifecycle-action" && !lifecycleActions.has(request.lifecycleAction)) return fail("unnamed-or-unsupported-lifecycle-action");
   if (highImpactLifecycleActions.has(request.lifecycleAction)) {
@@ -222,16 +267,30 @@ export function checkOperationAuthorization(input) {
     if (!request.target?.startsWith(lifecycleTargetPrefixes[request.lifecycleAction])) return fail("lifecycle-target-type-mismatch", request.lifecycleAction);
     if (!nonEmpty(request.recovery)) return fail("missing-recovery", request.lifecycleAction);
     if (request.evidenceCurrent !== true) return fail("incomplete-lifecycle-evidence", request.lifecycleAction);
-    if (request.deliveryProfile === "production-rapid") {
+    if (!deliveryProfiles.has(authorization.qualityProfile) ||
+        !deliveryProfiles.has(request.deliveryProfile) ||
+        request.deliveryProfile !== authorization.qualityProfile) {
+      return fail("delivery-profile-authorization-mismatch", request.deliveryProfile);
+    }
+    if (authorization.qualityProfile === "production-rapid") {
       if (request.independentReviewPackage || request.independentReviewResult) {
         if (!request.independentReviewPackage || !request.independentReviewResult) return fail("independent-review-v1-input-incomplete");
         if (!durableApplyEvidenceMatches(request)) return fail("independent-review-apply-evidence-not-durable");
         if (!durableReviewV1Matches(request)) return fail("independent-review-evidence-not-durable");
-        const reviewer = configuredReviewer(config, request.reviewer);
+        const strictUnavailableRecord = durableStrictUnavailableRecord(request);
+        if (request.independentReviewResult.assuranceLevel === "authorized-degraded" && !strictUnavailableRecord) return fail("independent-review-strict-unavailable-not-durable");
+        const reviewer = configuredReviewer(config, request.independentReviewResult.assuranceLevel === "authorized-degraded" ? request.strictReviewer : request.reviewer);
         if (!reviewer) return fail("independent-reviewer-not-configured");
+        const degradedReviewer = request.independentReviewResult.assuranceLevel === "authorized-degraded"
+          ? configuredDegradedReviewer(config, request.reviewer) : reviewer;
+        if (!degradedReviewer) return fail("degraded-independent-reviewer-not-configured");
         return validateIndependentReviewV1({ reviewer, implementerSession: request.implementerSession, reviewPackage: request.independentReviewPackage,
           reviewResult: request.independentReviewResult, applyEvidence: request.applyEvidence, dispositions: request.reviewDispositions ?? [],
-          correctionAttempts: request.correctionAttempts ?? 0, seenRecordIds: new Set(request.seenReviewRecordIds ?? []) });
+          strictUnavailableResult: strictUnavailableRecord?.result,
+          correctionAttempts: request.correctionAttempts ?? 0, seenRecordIds: new Set(request.seenReviewRecordIds ?? []),
+          degradedReviewer, authorization, selectedEntry: request.selectedEntry, transition: request.lifecycleAction,
+          derivedCorrection: request.derivedCorrection === true,
+          correctionEvidence: request.checkpoint?.selectedEntry?.correctionRecords?.at(-1), now: input.now });
       }
       const reviewInput = request.independentReviewInput;
       const manifest = immutableReviewManifest(reviewInput);

@@ -8,6 +8,13 @@ selected change or deterministic selection policy, allowed lifecycle
 transitions, local and external mutation boundaries, evidence gates, and
 stopping conditions.
 
+For the concise named-delivery form, first apply
+`skills/base/autonomous-goal-runner/references/sdd-delivery-request.md`. Resolve
+the target, mode, quality profile, authorization profile, independent-review
+policy, and expiration before step 1. If any are missing, invalid, or
+conflicting, ask once for every affected value with a short meaning and the
+published choices, and perform no selection or mutation.
+
 ## Lifecycle
 
 1. Inspect durable state: Git, OpenSpec active changes, tasks, issues,
@@ -29,7 +36,23 @@ stopping conditions.
    its sealed v1 package, normalized result, and dispositions in the exact
    durable transition record. A new head invalidates prior review and requires
    affected checks plus a fresh reviewer; unavailable or material outcomes
-   pause the lifecycle.
+   pause the lifecycle. Strict OS-isolated review is attempted first. A reduced-
+   assurance reviewer is eligible only under an explicit exact active
+   degraded-review authorization after durable strict unavailability; its
+   evidence remains labelled `authorized-degraded` with the strict precursor
+   and capability ledger and is never described as strict isolation. If the
+   outer sandbox denies detached-view setup or nested reviewer startup, use the
+   configured Codex or Claude external-host review launcher only when the exact run authorization,
+   launcher configuration, and runtime permission permit it. The in-sandbox
+   controller may only prepare and accept a digest-bound request. The
+   production orchestrator must consume that request through its configured
+   parent-runtime transport in the same bounded run, capture the response
+   directly, and return terminal unavailable evidence on denial or failure;
+   it never delegates execution, approval, payload relay, evidence attestation,
+   or a changed-head retrigger to the owner. Retain the runtime's
+   outside-sandbox execution receipt and the inner Codex read-only or
+   Claude read/search-only boundary. Treat the degraded launch evidence and
+   executable identity as best-effort rather than security-verifiable.
 8. Run formal Verify after every task has current evidence.
 9. Deliver through a pull request only when the delivery gate passes and the
    active authorization permits the mutation.

@@ -60,6 +60,17 @@ authorized target, configured adapter capability when an adapter is used, and
 active runtime permission. A correction still stops after three materially
 different attempts for the same failure signature.
 
+Objective-correction authorization derives both the total chain length and
+the attempts for the named failure signature from the validated durable
+selected-entry checkpoint. Any supplied counters must match those derived
+values, and the limit comes from the resolved authorization's per-signature
+budget; caller-selected counters cannot reset or widen it.
+
+For every high-impact SDD transition, the checker also requires a supported
+delivery profile that exactly matches the quality profile in the resolved
+durable authorization. A caller cannot omit or substitute that field to bypass
+the production independent-review gate.
+
 Public unauthenticated source reads require both `read-source` and an explicit
 public-source scope. They remain untrusted data: no sign-in, private source,
 consent, downloaded-code execution, or write outside an authorized local
@@ -95,12 +106,53 @@ read-only repository adapter for the recorded base/head and reject mismatches;
 duplicate review record IDs are durable conflicts. After a behavior-preserving objective fix,
 rerun affected evidence and review the new head; stop after three materially
 different fixes for one failure signature or on a material decision. An
-unavailable, self, malformed, stale, wrong-head, mutable, blocker, or high
-objective-fix review pauses the transition. GitHub publication is optional.
+unavailable, self, malformed, stale, wrong-head, or mutable review pauses the
+transition. Findings pause for human input when their durable disposition
+requires human judgment; high-severity objective findings instead use the
+bounded correction and exact-head rereview loop. Unresolved objective fixes
+still block delivery. GitHub publication is optional.
 The delivery evaluator compares reviewer identity/type to configured
 adapter-attested non-interactive, isolated read-only capability; request flags
 do not create reviewer authority. It resolves supplied lowercase full object
 IDs through read-only Git as commits and accepts only identical canonical IDs.
+
+## Authorized Degraded Independent Review
+
+An authorization may include `degradedIndependentReview` only as a disabled-by-
+default positive owner choice for one selected queue entry and named delivery
+transition. It names expiration, risk reason, fallback boundary, and initial
+sealed package binding; derived packages are eligible only for recorded in-scope
+behavior-preserving corrections before expiry and inside the correction budget.
+Strict review is always attempted first. The fallback is configured as a fresh,
+separate sealed-package-only reviewer and records `authorized-degraded`
+assurance with a capability ledger; missing, broad, expired, stale, mismatched,
+or unavailable fallback evidence pauses. This reduced-assurance path does not
+cryptographically prove its parent-launch evidence or executable identity and
+therefore is not a security boundary against an adversarial implementation
+process.
+
+When the selected concise request policy is `strict-first-degraded`, it also
+authorizes deriving an exact launcher record after strict unavailability for
+the same selected entry, transition, base, head, manifest, correction envelope,
+and expiration. That policy does not create runtime permission. The configured
+launcher and active runtime must independently permit either
+`codex-detached-read-only-v1` or `claude-detached-restricted-v1`; otherwise
+pause with the permission gap. The Codex launcher requests an inner read-only
+sandbox. The Claude launcher exposes only read/search tools. Both preserve a
+fresh sealed review attempt and accept no arbitrary shell text, but their
+ordinary request/evidence files and basename-checked executable path are not
+authenticated by an OS-protected key or capability. This limitation is an
+explicit accepted risk only for authorized degraded review and never applies
+to strict review.
+The production orchestrator must consume a valid prepared launcher request
+through the configured parent-runtime transport without owner relay. For
+Codex, that transport is an actual `require_escalated` shell-tool request
+eligible for Auto-review under an interactive approval policy; the inner
+reviewer does not inherit that authority. Missing, denied, timed-out, malformed,
+or failed transport returns terminal durable unavailable evidence and no
+manual command. Every objective correction or changed head automatically
+repeats affected validation and the complete strict-first review path inside
+the per-signature budget.
 
 ## Always Forbidden Without Separate Explicit Approval
 

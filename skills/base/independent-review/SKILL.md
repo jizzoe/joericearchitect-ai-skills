@@ -30,11 +30,39 @@ standing grants, noncanonical commits, or content outside the sealed package.
 4. Validate every returned `independent-review-result-v1` with the shared
    canonical validator. An unavailable, malformed, self-review, writable, or
    stale result pauses the transition.
-5. Preserve each finding and use the canonical finding state machine. Apply a
+5. An `authorized-degraded` result is eligible only after strict review has a
+   durable unavailable result for the exact sealed package and active bounded
+   authorization names the selected change, transition, expiration, risk
+   reason, and `fresh-separated-reviewer-only` boundary. It MUST retain the
+   strict record and capability ledger and MUST NOT be called strict-isolated.
+6. If detached-view creation or strict reviewer startup is denied by the outer
+   sandbox, use `scripts/sdd/review-launcher-recovery.mjs` to validate and
+   prepare a sealed host request only when the exact degraded authorization,
+   configured launcher, and active runtime permission all validate. Pass the
+   prepared request immediately to the configured parent-runtime transport and
+   call `executePreparedReviewLauncherRecovery`; never return the intermediate
+   host-required state as an owner action. A Codex parent uses
+   `writePreparedReviewHostRequest` and
+   `buildCodexParentReviewHostToolRequest`, which materializes and validates an
+   exact-head archive inside the managed sandbox. Issue its resulting fixed
+   host-owned reviewer invocation as an actual shell-tool call with
+   `sandbox_permissions: "require_escalated"`, then passes the tool result
+   through `consumeCodexParentReviewHostToolResult`. This request is eligible
+   for Auto-review only under the runtime's interactive approval policy. The
+   Codex MUST NOT execute `review-launcher-host.mjs` or other repository code
+   with parent authority. The sandbox-prepared archive hosts either a fresh
+   ephemeral Codex read-only reviewer or a fresh nonpersistent Claude reviewer
+   with read/search tools only. Capture the response directly; do not ask the
+   owner to run a command, approve a prompt, copy a payload, retrigger review,
+   or attest evidence. For degraded review the runtime receipt and executable
+   identity remain best-effort, non-security-verifiable evidence. Missing,
+   denied, timed-out, malformed, or failed transports return terminal
+   machine-readable unavailable evidence with no manual fallback.
+7. Preserve each finding and use the canonical finding state machine. Apply a
    bounded objective correction only when it is behavior-preserving and
    evidence-backed; rerun affected checks and obtain a fresh review for every
    new head.
-6. Record only the normalized result, non-sensitive execution reference,
+8. Record only the normalized result, non-sensitive execution reference,
    dispositions, and cleanup result in the durable checkpoint. Remove a review
    view only through its ownership-guarded cleanup helper.
 

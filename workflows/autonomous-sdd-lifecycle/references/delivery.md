@@ -20,8 +20,9 @@ Before marking a pull request ready or merging, verify:
   non-interactive isolated read-only reviewer to a sealed current package and
   exact base/head; package, result, and dispositions are retained in the named
   transition's unique durable review record. The v1 validator rejects stale,
-  unavailable, malformed, self-review, mutable, blocker, high, or unresolved
-  objective-fix outcomes before delivery.
+  unavailable, malformed, self-review, mutable, unresolved objective-fix, or
+  human-decision outcomes before delivery. Finding severity remains an impact
+  signal rather than an independent human-pause classification.
 
 ## Issue and Project Gate
 

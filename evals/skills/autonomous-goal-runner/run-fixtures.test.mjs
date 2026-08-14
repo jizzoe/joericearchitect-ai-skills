@@ -125,6 +125,34 @@ test("checkpoint inspection detects durable-state conflict", () => {
   assert.equal(result.reason, "durable-state-conflict");
 });
 
+test("checkpoint correction limits apply per failure signature rather than globally", () => {
+  const correctionRecords = ["signature-a", "signature-a", "signature-a", "signature-b"].map((findingId, index) => ({
+    id: `correction-${index + 1}`,
+    change: "change",
+    attempt: index + 1,
+    failureSource: { kind: "independent-review", reviewRecordId: `review-${index + 1}`, findingId, severity: "high", evidence: "scripts/sdd/checkpoint.mjs", transition: "merge-pr" },
+    failureSignature: `independent-review/${findingId}/scripts/sdd/checkpoint.mjs/merge-pr`,
+    classification: "objective-fix",
+    behaviorPreserving: true,
+    current: true,
+    ancestryVerified: true,
+    evidenceReference: `evidence:correction-${index + 1}`,
+    baseCommit: "1".repeat(40),
+    previousHead: String(index + 2).repeat(40),
+    previousManifestDigest: String(index + 2).repeat(64),
+    headCommit: String(index + 3).repeat(40),
+    manifestDigest: String(index + 3).repeat(64)
+  }));
+  const checkpoint = { selectedEntry: { name: "change", records: [], correctionAnchor: { baseCommit: "1".repeat(40), headCommit: "2".repeat(40), manifestDigest: "2".repeat(64) }, correctionRecords }, steps: [{ id: "apply", status: "pending" }] };
+  assert.equal(inspectCheckpoint(checkpoint).classification, "continue");
+  const exhausted = { ...checkpoint, selectedEntry: { ...checkpoint.selectedEntry, correctionRecords: correctionRecords.map((record, index) => index === 3 ? { ...record, failureSource: { ...record.failureSource, findingId: "signature-a" }, failureSignature: "independent-review/signature-a/scripts/sdd/checkpoint.mjs/merge-pr" } : record) } };
+  assert.equal(inspectCheckpoint(exhausted).reason, "selected-entry-invalid-correction-records");
+  const disconnected = { ...checkpoint, selectedEntry: { ...checkpoint.selectedEntry, correctionRecords: correctionRecords.map((record, index) => index === 2 ? { ...record, previousHead: "9".repeat(40) } : record) } };
+  assert.equal(inspectCheckpoint(disconnected).reason, "invalid-objective-correction-record");
+  const malformedDigest = { ...checkpoint, selectedEntry: { ...checkpoint.selectedEntry, correctionRecords: correctionRecords.map((record, index) => index === 1 ? { ...record, manifestDigest: "not-a-digest" } : record) } };
+  assert.equal(inspectCheckpoint(malformedDigest).reason, "invalid-objective-correction-record");
+});
+
 test("generic runner scenarios cover required behavior groups", () => {
   const scenarios = JSON.parse(
     fs.readFileSync(new URL("./scenarios.json", import.meta.url), "utf8")
@@ -132,6 +160,9 @@ test("generic runner scenarios cover required behavior groups", () => {
   const kinds = new Set(scenarios.map((scenario) => scenario.kind));
   for (const kind of ["positive", "negative", "retry", "no-op", "stop", "portability"]) {
     assert.equal(kinds.has(kind), true, `missing ${kind} scenario`);
+  }
+  for (const id of ["concise-delivery-request-complete", "concise-delivery-request-missing-inputs"]) {
+    assert.equal(scenarios.some((scenario) => scenario.id === id), true, `missing ${id} scenario`);
   }
 });
 

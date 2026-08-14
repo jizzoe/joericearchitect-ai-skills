@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "objective-correction-and-rereview",
+      "ownerActions": [],
+      "correctionBudgetPerFailureSignature": 3,
+      "steps": [
+        {"kind": "validation", "head": "1111111111111111111111111111111111111111", "status": "passed"},
+        {"kind": "strict-review", "head": "1111111111111111111111111111111111111111", "status": "unavailable"},
+        {"kind": "parent-transport", "head": "1111111111111111111111111111111111111111", "status": "executed", "sandboxPermissions": "require_escalated"},
+        {"kind": "degraded-review", "head": "1111111111111111111111111111111111111111", "status": "failed", "disposition": "objective-fix"},
+        {"kind": "objective-correction", "head": "2222222222222222222222222222222222222222", "failureSignature": "independent-review/objective/transport/merge-pr", "attempt": 1},
+        {"kind": "validation", "head": "2222222222222222222222222222222222222222", "status": "passed"},
+        {"kind": "strict-review", "head": "2222222222222222222222222222222222222222", "status": "unavailable"},
+        {"kind": "parent-transport", "head": "2222222222222222222222222222222222222222", "status": "executed", "sandboxPermissions": "require_escalated"},
+        {"kind": "degraded-review", "head": "2222222222222222222222222222222222222222", "status": "passed"}
+      ]
+    },
+    {
+      "id": "parent-transport-denied",
+      "ownerActions": [],
+      "steps": [
+        {"kind": "strict-review", "head": "3333333333333333333333333333333333333333", "status": "unavailable"},
+        {"kind": "parent-transport", "head": "3333333333333333333333333333333333333333", "status": "denied"},
+        {"kind": "terminal", "code": "review-launcher-runtime-transport-denied", "manualFallback": false}
+      ]
+    }
+  ]
+}

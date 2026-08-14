@@ -9,6 +9,7 @@ function input(profile, operation, overrides = {}) {
     authorization: {
       targets: ["workspace:docs", "record:tracker-1", "adapter:fixture", "pr:42", "change:example", "branch:feature/example"],
       allowedMutations: [operation],
+      qualityProfile: "prototype-rapid",
       correctionBudgetPerFailureSignature: 3,
       expiresAt: "2026-08-13T12:00:00.000Z",
       ...overrides.authorization
@@ -19,33 +20,23 @@ function input(profile, operation, overrides = {}) {
   };
 }
 function code(result) { return result.issues[0]?.code; }
-function correctionCheckpoint(failureSignature, count) {
-  const correctionRecords = Array.from({ length: count }, (_, index) => ({
-    id: `correction-${failureSignature}-${index + 1}`,
-    change: "quality-change",
-    attempt: index + 1,
-    classification: "objective-fix",
-    behaviorPreserving: true,
-    current: true,
-    ancestryVerified: true,
-    failureSignature,
-    evidenceReference: `evidence/${failureSignature}-${index + 1}.json`,
-    baseCommit: "1".repeat(40),
-    previousHead: "2".repeat(40),
-    headCommit: "3".repeat(40),
-    previousManifestDigest: "4".repeat(64),
-    manifestDigest: "5".repeat(64)
-  }));
-  return { selectedEntry: { name: "quality-change", correctionRecords } };
+function failureSource(findingId = "new-signature", reviewRecordId = "review-current") {
+  return { kind: "independent-review", reviewRecordId, findingId, severity: "high", evidence: "scripts/sdd/check-operation-authorization.mjs", transition: "merge-pr" };
 }
-function correctionRequest(failureSignature, count, aggregate = count) {
+function signature(source) { return `independent-review/${source.findingId}/${source.evidence}/${source.transition}`; }
+function correctionRecord(attempt, source) {
+  const commit = String(attempt).repeat(40);
+  const previousCommit = String(Math.max(0, attempt - 1)).repeat(40);
+  return { id: `correction-${attempt}`, change: "example", attempt, failureSignature: signature(source), failureSource: source, classification: "objective-fix", behaviorPreserving: true, current: true, ancestryVerified: true, evidenceReference: `evidence:${attempt}`, baseCommit: "a".repeat(40), previousHead: previousCommit, previousManifestDigest: `${attempt - 1}`.repeat(64), headCommit: commit, manifestDigest: `${attempt}`.repeat(64) };
+}
+function correction(overrides = {}) {
+  const correctionRecords = overrides.correctionRecords ?? [];
+  const source = overrides.request?.failureSource ?? failureSource();
+  const finding = { id: source.findingId, severity: source.severity, evidence: source.evidence, recommendation: "correct deterministic gate" };
+  const reviewRecord = { id: source.reviewRecordId, entry: "example", transition: source.transition, evidence: {}, findings: [finding] };
   return {
-    target: "workspace:docs/file.md",
-    selectedEntry: "quality-change",
-    failureSignature,
-    correctionAttemptsForFailureSignature: count,
-    correctionAttempts: aggregate,
-    checkpoint: correctionCheckpoint(failureSignature, count)
+    authorization: { target: { kind: "change", entries: ["example"] }, correctionBudgetPerFailureSignature: 3, ...overrides.authorization },
+    request: { selectedEntry: "example", failureSource: source, checkpoint: { selectedEntry: { name: "example", records: [], reviewRecords: [reviewRecord], correctionAnchor: { baseCommit: "a".repeat(40), headCommit: "0".repeat(40), manifestDigest: "0".repeat(64) }, correctionRecords }, steps: [] }, ...overrides.request }
   };
 }
 
@@ -53,12 +44,9 @@ test("each profile permits its fixed operations with authorized workspace or rec
   for (const [profile, operations] of Object.entries(profileOperations)) {
     for (const operation of operations) {
       const target = operation.includes("tracker") || operation === "upsert-allowlisted-record" || operation === "write-reconciliation-report" ? "record:tracker-1" : operation === "run-lifecycle-action" ? "change:example" : "workspace:docs/file.md";
-      const request = operation === "run-lifecycle-action"
-        ? { target, lifecycleAction: "sync-change" }
-        : operation === "objective-correction"
-          ? { ...correctionRequest("focused-check", 0), target }
-          : { target };
-      const result = checkOperationAuthorization(input(profile, operation, { request }));
+      const request = operation === "run-lifecycle-action" ? { target, lifecycleAction: "sync-change" } : { target };
+      const overrides = operation === "objective-correction" ? correction({ request }) : { request };
+      const result = checkOperationAuthorization(input(profile, operation, overrides));
       assert.equal(result.allowed, true, `${profile}:${operation}:${JSON.stringify(result)}`);
     }
   }
@@ -72,25 +60,41 @@ test("operation checker pauses for profile, authorization, target, adapter, runt
   assert.equal(code(checkOperationAuthorization(input("tracker-maintenance", "read-tracker", { request: { target: "record:tracker-1", adapter: "fixture" }, authorization: { targets: ["record:tracker-1"] } }))), "unauthorized-adapter");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "local-edit", { runtime: { permissionGaps: ["sandbox"] } }))), "runtime-permission-gap");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "local-edit", { authorization: { expiresAt: "2026-08-11T12:00:00.000Z" } }))), "expired-authorization");
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: correctionRequest("failed-check", 3) }))), "correction-limit-exhausted");
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { ...correctionRequest("fresh-check", 0), correctionAttemptsForFailureSignature: undefined, correctionAttempts: 3 } }))), "invalid-correction-attempt-count");
-  assert.equal(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: correctionRequest("fresh-check", 0) })).allowed, true);
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { ...correctionRequest("failed-check", 2), correctionAttempts: 1 } }))), "inconsistent-correction-attempt-count");
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { authorization: { correctionBudgetPerFailureSignature: 1 }, request: correctionRequest("failed-check", 1) }))), "correction-limit-exhausted");
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { authorization: { correctionBudgetPerFailureSignature: 2 }, request: correctionRequest("failed-check", 2) }))), "correction-limit-exhausted");
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { authorization: { correctionBudgetPerFailureSignature: 0 }, request: correctionRequest("failed-check", 0) }))), "invalid-correction-budget");
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { ...correctionRequest("failed-check", 3), correctionAttemptsForFailureSignature: 0 } }))), "correction-attempt-count-mismatch");
+  const exhaustedSource = failureSource();
+  const exhaustedRecords = [1, 2, 3].map((attempt) => correctionRecord(attempt, exhaustedSource));
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: exhaustedRecords })))), "correction-limit-exhausted");
+});
+
+test("objective correction derives per-signature attempts from the durable checkpoint", () => {
+  const oldSource = failureSource("old-signature", "review-old");
+  const newSource = failureSource();
+  const records = [correctionRecord(1, oldSource), correctionRecord(2, oldSource), correctionRecord(3, newSource)];
+  const valid = correction({ correctionRecords: records, request: { failureSource: newSource, correctionAttempts: 3, correctionAttemptsForFailureSignature: 1 } });
+  assert.equal(checkOperationAuthorization(input("local-implementation", "objective-correction", valid)).allowed, true);
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: records, request: { failureSource: newSource, correctionAttemptsForFailureSignature: 0 } })))), "correction-attempt-count-mismatch");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: records, request: { failureSource: newSource, correctionAttempts: 1 } })))), "correction-chain-length-mismatch");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSource: newSource } }))), "correction-context-incomplete");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: records, request: { failureSource: newSource, failureSignature: "renamed-signature" } })))), "correction-failure-signature-mismatch");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ request: { checkpoint: { selectedEntry: { name: "other", records: [], correctionRecords: [] }, steps: [] } } })))), "correction-entry-not-authorized");
 });
 
 test("sdd high-impact transitions require exact evidence and recovery boundaries", () => {
   for (const lifecycleAction of ["merge-pr", "archive-change", "delete-merged-topic-branch"]) {
     const target = lifecycleAction === "archive-change" ? "change:example" : lifecycleAction === "delete-merged-topic-branch" ? "branch:feature/example" : "pr:42";
-    const result = checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { request: { target, lifecycleAction, evidenceCurrent: true, recovery: "restore from durable records" } }));
+    const result = checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { request: { target, lifecycleAction, evidenceCurrent: true, recovery: "restore from durable records", deliveryProfile: "prototype-rapid" } }));
     assert.equal(result.allowed, true, lifecycleAction);
   }
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "run-lifecycle-action", { request: { lifecycleAction: "merge-pr", evidenceCurrent: true, recovery: "recover" } }))), "operation-not-in-profile");
   assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { request: { target: "pr:42", lifecycleAction: "merge-pr", evidenceCurrent: false } }))), "missing-recovery");
   assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action"))), "unnamed-or-unsupported-lifecycle-action");
+});
+
+test("high-impact delivery derives its quality gate from durable authorization", () => {
+  const request = { target: "pr:42", lifecycleAction: "merge-pr", evidenceCurrent: true, recovery: "re-read durable state" };
+  assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { request }))), "delivery-profile-authorization-mismatch");
+  assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { request: { ...request, deliveryProfile: "production-rapid" } }))), "delivery-profile-authorization-mismatch");
+  assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { authorization: { qualityProfile: "production-rapid" }, request: { ...request, deliveryProfile: "prototype-rapid" } }))), "delivery-profile-authorization-mismatch");
+  assert.equal(code(checkOperationAuthorization(input("sdd-delivery", "run-lifecycle-action", { authorization: { qualityProfile: "production-rapid" }, request: { ...request, deliveryProfile: "production-rapid" } }))), "independent-review-input-incomplete");
 });
 
 test("delivery preapproval preserves normal interactive prompts and permits only exact prototype exceptions", () => {

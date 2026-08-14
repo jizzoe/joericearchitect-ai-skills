@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { canonicalJson } from "./independent-review-contract.mjs";
 import { validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { validateFindingDispositions } from "./review-findings.mjs";
+import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
 // Pure evaluator for an independently executed, read-only review channel.
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
@@ -95,23 +96,63 @@ export function validateIndependentReviewEvidence({ reviewer, implementerSession
 
 // V1 result records are additive during migration. The legacy evidence
 // evaluator above remains available to existing checkpoints and callers.
-export function validateIndependentReviewV1({ reviewer, implementerSession, reviewPackage, reviewResult, applyEvidence, dispositions = [], correctionAttempts = 0, seenRecordIds = new Set() }) {
+export function strictSummaryMatchesResult(summary, result) {
+  return summary?.reviewRecordId === result?.reviewRecordId && summary.executionId === result.executionId &&
+    summary.adapter === result.reviewer?.adapter && summary.status === "unavailable" &&
+    summary.unavailableCode === result.unavailableCode && summary.baseCommit === result.baseCommit &&
+    summary.headCommit === result.headCommit && summary.manifestDigest === result.manifestDigest;
+}
+
+export function degradedAuthorizationMatchesResult(result, authorization) {
+  return result?.change === authorization?.change && result.transition === authorization.transition &&
+    result.expiresAt === authorization.expiresAt && result.riskReason === authorization.riskReason &&
+    result.fallbackBoundary === authorization.fallbackBoundary;
+}
+
+export function validateIndependentReviewV1({ reviewer, degradedReviewer, authorization, selectedEntry, transition = "merge-pr", implementerSession, reviewPackage, reviewResult, strictUnavailableResult, applyEvidence, dispositions = [], correctionAttempts = 0, seenRecordIds = new Set(), derivedCorrection = false, correctionEvidence, now }) {
   if (!reviewer?.available) return fail("independent-reviewer-unavailable");
   const packageValidation = validateReviewPackage(reviewPackage);
   if (!packageValidation.valid) return fail(packageValidation.issues[0].code);
   if (!applyEvidence || applyEvidence.current !== true || applyEvidence.headCommit !== reviewPackage.headCommit ||
       JSON.stringify(applyEvidence.validationEvidence) !== JSON.stringify(reviewPackage.validationEvidence)) return fail("independent-review-apply-evidence-mismatch");
+  const selectedReviewer = reviewResult?.assuranceLevel === "authorized-degraded" ? degradedReviewer : reviewer;
+  if (!selectedReviewer?.available) return fail("degraded-independent-reviewer-not-configured");
   const resultValidation = validateReviewResult(reviewResult, {
     expectedPackage: reviewPackage,
-    configuredReviewer: reviewer,
+    configuredReviewer: selectedReviewer,
     implementerSession,
     seenRecordIds
   });
   if (!resultValidation.valid) return fail(resultValidation.issues[0].code);
+  const applyCompletedAt = Date.parse(applyEvidence.completedAt);
+  if (Number.isNaN(applyCompletedAt) || Date.parse(reviewResult.startedAt) < applyCompletedAt) return fail("independent-review-result-before-apply");
   if (reviewResult.status === "unavailable") return fail(reviewResult.unavailableCode);
-  if (reviewResult.status !== "passed") return fail("independent-review-findings-unresolved");
-  const dispositionValidation = validateFindingDispositions({ findings: reviewResult.findings, dispositions, correctionAttempts });
+  if (reviewResult.assuranceLevel === "authorized-degraded") {
+    const strictValidation = validateReviewResult(strictUnavailableResult, {
+      expectedPackage: reviewPackage, configuredReviewer: reviewer, implementerSession
+    });
+    if (!strictValidation.valid || strictUnavailableResult.status !== "unavailable" ||
+        strictUnavailableResult.assuranceLevel !== "strict-isolated" ||
+        Date.parse(strictUnavailableResult.startedAt) < applyCompletedAt ||
+        !strictSummaryMatchesResult(reviewResult.strictUnavailable, strictUnavailableResult)) {
+      return fail("independent-review-strict-unavailable-not-durable");
+    }
+    const authorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage,
+      strictResult: strictUnavailableResult, correctionAttempts, derivedCorrection, correctionEvidence, now });
+    if (!authorizationCheck.allowed) return authorizationCheck;
+    if (!degradedAuthorizationMatchesResult(reviewResult.degradedAuthorization, authorizationCheck.authorization)) {
+      return fail("independent-review-degraded-authorization-mismatch");
+    }
+  }
+  const correctionAttemptsByFailureSignature = {};
+  for (const correction of authorization?.degradedIndependentReview?.derivedCorrections ?? []) {
+    if (typeof correction?.failureSignature === "string") {
+      correctionAttemptsByFailureSignature[correction.failureSignature] = (correctionAttemptsByFailureSignature[correction.failureSignature] ?? 0) + 1;
+    }
+  }
+  const dispositionValidation = validateFindingDispositions({ findings: reviewResult.findings, dispositions, correctionAttempts, correctionAttemptsByFailureSignature });
   if (!dispositionValidation.allowed) return dispositionValidation;
+  if (reviewResult.status !== "passed") return fail("independent-review-findings-unresolved");
   return { allowed: true, classification: "authorized", issues: [] };
 }
 

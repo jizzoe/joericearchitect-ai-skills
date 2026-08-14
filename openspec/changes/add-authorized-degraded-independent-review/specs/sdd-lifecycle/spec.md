@@ -1,0 +1,54 @@
+## MODIFIED Requirements
+
+### Requirement: Production-rapid lifecycle preserves independent rereview
+The lifecycle SHALL invoke and validate strict isolated independent review
+after Apply and after every behavior-preserving objective fix before a
+`production-rapid` delivery transition. It MUST bind the record to the exact
+base/head and sealed manifest, retain execution evidence, findings, and
+dispositions under a unique transition record, and pause on findings requiring
+human judgment, three materially different fixes for one signature, or strict unavailability
+unless an exact active degraded authorization applies. A degraded transition
+MUST retain strict unavailable evidence, `authorized-degraded` assurance, the
+authorization/risk record, expiration, and capability ledger; it MUST never be
+normalized to strict isolation. For external-host recovery it MUST also retain
+the selected Codex or Claude launcher kind and disclose that parent-launch
+evidence and executable identity are not security-verifiable. A new head MUST
+invalidate both prior strict and degraded review and repeat strict-first
+evaluation.
+The lifecycle MUST automatically hand a valid prepared recovery request to its
+configured parent-runtime transport, capture and validate the response, and
+continue the bounded finding/correction/rereview loop. It MUST NOT ask the
+owner to execute a command, approve a prompt, copy a request or response,
+retrigger review for a new head, or manufacture runtime evidence. Transport
+denial or unavailability MUST fail closed with durable machine-readable
+evidence.
+
+#### Scenario: Rereview follows an objective fix
+- **WHEN** an independent-review finding is corrected without changing approved
+  behavior
+- **THEN** the lifecycle reruns affected evidence and retries strict review for
+  the complete new diff before any eligible fresh degraded review
+
+#### Scenario: Rereview challenges a prior disposition
+- **WHEN** a prior finding was dispositioned as a warning or false positive
+- **THEN** the next fresh strict or degraded reviewer independently evaluates
+  the finding, disposition, and cited evidence and may return it unresolved
+
+#### Scenario: Authorized degraded lifecycle evidence is current
+- **WHEN** an exact change- and transition-bound authorization remains active
+  after durable strict unavailability for the same sealed package
+- **THEN** the lifecycle may retain a fresh degraded record as reduced-assurance
+  evidence for that one transition
+
+#### Scenario: Rereview cannot be performed safely
+- **WHEN** strict review is unavailable and no valid degraded authorization or
+  constrained fresh fallback can be established
+- **THEN** the lifecycle pauses without self-review or a silent downgrade
+
+#### Scenario: New head retriggers the complete review path
+- **WHEN** an objective correction or main integration changes the delivery
+  head
+- **THEN** the lifecycle automatically reruns affected checks, rebuilds the
+  sealed package, attempts strict review, invokes eligible parent recovery,
+  accepts and dispositions the result, and repeats within budget without
+  operator mediation

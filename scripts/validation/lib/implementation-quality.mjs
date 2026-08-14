@@ -407,6 +407,23 @@ function validateCorrectionAuthorization(details, localImplementationAuthorizati
   }
   let probeFailureSignature = "implementation-quality-validation-probe";
   while (records.some((record) => record?.failureSignature === probeFailureSignature)) probeFailureSignature += "-unused";
+  const probeFailureSource = {
+    kind: "verification",
+    verificationRecordId: "implementation-quality-validation-probe",
+    failureSignature: probeFailureSignature,
+    evidence: "implementation-quality-validation-probe",
+    transition: "openspec-verify"
+  };
+  const probeCheckpoint = {
+    ...context.checkpoint,
+    selectedEntry: {
+      ...context.checkpoint.selectedEntry,
+      verificationRecords: [
+        ...(context.checkpoint.selectedEntry?.verificationRecords ?? []),
+        { id: probeFailureSource.verificationRecordId, entry: context.request.selectedEntry, transition: probeFailureSource.transition, current: true, failureSignature: probeFailureSignature, evidence: probeFailureSource.evidence }
+      ]
+    }
+  };
   const checkpointAudit = checkOperationAuthorization({
     authorization: context.authorization,
     runtime: context.runtime,
@@ -418,9 +435,10 @@ function validateCorrectionAuthorization(details, localImplementationAuthorizati
       operation: "objective-correction",
       selectedEntry: context.request.selectedEntry,
       failureSignature: probeFailureSignature,
+      failureSource: probeFailureSource,
       correctionAttemptsForFailureSignature: 0,
       correctionAttempts: records.length,
-      checkpoint: context.checkpoint
+      checkpoint: probeCheckpoint
     }
   });
   if (!checkpointAudit.allowed) {
@@ -430,7 +448,9 @@ function validateCorrectionAuthorization(details, localImplementationAuthorizati
   for (const [index, attempt] of attempts.entries()) {
     const record = records[index];
     const expectedVerification = { result: attempt?.result, evidenceIds: attempt?.evidenceIds, binding: attempt?.binding };
-    if (record?.failureSignature !== attempt?.failureSignature || record?.attempt !== attempt?.attempt ||
+    const expectedGlobalAttempt = index + 1;
+    const expectedPerSignatureAttempt = attempts.slice(0, index + 1).filter((candidate) => candidate?.failureSignature === attempt?.failureSignature).length;
+    if (record?.failureSignature !== attempt?.failureSignature || record?.attempt !== expectedGlobalAttempt || attempt?.attempt !== expectedPerSignatureAttempt ||
         record?.classification !== attempt?.kind || JSON.stringify(record?.verification) !== JSON.stringify(expectedVerification)) {
       issues.push(issue("correction-history-not-durable", `${subject}[${index}]`));
       valid = false;
@@ -445,6 +465,7 @@ function validateCorrectionAuthorization(details, localImplementationAuthorizati
         correctionRecords: priorRecords
       }
     };
+    const failureSource = record?.failureSource;
     const authorization = checkOperationAuthorization({
       authorization: context.authorization,
       runtime: context.runtime,
@@ -456,6 +477,7 @@ function validateCorrectionAuthorization(details, localImplementationAuthorizati
         operation: "objective-correction",
         selectedEntry: context.request.selectedEntry,
         failureSignature: attempt.failureSignature,
+        failureSource,
         correctionAttemptsForFailureSignature: perSignature,
         correctionAttempts: index,
         checkpoint
@@ -766,7 +788,7 @@ export function evaluateVerificationLoop({ completedStages = [], currentBinding,
   return nextStage ? { state: "in-progress", nextStage } : { state: "complete", nextStage: null };
 }
 
-export function authorizeVerificationOperation({ authorization, runtime, config, operation, target, now, correctionAttemptsForFailureSignature, correctionAttempts, selectedEntry, failureSignature, checkpoint } = {}) {
+export function authorizeVerificationOperation({ authorization, runtime, config, operation, target, now, correctionAttemptsForFailureSignature, correctionAttempts, selectedEntry, failureSignature, failureSource, checkpoint } = {}) {
   return checkOperationAuthorization({
     authorization,
     runtime,
@@ -780,6 +802,7 @@ export function authorizeVerificationOperation({ authorization, runtime, config,
       correctionAttempts,
       selectedEntry,
       failureSignature,
+      failureSource,
       checkpoint
     }
   });

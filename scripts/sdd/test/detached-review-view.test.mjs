@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createDetachedReviewView, removeDetachedReviewView } from "../detached-review-view.mjs";
+import { createArchivedReviewView, createDetachedReviewView, removeArchivedReviewView, removeDetachedReviewView } from "../detached-review-view.mjs";
 import { probeIndependentReviewAdapter } from "../execute-independent-review.mjs";
 
 const git = (root, args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -27,6 +27,38 @@ test("detached review view is pinned to committed state and cleanup is ownership
     assert.throws(() => git(created.view.reviewPath, ["symbolic-ref", "--quiet", "--short", "HEAD"]));
     assert.equal(removeDetachedReviewView({ ...created.view, ownershipToken: "wrong" }).removed, false);
     assert.equal(removeDetachedReviewView(created.view).removed, true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("archived review view materializes only regular exact-head content without Git metadata", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ai-skills-review-archive-source-"));
+  try {
+    git(root, ["init"]);
+    git(root, ["config", "user.email", "review@example.invalid"]);
+    git(root, ["config", "user.name", "Review Fixture"]);
+    fs.writeFileSync(path.join(root, "tracked.txt"), "committed\n");
+    git(root, ["add", "tracked.txt"]); git(root, ["commit", "-m", "fixture"]);
+    const head = git(root, ["rev-parse", "HEAD"]);
+    fs.writeFileSync(path.join(root, "unrelated.txt"), "dirty\n");
+    const created = createArchivedReviewView({ repositoryPath: root, headCommit: head });
+    assert.equal(created.available, true, JSON.stringify(created));
+    assert.equal(fs.readFileSync(path.join(created.view.reviewPath, "tracked.txt"), "utf8"), "committed\n");
+    assert.equal(fs.existsSync(path.join(created.view.reviewPath, "unrelated.txt")), false);
+    assert.equal(fs.existsSync(path.join(created.view.reviewPath, ".git")), false);
+    assert.equal(removeArchivedReviewView({ ...created.view, ownershipToken: "wrong" }).removed, false);
+    assert.equal(removeArchivedReviewView(created.view).removed, true);
+
+    try {
+      fs.symlinkSync("tracked.txt", path.join(root, "linked.txt"));
+    } catch (error) {
+      if (["EPERM", "EACCES"].includes(error?.code)) return t.skip("filesystem does not permit symlink fixtures");
+      throw error;
+    }
+    git(root, ["add", "linked.txt"]); git(root, ["commit", "-m", "symlink"]);
+    const unsafeHead = git(root, ["rev-parse", "HEAD"]);
+    assert.equal(createArchivedReviewView({ repositoryPath: root, headCommit: unsafeHead }).code, "independent-review-view-tree-unsafe");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

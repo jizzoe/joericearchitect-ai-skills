@@ -7,6 +7,12 @@
       "expect": "Apply may proceed only when authorization permits it"
     },
     {
+      "id": "delivery-request-preflight-gap",
+      "kind": "stop",
+      "gate": "preflight",
+      "expect": "Lifecycle asks once for missing request fields and performs no selection or mutation"
+    },
+    {
       "id": "generated-propose-planning-only",
       "kind": "stop",
       "gate": "propose",
@@ -28,13 +34,19 @@
       "id": "independent-review-rereview",
       "kind": "complete",
       "gate": "delivery",
-      "expect": "An objective correction reruns affected checks and receives a fresh exact-head v1 review"
+      "expect": "An objective correction automatically reruns affected checks, rebuilds the package, and receives a fresh exact-head v1 review without owner retrigger"
     },
     {
       "id": "independent-review-unavailable",
       "kind": "stop",
       "gate": "delivery",
-      "expect": "An unavailable or unprovable isolated reviewer pauses production-rapid delivery"
+      "expect": "An unavailable, denied, or unprovable reviewer transport records terminal evidence and pauses production-rapid delivery without a manual fallback"
+    },
+    {
+      "id": "degraded-review-launcher-recovery",
+      "kind": "complete",
+      "gate": "delivery",
+      "expect": "An exact strict-first-degraded authorization and runtime permission automatically use the fixed parent launcher, directly capture its result, and preserve the inner read-only reviewer"
     },
     {
       "id": "delivery-partial-mutation",

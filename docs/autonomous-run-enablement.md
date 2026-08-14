@@ -9,6 +9,12 @@ review package and a disposable detached repository view. If the runtime cannot
 prove the required boundary, it returns `unavailable` and the delivery pauses.
 Do not replace that pause with self-review or a normal pull-request review.
 
+An explicitly authorized degraded fallback is a different assurance class. It
+still attempts a fresh separate review, but its parent-launch evidence and
+reviewer executable identity are not authenticated by an OS-protected key or
+capability. It is a best-effort quality signal and must never be described as
+strict, isolated, read-only-enforced, or security-verified.
+
 ## One-Time Readiness
 
 Install current Codex CLI and/or Claude Code normally and make sure Git and
@@ -52,6 +58,37 @@ Claude Code's OS sandbox is not available on native Windows. Run the Claude
 reviewer in WSL2 or another supported isolated environment. A native-Windows
 Claude adapter result is intentionally `unavailable`.
 
+### Authorized degraded launcher recovery
+
+After exact-package strict unavailability, a bounded `strict-first-degraded`
+authorization may permit external launcher recovery. Codex uses an ephemeral
+inner process with a requested read-only sandbox. Claude uses a fresh
+nonpersistent process with only `Read`, `Glob`, and `Grep`; Bash, edit/write,
+agents, web, and MCP tools are disabled. Both use an exact-head committed
+archive or detached view, sealed package, credential scrubbing, a fixed logical
+host protocol, expiration checks, and
+structured findings.
+
+The parent runtime transport is separate from the inner reviewer. In Codex it
+prepares the exact-head archive inside the sandbox, then issues only the fixed
+host-owned reviewer invocation as a shell-tool request with escalated sandbox
+permissions. When the active policy is interactive and
+`approvals_reviewer = "auto_review"`, Auto-review evaluates that request
+without handing it to the owner. This does not broaden the sandbox or elevate
+the inner reviewer, and repository-controlled JavaScript is never executed
+with parent authority. If the request is denied or the transport is unavailable,
+the run records terminal unavailable evidence and stops; there is no
+`host-debug`, copy/paste, approval-prompt, or owner-attestation fallback.
+
+The first release deliberately accepts two limitations for this reduced-
+assurance path: ordinary launcher evidence can be forged by a sufficiently
+adversarial implementation process, and the requested executable is checked by
+basename rather than pinned to a host-owned absolute path. A malicious program
+named `codex` or `claude` could therefore impersonate the reviewer. Eliminating
+those risks requires an external trusted launcher plus authenticated IPC or an
+OS-protected key/capability and host-owned executable configuration. That
+heavier setup is deferred; strict review is unaffected.
+
 ## Starting a Bounded Run
 
 ### Codex
@@ -92,4 +129,6 @@ implementation branch and evidence intact. Inspect the recorded unavailable
 code and local capability prerequisites, correct only a safe runtime or
 configuration problem, rerun affected checks, and create a fresh sealed package
 for the current head. A changed head always requires a new independent review.
-Do not reuse an old pass or silently broaden access.
+Within an active autonomous run, the runner performs those affected checks and
+fresh review automatically for objective corrections. Do not reuse an old pass,
+ask the owner to retrigger review, or silently broaden access.

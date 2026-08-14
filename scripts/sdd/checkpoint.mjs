@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import { validateReviewResult } from "./independent-review-contract.mjs";
+import { inspectCorrectionChain } from "./correction-chain.mjs";
 
 function readJson(path) {
   return JSON.parse(fs.readFileSync(path, "utf8"));
@@ -44,7 +45,30 @@ function invalidReviewRecord(input) {
       if (!result.valid || record.result.reviewRecordId !== record.id) return "invalid-independent-review-v1-record";
       if (!record.reviewPackage || record.reviewPackage.manifestDigest !== record.result.manifestDigest ||
           record.reviewPackage.baseCommit !== record.result.baseCommit || record.reviewPackage.headCommit !== record.result.headCommit) return "independent-review-v1-binding-mismatch";
+      if (record.result.assuranceLevel === "authorized-degraded" && (!record.strictUnavailable ||
+          JSON.stringify(record.strictUnavailable) !== JSON.stringify(record.result.strictUnavailable) ||
+          !record.degradedAuthorization || JSON.stringify(record.degradedAuthorization) !== JSON.stringify(record.result.degradedAuthorization) ||
+          !record.capabilityLedger || JSON.stringify(record.capabilityLedger) !== JSON.stringify(record.result.capabilityLedger))) return "independent-review-degraded-record-mismatch";
     }
+  }
+  return null;
+}
+
+function invalidStrictUnavailableRecord(input) {
+  const entry = input.selectedEntry;
+  if (!entry || entry.strictUnavailableRecords === undefined) return null;
+  if (!Array.isArray(entry.strictUnavailableRecords)) return "selected-entry-invalid-strict-unavailable-records";
+  const seen = new Set();
+  for (const record of entry.strictUnavailableRecords) {
+    const validation = validateReviewResult(record?.result);
+    if (!record || typeof record.id !== "string" || !record.id || seen.has(record.id) ||
+        record.entry !== entry.name || typeof record.transition !== "string" || !record.transition ||
+        record.current !== true || typeof record.evidenceReference !== "string" || !record.evidenceReference ||
+        !record.reviewPackage || !validation.valid || record.result.status !== "unavailable" ||
+        record.result.assuranceLevel !== "strict-isolated" || record.result.reviewRecordId !== record.id ||
+        record.reviewPackage.baseCommit !== record.result.baseCommit || record.reviewPackage.headCommit !== record.result.headCommit ||
+        record.reviewPackage.manifestDigest !== record.result.manifestDigest) return "invalid-strict-unavailable-record";
+    seen.add(record.id);
   }
   return null;
 }
@@ -65,14 +89,29 @@ function invalidApplyEvidenceRecord(input) {
   return null;
 }
 
+function invalidCorrectionRecord(input) {
+  const entry = input.selectedEntry;
+  if (!entry || entry.correctionRecords === undefined) return null;
+  const result = inspectCorrectionChain(entry.correctionRecords, {
+    selectedEntry: entry.name,
+    anchor: entry.correctionAnchor,
+    maxPerFailureSignature: entry.correctionBudgetPerFailureSignature ?? 3
+  });
+  return result.valid ? null : result.reason;
+}
+
 export function inspectCheckpoint(input) {
   const steps = input.steps ?? [];
   const recordIssue = invalidDerivedRecord(input);
   if (recordIssue) return { classification: "human-decision", firstIncomplete: null, reason: recordIssue };
   const reviewIssue = invalidReviewRecord(input);
   if (reviewIssue) return { classification: "human-decision", firstIncomplete: null, reason: reviewIssue };
+  const strictUnavailableIssue = invalidStrictUnavailableRecord(input);
+  if (strictUnavailableIssue) return { classification: "human-decision", firstIncomplete: null, reason: strictUnavailableIssue };
   const applyEvidenceIssue = invalidApplyEvidenceRecord(input);
   if (applyEvidenceIssue) return { classification: "human-decision", firstIncomplete: null, reason: applyEvidenceIssue };
+  const correctionIssue = invalidCorrectionRecord(input);
+  if (correctionIssue) return { classification: "human-decision", firstIncomplete: null, reason: correctionIssue };
 
   const conflict = steps.find((step) => step.durableConflict === true);
   if (conflict) {

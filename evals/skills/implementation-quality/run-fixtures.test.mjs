@@ -35,6 +35,8 @@ function productionReviewAuthorization(head) {
   result.baseCommit = baseCommit;
   result.headCommit = head;
   result.manifestDigest = reviewPackage.manifestDigest;
+  result.startedAt = "2026-08-13T03:01:00.000Z";
+  result.completedAt = "2026-08-13T03:02:00.000Z";
   const applyEvidence = {
     reference: "apply-current",
     current: true,
@@ -49,7 +51,7 @@ function productionReviewAuthorization(head) {
   const steps = ["issue", "branch", "pr", "merge-pr", "sync-change", "archive-change", "delete-merged-topic-branch"]
     .map((id, index) => ({ id, status: index < 3 ? "complete" : "pending", evidence: index < 3 ? { present: true, current: true } : undefined }));
   return {
-    authorization: { targets: ["workspace:reports"], allowedMutations: ["run-lifecycle-action"], derivedTargets: { queue: ["change"], selectedEntry: "change", repository: "owner/repository" } },
+    authorization: { targets: ["workspace:reports"], allowedMutations: ["run-lifecycle-action"], qualityProfile: "production-rapid", derivedTargets: { queue: ["change"], selectedEntry: "change", repository: "owner/repository" } },
     runtime: { permittedOperations: ["run-lifecycle-action"] },
     config: { independentReviewer: { type: "fixture", identity: "fresh-reviewer", enabled: true, attestation: { ref: "fixture-attestation", nonInteractive: true, isolatedContext: true, readOnly: true } } },
     request: {
@@ -64,15 +66,29 @@ function productionReviewAuthorization(head) {
 
 function localImplementationAuthorization(value) {
   const attempts = value?.details?.correctionAttempts ?? [];
+  const sources = new Map();
+  for (const attempt of attempts) {
+    if (!sources.has(attempt.failureSignature)) {
+      const index = sources.size + 1;
+      sources.set(attempt.failureSignature, {
+        kind: "verification",
+        verificationRecordId: `verification-${index}`,
+        failureSignature: attempt.failureSignature,
+        evidence: `evidence/verification-${index}.json`,
+        transition: "openspec-verify"
+      });
+    }
+  }
   const correctionRecords = attempts.map((attempt, index) => ({
     id: `correction-${index + 1}`,
     change: "quality-change",
-    attempt: attempt.attempt,
+    attempt: index + 1,
     classification: attempt.kind,
     behaviorPreserving: true,
     current: true,
     ancestryVerified: true,
     failureSignature: attempt.failureSignature,
+    failureSource: sources.get(attempt.failureSignature),
     evidenceReference: `evidence/correction-${index + 1}.json`,
     baseCommit: "0".repeat(40),
     previousHead: String(index + 1).repeat(40),
@@ -85,12 +101,22 @@ function localImplementationAuthorization(value) {
     authorization: {
       targets: ["workspace:src"],
       allowedMutations: ["objective-correction"],
-      correctionBudgetPerFailureSignature: value.details.correctionBudget
+      correctionBudgetPerFailureSignature: value.details.correctionBudget,
+      target: { entries: ["quality-change"] }
     },
     runtime: { permittedOperations: ["objective-correction"] },
     config: {},
     request: { target: "workspace:src/widget.mjs", selectedEntry: "quality-change" },
-    checkpoint: { selectedEntry: { name: "quality-change", records: [], correctionRecords }, steps: [] }
+    checkpoint: {
+      selectedEntry: {
+        name: "quality-change",
+        records: [],
+        verificationRecords: [...sources.values()].map((source) => ({ id: source.verificationRecordId, entry: "quality-change", transition: source.transition, current: true, failureSignature: source.failureSignature, evidence: source.evidence })),
+        correctionAnchor: { baseCommit: "0".repeat(40), headCommit: "1".repeat(40), manifestDigest: "3".repeat(64) },
+        correctionRecords
+      },
+      steps: []
+    }
   };
 }
 
@@ -228,6 +254,9 @@ test("verification operations reuse exact local-implementation authorization", (
   assert.equal(authorizeVerificationOperation(input).allowed, true);
   assert.equal(authorizeVerificationOperation({ ...input, target: "workspace:outside/widget.mjs" }).issues[0].code, "unauthorized-target");
   assert.equal(authorizeVerificationOperation({ ...input, operation: "run-lifecycle-action" }).issues[0].code, "operation-not-in-profile");
+  const failureSource = { kind: "verification", verificationRecordId: "verification-validation", failureSignature: "validation-failure", evidence: "evidence/validation-failure.json", transition: "openspec-verify" };
+  const freshFailureSource = { kind: "verification", verificationRecordId: "verification-fresh", failureSignature: "fresh-failure", evidence: "evidence/fresh-failure.json", transition: "openspec-verify" };
+  const verificationRecords = [failureSource, freshFailureSource].map((source) => ({ id: source.verificationRecordId, entry: "quality-change", transition: source.transition, current: true, failureSignature: source.failureSignature, evidence: source.evidence }));
   const correctionRecords = Array.from({ length: 3 }, (_, index) => ({
     id: `correction-${index + 1}`,
     change: "quality-change",
@@ -237,6 +266,7 @@ test("verification operations reuse exact local-implementation authorization", (
     current: true,
     ancestryVerified: true,
     failureSignature: "validation-failure",
+    failureSource,
     evidenceReference: `evidence/correction-${index + 1}.json`,
     baseCommit: "1".repeat(40),
     previousHead: String(index + 2).repeat(40),
@@ -255,9 +285,10 @@ test("verification operations reuse exact local-implementation authorization", (
     operation: "objective-correction",
     selectedEntry: "quality-change",
     failureSignature: "validation-failure",
+    failureSource,
     correctionAttemptsForFailureSignature: 3,
     correctionAttempts: 3,
-    checkpoint: { selectedEntry: { name: "quality-change", records: [], correctionRecords }, steps: [] }
+    checkpoint: { selectedEntry: { name: "quality-change", records: [], verificationRecords, correctionAnchor: { baseCommit: "1".repeat(40), headCommit: "2".repeat(40), manifestDigest: "4".repeat(64) }, correctionRecords }, steps: [] }
   });
   assert.equal(correction.issues[0].code, "correction-limit-exhausted");
   const forgedCount = authorizeVerificationOperation({
@@ -266,9 +297,10 @@ test("verification operations reuse exact local-implementation authorization", (
     operation: "objective-correction",
     selectedEntry: "quality-change",
     failureSignature: "validation-failure",
+    failureSource,
     correctionAttemptsForFailureSignature: 0,
     correctionAttempts: 3,
-    checkpoint: { selectedEntry: { name: "quality-change", records: [], correctionRecords }, steps: [] }
+    checkpoint: { selectedEntry: { name: "quality-change", records: [], verificationRecords, correctionAnchor: { baseCommit: "1".repeat(40), headCommit: "2".repeat(40), manifestDigest: "4".repeat(64) }, correctionRecords }, steps: [] }
   });
   assert.equal(forgedCount.issues[0].code, "correction-attempt-count-mismatch");
   const freshSignature = authorizeVerificationOperation({
@@ -277,9 +309,10 @@ test("verification operations reuse exact local-implementation authorization", (
     operation: "objective-correction",
     selectedEntry: "quality-change",
     failureSignature: "fresh-failure",
+    failureSource: freshFailureSource,
     correctionAttemptsForFailureSignature: 0,
     correctionAttempts: 3,
-    checkpoint: { selectedEntry: { name: "quality-change", records: [], correctionRecords }, steps: [] }
+    checkpoint: { selectedEntry: { name: "quality-change", records: [], verificationRecords, correctionAnchor: { baseCommit: "1".repeat(40), headCommit: "2".repeat(40), manifestDigest: "4".repeat(64) }, correctionRecords }, steps: [] }
   });
   assert.equal(freshSignature.allowed, true);
   const missingPerSignature = authorizeVerificationOperation({
@@ -288,10 +321,31 @@ test("verification operations reuse exact local-implementation authorization", (
     operation: "objective-correction",
     selectedEntry: "quality-change",
     failureSignature: "fresh-failure",
+    failureSource: freshFailureSource,
     correctionAttempts: 3,
-    checkpoint: { selectedEntry: { name: "quality-change", records: [], correctionRecords }, steps: [] }
+    checkpoint: { selectedEntry: { name: "quality-change", records: [], verificationRecords, correctionAnchor: { baseCommit: "1".repeat(40), headCommit: "2".repeat(40), manifestDigest: "4".repeat(64) }, correctionRecords }, steps: [] }
   });
-  assert.equal(missingPerSignature.issues[0].code, "invalid-correction-attempt-count");
+  assert.equal(missingPerSignature.allowed, true);
+  const renamedSignature = authorizeVerificationOperation({
+    ...input,
+    authorization: correctionAuthorization,
+    operation: "objective-correction",
+    selectedEntry: "quality-change",
+    failureSignature: "renamed-failure",
+    failureSource,
+    checkpoint: { selectedEntry: { name: "quality-change", records: [], verificationRecords, correctionAnchor: { baseCommit: "1".repeat(40), headCommit: "2".repeat(40), manifestDigest: "4".repeat(64) }, correctionRecords }, steps: [] }
+  });
+  assert.equal(renamedSignature.issues[0].code, "correction-failure-signature-mismatch");
+  const forgedSource = authorizeVerificationOperation({
+    ...input,
+    authorization: correctionAuthorization,
+    operation: "objective-correction",
+    selectedEntry: "quality-change",
+    failureSignature: "fresh-failure",
+    failureSource: { ...freshFailureSource, evidence: "evidence/forged.json" },
+    checkpoint: { selectedEntry: { name: "quality-change", records: [], verificationRecords, correctionAnchor: { baseCommit: "1".repeat(40), headCommit: "2".repeat(40), manifestDigest: "4".repeat(64) }, correctionRecords }, steps: [] }
+  });
+  assert.equal(forgedSource.issues[0].code, "correction-failure-source-not-durable");
   assert.equal(authorizeVerificationOperation({ ...input, runtime: { permissionGaps: ["local-edit"] } }).issues[0].code, "runtime-permission-gap");
 });
 
@@ -355,7 +409,7 @@ test("production gate is exact-head, strict, fresh, and independent", () => {
   const unavailable = clone(gate);
   unavailable.request.independentReviewResult.status = "unavailable";
   unavailable.request.independentReviewResult.unavailableCode = "independent-reviewer-runtime-unavailable";
-  unavailable.request.independentReviewResult.attestation = { ...unavailable.request.independentReviewResult.attestation, nonInteractive: false, isolatedContext: false, readOnly: false };
+  unavailable.request.independentReviewResult.attestation = { ...unavailable.request.independentReviewResult.attestation, nonInteractive: false, isolatedContext: false, freshContext: false, readOnly: false };
   unavailable.request.checkpoint.selectedEntry.reviewRecords[0].result = unavailable.request.independentReviewResult;
   assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence, productionReviewAuthorization: unavailable }).reason, "strict-review-unavailable");
 

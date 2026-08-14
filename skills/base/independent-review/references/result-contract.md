@@ -10,6 +10,12 @@ and structured findings. A successful or failed review must attest fresh,
 noninteractive, read-only isolation. An unavailable result must carry a stable
 unavailable code and must not claim isolation.
 
+Strict results use `assuranceLevel: strict-isolated`. A degraded result uses
+`assuranceLevel: authorized-degraded` and retains its strict-unavailable
+precursor, authorization/risk record, expiration, and capability ledger. It is
+reduced-assurance evidence for one transition, never a strict result or
+standing exception.
+
 Findings use a stable ID, severity, repository-relative evidence, and a safe
 recommendation. Valid severities are `blocker`, `high`, `objective-fix`,
 `warning`, and `false-positive`. The result is evidence, never authority to
