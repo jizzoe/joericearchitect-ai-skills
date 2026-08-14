@@ -387,7 +387,87 @@ function validateProductionGate(gate, details, evidenceById, issues, productionR
   };
 }
 
-function validateVerificationDetails(result, issues, { productionReviewAuthorization } = {}) {
+function validateCorrectionAuthorization(details, localImplementationAuthorization, issues) {
+  const subject = "result.details.correctionAttempts";
+  const context = localImplementationAuthorization;
+  if (!isObject(context) || !isObject(context.authorization) || !isObject(context.request) || !isObject(context.checkpoint)) {
+    issues.push(issue("missing-local-implementation-authorization", subject));
+    return false;
+  }
+  let valid = true;
+  if (details.correctionBudget !== context.authorization.correctionBudgetPerFailureSignature) {
+    issues.push(issue("correction-budget-authorization-mismatch", "result.details.correctionBudget"));
+    valid = false;
+  }
+  const records = context.checkpoint.selectedEntry?.correctionRecords;
+  const attempts = Array.isArray(details.correctionAttempts) ? details.correctionAttempts : [];
+  if (!Array.isArray(records) || records.length !== attempts.length) {
+    issues.push(issue("correction-history-not-durable", subject));
+    return false;
+  }
+  let probeFailureSignature = "implementation-quality-validation-probe";
+  while (records.some((record) => record?.failureSignature === probeFailureSignature)) probeFailureSignature += "-unused";
+  const checkpointAudit = checkOperationAuthorization({
+    authorization: context.authorization,
+    runtime: context.runtime,
+    config: context.config,
+    now: context.now,
+    request: {
+      ...context.request,
+      profile: "local-implementation",
+      operation: "objective-correction",
+      selectedEntry: context.request.selectedEntry,
+      failureSignature: probeFailureSignature,
+      correctionAttemptsForFailureSignature: 0,
+      correctionAttempts: records.length,
+      checkpoint: context.checkpoint
+    }
+  });
+  if (!checkpointAudit.allowed) {
+    issues.push(issue("local-implementation-authorization-invalid", subject, checkpointAudit.issues?.[0]?.code));
+    return false;
+  }
+  for (const [index, attempt] of attempts.entries()) {
+    const record = records[index];
+    if (record?.failureSignature !== attempt?.failureSignature || record?.attempt !== attempt?.attempt || record?.classification !== attempt?.kind) {
+      issues.push(issue("correction-history-not-durable", `${subject}[${index}]`));
+      valid = false;
+      continue;
+    }
+    const priorRecords = records.slice(0, index);
+    const perSignature = priorRecords.filter((candidate) => candidate.failureSignature === attempt.failureSignature).length;
+    const checkpoint = {
+      ...context.checkpoint,
+      selectedEntry: {
+        ...context.checkpoint.selectedEntry,
+        correctionRecords: priorRecords
+      }
+    };
+    const authorization = checkOperationAuthorization({
+      authorization: context.authorization,
+      runtime: context.runtime,
+      config: context.config,
+      now: context.now,
+      request: {
+        ...context.request,
+        profile: "local-implementation",
+        operation: "objective-correction",
+        selectedEntry: context.request.selectedEntry,
+        failureSignature: attempt.failureSignature,
+        correctionAttemptsForFailureSignature: perSignature,
+        correctionAttempts: index,
+        checkpoint
+      }
+    });
+    if (!authorization.allowed) {
+      issues.push(issue("correction-attempt-not-authorized", `${subject}[${index}]`, authorization.issues?.[0]?.code));
+      valid = false;
+    }
+  }
+  return valid;
+}
+
+function validateVerificationDetails(result, issues, { productionReviewAuthorization, localImplementationAuthorization } = {}) {
   const details = result.details;
   const subject = "result.details";
   const keys = new Set(["profile", "uiScope", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness", "productionGate"]);
@@ -518,6 +598,7 @@ function validateVerificationDetails(result, issues, { productionReviewAuthoriza
 
   if (exhaustedCorrection && result.status !== "blocked") issues.push(issue("exhausted-correction-requires-blocked-status", "result.status"));
   if (exhaustedCorrection && details.readiness !== "blocked") issues.push(issue("exhausted-correction-requires-blocked-readiness", `${subject}.readiness`));
+  const correctionAuthorizationValid = validateCorrectionAuthorization(details, localImplementationAuthorization, issues);
 
   const requiredFailure = Array.isArray(details.selectedChecks) && details.selectedChecks.some((check) =>
     check.required && new Set(["failed", "pending"]).has(check.result));
@@ -559,7 +640,7 @@ function validateVerificationDetails(result, issues, { productionReviewAuthoriza
       productionReady = productionReady && gate.ready;
     }
   }
-  if (details.readiness === "ready-for-openspec-verify" && (!reviewedPathCoverage || missingProfileCheck || requiredFailure || hasGaps || !currentCheckEvidence || !currentCorrectionEvidence || failedCorrection || blockingLocalFinding || !productionValid || !productionReady)) {
+  if (details.readiness === "ready-for-openspec-verify" && (!reviewedPathCoverage || missingProfileCheck || requiredFailure || hasGaps || !currentCheckEvidence || !currentCorrectionEvidence || !correctionAuthorizationValid || failedCorrection || blockingLocalFinding || !productionValid || !productionReady)) {
     issues.push(issue("readiness-overclaim", `${subject}.readiness`));
   }
 }

@@ -19,6 +19,11 @@ that record and the delivery profile; callers cannot establish readiness by
 omitting a minimum check or marking an applicable minimum `not-applicable`.
 Every selected check reported as `not-applicable` retains a non-empty reason
 tied to the explicit scope record.
+The result's correction budget and attempt history match the applicable local-
+implementation authorization and its durable correction records. The validator
+replays each attempt boundary through the canonical operation checker; a caller
+cannot enlarge a budget, invent a correction, or reset a signature count in the
+result.
 
 ## Prototype Rapid
 

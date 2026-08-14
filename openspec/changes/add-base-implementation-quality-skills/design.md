@@ -97,6 +97,13 @@ the following documented `details` shapes before rendering Markdown:
   head or workspace binding when applicable, exact-head CI provenance for
   production, and readiness state.
 
+Verification validation also receives a separate invocation-owned context. It
+uses the existing operation checker to reconcile the result's correction budget
+and ordered attempts with local-implementation authorization and durable
+correction records. For ready production results, the same context carries the
+canonical production-review authorization input. These controls remain outside
+`skill-result-v1`; the result cannot self-assert either authorization boundary.
+
 Verification readiness maps to the shared result status without contradiction:
 paused and blocked map to their same-named statuses, needs-implementation maps
 to completed execution of the current loop, and ready maps to completed or an

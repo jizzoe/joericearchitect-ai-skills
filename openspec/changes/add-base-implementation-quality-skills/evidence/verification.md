@@ -50,8 +50,8 @@ implementation head. All earlier objective findings are preserved with their
 corrections and rerun evidence in this change's `evidence/` directory.
 The later final-head findings about top-level sensitive-value coverage,
 Assumptions-section rendering, helper-level unvalidated production readiness,
-and result-level self-asserted review summaries are also corrected and covered
-by the refreshed suite.
+result-level self-asserted review summaries, and unbound result correction
+histories are also corrected and covered by the refreshed suite.
 
 ## Coherence
 

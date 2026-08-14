@@ -84,10 +84,13 @@ Historical attempts retain evidence bound to their recorded workspace or head;
 only the latest passed attempt for each signature must bind to current rerun
 evidence for readiness.
 
-Validate with `scripts/validation/validate-implementation-quality.mjs`. A
-production-ready result supplies the canonical owner's complete review
-authorization input as the validator's second JSON-file argument; a summary or
-top-level review evidence record alone cannot establish strict readiness. Report
+Validate with `scripts/validation/validate-implementation-quality.mjs`. Supply
+a validation-context JSON file as its second argument. The context carries the
+applicable local-implementation authorization and durable correction checkpoint;
+a production-ready result additionally carries the canonical owner's complete
+review authorization input. Self-reported correction budgets, correction
+histories, review summaries, or top-level evidence records cannot establish
+readiness. Report
 only `needs-implementation`, `paused`, `blocked`, or
 `ready-for-openspec-verify`; never claim that OpenSpec Verify, CI delivery,
 merge, Sync, or Archive completed.

@@ -18,7 +18,7 @@ Change: `add-base-implementation-quality-skills`
 | Delivery profiles select proportional evidence | `selectVerificationChecks` and profile reference | Prototype, production, UI, and non-UI selection tests |
 | Initial web UI evidence is deterministic | Profile selector and profile reference | Exact `1440x900`, `390x844`, screenshot, interaction, axe-core, and manual-review assertions |
 | Missing verification tools fail visibly | Profile selector returns `needs-authorization` or `paused` | Interactive and autonomous missing-prerequisite tests |
-| Objective corrections and rereview are bounded | State evaluator plus existing durable local-operation checker | Narrower-budget, three-attempt, stale-binding, and durable correction tests |
+| Objective corrections and rereview are bounded | State evaluator plus result-validation replay through the existing durable local-operation checker | Narrower-budget, three-attempt, stale-binding, durable correction, forged count, and over-authorized-result tests |
 | Production readiness retains current strict review gates | `evaluateProductionReadiness`, the canonical production-rapid operation checker, and structured production gate summary | Canonical strict pass, unavailable, malformed, wrong-head, stale CI, self-review, fabricated-label, and nondurable-record tests |
 | Verification results are structured and lifecycle-limited | Verification details validator and renderer | Prototype/production results, paused result, readiness-overclaim, and no-delivery-overclaim tests |
 | Canonical verification behavior remains portable | Canonical skill, thin wrappers, structured product check definitions | Second-workspace, trusted-argv, adapter-drift, and cross-assistant tests |
@@ -273,6 +273,18 @@ prove that a self-asserted summary, nondurable record, or misleading summary
 cannot validate, while unavailable evidence can still produce a valid paused
 result.
 
+### IQ-R27 — high / objective-fix
+
+The next exact-head strict review found that verification result validation
+still trusted the result's correction budget and attempt history even though
+mutation authorization itself was durable and canonical. Verification
+validation now requires the applicable local-implementation authorization and
+durable correction checkpoint, requires the result budget and ordered history
+to match them, and replays the boundary before every recorded attempt through
+the existing operation checker. An adversarial regression proves a result
+claiming two corrections against a one-attempt authorization is rejected as an
+authorization mismatch and readiness overclaim.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -305,12 +317,12 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R26: 26 passed, 0 failed. The complete
+Focused tests after IQ-R1 through IQ-R27: 26 passed, 0 failed. The complete
 current-main Node suite passes 194 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
 validation pass. Strict review record
 `codex-review-d0fc9717c544-20260814T011625Z` passed with zero findings for sealed
 implementation head `d0fc9717c54487943566100afd80716bb6cd2976`; the later
-final-head findings IQ-R23 through IQ-R26 are corrected and require a fresh
+final-head findings IQ-R23 through IQ-R27 are corrected and require a fresh
 exact-head review.

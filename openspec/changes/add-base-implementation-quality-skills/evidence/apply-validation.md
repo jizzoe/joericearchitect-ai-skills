@@ -15,14 +15,15 @@ Change: `add-base-implementation-quality-skills`
   reviewed-path coverage, consistent result status/readiness state, and
   complete-result sensitive-value scanning, Assumptions rendering, and
   canonical durable production-review authorization in both the helper and
-  result-validation paths.
+  result-validation paths, plus result-to-authorization correction-history
+  reconciliation.
 - `node scripts/validation/validate-implementation-quality.mjs
   evals/skills/implementation-quality/fixtures/valid-code-review.json` returned
   `valid: true`.
 - The focused CLI regression proves the production fixture fails closed without
-  canonical review authorization and returns `valid: true` when the same
-  validator receives the canonical authorization input as its second JSON-file
-  argument.
+  its validation context and returns `valid: true` when the same validator
+  receives canonical local-implementation and production-review authorization
+  inputs as its second JSON-file argument.
 
 ## Integrated local evidence
 

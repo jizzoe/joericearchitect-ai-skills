@@ -62,7 +62,41 @@ function productionReviewAuthorization(head) {
   };
 }
 
+function localImplementationAuthorization(value) {
+  const attempts = value?.details?.correctionAttempts ?? [];
+  const correctionRecords = attempts.map((attempt, index) => ({
+    id: `correction-${index + 1}`,
+    change: "quality-change",
+    attempt: attempt.attempt,
+    classification: attempt.kind,
+    behaviorPreserving: true,
+    current: true,
+    ancestryVerified: true,
+    failureSignature: attempt.failureSignature,
+    evidenceReference: `evidence/correction-${index + 1}.json`,
+    baseCommit: "0".repeat(40),
+    previousHead: String(index + 1).repeat(40),
+    headCommit: String(index + 2).repeat(40),
+    previousManifestDigest: String(index + 3).repeat(64),
+    manifestDigest: String(index + 4).repeat(64)
+  }));
+  return {
+    authorization: {
+      targets: ["workspace:src"],
+      allowedMutations: ["objective-correction"],
+      correctionBudgetPerFailureSignature: value.details.correctionBudget
+    },
+    runtime: { permittedOperations: ["objective-correction"] },
+    config: {},
+    request: { target: "workspace:src/widget.mjs", selectedEntry: "quality-change" },
+    checkpoint: { selectedEntry: { name: "quality-change", records: [], correctionRecords }, steps: [] }
+  };
+}
+
 const validationOptions = (value) => ({
+  localImplementationAuthorization: value?.skill === "base-verification-loop"
+    ? localImplementationAuthorization(value)
+    : undefined,
   productionReviewAuthorization: value?.skill === "base-verification-loop" &&
     value?.details?.profile === "production-rapid" &&
     value?.details?.readiness === "ready-for-openspec-verify"
@@ -343,7 +377,7 @@ test("production result CLI requires canonical review authorization evidence", (
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "implementation-quality-"));
   const authorizationPath = path.join(temporaryRoot, "production-review-authorization.json");
   try {
-    fs.writeFileSync(authorizationPath, `${JSON.stringify(productionReviewAuthorization("1".repeat(40)))}\n`, { mode: 0o600 });
+    fs.writeFileSync(authorizationPath, `${JSON.stringify(validationOptions(readJson("valid-verification-production.json")))}\n`, { mode: 0o600 });
     const output = JSON.parse(execFileSync(process.execPath, [validatorPath, resultPath, authorizationPath], { encoding: "utf8" }));
     assert.deepEqual(output, { valid: true, issues: [] });
   } finally {
@@ -474,6 +508,23 @@ test("local findings require an evidence-backed nonblocking resolution", () => {
     binding: "workspace-state-1"
   }];
   assert.deepEqual(validateResult(corrected), { valid: true, issues: [] });
+
+  const overAuthorizedBudget = clone(corrected);
+  overAuthorizedBudget.details.correctionAttempts.push({
+    ...overAuthorizedBudget.details.correctionAttempts[0],
+    attempt: 2
+  });
+  const narrowAuthorization = localImplementationAuthorization(overAuthorizedBudget);
+  narrowAuthorization.authorization.correctionBudgetPerFailureSignature = 1;
+  const overAuthorizedResult = validateImplementationQualityResultRaw(overAuthorizedBudget, { localImplementationAuthorization: narrowAuthorization });
+  assert.ok(overAuthorizedResult.issues.some((item) => item.code === "correction-budget-authorization-mismatch"));
+  assert.ok(overAuthorizedResult.issues.some((item) => item.code === "correction-attempt-not-authorized"));
+  assert.ok(overAuthorizedResult.issues.some((item) => item.code === "readiness-overclaim"));
+
+  const malformedDurableRecord = localImplementationAuthorization(corrected);
+  malformedDurableRecord.checkpoint.selectedEntry.correctionRecords[0].current = false;
+  const malformedDurableResult = validateImplementationQualityResultRaw(corrected, { localImplementationAuthorization: malformedDurableRecord });
+  assert.ok(malformedDurableResult.issues.some((item) => item.code === "local-implementation-authorization-invalid"));
 
   const falsePassedCorrection = clone(corrected);
   falsePassedCorrection.evidence.find((item) => item.id === "focused").result = "failed";
