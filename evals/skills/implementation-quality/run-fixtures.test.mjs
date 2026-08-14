@@ -442,6 +442,28 @@ test("readiness requires current evidence bindings for prototype and production 
   }
 });
 
+test("readiness requires complete unique review coverage of changed paths", () => {
+  const empty = readJson("valid-verification-prototype.json");
+  empty.details.reviewedPaths = [];
+  const emptyResult = validateImplementationQualityResult(empty);
+  assert.ok(emptyResult.issues.some((item) => item.code === "incomplete-reviewed-path-coverage"));
+  assert.ok(emptyResult.issues.some((item) => item.code === "readiness-overclaim"));
+
+  const partial = readJson("valid-verification-prototype.json");
+  partial.details.changedPaths.push("src/helper.mjs");
+  for (const binding of partial.details.evidenceBindings) binding.changedPaths.push("src/helper.mjs");
+  const partialResult = validateImplementationQualityResult(partial);
+  assert.ok(partialResult.issues.some((item) => item.code === "incomplete-reviewed-path-coverage"));
+
+  const stale = readJson("valid-verification-prototype.json");
+  stale.details.reviewedPaths = ["src/old-widget.mjs"];
+  assert.ok(validateImplementationQualityResult(stale).issues.some((item) => item.code === "incomplete-reviewed-path-coverage"));
+
+  const duplicate = readJson("valid-verification-prototype.json");
+  duplicate.details.reviewedPaths.push("src/widget.mjs");
+  assert.ok(validateImplementationQualityResult(duplicate).issues.some((item) => item.code === "duplicate-reviewed-path"));
+});
+
 test("failed and exhausted correction histories cannot report readiness", () => {
   const attempt = (number) => ({
     failureSignature: "focused-regression",

@@ -368,6 +368,10 @@ function validateVerificationDetails(result, issues) {
   if (!nonEmpty(details.criticalPath)) issues.push(issue("invalid-critical-path", `${subject}.criticalPath`));
   validateStringArray(details.changedPaths, `${subject}.changedPaths`, issues, { paths: true, nonEmptyArray: true });
   validateStringArray(details.reviewedPaths, `${subject}.reviewedPaths`, issues, { paths: true });
+  if (Array.isArray(details.reviewedPaths) && new Set(details.reviewedPaths).size !== details.reviewedPaths.length) issues.push(issue("duplicate-reviewed-path", `${subject}.reviewedPaths`));
+  const reviewedPathCoverage = Array.isArray(details.changedPaths) && Array.isArray(details.reviewedPaths)
+    && details.changedPaths.every((changedPath) => details.reviewedPaths.includes(changedPath));
+  if (details.readiness === "ready-for-openspec-verify" && !reviewedPathCoverage) issues.push(issue("incomplete-reviewed-path-coverage", `${subject}.reviewedPaths`));
   validateStringArray(details.unresolvedGaps, `${subject}.unresolvedGaps`, issues);
   validateStringArray(details.recoverySteps, `${subject}.recoverySteps`, issues, { nonEmptyArray: true });
   validateBinding(details.binding, `${subject}.binding`, issues);
@@ -518,7 +522,7 @@ function validateVerificationDetails(result, issues) {
       productionReady = productionReady && gate.ready;
     }
   }
-  if (details.readiness === "ready-for-openspec-verify" && (missingProfileCheck || requiredFailure || hasGaps || !currentCheckEvidence || !currentCorrectionEvidence || failedCorrection || blockingLocalFinding || !productionValid || !productionReady)) {
+  if (details.readiness === "ready-for-openspec-verify" && (!reviewedPathCoverage || missingProfileCheck || requiredFailure || hasGaps || !currentCheckEvidence || !currentCorrectionEvidence || failedCorrection || blockingLocalFinding || !productionValid || !productionReady)) {
     issues.push(issue("readiness-overclaim", `${subject}.readiness`));
   }
 }

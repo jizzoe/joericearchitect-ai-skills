@@ -199,6 +199,14 @@ for each signature must bind to current evidence for readiness. A regression
 proves that a failed old-head attempt followed by a passed current-head attempt
 is valid and that falsifying the historical binding is rejected.
 
+### IQ-R19 — high / objective-fix
+
+Fresh strict review found that readiness accepted an empty or partial
+`reviewedPaths` set despite requiring local review of changed implementation.
+Readiness now requires the unique reviewed-path set to cover every changed path.
+Focused regressions reject empty, partial, stale-path, and duplicate review
+coverage.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -231,8 +239,8 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R18: 22 passed, 0 failed. The complete
-current-main Node suite passes 190 tests. Syntax checks, whitespace checks,
+Focused tests after IQ-R1 through IQ-R19: 23 passed, 0 failed. The complete
+current-main Node suite passes 191 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
 validation pass. A fresh exact-head strict independent review is the next gate.

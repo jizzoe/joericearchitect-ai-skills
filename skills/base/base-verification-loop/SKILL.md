@@ -32,8 +32,8 @@ decisions as separate gates in every mode.
 3. Select focused deterministic checks and proportional profile checks.
 4. Implement only the approved scope.
 5. Run focused checks before broader profile checks.
-6. Invoke `base-code-review` for local code and security review and preserve all
-   findings.
+6. Invoke `base-code-review` for local code and security review, cover every
+   changed path exactly once in the reviewed-path set, and preserve all findings.
 7. Apply only separately authorized behavior-preserving `objective-fix`
    corrections within the per-signature budget of at most three attempts.
 8. Invalidate stale evidence, rerun affected checks and local review, then emit

@@ -137,7 +137,8 @@ The canonical loop records these ordered stages:
 3. select focused deterministic and proportional profile checks;
 4. perform only approved implementation work;
 5. run focused checks, then broader profile checks;
-6. run local code and security review and classify all findings;
+6. run local code and security review across every changed path exactly once in
+   the reviewed-path set and classify all findings;
 7. apply only authorized behavior-preserving objective fixes within the
    per-signature correction budget; and
 8. invalidate stale evidence, rerun affected checks and review, then emit
