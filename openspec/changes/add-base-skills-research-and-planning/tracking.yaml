@@ -1,0 +1,26 @@
+schema_version: 1
+openspec:
+  change: add-base-skills-research-and-planning
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 86
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/86
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - openspec/changes/add-base-skills-research-and-planning/
+      - skills/base/research-topic-workflow/
+      - skills/base/design-brief-from-research/
+      - skills/base/sdd-requirements-to-plan/
+      - evals/skills/research-topic-workflow/
+      - evals/skills/design-brief-from-research/
+      - evals/skills/sdd-requirements-to-plan/
+      - .agents/skills/research-topic-workflow/
+      - .agents/skills/design-brief-from-research/
+      - .agents/skills/sdd-requirements-to-plan/
+      - .claude/skills/research-topic-workflow/
+      - .claude/skills/design-brief-from-research/
+      - .claude/skills/sdd-requirements-to-plan/

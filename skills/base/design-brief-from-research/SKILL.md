@@ -1,0 +1,56 @@
+---
+name: design-brief-from-research
+description: Turn durable research and project context into one reviewable Markdown decision brief before OpenSpec Explore or Propose. Use when a concise decision record is needed first; do not use to fabricate a decision from incomplete evidence or to generate OpenSpec artifacts.
+---
+
+# Design Brief From Research
+
+Use this skill to turn durable research and project context into one
+reviewable brief before OpenSpec Explore or Propose. It does not replace
+either action; it produces the input those actions read.
+
+## Gather Inputs
+
+Require: research document paths; relevant requirements, plan, and
+current-context paths; an output path or the `designBriefRoot` default from
+`config/ai-skills.json`; execution mode and, for autonomous mode, the bounded
+authorization. Accept optional stated owner decisions and unresolved
+questions.
+
+If a named research or context path does not resolve, or sources conflict on
+a point material to the recommendation without a defensible interpretation,
+return a `skill-result-v1` paused result naming the missing or conflicting
+evidence as an `openQuestions` entry. Do not fabricate a decision.
+
+## Write the Brief
+
+Write one Markdown brief containing, in order:
+
+1. problem and desired outcome;
+2. evidence and key findings, linked to their source rather than duplicated;
+3. options considered and tradeoffs;
+4. explicit decisions, assumptions, and decision owner where known;
+5. scope, non-goals, constraints, dependencies, and risks;
+6. open questions and blocking decisions;
+7. recommended next step: more research, design refinement, OpenSpec
+   Explore, or OpenSpec Propose.
+
+Visibly label an evidence-derived recommendation as a recommendation, never
+as an owner decision, until the owner confirms it. Do not create OpenSpec
+proposal, design, delta spec, or task content; state the recommended next
+OpenSpec action and stop.
+
+## Pause Conditions
+
+Pause when key research is unavailable, sources conflict without a
+defensible interpretation, the requested content requires a material
+architecture or product decision the owner has not made, or the request asks
+the brief to claim approval that was not given.
+
+Autonomous execution is permitted only under the `local-implementation`
+bounded-autonomous-execution profile, writing only the brief file within the
+run's authorized workspace and paths.
+
+## Guardrails
+
+See [Shared guardrails](../_shared/guardrails.md).
