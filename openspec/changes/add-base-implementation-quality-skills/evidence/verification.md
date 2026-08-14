@@ -49,7 +49,8 @@ The validated strict independent review record
 implementation head. All earlier objective findings are preserved with their
 corrections and rerun evidence in this change's `evidence/` directory.
 The later final-head review finding about top-level sensitive-value coverage is
-also corrected and covered by the refreshed suite.
+also corrected and covered by the refreshed suite, as is the subsequent
+Assumptions-section rendering finding.
 
 ## Coherence
 

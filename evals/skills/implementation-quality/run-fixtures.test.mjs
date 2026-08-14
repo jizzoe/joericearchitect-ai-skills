@@ -26,8 +26,15 @@ test("valid code-review result is findings-first and shared-contract compliant",
   assert.deepEqual(validateImplementationQualityResult(result), { valid: true, issues: [] });
   const markdown = renderImplementationQualityMarkdown(result);
   assert.ok(markdown.indexOf("## Findings") < markdown.indexOf("## Evidence Gaps"));
-  assert.ok(markdown.indexOf("## Evidence Gaps") < markdown.indexOf("## Summary"));
+  assert.ok(markdown.indexOf("## Evidence Gaps") < markdown.indexOf("## Assumptions"));
+  assert.ok(markdown.indexOf("## Assumptions") < markdown.indexOf("## Scope"));
+  assert.ok(markdown.indexOf("## Scope") < markdown.indexOf("## Summary"));
+  assert.match(markdown, /- The supplied changed path list is complete\./);
   assert.match(markdown, /HIGH finding-high-validation/);
+
+  const emptyAssumptions = clone(result);
+  emptyAssumptions.assumptions = [];
+  assert.match(renderImplementationQualityMarkdown(emptyAssumptions), /## Assumptions\n\nNone\./);
 });
 
 test("review validator rejects malformed, duplicate, unsafe, unsupported, and misordered findings", () => {

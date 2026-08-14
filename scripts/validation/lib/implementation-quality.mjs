@@ -571,6 +571,9 @@ export function renderImplementationQualityMarkdown(result) {
     lines.push("", "## Evidence Gaps");
     if (!result.details.evidenceGaps.length) lines.push("", "None.");
     else for (const gap of result.details.evidenceGaps) lines.push("", `- ${gap.id}: ${gap.subject} — ${gap.reason}`);
+    lines.push("", "## Assumptions");
+    if (!result.assumptions.length) lines.push("", "None.");
+    else for (const assumption of result.assumptions) lines.push("", `- ${assumption}`);
     lines.push("", "## Scope", "", result.details.scopeSummary);
   } else {
     lines.push("## Readiness", "", result.details.readiness, "", "## Selected Checks");

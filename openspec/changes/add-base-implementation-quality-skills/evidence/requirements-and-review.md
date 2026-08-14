@@ -241,6 +241,14 @@ persisted. The validator now scans the complete implementation-quality result.
 Field-by-field adversarial regressions cover summary, artifacts, evidence,
 assumptions, open questions, next action, and details.
 
+### IQ-R24 — objective-fix / objective-fix
+
+Final exact-head strict review found that the code-review Markdown renderer
+omitted assumptions despite the required findings, gaps, assumptions, and scope
+order. The renderer now emits an Assumptions section between Evidence Gaps and
+Scope, with either every assumption or an explicit `None.` state. Focused
+regressions verify order, non-empty content, and empty-state rendering.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -273,11 +281,12 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R23: 25 passed, 0 failed. The complete
+Focused tests after IQ-R1 through IQ-R24: 25 passed, 0 failed. The complete
 current-main Node suite passes 193 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
 validation pass. Strict review record
 `codex-review-d0fc9717c544-20260814T011625Z` passed with zero findings for sealed
 implementation head `d0fc9717c54487943566100afd80716bb6cd2976`; the later
-final-head finding IQ-R23 is corrected and requires a fresh exact-head review.
+final-head findings IQ-R23 and IQ-R24 are corrected and require a fresh
+exact-head review.
