@@ -102,7 +102,7 @@
   - Evidence: requirements mapping and review record contain every finding,
     disposition, correction, rerun, known limitation, and final changed-path
     inventory.
-- [ ] 4.3 Obtain current-head strict isolated independent review using the
+- [x] 4.3 Obtain current-head strict isolated independent review using the
   existing production protocol after Apply and after any objective correction;
   pause if a fresh enforced read-only reviewer or exact package evidence is
   unavailable.
@@ -110,7 +110,7 @@
   - Evidence: unique durable review record binds the current canonical base and
     head, sealed manifest, validation evidence, reviewer execution, findings,
     dispositions, and final strict status.
-- [ ] 4.4 Run formal OpenSpec Verify,
+- [x] 4.4 Run formal OpenSpec Verify,
   `openspec validate add-base-implementation-quality-skills --strict`, and
   `openspec validate --all --strict`; resolve only objective planning or
   implementation defects and repeat affected evidence and strict review for a

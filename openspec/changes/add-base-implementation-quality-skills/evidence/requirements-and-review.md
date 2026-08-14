@@ -269,4 +269,6 @@ Focused tests after IQ-R1 through IQ-R22: 24 passed, 0 failed. The complete
 current-main Node suite passes 192 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
-validation pass. A fresh exact-head strict independent review is the next gate.
+validation pass. Strict review record
+`codex-review-d0fc9717c544-20260814T011625Z` passed with zero findings for sealed
+implementation head `d0fc9717c54487943566100afd80716bb6cd2976`.
