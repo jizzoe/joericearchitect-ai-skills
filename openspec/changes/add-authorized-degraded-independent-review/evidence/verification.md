@@ -55,9 +55,10 @@ No evidence describes degraded review as strict or security-verified.
 Deterministic tests cover positive and negative scenarios for absent, expired,
 wrong-transition, stale, malformed, mutable, self-review, capability, runtime-
 permission, launcher, Claude/Codex, correction-envelope, goal-expiration,
-authenticity-ledger, secret, unsafe-path,
+authenticity-ledger, severity/disposition compatibility, unresolved-objective-
+fix routing, secret, unsafe-path,
 symlink, durable delivery-profile, correction-counter, and portability
-boundaries. `node --test` passed 209 tests in a clean exact-head clone.
+boundaries. `node --test` passed 211 tests in a clean exact-head clone.
 `openspec validate --all --strict` passed all 22
 items. Adapter drift, skill metadata, shared guardrails, artifact quality,
 whitespace, secret-pattern, attribution, portability, and recovery reviews
