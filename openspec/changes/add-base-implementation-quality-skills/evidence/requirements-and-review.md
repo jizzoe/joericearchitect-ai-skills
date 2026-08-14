@@ -119,6 +119,23 @@ are accepted only as advisory, and blocker/high warnings still prevent
 readiness. Focused regressions cover unresolved, corrected, warning, severe
 warning, and human-decision states.
 
+### IQ-R10 — high / objective-fix
+
+Fresh strict review found that readiness did not require the complete profile
+minimum. Verification details now record explicit non-UI or web UI scope plus
+layout and material-change flags. The validator requires focused, critical-flow,
+and local-review checks for both profiles; every production minimum; and all
+applicable viewport, interaction, screenshot, and accessibility checks. Negative
+regressions remove every mandatory check one at a time and fail deterministically.
+
+### IQ-R11 — objective-fix / objective-fix
+
+Fresh strict review found that a corrected finding could cite current but
+unrelated evidence. A corrected finding's resolution evidence must now equal
+the latest passed correction attempt's evidence set. A regression proves an
+unrelated current local-review record cannot substantiate a different
+correction.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 

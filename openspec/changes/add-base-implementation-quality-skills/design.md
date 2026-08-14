@@ -89,8 +89,9 @@ the following documented `details` shapes before rendering Markdown:
 
 - code review: reviewed scope, ordered findings, review-area coverage, evidence
   gaps, and concise scope summary;
-- verification: selected profile and checks, critical path, changed paths,
-  current binding records for readiness evidence, correction budget and
+- verification: selected profile, explicit UI applicability and change flags,
+  complete mandatory check inventory, critical path, changed paths, current
+  binding records for readiness evidence, correction budget and
   attempts by failure signature, local findings with evidence-backed resolution
   state, unresolved gaps, recovery steps, current head or workspace binding
   when applicable, and readiness state.

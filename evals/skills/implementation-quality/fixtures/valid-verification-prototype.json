@@ -15,6 +15,7 @@
   "nextAction": { "kind": "continue", "description": "Run formal OpenSpec Verify." },
   "details": {
     "profile": "prototype-rapid",
+    "uiScope": { "kind": "none", "layoutChanged": false, "materiallyChanged": false },
     "intendedBehavior": "The widget returns a stable normalized value.",
     "criticalPath": "Invoke the widget with the representative fixture and inspect the normalized result.",
     "changedPaths": ["src/widget.mjs"],

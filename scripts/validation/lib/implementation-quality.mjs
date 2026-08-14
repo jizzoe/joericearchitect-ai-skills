@@ -104,7 +104,10 @@ function scanSensitive(value, subject, issues, seen = new Set()) {
 function validateEvidenceReferences(ids, subject, evidenceById, issues, { nonEmptyArray = false } = {}) {
   validateStringArray(ids, subject, issues, { nonEmptyArray });
   if (!Array.isArray(ids)) return;
-  for (const id of ids) {
+  const uniqueIds = new Set();
+  for (const [index, id] of ids.entries()) {
+    if (uniqueIds.has(id)) issues.push(issue("duplicate-evidence-reference", `${subject}[${index}]`, id));
+    uniqueIds.add(id);
     if (nonEmpty(id) && !evidenceById.has(id)) issues.push(issue("unknown-evidence-reference", subject, id));
   }
 }
@@ -206,12 +209,16 @@ function validateLocalFindingResolution(finding, index, correctionAttempts, issu
   const statuses = new Set(["unresolved", "corrected", "accepted-warning", "false-positive"]);
   if (!statuses.has(resolution.status)) issues.push(issue("invalid-finding-resolution", `${subject}.status`));
   validateStringArray(resolution.evidenceIds, `${subject}.evidenceIds`, issues, { nonEmptyArray: resolution.status !== "unresolved" });
+  if (Array.isArray(resolution.evidenceIds) && new Set(resolution.evidenceIds).size !== resolution.evidenceIds.length) {
+    issues.push(issue("duplicate-evidence-reference", `${subject}.evidenceIds`));
+  }
 
   if (resolution.status === "corrected") {
     if (!nonEmpty(resolution.correctionFailureSignature)) issues.push(issue("missing-finding-correction-signature", `${subject}.correctionFailureSignature`));
     const matching = correctionAttempts.filter((attempt) => attempt.failureSignature === resolution.correctionFailureSignature);
     const latest = matching.at(-1);
     if (!latest || latest.result !== "passed") issues.push(issue("finding-correction-not-passed", subject, finding?.id));
+    else if (!sameStringSet(resolution.evidenceIds, latest.evidenceIds)) issues.push(issue("finding-correction-evidence-mismatch", `${subject}.evidenceIds`, finding?.id));
   } else if (resolution.correctionFailureSignature !== null) {
     issues.push(issue("unexpected-finding-correction-signature", `${subject}.correctionFailureSignature`));
   }
@@ -240,6 +247,55 @@ function validateBinding(binding, subject, issues) {
 
 function sameStringArray(left, right) {
   return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
+function sameStringSet(left, right) {
+  return Array.isArray(left) && Array.isArray(right)
+    && new Set(left).size === left.length
+    && new Set(right).size === right.length
+    && left.length === right.length
+    && left.every((item) => right.includes(item));
+}
+
+function validateUiScope(value, subject, issues) {
+  if (!exactKeys(value, new Set(["kind", "layoutChanged", "materiallyChanged"]), subject, issues)) return;
+  required(value, ["kind", "layoutChanged", "materiallyChanged"], subject, issues);
+  if (!new Set(["none", "web"]).has(value.kind)) issues.push(issue("invalid-ui-scope-kind", `${subject}.kind`));
+  if (typeof value.layoutChanged !== "boolean") issues.push(issue("invalid-ui-layout-change", `${subject}.layoutChanged`));
+  if (typeof value.materiallyChanged !== "boolean") issues.push(issue("invalid-ui-material-change", `${subject}.materiallyChanged`));
+  if (value.kind === "none" && (value.layoutChanged === true || value.materiallyChanged === true)) issues.push(issue("non-ui-scope-has-ui-changes", subject));
+}
+
+function requiredProfileChecks(details) {
+  const checks = [
+    ["focused-unit-or-integration", "focused"],
+    ["critical-flow", "critical-flow"],
+    ["local-review", "review"]
+  ];
+  if (details.profile === "production-rapid") checks.push(
+    ["regression-coverage", "regression"],
+    ["repeatability", "repeatability"],
+    ["operational-checks", "operational"],
+    ["release-evidence", "release"],
+    ["exact-head-ci", "ci"],
+    ["strict-independent-review", "independent-review"]
+  );
+  if (details.uiScope?.kind === "web") {
+    checks.push(
+      ["chromium-desktop-1440x900", "browser"],
+      ["chromium-mobile-web-390x844", "device"],
+      ["critical-ui-interaction", "browser"]
+    );
+    if (details.uiScope.layoutChanged === true) checks.push(
+      ["desktop-current-screenshot", "browser"],
+      ["mobile-current-screenshot", "browser"]
+    );
+    if (details.uiScope.materiallyChanged === true) checks.push(
+      ["axe-core", "accessibility"],
+      ["manual-keyboard-semantics", "accessibility"]
+    );
+  }
+  return checks;
 }
 
 function validateEvidenceBindings(entries, details, evidenceById, issues) {
@@ -295,11 +351,12 @@ function validateProductionGate(gate, details, evidenceById, issues) {
 function validateVerificationDetails(result, issues) {
   const details = result.details;
   const subject = "result.details";
-  const keys = new Set(["profile", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness", "productionGate"]);
+  const keys = new Set(["profile", "uiScope", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness", "productionGate"]);
   if (!exactKeys(details, keys, subject, issues)) return;
-  required(details, ["profile", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness"], subject, issues);
+  required(details, ["profile", "uiScope", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness"], subject, issues);
   const evidenceById = new Map((result.evidence ?? []).map((item) => [item.id, item]));
   if (!deliveryProfiles.includes(details.profile)) issues.push(issue("invalid-delivery-profile", `${subject}.profile`));
+  validateUiScope(details.uiScope, `${subject}.uiScope`, issues);
   if (!nonEmpty(details.intendedBehavior)) issues.push(issue("invalid-intended-behavior", `${subject}.intendedBehavior`));
   if (!nonEmpty(details.criticalPath)) issues.push(issue("invalid-critical-path", `${subject}.criticalPath`));
   validateStringArray(details.changedPaths, `${subject}.changedPaths`, issues, { paths: true, nonEmptyArray: true });
@@ -415,11 +472,19 @@ function validateVerificationDetails(result, issues) {
     const productionGateCheck = details.profile === "production-rapid" && new Set(["ci", "independent-review"]).has(check.category);
     return check.result !== "not-applicable" || productionGateCheck;
   });
+  let missingProfileCheck = false;
+  const selectedById = new Map((Array.isArray(details.selectedChecks) ? details.selectedChecks : []).map((check) => [check.id, check]));
+  for (const [id, category] of requiredProfileChecks(details)) {
+    const check = selectedById.get(id);
+    if (!check || check.category !== category || check.required !== true) {
+      missingProfileCheck = true;
+      issues.push(issue("missing-required-profile-check", `${subject}.selectedChecks`, id));
+    }
+  }
   const hasGaps = Array.isArray(details.unresolvedGaps) && details.unresolvedGaps.length > 0;
   let productionValid = true;
   let productionReady = true;
   if (details.profile === "production-rapid") {
-    const selectedById = new Map((Array.isArray(details.selectedChecks) ? details.selectedChecks : []).map((check) => [check.id, check]));
     for (const [id, category, gateEvidenceField] of [["exact-head-ci", "ci", "ciEvidenceId"], ["strict-independent-review", "independent-review", "independentReviewEvidenceId"]]) {
       const check = selectedById.get(id);
       if (!check || check.category !== category || check.required !== true) {
@@ -443,7 +508,7 @@ function validateVerificationDetails(result, issues) {
       productionReady = productionReady && gate.ready;
     }
   }
-  if (details.readiness === "ready-for-openspec-verify" && (requiredFailure || hasGaps || !currentCheckEvidence || !currentCorrectionEvidence || failedCorrection || blockingLocalFinding || !productionValid || !productionReady)) {
+  if (details.readiness === "ready-for-openspec-verify" && (missingProfileCheck || requiredFailure || hasGaps || !currentCheckEvidence || !currentCorrectionEvidence || failedCorrection || blockingLocalFinding || !productionValid || !productionReady)) {
     issues.push(issue("readiness-overclaim", `${subject}.readiness`));
   }
 }
@@ -507,7 +572,8 @@ export function selectVerificationChecks({ profile, hasUi = false, layoutChanged
   if (!new Set(["interactive", "autonomous"]).has(mode)) return { status: "paused", checks: [], issues: [issue("invalid-mode", "mode")] };
   const checks = [
     { id: "focused-unit-or-integration", category: "focused", required: true },
-    { id: "critical-flow", category: "critical-flow", required: true }
+    { id: "critical-flow", category: "critical-flow", required: true },
+    { id: "local-review", category: "review", required: true }
   ];
   if (profile === "production-rapid") {
     checks.push(

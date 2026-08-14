@@ -13,6 +13,11 @@ correction, and accepted warnings or false positives preserve their disposition
 evidence. A latest failed correction prevents readiness; an exhausted failed
 signature is blocked.
 
+The result records UI scope as `none` or `web`, plus layout-change and material-
+change flags. The validator derives the complete mandatory check inventory from
+that record and the delivery profile; callers cannot establish readiness by
+omitting a minimum check.
+
 ## Prototype Rapid
 
 Require focused unit or integration evidence and the critical flow. When UI

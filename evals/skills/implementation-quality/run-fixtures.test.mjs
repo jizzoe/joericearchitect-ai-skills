@@ -76,7 +76,7 @@ test("trusted check definitions require structured argv and trusted sources", ()
 test("profile selection covers prototype, production, UI viewports, accessibility, and missing tools", () => {
   const prototype = selectVerificationChecks({ profile: "prototype-rapid", hasUi: false });
   assert.equal(prototype.status, "ready");
-  assert.deepEqual(prototype.checks.map((item) => item.id), ["focused-unit-or-integration", "critical-flow"]);
+  assert.deepEqual(prototype.checks.map((item) => item.id), ["focused-unit-or-integration", "critical-flow", "local-review"]);
 
   const ui = selectVerificationChecks({ profile: "production-rapid", hasUi: true, layoutChanged: true, materiallyChangedUi: true, tools: { playwright: true, chromium: true, axeCore: true } });
   assert.equal(ui.status, "ready");
@@ -275,6 +275,15 @@ test("local findings require an evidence-backed nonblocking resolution", () => {
   }];
   assert.deepEqual(validateImplementationQualityResult(corrected), { valid: true, issues: [] });
 
+  const unrelatedCorrectionEvidence = clone(corrected);
+  unrelatedCorrectionEvidence.details.localReviewFindings[0].resolution.evidenceIds = ["local-review"];
+  assert.ok(validateImplementationQualityResult(unrelatedCorrectionEvidence).issues.some((item) => item.code === "finding-correction-evidence-mismatch"));
+
+  const duplicateCorrectionEvidence = clone(corrected);
+  duplicateCorrectionEvidence.details.localReviewFindings[0].resolution.evidenceIds = ["correction", "correction"];
+  assert.ok(validateImplementationQualityResult(duplicateCorrectionEvidence).issues.some((item) => item.code === "duplicate-evidence-reference"));
+  assert.ok(validateImplementationQualityResult(duplicateCorrectionEvidence).issues.some((item) => item.code === "finding-correction-evidence-mismatch"));
+
   const warning = readJson("valid-verification-prototype.json");
   warning.details.localReviewFindings = [{
     ...finding,
@@ -303,6 +312,42 @@ test("local findings require an evidence-backed nonblocking resolution", () => {
   }];
   humanDecision.details.correctionAttempts = corrected.details.correctionAttempts;
   assert.ok(validateImplementationQualityResult(humanDecision).issues.some((item) => item.code === "finding-resolution-disposition-mismatch"));
+});
+
+test("profile readiness requires every common, production, and applicable UI check", () => {
+  for (const fixture of ["valid-verification-prototype.json", "valid-verification-production.json"]) {
+    const baseline = readJson(fixture);
+    for (const check of baseline.details.selectedChecks) {
+      const value = clone(baseline);
+      value.details.selectedChecks = value.details.selectedChecks.filter((item) => item.id !== check.id);
+      const result = validateImplementationQualityResult(value);
+      assert.ok(result.issues.some((item) => item.code === "missing-required-profile-check" && item.detail === check.id), `${fixture}: ${check.id}`);
+    }
+  }
+
+  const ui = readJson("valid-verification-prototype.json");
+  ui.details.uiScope = { kind: "web", layoutChanged: true, materiallyChanged: true };
+  const requiredUi = [
+    ["chromium-desktop-1440x900", "browser"],
+    ["chromium-mobile-web-390x844", "device"],
+    ["critical-ui-interaction", "browser"],
+    ["desktop-current-screenshot", "browser"],
+    ["mobile-current-screenshot", "browser"],
+    ["axe-core", "accessibility"],
+    ["manual-keyboard-semantics", "accessibility"]
+  ];
+  for (const [id, category] of requiredUi) {
+    ui.evidence.push({ id, type: category === "accessibility" ? "accessibility" : "test", subject: id, result: "passed" });
+    ui.details.selectedChecks.push({ id, category, required: true, result: "passed", evidenceId: id });
+    ui.details.evidenceBindings.push({ evidenceId: id, binding: { kind: "workspace", value: "workspace-state-1" }, changedPaths: ["src/widget.mjs"] });
+  }
+  assert.deepEqual(validateImplementationQualityResult(ui), { valid: true, issues: [] });
+  for (const [id] of requiredUi) {
+    const value = clone(ui);
+    value.details.selectedChecks = value.details.selectedChecks.filter((item) => item.id !== id);
+    const result = validateImplementationQualityResult(value);
+    assert.ok(result.issues.some((item) => item.code === "missing-required-profile-check" && item.detail === id), id);
+  }
 });
 
 test("readiness requires current evidence bindings for prototype and production checks", () => {

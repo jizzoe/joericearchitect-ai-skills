@@ -57,7 +57,8 @@ readiness without inventing a fallback or silently changing profiles.
 ## Result
 
 Emit `skill-result-v1` with `skill: base-verification-loop`. Put profile,
-behavior, critical path, changed and reviewed paths, selected checks, current
+explicit non-UI or web UI applicability and change flags, behavior, critical
+path, changed and reviewed paths, the complete profile-minimum selected checks, current
 binding records for their evidence IDs, correction budget and attempts, local
 findings, unresolved gaps, recovery steps, current binding, readiness, and any
 production gate summary in `details`. Each completed check, test, screenshot,
@@ -65,7 +66,8 @@ accessibility check, and review references one stable top-level evidence ID
 whose result agrees with the selected-check result and whose details binding
 matches the current workspace or commit and changed-path set. Preserve each
 local finding with an explicit unresolved, corrected, accepted-warning, or
-false-positive resolution. Corrected findings link a current passed correction;
+false-positive resolution. Corrected findings use the exact evidence set from
+their latest current passed correction;
 unresolved findings prevent readiness. A latest failed correction prevents
 readiness; an exhausted failed signature requires blocked status and recovery.
 

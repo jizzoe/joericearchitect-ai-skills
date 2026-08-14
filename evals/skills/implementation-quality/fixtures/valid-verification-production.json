@@ -12,6 +12,7 @@
     { "id": "repeatability", "type": "test", "subject": "repeat run", "result": "passed" },
     { "id": "operational", "type": "validation", "subject": "operational checks", "result": "passed" },
     { "id": "release", "type": "validation", "subject": "release evidence", "result": "passed" },
+    { "id": "local-review", "type": "review", "subject": "changed implementation paths", "result": "passed" },
     { "id": "ci-current", "type": "validation", "subject": "exact-head CI", "result": "passed" },
     { "id": "strict-review", "type": "review", "subject": "strict isolated independent review", "result": "passed" }
   ],
@@ -20,6 +21,7 @@
   "nextAction": { "kind": "continue", "description": "Run formal OpenSpec Verify." },
   "details": {
     "profile": "production-rapid",
+    "uiScope": { "kind": "none", "layoutChanged": false, "materiallyChanged": false },
     "intendedBehavior": "The widget returns a stable normalized value under production checks.",
     "criticalPath": "Invoke the widget through the production entry point.",
     "changedPaths": ["src/widget.mjs"],
@@ -30,6 +32,7 @@
       { "id": "repeatability", "category": "repeatability", "required": true, "result": "passed", "evidenceId": "repeatability" },
       { "id": "operational-checks", "category": "operational", "required": true, "result": "passed", "evidenceId": "operational" },
       { "id": "release-evidence", "category": "release", "required": true, "result": "passed", "evidenceId": "release" },
+      { "id": "local-review", "category": "review", "required": true, "result": "passed", "evidenceId": "local-review" },
       { "id": "exact-head-ci", "category": "ci", "required": true, "result": "passed", "evidenceId": "ci-current" },
       { "id": "strict-independent-review", "category": "independent-review", "required": true, "result": "passed", "evidenceId": "strict-review" }
     ],
@@ -40,6 +43,7 @@
       { "evidenceId": "repeatability", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
       { "evidenceId": "operational", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
       { "evidenceId": "release", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
+      { "evidenceId": "local-review", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
       { "evidenceId": "ci-current", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] },
       { "evidenceId": "strict-review", "binding": { "kind": "commit", "value": "1111111111111111111111111111111111111111" }, "changedPaths": ["src/widget.mjs"] }
     ],
