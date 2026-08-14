@@ -42,9 +42,10 @@ Recommend a candidate change as ready for OpenSpec Propose only when it has:
 an outcome; scope and non-goals; observable acceptance evidence; named
 source requirements/design; a selected delivery profile; known hard
 dependencies and shared-resource hazards; test/eval and guardrail needs; and
-a clear first action. List a missing or conflicting element as an
-`openQuestions` entry with `status: paused`; never convert it into a guessed
-task.
+a clear first action. For a missing or conflicting element, return a paused
+condition with top-level `status: paused` and an `openQuestions` entry
+containing `id`, `question`, and `blocking: true`; never convert it into a
+guessed task or represent status as a field on an `openQuestions` entry.
 
 Select the delivery profile per candidate change, not once for the whole
 plan. When a plan mixes `prototype-rapid` and `production-rapid` candidates,

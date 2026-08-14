@@ -42,7 +42,9 @@ test("missing input: gap behavior never invents requirements or acceptance behav
 });
 
 test("readiness gaps become open questions rather than guessed tasks", () => {
-  assert.match(flat, /openQuestions. entry with `status: paused`/);
+  assert.match(flat, /top-level `status: paused`/);
+  assert.match(flat, /`openQuestions` entry containing `id`, `question`, and `blocking: true`/);
+  assert.match(flat, /or represent status as a field on an `openQuestions` entry/);
   assert.match(flat, /never convert it into a guessed task/);
 });
 

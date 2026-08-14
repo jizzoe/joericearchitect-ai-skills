@@ -52,9 +52,10 @@ The system SHALL recommend OpenSpec Propose for a candidate change only when
 it has: an outcome; scope and non-goals; observable acceptance evidence;
 named source requirements/design; a selected delivery profile; known hard
 dependencies and shared-resource hazards; test/eval and guardrail needs; and a
-clear first action. A missing or conflicting material input MUST be listed as
-an `openQuestions` entry with `status: paused` rather than converted into a
-guessed task.
+clear first action. For missing or conflicting material input, the returned
+`skill-result-v1` MUST have top-level `status: paused` and an `openQuestions`
+entry containing `id`, `question`, and `blocking: true`, rather than a guessed
+task or an unsupported status field on the `openQuestions` entry.
 
 #### Scenario: Candidate change satisfies the readiness contract
 - **WHEN** a candidate change has all readiness-contract elements present and
@@ -64,8 +65,9 @@ guessed task.
 #### Scenario: Candidate change is missing a readiness element
 - **WHEN** a candidate change lacks observable acceptance evidence or a
   selected delivery profile
-- **THEN** the plan lists the missing element as an `openQuestions` entry
-  with `status: paused` instead of a guessed task
+- **THEN** the returned `skill-result-v1` has top-level `status: paused` and
+  an `openQuestions` entry containing `id`, `question`, and `blocking: true`
+  instead of a guessed task
 
 ### Requirement: Delivery profile is selected per candidate change with a stated rationale
 The system SHALL select `prototype-rapid` or `production-rapid` per candidate
