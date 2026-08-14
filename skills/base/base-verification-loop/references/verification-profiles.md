@@ -34,7 +34,11 @@ stronger release evidence, exact-head CI, and strict isolated independent
 review. Exact-head CI and strict review are never not applicable, must retain
 their production-gate evidence bindings, and must pass. UI work also retains
 applicable browser and device matrix evidence. Profile selection never grants
-mutation or delivery authority.
+mutation or delivery authority. The implementation-quality validator consumes
+the canonical production-rapid authorization input alongside a ready result so
+it can validate the immutable package, normalized result, current Apply
+evidence, reviewer attestation, and exact durable review record. Descriptive
+summary fields are not independent-review evidence.
 
 ## Web UI Evidence
 

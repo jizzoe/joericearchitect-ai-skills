@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
@@ -12,7 +14,7 @@ import {
   renderImplementationQualityMarkdown,
   selectVerificationChecks,
   sortReviewFindings,
-  validateImplementationQualityResult,
+  validateImplementationQualityResult as validateImplementationQualityResultRaw,
   validateTrustedCheckDefinitions,
   verificationStages
 } from "../../../scripts/validation/lib/implementation-quality.mjs";
@@ -60,9 +62,19 @@ function productionReviewAuthorization(head) {
   };
 }
 
+const validationOptions = (value) => ({
+  productionReviewAuthorization: value?.skill === "base-verification-loop" &&
+    value?.details?.profile === "production-rapid" &&
+    value?.details?.readiness === "ready-for-openspec-verify"
+    ? productionReviewAuthorization(value.details.productionGate?.head ?? "")
+    : undefined
+});
+const validateResult = (value) => validateImplementationQualityResultRaw(value, validationOptions(value));
+const renderResult = (value) => renderImplementationQualityMarkdown(value, validationOptions(value));
+
 test("valid code-review result is findings-first and shared-contract compliant", () => {
   const result = readJson("valid-code-review.json");
-  assert.deepEqual(validateImplementationQualityResult(result), { valid: true, issues: [] });
+  assert.deepEqual(validateResult(result), { valid: true, issues: [] });
   const markdown = renderImplementationQualityMarkdown(result);
   assert.ok(markdown.indexOf("## Findings") < markdown.indexOf("## Evidence Gaps"));
   assert.ok(markdown.indexOf("## Evidence Gaps") < markdown.indexOf("## Assumptions"));
@@ -77,7 +89,7 @@ test("valid code-review result is findings-first and shared-contract compliant",
 });
 
 test("review validator rejects malformed, duplicate, unsafe, unsupported, and misordered findings", () => {
-  const misordered = validateImplementationQualityResult(readJson("invalid-code-review-misordered.json"));
+  const misordered = validateResult(readJson("invalid-code-review-misordered.json"));
   assert.equal(misordered.valid, false);
   assert.ok(misordered.issues.some((item) => item.code === "findings-not-deterministically-ordered"));
 
@@ -92,7 +104,7 @@ test("review validator rejects malformed, duplicate, unsafe, unsupported, and mi
   for (const [name, mutate, code] of cases) {
     const value = readJson("valid-code-review.json");
     mutate(value);
-    const result = validateImplementationQualityResult(value);
+    const result = validateResult(value);
     assert.equal(result.valid, false, name);
     assert.ok(result.issues.some((item) => item.code === code), `${name}: ${JSON.stringify(result.issues)}`);
   }
@@ -112,7 +124,7 @@ test("implementation-quality results reject sensitive values in every rendered t
   for (const [field, mutate] of cases) {
     const value = readJson("valid-code-review.json");
     mutate(value);
-    const result = validateImplementationQualityResult(value);
+    const result = validateResult(value);
     assert.ok(result.issues.some((item) => item.code === "sensitive-value"), field);
   }
 });
@@ -251,8 +263,8 @@ test("verification operations reuse exact local-implementation authorization", (
 test("prototype and strict production results validate without lifecycle overclaim", () => {
   for (const fixture of ["valid-verification-prototype.json", "valid-verification-production.json"]) {
     const value = readJson(fixture);
-    assert.deepEqual(validateImplementationQualityResult(value), { valid: true, issues: [] }, fixture);
-    assert.match(renderImplementationQualityMarkdown(value), /ready-for-openspec-verify/);
+    assert.deepEqual(validateResult(value), { valid: true, issues: [] }, fixture);
+    assert.match(renderResult(value), /ready-for-openspec-verify/);
     assert.doesNotMatch(value.summary, /merge|archive|delivery complete/i);
   }
 });
@@ -261,25 +273,25 @@ test("verification result status and readiness remain consistent", () => {
   for (const status of ["paused", "blocked"]) {
     const value = readJson("valid-verification-prototype.json");
     value.status = status;
-    assert.ok(validateImplementationQualityResult(value).issues.some((item) => item.code === "status-readiness-mismatch"), status);
+    assert.ok(validateResult(value).issues.some((item) => item.code === "status-readiness-mismatch"), status);
   }
 
   for (const readiness of ["paused", "blocked"]) {
     const value = readJson("valid-verification-prototype.json");
     value.details.readiness = readiness;
-    assert.ok(validateImplementationQualityResult(value).issues.some((item) => item.code === "status-readiness-mismatch"), readiness);
+    assert.ok(validateResult(value).issues.some((item) => item.code === "status-readiness-mismatch"), readiness);
   }
 
   const needsImplementation = readJson("valid-verification-prototype.json");
   needsImplementation.details.readiness = "needs-implementation";
-  assert.ok(!validateImplementationQualityResult(needsImplementation).issues.some((item) => item.code === "status-readiness-mismatch"));
+  assert.ok(!validateResult(needsImplementation).issues.some((item) => item.code === "status-readiness-mismatch"));
 
   const noOpReady = readJson("valid-verification-prototype.json");
   noOpReady.status = "no-op";
-  assert.deepEqual(validateImplementationQualityResult(noOpReady), { valid: true, issues: [] });
+  assert.deepEqual(validateResult(noOpReady), { valid: true, issues: [] });
 
   noOpReady.details.readiness = "paused";
-  assert.ok(validateImplementationQualityResult(noOpReady).issues.some((item) => item.code === "status-readiness-mismatch"));
+  assert.ok(validateResult(noOpReady).issues.some((item) => item.code === "status-readiness-mismatch"));
 });
 
 test("paused production result can preserve valid unavailable strict-review evidence", () => {
@@ -291,7 +303,7 @@ test("paused production result can preserve valid unavailable strict-review evid
   value.details.productionGate.reviewStatus = "unavailable";
   value.evidence.find((item) => item.id === "strict-review").result = "failed";
   value.details.selectedChecks.find((item) => item.id === "strict-independent-review").result = "failed";
-  assert.deepEqual(validateImplementationQualityResult(value), { valid: true, issues: [] });
+  assert.deepEqual(validateResult(value), { valid: true, issues: [] });
 });
 
 test("production gate is exact-head, strict, fresh, and independent", () => {
@@ -324,47 +336,77 @@ test("production gate is exact-head, strict, fresh, and independent", () => {
   assert.equal(evaluateProductionReadiness({ currentHead: head, ciEvidence, productionReviewAuthorization: nondurable }).reason, "strict-review-not-passed");
 });
 
+test("production result CLI requires canonical review authorization evidence", () => {
+  const resultPath = path.join(fixtures, "valid-verification-production.json");
+  const validatorPath = path.join(root, "scripts/validation/validate-implementation-quality.mjs");
+  assert.throws(() => execFileSync(process.execPath, [validatorPath, resultPath], { stdio: "pipe" }));
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "implementation-quality-"));
+  const authorizationPath = path.join(temporaryRoot, "production-review-authorization.json");
+  try {
+    fs.writeFileSync(authorizationPath, `${JSON.stringify(productionReviewAuthorization("1".repeat(40)))}\n`, { mode: 0o600 });
+    const output = JSON.parse(execFileSync(process.execPath, [validatorPath, resultPath, authorizationPath], { encoding: "utf8" }));
+    assert.deepEqual(output, { valid: true, issues: [] });
+  } finally {
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
 test("result validator rejects readiness overclaim, stale production head, and self review", () => {
   const overclaim = readJson("valid-verification-prototype.json");
   overclaim.details.selectedChecks[0].result = "failed";
   overclaim.evidence.find((item) => item.id === "focused").result = "failed";
-  assert.ok(validateImplementationQualityResult(overclaim).issues.some((item) => item.code === "readiness-overclaim"));
+  assert.ok(validateResult(overclaim).issues.some((item) => item.code === "readiness-overclaim"));
+
+  const selfAssertedReview = readJson("valid-verification-production.json");
+  const selfAssertedResult = validateImplementationQualityResultRaw(selfAssertedReview);
+  assert.ok(selfAssertedResult.issues.some((item) => item.code === "canonical-independent-review-not-validated"));
+  assert.ok(selfAssertedResult.issues.some((item) => item.code === "readiness-overclaim"));
+
+  const nondurableReview = productionReviewAuthorization(selfAssertedReview.details.productionGate.head);
+  nondurableReview.request.checkpoint.selectedEntry.reviewRecords = [];
+  const nondurableResult = validateImplementationQualityResultRaw(selfAssertedReview, { productionReviewAuthorization: nondurableReview });
+  assert.ok(nondurableResult.issues.some((item) => item.code === "canonical-independent-review-not-validated"));
+
+  const misleadingSummary = clone(selfAssertedReview);
+  misleadingSummary.details.productionGate.reviewerSession = "different-reviewer";
+  const misleadingResult = validateResult(misleadingSummary);
+  assert.ok(misleadingResult.issues.some((item) => item.code === "production-review-summary-mismatch"));
 
   const wrongHead = readJson("valid-verification-production.json");
   wrongHead.details.productionGate.reviewHead = "2".repeat(40);
-  assert.ok(validateImplementationQualityResult(wrongHead).issues.some((item) => item.code === "production-head-mismatch"));
+  assert.ok(validateResult(wrongHead).issues.some((item) => item.code === "production-head-mismatch"));
 
   const selfReview = readJson("valid-verification-production.json");
   selfReview.details.productionGate.reviewerSession = selfReview.details.productionGate.implementerSession;
-  assert.ok(validateImplementationQualityResult(selfReview).issues.some((item) => item.code === "reviewer-not-independent"));
+  assert.ok(validateResult(selfReview).issues.some((item) => item.code === "reviewer-not-independent"));
 
   const skippedProductionGates = readJson("valid-verification-production.json");
   skippedProductionGates.details.selectedChecks.find((item) => item.id === "exact-head-ci").result = "not-applicable";
   skippedProductionGates.details.selectedChecks.find((item) => item.id === "strict-independent-review").result = "not-applicable";
-  const skippedGateResult = validateImplementationQualityResult(skippedProductionGates);
+  const skippedGateResult = validateResult(skippedProductionGates);
   assert.ok(skippedGateResult.issues.some((item) => item.code === "readiness-overclaim"));
 
   const missingProductionGateCheck = readJson("valid-verification-production.json");
   missingProductionGateCheck.details.selectedChecks = missingProductionGateCheck.details.selectedChecks.filter((item) => item.id !== "strict-independent-review");
-  assert.ok(validateImplementationQualityResult(missingProductionGateCheck).issues.some((item) => item.code === "missing-production-check"));
+  assert.ok(validateResult(missingProductionGateCheck).issues.some((item) => item.code === "missing-production-check"));
 
   const mismatchedProductionEvidence = readJson("valid-verification-production.json");
   mismatchedProductionEvidence.details.selectedChecks.find((item) => item.id === "exact-head-ci").evidenceId = "focused";
-  const mismatchedEvidenceResult = validateImplementationQualityResult(mismatchedProductionEvidence);
+  const mismatchedEvidenceResult = validateResult(mismatchedProductionEvidence);
   assert.ok(mismatchedEvidenceResult.issues.some((item) => item.code === "production-check-evidence-mismatch"));
   assert.ok(mismatchedEvidenceResult.issues.some((item) => item.code === "readiness-overclaim"));
 
   const nonCiEvidence = readJson("valid-verification-production.json");
   nonCiEvidence.evidence.find((item) => item.id === "ci-current").type = "review";
-  assert.ok(validateImplementationQualityResult(nonCiEvidence).issues.some((item) => item.code === "ci-evidence-missing"));
+  assert.ok(validateResult(nonCiEvidence).issues.some((item) => item.code === "ci-evidence-missing"));
 
   const staleCiHead = readJson("valid-verification-production.json");
   staleCiHead.details.productionGate.ciHead = "2".repeat(40);
-  assert.ok(validateImplementationQualityResult(staleCiHead).issues.some((item) => item.code === "ci-head-mismatch"));
+  assert.ok(validateResult(staleCiHead).issues.some((item) => item.code === "ci-head-mismatch"));
 
   const invalidCiSource = readJson("valid-verification-production.json");
   invalidCiSource.details.productionGate.ciSource = "local-validation";
-  assert.ok(validateImplementationQualityResult(invalidCiSource).issues.some((item) => item.code === "invalid-ci-source"));
+  assert.ok(validateResult(invalidCiSource).issues.some((item) => item.code === "invalid-ci-source"));
 
   const staleCorrection = readJson("valid-verification-production.json");
   staleCorrection.details.correctionAttempts.push({
@@ -375,13 +417,13 @@ test("result validator rejects readiness overclaim, stale production head, and s
     evidenceIds: ["focused"],
     binding: "2".repeat(40)
   });
-  const staleCorrectionResult = validateImplementationQualityResult(staleCorrection);
+  const staleCorrectionResult = validateResult(staleCorrection);
   assert.ok(staleCorrectionResult.issues.some((item) => item.code === "stale-correction-binding"));
   assert.ok(staleCorrectionResult.issues.some((item) => item.code === "readiness-overclaim"));
 
   const malformedGate = readJson("valid-verification-production.json");
   malformedGate.details.productionGate = [];
-  const malformedResult = validateImplementationQualityResult(malformedGate);
+  const malformedResult = validateResult(malformedGate);
   assert.equal(malformedResult.valid, false);
   assert.ok(malformedResult.issues.some((item) => item.code === "invalid-object"));
 
@@ -390,14 +432,14 @@ test("result validator rejects readiness overclaim, stale production head, and s
     { "id": "low", "severity": "low", "disposition": "warning", "subject": "src/widget.mjs", "evidenceIds": ["local-review"], "impact": "Limited issue.", "recommendation": "Review later.", "resolution": { "status": "accepted-warning", "correctionFailureSignature": null, "evidenceIds": ["local-review"] } },
     { "id": "high", "severity": "high", "disposition": "objective-fix", "subject": "src/widget.mjs", "evidenceIds": ["local-review"], "impact": "Material issue.", "recommendation": "Correct separately.", "resolution": { "status": "unresolved", "correctionFailureSignature": null, "evidenceIds": [] } }
   ];
-  assert.ok(validateImplementationQualityResult(localFindings).issues.some((item) => item.code === "findings-not-deterministically-ordered"));
+  assert.ok(validateResult(localFindings).issues.some((item) => item.code === "findings-not-deterministically-ordered"));
 });
 
 test("selected-check results must agree with their referenced evidence", () => {
   for (const evidenceResult of ["failed", "informational"]) {
     const value = readJson("valid-verification-prototype.json");
     value.evidence.find((item) => item.id === "focused").result = evidenceResult;
-    const result = validateImplementationQualityResult(value);
+    const result = validateResult(value);
     assert.ok(result.issues.some((item) => item.code === "check-evidence-result-mismatch"), evidenceResult);
   }
 });
@@ -416,7 +458,7 @@ test("local findings require an evidence-backed nonblocking resolution", () => {
 
   const unresolved = readJson("valid-verification-prototype.json");
   unresolved.details.localReviewFindings = [finding];
-  assert.ok(validateImplementationQualityResult(unresolved).issues.some((item) => item.code === "readiness-overclaim"));
+  assert.ok(validateResult(unresolved).issues.some((item) => item.code === "readiness-overclaim"));
 
   const corrected = readJson("valid-verification-prototype.json");
   corrected.details.localReviewFindings = [{
@@ -431,24 +473,24 @@ test("local findings require an evidence-backed nonblocking resolution", () => {
     evidenceIds: ["focused"],
     binding: "workspace-state-1"
   }];
-  assert.deepEqual(validateImplementationQualityResult(corrected), { valid: true, issues: [] });
+  assert.deepEqual(validateResult(corrected), { valid: true, issues: [] });
 
   const falsePassedCorrection = clone(corrected);
   falsePassedCorrection.evidence.find((item) => item.id === "focused").result = "failed";
   falsePassedCorrection.details.selectedChecks.find((item) => item.evidenceId === "focused").result = "failed";
-  const falsePassedResult = validateImplementationQualityResult(falsePassedCorrection);
+  const falsePassedResult = validateResult(falsePassedCorrection);
   assert.ok(falsePassedResult.issues.some((item) => item.code === "correction-evidence-result-mismatch"));
   assert.ok(falsePassedResult.issues.some((item) => item.code === "finding-correction-not-passed"));
   assert.ok(falsePassedResult.issues.some((item) => item.code === "readiness-overclaim"));
 
   const unrelatedCorrectionEvidence = clone(corrected);
   unrelatedCorrectionEvidence.details.localReviewFindings[0].resolution.evidenceIds = ["local-review"];
-  assert.ok(validateImplementationQualityResult(unrelatedCorrectionEvidence).issues.some((item) => item.code === "finding-correction-evidence-mismatch"));
+  assert.ok(validateResult(unrelatedCorrectionEvidence).issues.some((item) => item.code === "finding-correction-evidence-mismatch"));
 
   const duplicateCorrectionEvidence = clone(corrected);
   duplicateCorrectionEvidence.details.localReviewFindings[0].resolution.evidenceIds = ["correction", "correction"];
-  assert.ok(validateImplementationQualityResult(duplicateCorrectionEvidence).issues.some((item) => item.code === "duplicate-evidence-reference"));
-  assert.ok(validateImplementationQualityResult(duplicateCorrectionEvidence).issues.some((item) => item.code === "finding-correction-evidence-mismatch"));
+  assert.ok(validateResult(duplicateCorrectionEvidence).issues.some((item) => item.code === "duplicate-evidence-reference"));
+  assert.ok(validateResult(duplicateCorrectionEvidence).issues.some((item) => item.code === "finding-correction-evidence-mismatch"));
 
   const warning = readJson("valid-verification-prototype.json");
   warning.details.localReviewFindings = [{
@@ -458,7 +500,7 @@ test("local findings require an evidence-backed nonblocking resolution", () => {
     disposition: "warning",
     resolution: { status: "accepted-warning", correctionFailureSignature: null, evidenceIds: ["local-review"] }
   }];
-  assert.deepEqual(validateImplementationQualityResult(warning), { valid: true, issues: [] });
+  assert.deepEqual(validateResult(warning), { valid: true, issues: [] });
 
   const highWarning = readJson("valid-verification-prototype.json");
   highWarning.details.localReviewFindings = [{
@@ -467,7 +509,7 @@ test("local findings require an evidence-backed nonblocking resolution", () => {
     disposition: "warning",
     resolution: { status: "accepted-warning", correctionFailureSignature: null, evidenceIds: ["local-review"] }
   }];
-  assert.ok(validateImplementationQualityResult(highWarning).issues.some((item) => item.code === "readiness-overclaim"));
+  assert.ok(validateResult(highWarning).issues.some((item) => item.code === "readiness-overclaim"));
 
   const humanDecision = readJson("valid-verification-prototype.json");
   humanDecision.details.localReviewFindings = [{
@@ -477,7 +519,7 @@ test("local findings require an evidence-backed nonblocking resolution", () => {
     resolution: { status: "corrected", correctionFailureSignature: "local-high", evidenceIds: ["focused"] }
   }];
   humanDecision.details.correctionAttempts = corrected.details.correctionAttempts;
-  assert.ok(validateImplementationQualityResult(humanDecision).issues.some((item) => item.code === "finding-resolution-disposition-mismatch"));
+  assert.ok(validateResult(humanDecision).issues.some((item) => item.code === "finding-resolution-disposition-mismatch"));
 });
 
 test("profile readiness requires every common, production, and applicable UI check", () => {
@@ -486,7 +528,7 @@ test("profile readiness requires every common, production, and applicable UI che
     for (const check of baseline.details.selectedChecks) {
       const value = clone(baseline);
       value.details.selectedChecks = value.details.selectedChecks.filter((item) => item.id !== check.id);
-      const result = validateImplementationQualityResult(value);
+      const result = validateResult(value);
       assert.ok(result.issues.some((item) => item.code === "missing-required-profile-check" && item.detail === check.id), `${fixture}: ${check.id}`);
     }
   }
@@ -507,11 +549,11 @@ test("profile readiness requires every common, production, and applicable UI che
     ui.details.selectedChecks.push({ id, category, required: true, result: "passed", evidenceId: id });
     ui.details.evidenceBindings.push({ evidenceId: id, binding: { kind: "workspace", value: "workspace-state-1" }, changedPaths: ["src/widget.mjs"] });
   }
-  assert.deepEqual(validateImplementationQualityResult(ui), { valid: true, issues: [] });
+  assert.deepEqual(validateResult(ui), { valid: true, issues: [] });
   for (const [id] of requiredUi) {
     const value = clone(ui);
     value.details.selectedChecks = value.details.selectedChecks.filter((item) => item.id !== id);
-    const result = validateImplementationQualityResult(value);
+    const result = validateResult(value);
     assert.ok(result.issues.some((item) => item.code === "missing-required-profile-check" && item.detail === id), id);
   }
 
@@ -520,7 +562,7 @@ test("profile readiness requires every common, production, and applicable UI che
   uiCheck.result = "not-applicable";
   uiCheck.applicabilityReason = "The interaction does not exist in this fixture.";
   inapplicableUi.evidence.find((item) => item.id === uiCheck.evidenceId).result = "not-applicable";
-  const inapplicableUiResult = validateImplementationQualityResult(inapplicableUi);
+  const inapplicableUiResult = validateResult(inapplicableUi);
   assert.ok(inapplicableUiResult.issues.some((item) => item.code === "readiness-overclaim"));
 });
 
@@ -529,7 +571,7 @@ test("not-applicable checks require scope reasons and cannot bypass applicable m
   const focused = unjustified.details.selectedChecks.find((item) => item.id === "focused-unit-or-integration");
   focused.result = "not-applicable";
   unjustified.evidence.find((item) => item.id === focused.evidenceId).result = "not-applicable";
-  const unjustifiedResult = validateImplementationQualityResult(unjustified);
+  const unjustifiedResult = validateResult(unjustified);
   assert.ok(unjustifiedResult.issues.some((item) => item.code === "missing-applicability-reason"));
   assert.ok(unjustifiedResult.issues.some((item) => item.code === "readiness-overclaim"));
 
@@ -548,14 +590,14 @@ test("not-applicable checks require scope reasons and cannot bypass applicable m
     binding: { kind: "workspace", value: "workspace-state-1" },
     changedPaths: ["src/widget.mjs"]
   });
-  assert.deepEqual(validateImplementationQualityResult(scopedOut), { valid: true, issues: [] });
+  assert.deepEqual(validateResult(scopedOut), { valid: true, issues: [] });
 });
 
 test("readiness requires current evidence bindings for prototype and production checks", () => {
   for (const evidenceId of ["focused", "local-review"]) {
     const value = readJson("valid-verification-prototype.json");
     value.details.evidenceBindings.find((item) => item.evidenceId === evidenceId).binding.value = "workspace-state-old";
-    const result = validateImplementationQualityResult(value);
+    const result = validateResult(value);
     assert.ok(result.issues.some((item) => item.code === "stale-evidence-binding"), evidenceId);
     assert.ok(result.issues.some((item) => item.code === "readiness-overclaim"), evidenceId);
   }
@@ -563,7 +605,7 @@ test("readiness requires current evidence bindings for prototype and production 
   for (const evidenceId of ["regression", "ci-current", "strict-review"]) {
     const value = readJson("valid-verification-production.json");
     value.details.evidenceBindings.find((item) => item.evidenceId === evidenceId).changedPaths = ["src/old-widget.mjs"];
-    const result = validateImplementationQualityResult(value);
+    const result = validateResult(value);
     assert.ok(result.issues.some((item) => item.code === "stale-evidence-binding"), evidenceId);
     assert.ok(result.issues.some((item) => item.code === "readiness-overclaim"), evidenceId);
   }
@@ -572,23 +614,23 @@ test("readiness requires current evidence bindings for prototype and production 
 test("readiness requires complete unique review coverage of changed paths", () => {
   const empty = readJson("valid-verification-prototype.json");
   empty.details.reviewedPaths = [];
-  const emptyResult = validateImplementationQualityResult(empty);
+  const emptyResult = validateResult(empty);
   assert.ok(emptyResult.issues.some((item) => item.code === "incomplete-reviewed-path-coverage"));
   assert.ok(emptyResult.issues.some((item) => item.code === "readiness-overclaim"));
 
   const partial = readJson("valid-verification-prototype.json");
   partial.details.changedPaths.push("src/helper.mjs");
   for (const binding of partial.details.evidenceBindings) binding.changedPaths.push("src/helper.mjs");
-  const partialResult = validateImplementationQualityResult(partial);
+  const partialResult = validateResult(partial);
   assert.ok(partialResult.issues.some((item) => item.code === "incomplete-reviewed-path-coverage"));
 
   const stale = readJson("valid-verification-prototype.json");
   stale.details.reviewedPaths = ["src/old-widget.mjs"];
-  assert.ok(validateImplementationQualityResult(stale).issues.some((item) => item.code === "incomplete-reviewed-path-coverage"));
+  assert.ok(validateResult(stale).issues.some((item) => item.code === "incomplete-reviewed-path-coverage"));
 
   const duplicate = readJson("valid-verification-prototype.json");
   duplicate.details.reviewedPaths.push("src/widget.mjs");
-  assert.ok(validateImplementationQualityResult(duplicate).issues.some((item) => item.code === "duplicate-reviewed-path"));
+  assert.ok(validateResult(duplicate).issues.some((item) => item.code === "duplicate-reviewed-path"));
 });
 
 test("failed and exhausted correction histories cannot report readiness", () => {
@@ -605,13 +647,13 @@ test("failed and exhausted correction histories cannot report readiness", () => 
   failed.evidence.push({ id: "correction-failed", type: "test", subject: "failed correction", result: "failed" });
   failed.details.evidenceBindings.push({ evidenceId: "correction-failed", binding: { kind: "workspace", value: "workspace-state-1" }, changedPaths: ["src/widget.mjs"] });
   failed.details.correctionAttempts = [attempt(1)];
-  assert.ok(validateImplementationQualityResult(failed).issues.some((item) => item.code === "readiness-overclaim"));
+  assert.ok(validateResult(failed).issues.some((item) => item.code === "readiness-overclaim"));
 
   const exhausted = readJson("valid-verification-prototype.json");
   exhausted.evidence.push({ id: "correction-failed", type: "test", subject: "failed correction", result: "failed" });
   exhausted.details.evidenceBindings.push({ evidenceId: "correction-failed", binding: { kind: "workspace", value: "workspace-state-1" }, changedPaths: ["src/widget.mjs"] });
   exhausted.details.correctionAttempts = [attempt(1), attempt(2), attempt(3)];
-  const invalidExhausted = validateImplementationQualityResult(exhausted);
+  const invalidExhausted = validateResult(exhausted);
   assert.ok(invalidExhausted.issues.some((item) => item.code === "exhausted-correction-requires-blocked-status"));
   assert.ok(invalidExhausted.issues.some((item) => item.code === "exhausted-correction-requires-blocked-readiness"));
 
@@ -619,7 +661,7 @@ test("failed and exhausted correction histories cannot report readiness", () => 
   exhausted.summary = "Verification is blocked after the configured correction budget was exhausted.";
   exhausted.details.readiness = "blocked";
   exhausted.nextAction = { kind: "user-decision", description: "Resolve the exhausted correction failure before resuming." };
-  assert.deepEqual(validateImplementationQualityResult(exhausted), { valid: true, issues: [] });
+  assert.deepEqual(validateResult(exhausted), { valid: true, issues: [] });
 
   const narrowBudget = readJson("valid-verification-prototype.json");
   narrowBudget.evidence.push({ id: "correction-failed", type: "test", subject: "failed correction", result: "failed" });
@@ -630,7 +672,7 @@ test("failed and exhausted correction histories cannot report readiness", () => 
   narrowBudget.details.correctionBudget = 1;
   narrowBudget.details.correctionAttempts = [attempt(1)];
   narrowBudget.nextAction = { kind: "user-decision", description: "Resolve the exhausted correction failure before resuming." };
-  assert.deepEqual(validateImplementationQualityResult(narrowBudget), { valid: true, issues: [] });
+  assert.deepEqual(validateResult(narrowBudget), { valid: true, issues: [] });
 });
 
 test("historical correction evidence retains its own binding while latest passed evidence is current", () => {
@@ -647,11 +689,11 @@ test("historical correction evidence retains its own binding while latest passed
     { failureSignature: "focused-regression", attempt: 1, kind: "objective-fix", result: "failed", evidenceIds: ["correction-old"], binding: "workspace-state-old" },
     { failureSignature: "focused-regression", attempt: 2, kind: "objective-fix", result: "passed", evidenceIds: ["correction-current"], binding: "workspace-state-1" }
   ];
-  assert.deepEqual(validateImplementationQualityResult(value), { valid: true, issues: [] });
+  assert.deepEqual(validateResult(value), { valid: true, issues: [] });
 
   const mismatchedHistory = clone(value);
   mismatchedHistory.details.correctionAttempts[0].binding = "workspace-state-unrelated";
-  assert.ok(validateImplementationQualityResult(mismatchedHistory).issues.some((item) => item.code === "correction-evidence-binding-mismatch"));
+  assert.ok(validateResult(mismatchedHistory).issues.some((item) => item.code === "correction-evidence-binding-mismatch"));
 });
 
 test("canonical skills expose read-only, correction, strict-review, recovery, and profile boundaries", () => {

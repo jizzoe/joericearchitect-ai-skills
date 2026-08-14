@@ -344,7 +344,7 @@ function evidenceIsCurrent(evidenceId, bindings, details) {
     sameStringArray(record.changedPaths, details.changedPaths);
 }
 
-function validateProductionGate(gate, details, evidenceById, issues) {
+function validateProductionGate(gate, details, evidenceById, issues, productionReviewAuthorization) {
   const subject = "result.details.productionGate";
   const keys = new Set(["head", "ciEvidenceId", "ciHead", "ciSource", "independentReviewEvidenceId", "reviewStatus", "reviewHead", "reviewerSession", "implementerSession", "source", "assurance"]);
   if (!exactKeys(gate, keys, subject, issues)) return { valid: false, ready: false };
@@ -363,13 +363,31 @@ function validateProductionGate(gate, details, evidenceById, issues) {
   if (gate.ciHead !== gate.head) fail("ci-head-mismatch", "ciHead");
   const review = evidenceById.get(gate.independentReviewEvidenceId);
   if (!review || review.type !== "review") fail("independent-review-evidence-missing", "independentReviewEvidenceId");
+  const selfAssertedReady = valid && ci?.result === "passed" && review?.result === "passed" && gate.reviewStatus === "passed";
+  let canonicalReady = false;
+  if (selfAssertedReady) {
+    const authorizationRequest = productionReviewAuthorization?.request;
+    if (gate.reviewerSession !== authorizationRequest?.independentReviewResult?.reviewer?.identity ||
+        gate.implementerSession !== authorizationRequest?.implementerSession ||
+        gate.reviewHead !== authorizationRequest?.independentReviewResult?.headCommit ||
+        gate.reviewStatus !== authorizationRequest?.independentReviewResult?.status) {
+      fail("production-review-summary-mismatch", "independentReviewEvidenceId");
+    }
+    const canonical = evaluateProductionReadiness({
+      currentHead: gate.head,
+      ciEvidence: { status: ci.result, head: gate.ciHead },
+      productionReviewAuthorization
+    });
+    canonicalReady = canonical.ready;
+    if (!canonicalReady) fail("canonical-independent-review-not-validated", "independentReviewEvidenceId", canonical.reason);
+  }
   return {
     valid,
-    ready: valid && ci?.result === "passed" && review?.result === "passed" && gate.reviewStatus === "passed"
+    ready: valid && selfAssertedReady && canonicalReady
   };
 }
 
-function validateVerificationDetails(result, issues) {
+function validateVerificationDetails(result, issues, { productionReviewAuthorization } = {}) {
   const details = result.details;
   const subject = "result.details";
   const keys = new Set(["profile", "uiScope", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness", "productionGate"]);
@@ -536,7 +554,7 @@ function validateVerificationDetails(result, issues) {
       productionValid = false;
       productionReady = false;
     } else {
-      const gate = validateProductionGate(details.productionGate, details, evidenceById, issues);
+      const gate = validateProductionGate(details.productionGate, details, evidenceById, issues, productionReviewAuthorization);
       productionValid = productionValid && gate.valid;
       productionReady = productionReady && gate.ready;
     }
@@ -546,20 +564,20 @@ function validateVerificationDetails(result, issues) {
   }
 }
 
-export function validateImplementationQualityResult(result) {
+export function validateImplementationQualityResult(result, options = {}) {
   const issues = [];
   const shared = validateSkillResult(result);
   issues.push(...shared.issues.map((item) => ({ ...item, code: `skill-result.${item.code}` })));
   if (!isObject(result)) return { valid: false, issues };
   scanSensitive(result, "result", issues);
   if (result.skill === "base-code-review") validateReviewDetails(result, issues);
-  else if (result.skill === "base-verification-loop") validateVerificationDetails(result, issues);
+  else if (result.skill === "base-verification-loop") validateVerificationDetails(result, issues, options);
   else issues.push(issue("unsupported-implementation-quality-skill", "result.skill", result.skill));
   return { valid: issues.length === 0, issues };
 }
 
-export function renderImplementationQualityMarkdown(result) {
-  const validation = validateImplementationQualityResult(result);
+export function renderImplementationQualityMarkdown(result, options = {}) {
+  const validation = validateImplementationQualityResult(result, options);
   if (!validation.valid) throw new Error(`Cannot render invalid implementation-quality result: ${validation.issues.map((item) => item.code).join(", ")}`);
   const lines = [`# ${result.skill}`, ""];
   if (result.skill === "base-code-review") {

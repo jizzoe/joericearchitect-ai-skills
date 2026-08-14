@@ -63,8 +63,8 @@
       "independentReviewEvidenceId": "strict-review",
       "reviewStatus": "passed",
       "reviewHead": "1111111111111111111111111111111111111111",
-      "reviewerSession": "reviewer-session-1",
-      "implementerSession": "implementer-session-1",
+      "reviewerSession": "fresh-reviewer",
+      "implementerSession": "implementer",
       "source": "isolated-independent-review",
       "assurance": "strict-isolated"
     }

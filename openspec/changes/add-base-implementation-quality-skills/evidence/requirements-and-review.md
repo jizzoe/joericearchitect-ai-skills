@@ -11,7 +11,7 @@ Change: `add-base-implementation-quality-skills`
 | Findings are evidence-backed, ordered, and independently classified | `scripts/validation/lib/implementation-quality.mjs` finding validator, sorter, and renderer | Valid, misordered, duplicate, unsafe-path, unsupported-severity, and findings-first tests |
 | Severity and disposition retain distinct meanings | Canonical review contract and separate validator enums | Independent severity/disposition sort test and material-decision skill assertions |
 | Review coverage is proportional and explicit | Canonical review skill coverage list and structured coverage/gap validation | Valid review fixture plus missing-evidence and scenario mapping tests |
-| Review results use the shared result contract | Implementation-quality validator delegates to `validateSkillResult` and validates only `details` | Valid and malformed result fixtures and CLI validation |
+| Review results use the shared result contract | Implementation-quality validator delegates to `validateSkillResult` and validates only implementation-quality details plus an optional external production-review authorization input | Valid and malformed result fixtures and CLI validation |
 | Canonical review behavior remains portable | Canonical skill, thin Claude/Codex wrappers, second-workspace fixture | Adapter-drift, wrapper-size, scenario parity, and portability tests |
 | Verification starts from explicit behavior and authority | Canonical verification required inputs and `authorizeVerificationOperation` | Exact target, unexpected target, runtime gap, and reserved-operation tests |
 | Loop progresses through evidence-gated stages | `verificationStages` and `evaluateVerificationLoop` | Ordered, idempotent, stale-evidence, and completion tests |
@@ -260,6 +260,19 @@ reviewer, current Apply evidence, exact reviewed head, and exact durable review
 record. Adversarial regressions prove fabricated labels and a missing durable
 record cannot establish readiness.
 
+### IQ-R26 — high / objective-fix
+
+The next exact-head strict review found that the structured production-gate
+summary inside a verification result could still establish readiness without
+the canonical evidence required by IQ-R25's helper. Ready production validation
+now requires the canonical production-review authorization input alongside the
+result, delegates it to the same operation checker, and cross-checks the summary
+against the canonical reviewer identity, implementer session, reviewed head,
+and result status. The CLI accepts that input as a second JSON file. Regressions
+prove that a self-asserted summary, nondurable record, or misleading summary
+cannot validate, while unavailable evidence can still produce a valid paused
+result.
+
 No blocker, high, human-decision, unresolved objective-fix, or false-positive
 finding remains.
 
@@ -292,12 +305,12 @@ review implementation remain unchanged.
 
 ## Current review status
 
-Focused tests after IQ-R1 through IQ-R25: 25 passed, 0 failed. The complete
-current-main Node suite passes 193 tests. Syntax checks, whitespace checks,
+Focused tests after IQ-R1 through IQ-R26: 26 passed, 0 failed. The complete
+current-main Node suite passes 194 tests. Syntax checks, whitespace checks,
 adapter drift, metadata, guardrail linkage, secret and product-constant scans,
 artifact quality, tracking, and selected and repository-wide strict OpenSpec
 validation pass. Strict review record
 `codex-review-d0fc9717c544-20260814T011625Z` passed with zero findings for sealed
 implementation head `d0fc9717c54487943566100afd80716bb6cd2976`; the later
-final-head findings IQ-R23 through IQ-R25 are corrected and require a fresh
+final-head findings IQ-R23 through IQ-R26 are corrected and require a fresh
 exact-head review.
