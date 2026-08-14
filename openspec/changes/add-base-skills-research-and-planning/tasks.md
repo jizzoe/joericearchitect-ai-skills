@@ -91,9 +91,10 @@
   delivery are separate lifecycle actions from Apply and require their own
   explicit authorization. Evidence: formal Verify report, strict validation,
   and a current-head independent-review record bound to its sealed package.
-- [ ] 4.3 Create the GitHub issue via `github-issue-authoring`, link it to
+- [x] 4.3 Create the GitHub issue via `github-issue-authoring`, link it to
   this change via `github-issue-to-openspec`, and add `tracking.yaml`, before
-  or alongside the implementation pull request. Depends on: 4.1. Not
-  started: deferred per `proposal.md` Impact section pending explicit
-  authorization to create GitHub-visible state. Evidence: validated
-  `tracking.yaml` and issue-managed linkage for the selected change.
+  or alongside the implementation pull request. Depends on: 4.1. Evidence:
+  [issue #86](https://github.com/jizzoe/joericearchitect-ai-skills/issues/86)
+  is open with `OpenSpec change: add-base-skills-research-and-planning`; its
+  `tracking.yaml` validates with `node scripts/validation/validate-tracking.mjs
+  --change add-base-skills-research-and-planning .../tracking.yaml`.
