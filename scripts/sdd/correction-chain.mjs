@@ -4,9 +4,14 @@ const text = (value) => typeof value === "string" && value.trim().length > 0;
 const encodeBoundary = (value) => value.replaceAll("%", "%25").replaceAll("/", "%2F");
 
 export function canonicalFailureSignature(source) {
-  if (!source || source.kind !== "independent-review" || !text(source.reviewRecordId) ||
-      !text(source.findingId) || !text(source.severity) || !text(source.evidence) ||
-      !text(source.transition)) return null;
+  if (!source || !text(source.evidence) || !text(source.transition)) return null;
+  if (source.kind === "verification") {
+    return text(source.verificationRecordId) && text(source.failureSignature)
+      ? source.failureSignature
+      : null;
+  }
+  if (source.kind !== "independent-review" || !text(source.reviewRecordId) ||
+      !text(source.findingId) || !text(source.severity)) return null;
   // Evidence is intentionally preserved for compatibility with durable v1
   // correction chains. Escaping the two boundary fields makes the framing
   // unambiguous even when finding IDs or transitions contain the delimiter;

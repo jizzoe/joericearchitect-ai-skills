@@ -33,3 +33,10 @@ test("failure signature boundaries cannot collide through slash or percent value
     canonicalFailureSignature(source("a", "c", "d/e"))
   );
 });
+
+test("verification failure signatures come from their durable source field", () => {
+  const verification = { kind: "verification", verificationRecordId: "verification-1", failureSignature: "focused-regression", evidence: "evidence/focused.json", transition: "openspec-verify" };
+  assert.equal(canonicalFailureSignature(verification), "focused-regression");
+  assert.equal(canonicalFailureSignature({ ...verification, verificationRecordId: "" }), null);
+  assert.equal(canonicalFailureSignature({ ...verification, failureSignature: "" }), null);
+});

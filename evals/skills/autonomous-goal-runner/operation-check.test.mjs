@@ -10,6 +10,7 @@ function input(profile, operation, overrides = {}) {
       targets: ["workspace:docs", "record:tracker-1", "adapter:fixture", "pr:42", "change:example", "branch:feature/example"],
       allowedMutations: [operation],
       qualityProfile: "prototype-rapid",
+      correctionBudgetPerFailureSignature: 3,
       expiresAt: "2026-08-13T12:00:00.000Z",
       ...overrides.authorization
     },
@@ -72,7 +73,7 @@ test("objective correction derives per-signature attempts from the durable check
   assert.equal(checkOperationAuthorization(input("local-implementation", "objective-correction", valid)).allowed, true);
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: records, request: { failureSource: newSource, correctionAttemptsForFailureSignature: 0 } })))), "correction-attempt-count-mismatch");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: records, request: { failureSource: newSource, correctionAttempts: 1 } })))), "correction-chain-length-mismatch");
-  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSource: newSource } }))), "correction-budget-invalid");
+  assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", { request: { failureSource: newSource } }))), "correction-context-incomplete");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ correctionRecords: records, request: { failureSource: newSource, failureSignature: "renamed-signature" } })))), "correction-failure-signature-mismatch");
   assert.equal(code(checkOperationAuthorization(input("local-implementation", "objective-correction", correction({ request: { checkpoint: { selectedEntry: { name: "other", records: [], correctionRecords: [] }, steps: [] } } })))), "correction-entry-not-authorized");
 });

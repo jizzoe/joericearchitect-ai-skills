@@ -198,14 +198,26 @@ function durableCorrectionState(authorization, request) {
   }
   const records = request.checkpoint?.selectedEntry?.correctionRecords;
   if (!Array.isArray(records)) return fail("correction-checkpoint-not-valid", "selected-entry-invalid-correction-records");
-  const reviewRecords = request.checkpoint?.selectedEntry?.reviewRecords ?? [];
-  const sourceRecords = reviewRecords.filter((record) => record?.id === request.failureSource.reviewRecordId &&
-    record.transition === request.failureSource.transition);
-  const durableFindings = sourceRecords[0]?.result?.findings ?? sourceRecords[0]?.findings;
-  const sourceFindings = durableFindings?.filter((finding) =>
-    finding.id === request.failureSource.findingId && finding.severity === request.failureSource.severity &&
-    finding.evidence === request.failureSource.evidence) ?? [];
-  if (sourceRecords.length !== 1 || sourceFindings.length !== 1) return fail("correction-failure-source-not-durable", failureSignature);
+  let sourceDurable = false;
+  if (request.failureSource.kind === "independent-review") {
+    const reviewRecords = request.checkpoint?.selectedEntry?.reviewRecords ?? [];
+    const sourceRecords = reviewRecords.filter((record) => record?.id === request.failureSource.reviewRecordId &&
+      record.transition === request.failureSource.transition);
+    const durableFindings = sourceRecords[0]?.result?.findings ?? sourceRecords[0]?.findings;
+    const sourceFindings = durableFindings?.filter((finding) =>
+      finding.id === request.failureSource.findingId && finding.severity === request.failureSource.severity &&
+      finding.evidence === request.failureSource.evidence) ?? [];
+    sourceDurable = sourceRecords.length === 1 && sourceFindings.length === 1;
+  } else if (request.failureSource.kind === "verification") {
+    const verificationRecords = request.checkpoint?.selectedEntry?.verificationRecords ?? [];
+    const matches = verificationRecords.filter((record) =>
+      record?.id === request.failureSource.verificationRecordId && record.entry === request.selectedEntry &&
+      record.transition === request.failureSource.transition && record.current === true &&
+      record.failureSignature === request.failureSource.failureSignature &&
+      record.evidence === request.failureSource.evidence);
+    sourceDurable = matches.length === 1;
+  }
+  if (!sourceDurable) return fail("correction-failure-source-not-durable", failureSignature);
   if (request.failureSignature !== undefined && request.failureSignature !== failureSignature) {
     return fail("correction-failure-signature-mismatch", failureSignature);
   }
