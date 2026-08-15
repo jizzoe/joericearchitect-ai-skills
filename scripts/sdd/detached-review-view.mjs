@@ -62,13 +62,45 @@ function ownedMarkerPath(temporaryRoot) {
   return path.join(temporaryRoot, ".ai-skills-review-view.json");
 }
 
-function cleanupOwnedPath({ repository, reviewPath, temporaryRoot }, runGit) {
+function partialCleanupFailure(error, requestDigest) {
+  const diagnostic = createReviewDiagnostic({
+    stage: "review-view-cleanup",
+    operation: cleanupOperation,
+    code: "review-worktree-partial-cleanup-failed",
+    category: "cleanup-failed",
+    subject: "review-worktree",
+    ...(Number.isInteger(error?.status) ? { exitCode: error.status } : {}),
+    safeMessage: "The partially created review worktree could not be safely removed."
+  });
+  return {
+    removed: false,
+    available: false,
+    status: "unavailable",
+    requestDigest,
+    code: diagnostic.code,
+    diagnostic
+  };
+}
+
+function cleanupOwnedPath({ repository, reviewPath, temporaryRoot, requestDigest }, runGit) {
   if (repository && reviewPath && fs.existsSync(reviewPath)) {
-    try { runGit(["-C", repository, "worktree", "remove", "--force", reviewPath]); } catch { /* report the original safe failure */ }
+    try {
+      runGit(["-C", repository, "worktree", "remove", "--force", reviewPath]);
+    } catch (error) {
+      // Preserve the owned root for a separately authenticated recovery path.
+      // Removing it after Git cleanup failed would discard the only remaining
+      // local evidence while leaving source metadata potentially registered.
+      return partialCleanupFailure(error, requestDigest);
+    }
   }
   if (temporaryRoot && fs.existsSync(temporaryRoot)) {
-    try { fs.rmSync(temporaryRoot, { recursive: true, force: true }); } catch { /* preserve the narrow temporary path for recovery */ }
+    try {
+      fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    } catch (error) {
+      return partialCleanupFailure(error, requestDigest);
+    }
   }
+  return { removed: true };
 }
 
 function archiveUnavailable(code, category, subject, safeMessage) {
@@ -199,7 +231,8 @@ export function createDetachedReviewView({ repositoryPath, headCommit, lifecycle
     try {
       runGit(["-C", repository, "worktree", "add", "--detach", reviewPath, head]);
     } catch (error) {
-      cleanupOwnedPath({ repository, reviewPath, temporaryRoot }, runGit);
+      const cleanup = cleanupOwnedPath({ repository, reviewPath, temporaryRoot, requestDigest: lifecycleRequestDigest }, runGit);
+      if (!cleanup.removed) return cleanup;
       return gitFailure(error, { requestDigest: lifecycleRequestDigest, stage: "review-view-construction", operation: worktreeOperation,
         fallbackCode: "review-worktree-create-failed", fallbackSubject: "worktree-creation",
         fallbackMessage: "The review worktree could not be created." });
@@ -210,13 +243,15 @@ export function createDetachedReviewView({ repositoryPath, headCommit, lifecycle
       actualHead = canonicalCommit(reviewPath, "HEAD", runGit);
       detached = isDetached(reviewPath, runGit);
     } catch (error) {
-      cleanupOwnedPath({ repository, reviewPath, temporaryRoot }, runGit);
+      const cleanup = cleanupOwnedPath({ repository, reviewPath, temporaryRoot, requestDigest: lifecycleRequestDigest }, runGit);
+      if (!cleanup.removed) return cleanup;
       return gitFailure(error, { requestDigest: lifecycleRequestDigest, stage: "review-view-verification", operation: worktreeOperation,
         fallbackCode: "review-worktree-verification-failed", fallbackSubject: "review-worktree",
         fallbackMessage: "The created review worktree could not be verified." });
     }
     if (actualHead !== head || !detached) {
-      cleanupOwnedPath({ repository, reviewPath, temporaryRoot }, runGit);
+      const cleanup = cleanupOwnedPath({ repository, reviewPath, temporaryRoot, requestDigest: lifecycleRequestDigest }, runGit);
+      if (!cleanup.removed) return cleanup;
       return unavailable({ requestDigest: lifecycleRequestDigest, stage: "review-view-verification", operation: worktreeOperation,
         code: "review-worktree-verification-mismatch", category: "verification-failed", subject: "sealed-head",
         safeMessage: "The created review worktree does not match the sealed detached commit." });
@@ -226,7 +261,8 @@ export function createDetachedReviewView({ repositoryPath, headCommit, lifecycle
     fs.writeFileSync(ownedMarkerPath(temporaryRoot), `${JSON.stringify(view)}\n`, { mode: 0o600, flag: "wx" });
     return { available: true, status: "available", requestDigest: lifecycleRequestDigest, view };
   } catch (error) {
-    cleanupOwnedPath({ repository, reviewPath, temporaryRoot }, runGit);
+    const cleanup = cleanupOwnedPath({ repository, reviewPath, temporaryRoot, requestDigest: lifecycleRequestDigest }, runGit);
+    if (!cleanup.removed) return cleanup;
     return gitFailure(error, { requestDigest: lifecycleRequestDigest, stage: "review-view-construction", operation: worktreeOperation,
       fallbackCode: "review-worktree-create-failed", fallbackSubject: "worktree-creation",
       fallbackMessage: "The review worktree could not be created." });

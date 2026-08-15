@@ -35,6 +35,55 @@ test("detached review view is pinned to committed state and cleanup is ownership
   }
 });
 
+test("partial worktree cleanup failure is reported and preserves the owned root", () => {
+  const source = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ai-skills-review-partial-source-")));
+  const temporaryRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ai-skills-review-partial-")));
+  const head = "a".repeat(40);
+  const requestDigest = "b".repeat(64);
+  const reviewPath = path.join(temporaryRoot, "review-session", "repository");
+  let cleanupAttempted = false;
+  try {
+    const result = createDetachedReviewView({
+      repositoryPath: source,
+      headCommit: head,
+      lifecycleRequestDigest: requestDigest,
+      expiresAt: "2026-08-14T00:00:00.000Z"
+    }, {
+      now: "2026-08-13T12:00:00.000Z",
+      createTemporaryRoot: () => temporaryRoot,
+      runGit: (args) => {
+        if (args.includes("rev-parse")) return head;
+        if (args.includes("add")) {
+          fs.mkdirSync(reviewPath, { recursive: true });
+          const error = new Error("synthetic create failure");
+          error.status = 128;
+          throw error;
+        }
+        if (args.includes("remove")) {
+          cleanupAttempted = true;
+          const error = new Error("synthetic cleanup failure");
+          error.status = 128;
+          throw error;
+        }
+        throw new Error("unexpected git operation");
+      }
+    });
+    assert.equal(cleanupAttempted, true);
+    assert.equal(result.available, false);
+    assert.equal(result.removed, false);
+    assert.equal(result.status, "unavailable");
+    assert.equal(result.requestDigest, requestDigest);
+    assert.equal(result.diagnostic.stage, "review-view-cleanup");
+    assert.equal(result.diagnostic.code, "review-worktree-partial-cleanup-failed");
+    assert.equal(result.diagnostic.category, "cleanup-failed");
+    assert.equal(result.diagnostic.exitCode, 128);
+    assert.equal(fs.existsSync(temporaryRoot), true, "failed Git cleanup preserves the owned root for recovery");
+  } finally {
+    fs.rmSync(source, { recursive: true, force: true });
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
 test("archived review view materializes only regular exact-head content without Git metadata", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ai-skills-review-archive-source-"));
   try {
