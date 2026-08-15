@@ -27,8 +27,9 @@ destination.
 Repository runtimes MUST route trigger selection, required-input checks,
 workspace-relative path resolution, and autonomous write authorization through
 `executeResearchTopicWorkflow` in
-`scripts/sdd/research-planning-skill-runtime.mjs`, supplying bounded artifact
-reader and writer functions and a bounded model-guidance display callback.
+`scripts/sdd/research-planning-skill-runtime.mjs`, supplying a bounded artifact
+reader, an atomic multi-artifact writer, and a bounded model-guidance display
+callback.
 The runtime displays provider-aware guidance before source resolution,
 enforces the selected depth's source target, resolves every path-backed
 source, preserves existing destination content for reconciliation, generates
@@ -40,6 +41,10 @@ is the explicit `primary`, `secondary`, or `tertiary` enum. For technical,
 pricing, policy, API, or current-product claims, at least one source in the
 domain must be `primary`. The runtime normalizes and Markdown-escapes untrusted
 source fields before rendering them.
+For a path-backed source, `urlOrPath` must canonically identify the exact
+workspace-relative `path` given to the reader; inline content and path-backed
+content are mutually exclusive. Commit findings and sources through one
+atomic writer transaction so neither file can be updated without the other.
 When destination files already exist, supply a bounded reconciliation callback
 that explicitly identifies retained accurate excerpts, removed stale excerpts,
 and unresolved conflicts. Pause on a conflict or incomplete reconciliation;

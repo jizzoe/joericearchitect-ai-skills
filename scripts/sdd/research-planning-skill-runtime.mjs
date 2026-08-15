@@ -77,7 +77,24 @@ function authorize(input, profile, operations) {
 }
 
 function performWrites(operations, writeArtifact) {
-  for (const operation of operations) writeArtifact(Object.freeze({ ...operation }));
+  try {
+    for (const operation of operations) writeArtifact(Object.freeze({ ...operation }));
+    return { committed: true };
+  } catch {
+    return { error: "The bounded artifact writer failed." };
+  }
+}
+
+function performAtomicWrites(operations, writeArtifactsAtomically) {
+  if (typeof writeArtifactsAtomically !== "function") return { error: "Provide a bounded atomic artifact writer." };
+  try {
+    const frozenOperations = Object.freeze(operations.map((operation) => Object.freeze({ ...operation })));
+    const receipt = writeArtifactsAtomically(frozenOperations);
+    if (receipt?.committed !== true) return { error: "The atomic artifact transaction did not commit." };
+    return { committed: true };
+  } catch {
+    return { error: "The atomic artifact transaction failed without committing." };
+  }
 }
 
 function commonMode(input) {
@@ -267,8 +284,15 @@ function resolveResearchSources(sources, readArtifact) {
       !nonEmpty(source.relevance) || !sourceClassifications.has(source.classification) || !claimDomains.has(source.claimDomain)) {
       return { error: `Source ${index + 1} is missing required provenance or classification.` };
     }
+    const hasInlineContent = nonEmpty(source.content);
+    const hasPath = nonEmpty(source.path);
+    if (hasInlineContent && hasPath) return { error: `Source ${source.id} must use either inline content or a path, not both.` };
     let content = source.content;
-    if (!nonEmpty(content) && safeWorkspacePath(source.path)) {
+    if (hasPath) {
+      const canonicalPath = canonicalSourceLocation(source.path);
+      if (!safeWorkspacePath(source.path) || canonicalPath === null || canonicalSourceLocation(source.urlOrPath) !== canonicalPath) {
+        return { error: `Source ${source.id} provenance does not match its resolved path.` };
+      }
       const resolution = resolveArtifacts([source.path], readArtifact);
       if (resolution.error) return resolution;
       content = resolution.artifacts[0].content;
@@ -456,7 +480,7 @@ function deliveryPlanContent(input, candidates, resolvedInputs) {
   ].join("\n") + "\n";
 }
 
-export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeArtifact, displayGuidance, reconcileExistingArtifact } = {}) {
+export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeArtifactsAtomically, displayGuidance, reconcileExistingArtifact } = {}) {
   const skill = "research-topic-workflow";
   const mode = commonMode(input);
   if (input.requestKind !== skill) return noOp(skill, mode);
@@ -480,7 +504,7 @@ export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeAr
   if (sourceResolution.sources.length < depthSourceMinimums[input.depth]) {
     return gap(skill, mode, "blocked", "insufficient-source-depth", `${input.depth} research requires at least ${depthSourceMinimums[input.depth]} sources.`);
   }
-  if (typeof writeArtifact !== "function") return gap(skill, mode, "blocked", "missing-writer", "Provide a bounded artifact writer.");
+  if (typeof writeArtifactsAtomically !== "function") return gap(skill, mode, "blocked", "missing-writer", "Provide a bounded atomic artifact writer.");
 
   const root = path.posix.join(destination, input.category, input.topic);
   const findingsPath = path.posix.join(root, `${input.topic}-findings.md`);
@@ -502,7 +526,8 @@ export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeAr
   ];
   const checks = authorize(input, "research-read-only", operations);
   if (checks.some((check) => check.allowed !== true)) return pauseForAuthorization(skill, mode, checks);
-  performWrites(operations, writeArtifact);
+  const writeResult = performAtomicWrites(operations, writeArtifactsAtomically);
+  if (writeResult.error) return gap(skill, mode, "blocked", "atomic-write-failed", writeResult.error);
   return result(skill, mode, "completed", "Durable research artifacts were written at the selected depth.", {
     artifacts: operations.map(({ path: subject, artifactOperation: operation }) => ({ kind: "file", operation, subject })),
     evidence: [
@@ -544,7 +569,8 @@ export function executeDesignBriefFromResearch(input = {}, { readArtifact, write
   const operations = [{ operation: "local-edit", path: outputPath, target: `workspace:${outputPath}`, contentKind: "design-brief", content: designBriefContent(input, resolvedResearch.artifacts, resolvedContext.artifacts) }];
   const checks = authorize(input, "local-implementation", operations);
   if (checks.some((check) => check.allowed !== true)) return pauseForAuthorization(skill, mode, checks);
-  performWrites(operations, writeArtifact);
+  const writeResult = performWrites(operations, writeArtifact);
+  if (writeResult.error) return gap(skill, mode, "paused", "artifact-write-failed", writeResult.error);
   return result(skill, mode, "completed", "A seven-section design brief was written without creating OpenSpec artifacts.", {
     artifacts: [{ kind: "file", operation: "created", subject: outputPath }],
     evidence: [
@@ -601,7 +627,8 @@ export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeAr
   const operations = [{ operation: "local-edit", path: outputPath, target: `workspace:${outputPath}`, contentKind: "delivery-plan", content: deliveryPlanContent(input, candidates, resolved.artifacts) }];
   const checks = authorize(input, "local-implementation", operations);
   if (checks.some((check) => check.allowed !== true)) return pauseForAuthorization(skill, mode, checks);
-  performWrites(operations, writeArtifact);
+  const writeResult = performWrites(operations, writeArtifact);
+  if (writeResult.error) return gap(skill, mode, "paused", "artifact-write-failed", writeResult.error);
   return result(skill, mode, "completed", "A reviewable delivery plan was written without governance or OpenSpec mutation.", {
     artifacts: [{ kind: "file", operation: "created", subject: outputPath }],
     evidence: [

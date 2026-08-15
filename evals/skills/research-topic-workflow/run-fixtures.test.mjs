@@ -49,7 +49,11 @@ const emptyReader = () => undefined;
 const run = (input = base, readArtifact = emptyReader, reconcileExistingArtifact) => {
   const writes = [];
   const guidance = [];
-  const output = executeResearchTopicWorkflow(input, { readArtifact, writeArtifact: (operation) => writes.push(operation), displayGuidance: (value) => guidance.push(value), reconcileExistingArtifact });
+  const writeArtifactsAtomically = (operations) => {
+    writes.push(...operations);
+    return { committed: true };
+  };
+  const output = executeResearchTopicWorkflow(input, { readArtifact, writeArtifactsAtomically, displayGuidance: (value) => guidance.push(value), reconcileExistingArtifact });
   return { output, writes, guidance };
 };
 
@@ -59,8 +63,9 @@ test("scenario manifest maps one-to-one to the executable fixtures", () => {
 
 test("trigger and non-trigger select execution behavior and write generated content", () => {
   let writes = 0;
-  const skipped = executeResearchTopicWorkflow({ ...base, requestKind: "quick-factual-answer" }, { readArtifact: emptyReader, writeArtifact: () => { writes += 1; }, displayGuidance: () => {} });
-  const executed = executeResearchTopicWorkflow(base, { readArtifact: emptyReader, writeArtifact: () => { writes += 1; }, displayGuidance: () => {} });
+  const atomicWriter = (operations) => { writes += operations.length; return { committed: true }; };
+  const skipped = executeResearchTopicWorkflow({ ...base, requestKind: "quick-factual-answer" }, { readArtifact: emptyReader, writeArtifactsAtomically: atomicWriter, displayGuidance: () => {} });
+  const executed = executeResearchTopicWorkflow(base, { readArtifact: emptyReader, writeArtifactsAtomically: atomicWriter, displayGuidance: () => {} });
   valid(skipped); valid(executed);
   assert.equal(skipped.status, "no-op");
   assert.equal(executed.status, "completed");
@@ -69,9 +74,9 @@ test("trigger and non-trigger select execution behavior and write generated cont
 
 test("missing input and unresolvable source paths return structured blocked results", () => {
   const missing = executeResearchTopicWorkflow({ ...base, destination: "", config: {} });
-  const unresolved = executeResearchTopicWorkflow({ ...base, sources: [{ ...source, content: undefined, path: "docs/missing.md" }] }, {
+  const unresolved = executeResearchTopicWorkflow({ ...base, sources: [{ ...source, urlOrPath: "docs/missing.md", content: undefined, path: "docs/missing.md" }] }, {
     readArtifact: () => { throw new Error("ENOENT"); },
-    writeArtifact: () => assert.fail("must not write"),
+    writeArtifactsAtomically: () => assert.fail("must not write"),
     displayGuidance: () => {}
   });
   valid(missing); valid(unresolved);
@@ -124,21 +129,53 @@ test("depth source targets, pause conditions, and pre-execution guidance are enf
       urlOrPath: `https://example.invalid/runtime-isolation${index % 2 === 0 ? "/" : "#section"}${index > 1 ? `?utm_source=${index}` : ""}`
     }))
   }).output;
+  const relabeledPath = run({
+    ...base,
+    sources: sources.map((entry, index) => ({
+      ...entry,
+      content: undefined,
+      path: "docs/shared-source.md",
+      urlOrPath: `https://example.invalid/fabricated-${index}`
+    }))
+  }, () => "One local source document.").output;
   const credentialPause = run({ ...base, requiresNewCredentials: true }).output;
   const { output, guidance } = run({ ...base, assistantProvider: undefined });
-  valid(tooShallow); valid(duplicateSources); valid(secondaryOnly); valid(misleadingPrimary); valid(superficialDuplicates); valid(credentialPause); valid(output);
+  valid(tooShallow); valid(duplicateSources); valid(secondaryOnly); valid(misleadingPrimary); valid(superficialDuplicates); valid(relabeledPath); valid(credentialPause); valid(output);
   assert.equal(tooShallow.status, "blocked");
   assert.equal(tooShallow.openQuestions[0].id, "insufficient-source-depth");
   assert.equal(duplicateSources.status, "blocked");
   assert.equal(secondaryOnly.status, "blocked");
   assert.equal(misleadingPrimary.status, "blocked");
   assert.equal(superficialDuplicates.status, "blocked");
+  assert.equal(relabeledPath.status, "blocked");
   assert.equal(credentialPause.openQuestions[0].id, "new-credentials-required");
   assert.equal(guidance.length, 1);
   assert.equal(guidance[0].role, "balanced-standard");
   assert.deepEqual(guidance[0].providers.map(({ provider }) => provider), ["codex", "claude"]);
   assert.equal(guidance[0].providers.every(({ freshness }) => freshness.includes("stale-risk")), true);
   assert.equal(guidance[0].sessionModelChanged, false);
+});
+
+test("path-backed sources bind provenance to each exact resolved path", () => {
+  const pathSources = sources.slice(0, 5).map((entry, index) => ({
+    ...entry,
+    content: undefined,
+    path: `docs/sources/source-${index + 1}.md`,
+    urlOrPath: `docs/sources/source-${index + 1}.md`
+  }));
+  const readPaths = [];
+  const { output } = run({ ...base, depth: "quick", sources: pathSources }, (artifactPath) => {
+    if (!artifactPath.startsWith("docs/sources/")) {
+      const error = new Error("ENOENT");
+      error.code = "ENOENT";
+      throw error;
+    }
+    readPaths.push(artifactPath);
+    return `Resolved content for ${artifactPath}`;
+  });
+  valid(output);
+  assert.equal(output.status, "completed");
+  assert.deepEqual(readPaths, pathSources.map(({ path: sourcePath }) => sourcePath));
 });
 
 test("existing findings and source records are preserved and reported as updates", () => {
@@ -169,6 +206,23 @@ test("existing findings and source records are preserved and reported as updates
   assert.equal(unreadable.openQuestions[0].id, "existing-artifact-unreadable");
 });
 
+test("research artifacts commit through one atomic transaction and writer failures pause cleanly", () => {
+  const attempted = [];
+  const output = executeResearchTopicWorkflow(base, {
+    readArtifact: emptyReader,
+    displayGuidance: () => {},
+    writeArtifactsAtomically: (operations) => {
+      attempted.push(operations.map(({ path: outputPath }) => outputPath));
+      throw new Error("synthetic transaction failure");
+    }
+  });
+  valid(output);
+  assert.equal(output.status, "blocked");
+  assert.equal(output.openQuestions[0].id, "atomic-write-failed");
+  assert.equal(attempted.length, 1);
+  assert.equal(attempted[0].length, 2);
+});
+
 test("autonomous research writes require exact operation authorization", () => {
   const input = {
     ...base,
@@ -178,7 +232,7 @@ test("autonomous research writes require exact operation authorization", () => {
     now: "2026-08-15T12:00:00.000Z"
   };
   let writes = 0;
-  const adapters = { readArtifact: emptyReader, writeArtifact: () => { writes += 1; }, displayGuidance: () => {} };
+  const adapters = { readArtifact: emptyReader, writeArtifactsAtomically: (operations) => { writes += operations.length; return { committed: true }; }, displayGuidance: () => {} };
   const allowed = executeResearchTopicWorkflow(input, adapters);
   const denied = executeResearchTopicWorkflow({ ...input, authorization: { ...input.authorization, targets: ["workspace:other"] } }, adapters);
   valid(allowed); valid(denied);
