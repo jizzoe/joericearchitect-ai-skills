@@ -216,14 +216,32 @@ test("proposed preapproval is prototype-only, complete, and time bounded", () =>
   const expired = run({ ...base, candidates: [{ ...prototype, preapproval: { ...preapproval, expiresAt: "2026-08-14T00:00:00.000Z" } }], now: "2026-08-15T12:00:00.000Z" }).output;
   const wrongAction = run({ ...base, candidates: [{ ...prototype, preapproval: { ...preapproval, action: "publish-release" } }], now: "2026-08-15T12:00:00.000Z" }).output;
   const wrongTarget = run({ ...base, candidates: [{ ...prototype, preapproval: { ...preapproval, target: "branch:prototype-review" } }], now: "2026-08-15T12:00:00.000Z" }).output;
+  const ambiguousTargets = ["pr:*", "pr: 42", "pr:42\n", "change:*", "change:two words", "branch:*", "branch:feature//review", "branch:feature/../review"]
+    .map((target) => run({
+      ...base,
+      candidates: [{
+        ...prototype,
+        preapproval: {
+          ...preapproval,
+          target,
+          action: target.startsWith("pr:") ? "merge-pr" : target.startsWith("change:") ? "archive-change" : "delete-merged-topic-branch"
+        }
+      }],
+      now: "2026-08-15T12:00:00.000Z"
+    }).output);
   const accepted = run({ ...base, candidates: [{ ...prototype, preapproval }], now: "2026-08-15T12:00:00.000Z" });
-  for (const output of [wrongProfile, missingField, expired, wrongAction, wrongTarget, accepted.output]) valid(output);
+  const acceptedPr = run({ ...base, candidates: [{ ...prototype, preapproval: { ...preapproval, target: "pr:42", action: "merge-pr" } }], now: "2026-08-15T12:00:00.000Z" }).output;
+  const acceptedBranch = run({ ...base, candidates: [{ ...prototype, preapproval: { ...preapproval, target: "branch:feature/prototype-review", action: "delete-merged-topic-branch" } }], now: "2026-08-15T12:00:00.000Z" }).output;
+  for (const output of [wrongProfile, missingField, expired, wrongAction, wrongTarget, ...ambiguousTargets, accepted.output, acceptedPr, acceptedBranch]) valid(output);
   assert.equal(wrongProfile.status, "paused");
   assert.equal(missingField.status, "paused");
   assert.equal(expired.status, "paused");
   assert.equal(wrongAction.status, "paused");
   assert.equal(wrongTarget.status, "paused");
+  assert.equal(ambiguousTargets.every(({ status }) => status === "paused"), true);
   assert.equal(accepted.output.status, "completed");
+  assert.equal(acceptedPr.status, "completed");
+  assert.equal(acceptedBranch.status, "completed");
   assert.equal(accepted.writes[0].content.includes("This is proposed, not granted."), true);
   assert.equal(accepted.writes[0].content.includes(preapproval.recovery), true);
 });

@@ -87,6 +87,11 @@ OpenSpec Archive, or whether a `prototype-rapid` one-change preapproval is
 proposed. A proposed preapproval must itself name the exact target, action,
 evidence, recovery behavior, and expiration; selecting a delivery profile
 alone never grants that authority.
+Exact target forms are canonical and action-specific: a positive integer
+`pr:<number>` for `merge-pr`, a lowercase hyphenated `change:<slug>` for
+`archive-change`, or a safe concrete `branch:<git-branch-name>` for
+`delete-merged-topic-branch`. Wildcards, whitespace, traversal, empty path
+segments, and merely prefix-shaped targets pause as invalid.
 
 ## Pause Conditions
 

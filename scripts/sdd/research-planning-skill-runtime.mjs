@@ -35,6 +35,21 @@ function nonEmpty(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function validBranchName(value) {
+  if (typeof value !== "string" || value.length === 0 || value !== value.trim() || value === "@" ||
+    !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(value) || value.endsWith("/") || value.endsWith(".") ||
+    value.includes("//") || value.includes("..") || value.includes("@{")) return false;
+  return value.split("/").every((segment) => segment.length > 0 && !segment.startsWith(".") && !segment.endsWith(".lock"));
+}
+
+function validPreapprovalTarget(action, target) {
+  if (typeof target !== "string") return false;
+  if (action === "merge-pr") return /^pr:[1-9]\d*$/.test(target);
+  if (action === "archive-change") return target.startsWith("change:") && slugs.test(target.slice("change:".length));
+  if (action === "delete-merged-topic-branch") return target.startsWith("branch:") && validBranchName(target.slice("branch:".length));
+  return false;
+}
+
 function validIsoDate(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -407,7 +422,7 @@ function preapprovalIssue(candidate, nowValue) {
   }
   const targetPrefix = preapprovalTargetPrefixes[preapproval.action];
   if (!targetPrefix) return "Select an eligible high-impact lifecycle action for the proposed preapproval.";
-  if (!preapproval.target.startsWith(targetPrefix) || preapproval.target.length === targetPrefix.length) {
+  if (!validPreapprovalTarget(preapproval.action, preapproval.target)) {
     return `Provide an exact ${targetPrefix} target for proposed ${preapproval.action}.`;
   }
   const now = Date.parse(nowValue ?? new Date().toISOString());
