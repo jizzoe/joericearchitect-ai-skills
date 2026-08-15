@@ -253,6 +253,7 @@ function resolveResearchSources(sources, readArtifact) {
 function designBriefContent(input, research, context) {
   const evidence = [...research, ...context];
   const action = input.recommendedNextAction === "openspec-propose" ? "OpenSpec Propose" : "OpenSpec Explore";
+  const decisionConfirmed = input.ownerDecisionConfirmed === true;
   return [
     `# ${input.briefSlug ?? "Design"} design brief`,
     "",
@@ -268,7 +269,8 @@ function designBriefContent(input, research, context) {
     "",
     "## 4. Decisions, assumptions, and owner",
     `- Owner: ${input.decisionOwner ?? "Not yet named"}`,
-    `- Confirmed decisions: ${input.ownerDecisionConfirmed === true ? (input.decisions ?? []).join("; ") || "None supplied." : "None; recommendation remains pending owner decision."}`,
+    `- Confirmed decisions: ${decisionConfirmed ? (input.decisions ?? []).join("; ") || input.recommendation : "None; recommendation remains pending owner decision."}`,
+    `- Approval evidence: ${decisionConfirmed ? `${input.decisionApproval.approvedBy} at ${input.decisionApproval.approvedAt}` : "Not supplied."}`,
     `- Assumptions: ${(input.assumptions ?? []).join("; ") || "None supplied."}`,
     "",
     "## 5. Scope, non-goals, constraints, dependencies, and risks",
@@ -282,7 +284,7 @@ function designBriefContent(input, research, context) {
     bullets(input.unresolvedQuestions),
     "",
     "## 7. Recommended next step",
-    `Recommendation pending owner confirmation: ${input.recommendation}`,
+    `${decisionConfirmed ? "Owner-confirmed decision" : "Recommendation pending owner confirmation"}: ${input.recommendation}`,
     `Recommended workflow action: ${action}. No OpenSpec artifacts were created.`
   ].join("\n") + "\n";
 }
@@ -325,9 +327,24 @@ function preapprovalIssue(candidate, nowValue) {
   if (!preapproval.target.startsWith(targetPrefix) || preapproval.target.length === targetPrefix.length) {
     return `Provide an exact ${targetPrefix} target for proposed ${preapproval.action}.`;
   }
-  const expiration = Date.parse(preapproval.expiresAt);
   const now = Date.parse(nowValue ?? new Date().toISOString());
+  if (Number.isNaN(now)) return "Provide a valid current time for proposed preapproval validation.";
+  const expiration = Date.parse(preapproval.expiresAt);
   if (Number.isNaN(expiration) || expiration <= now) return "Provide a valid future proposed preapproval expiration.";
+  return null;
+}
+
+function decisionApprovalIssue(input) {
+  if (input.ownerDecisionConfirmed !== true) return null;
+  const approval = input.decisionApproval;
+  if (!nonEmpty(input.decisionOwner) || !Array.isArray(input.decisions) || input.decisions.length === 0 ||
+    !approval || approval.approvedBy !== input.decisionOwner || !nonEmpty(approval.approvedAt) ||
+    !/^[0-9a-f]{64}$/.test(approval.sha256 ?? "")) return "Provide owner approval evidence bound to the confirmed decision content.";
+  const now = Date.parse(input.now ?? new Date().toISOString());
+  const approvedAt = Date.parse(approval.approvedAt);
+  if (Number.isNaN(now) || Number.isNaN(approvedAt) || approvedAt > now) return "Provide valid non-future decision approval and current timestamps.";
+  const content = JSON.stringify({ decisionOwner: input.decisionOwner, decisions: input.decisions, recommendation: input.recommendation });
+  if (approval.sha256 !== createHash("sha256").update(content).digest("hex")) return "The owner approval digest does not match the confirmed decision content.";
   return null;
 }
 
@@ -337,7 +354,7 @@ function designBriefApprovalIssue(input, designBriefContent) {
     !nonEmpty(approval.approvedAt) || !/^[0-9a-f]{64}$/.test(approval.sha256 ?? "")) return "Provide complete approval evidence bound to the design brief path and content.";
   const approvedAt = Date.parse(approval.approvedAt);
   const now = Date.parse(input.now ?? new Date().toISOString());
-  if (Number.isNaN(approvedAt) || approvedAt > now) return "Provide a valid, non-future design-brief approval time.";
+  if (Number.isNaN(now) || Number.isNaN(approvedAt) || approvedAt > now) return "Provide valid, non-future design-brief approval and current timestamps.";
   const digest = createHash("sha256").update(designBriefContent).digest("hex");
   if (approval.sha256 !== digest) return "The design-brief approval digest does not match the resolved approved brief.";
   return null;
@@ -460,6 +477,8 @@ export function executeDesignBriefFromResearch(input = {}, { readArtifact, write
   }
   const missingField = missingDesignField(input);
   if (missingField) return gap(skill, mode, "paused", "missing-brief-input", `Provide the material brief field: ${missingField}.`);
+  const invalidDecisionApproval = decisionApprovalIssue(input);
+  if (invalidDecisionApproval) return gap(skill, mode, "paused", "owner-decision-evidence-required", invalidDecisionApproval);
   const outputPath = input.outputPath ?? (safeWorkspacePath(input.config?.defaults?.designBriefRoot) && slugs.test(input.briefSlug ?? "")
     ? path.posix.join(input.config.defaults.designBriefRoot, `${input.briefSlug}.md`) : null);
   if (!safeWorkspacePath(outputPath)) return gap(skill, mode, "paused", "missing-output", "Provide a safe workspace-relative brief output path.");

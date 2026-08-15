@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import test from "node:test";
 
@@ -104,6 +105,28 @@ test("unsupported approval and undecided material decisions pause", () => {
   valid(approval); valid(undecided);
   assert.equal(approval.status, "paused");
   assert.equal(undecided.openQuestions[0].id, "owner-decision-required");
+});
+
+test("confirmed owner decisions require identity, time, and content-bound approval", () => {
+  const decisions = ["Use the sealed local reviewer."];
+  const decisionOwner = "decision-owner";
+  const content = JSON.stringify({ decisionOwner, decisions, recommendation: base.recommendation });
+  const approved = {
+    ...base,
+    ownerDecisionConfirmed: true,
+    decisionOwner,
+    decisions,
+    now: "2026-08-15T12:00:00.000Z",
+    decisionApproval: { approvedBy: decisionOwner, approvedAt: "2026-08-15T10:00:00.000Z", sha256: createHash("sha256").update(content).digest("hex") }
+  };
+  const accepted = run(approved);
+  const stale = run({ ...approved, decisionApproval: { ...approved.decisionApproval, sha256: "0".repeat(64) } }).output;
+  const invalidNow = run({ ...approved, now: "not-a-time" }).output;
+  valid(accepted.output); valid(stale); valid(invalidNow);
+  assert.equal(accepted.output.status, "completed");
+  assert.equal(accepted.writes[0].content.includes("Owner-confirmed decision"), true);
+  assert.equal(stale.openQuestions[0].id, "owner-decision-evidence-required");
+  assert.equal(invalidNow.openQuestions[0].id, "owner-decision-evidence-required");
 });
 
 test("autonomous brief writes require exact operation authorization", () => {

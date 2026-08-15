@@ -92,12 +92,14 @@ test("missing and nonexistent inputs and readiness gaps return structured paused
   const gap = run({ ...base, readinessGaps: ["Observable acceptance evidence is missing."] }).output;
   const unapproved = run({ ...base, designBriefApproval: undefined }).output;
   const staleApproval = run({ ...base, designBriefApproval: { ...base.designBriefApproval, sha256: "0".repeat(64) } }).output;
-  valid(missing); valid(nonexistent); valid(gap); valid(unapproved); valid(staleApproval);
+  const invalidNow = run({ ...base, now: "not-a-time" }).output;
+  valid(missing); valid(nonexistent); valid(gap); valid(unapproved); valid(staleApproval); valid(invalidNow);
   assert.equal(missing.status, "paused");
   assert.equal(nonexistent.status, "paused");
   assert.equal(nonexistent.openQuestions[0].id, "unresolved-source-path");
   assert.equal(unapproved.openQuestions[0].id, "design-brief-approval-required");
   assert.equal(staleApproval.openQuestions[0].id, "design-brief-approval-required");
+  assert.equal(invalidNow.openQuestions[0].id, "design-brief-approval-required");
   assert.deepEqual(gap.openQuestions, [{ id: "readiness-gap", question: "Observable acceptance evidence is missing.", blocking: true }]);
 });
 

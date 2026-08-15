@@ -17,6 +17,11 @@ current-context paths; an output path or the `designBriefRoot` default from
 authorization. Accept optional stated owner decisions and unresolved
 questions.
 
+A confirmed owner decision requires the decision-owner identity, a non-future
+approval time, and a SHA-256 digest bound to the owner, decisions, and
+recommendation. The runtime recomputes that digest. Without valid evidence,
+the recommendation remains pending or the requested confirmation pauses.
+
 If a named research or context path does not resolve, or sources conflict on
 a point material to the recommendation without a defensible interpretation,
 return a `skill-result-v1` paused result naming the missing or conflicting
