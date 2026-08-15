@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "defaults": {
+    "researchRoot": "docs/research",
+    "designBriefRoot": "docs/design-briefs",
+    "planRoot": "docs/plans"
+  }
+}

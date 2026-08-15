@@ -19,6 +19,7 @@ implementation_repositories:
       - evals/skills/design-brief-from-research/
       - evals/skills/sdd-requirements-to-plan/
       - scripts/sdd/research-planning-skill-runtime.mjs
+      - config/ai-skills.json
       - .agents/skills/research-topic-workflow/
       - .agents/skills/design-brief-from-research/
       - .agents/skills/sdd-requirements-to-plan/
