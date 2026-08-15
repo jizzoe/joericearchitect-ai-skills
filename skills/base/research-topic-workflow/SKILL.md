@@ -45,6 +45,10 @@ For a path-backed source, `urlOrPath` must canonically identify the exact
 workspace-relative `path` given to the reader; inline content and path-backed
 content are mutually exclusive. Commit findings and sources through one
 atomic writer transaction so neither file can be updated without the other.
+Require a real calendar-date `modelGuidanceLookupDate` in `YYYY-MM-DD` form.
+The durable findings document records the guidance role and, for every shown
+provider, the exact model, official source URL, stale-risk notice, and lookup
+date. Source access dates use the same validated calendar-date form.
 When destination files already exist, supply a bounded reconciliation callback
 that explicitly identifies retained accurate excerpts, removed stale excerpts,
 and unresolved conflicts. Pause on a conflict or incomplete reconciliation;

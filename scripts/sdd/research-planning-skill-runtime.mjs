@@ -35,6 +35,12 @@ function nonEmpty(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function validIsoDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 function result(skill, mode, status, summary, {
   artifacts = [], evidence = [], assumptions = [], openQuestions = [],
   nextAction = { kind: "none", description: "No further action is required." }, details = {}
@@ -77,8 +83,10 @@ function authorize(input, profile, operations) {
 }
 
 function performWrites(operations, writeArtifact) {
+  if (operations.length !== 1) return { error: "The single-artifact writer received a multi-artifact operation." };
   try {
-    for (const operation of operations) writeArtifact(Object.freeze({ ...operation }));
+    const receipt = writeArtifact(Object.freeze({ ...operations[0] }));
+    if (receipt?.committed !== true) return { error: "The bounded artifact writer did not commit." };
     return { committed: true };
   } catch {
     return { error: "The bounded artifact writer failed." };
@@ -134,6 +142,7 @@ function guidanceFor(input) {
   return Object.freeze({
     depth: input.depth,
     role: modelRoles[input.depth],
+    lookupDate: input.modelGuidanceLookupDate,
     providers: Object.freeze(providers.map((provider) => Object.freeze({
       provider,
       exactModel: lastKnownModels[provider][input.depth],
@@ -146,6 +155,9 @@ function guidanceFor(input) {
 
 function displayModelGuidance(input, displayGuidance) {
   if (typeof displayGuidance !== "function") return { error: "Provide a bounded model-guidance display callback." };
+  if (!validIsoDate(input.modelGuidanceLookupDate)) {
+    return { error: "Provide the model-guidance lookup date in YYYY-MM-DD form." };
+  }
   const guidance = guidanceFor(input);
   try {
     displayGuidance(guidance);
@@ -197,7 +209,7 @@ function bullets(values, empty = "- None supplied.") {
   return Array.isArray(values) && values.length > 0 ? values.map((value) => `- ${markdownText(value)}`).join("\n") : empty;
 }
 
-function researchContent(input, sources) {
+function researchContent(input, sources, guidance) {
   const grouped = new Map([...sourceClassifications].map((classification) => [classification, []]));
   for (const source of sources) grouped.get(source.classification).push(source.claim ?? excerpt(source.content));
   const depthSections = {
@@ -227,6 +239,12 @@ function researchContent(input, sources) {
     "",
     "## Recommendations",
     bullets(grouped.get("recommendation")),
+    "",
+    "## Model guidance provenance",
+    `- Role: ${markdownText(guidance.role)}`,
+    `- Lookup date: ${markdownText(guidance.lookupDate)}`,
+    ...guidance.providers.map(({ provider, exactModel, sourceUrl, freshness }) =>
+      `- ${markdownText(provider)}: ${markdownText(exactModel)}; source: ${markdownText(sourceUrl)}; ${markdownText(freshness)}`),
     "",
     ...depthSections[input.depth].flatMap((heading) => [heading, "- See the classified findings and linked sources above.", ""]),
     "## Source material used as data",
@@ -280,7 +298,7 @@ function resolveResearchSources(sources, readArtifact) {
   const resolved = [];
   for (const [index, source] of sources.entries()) {
     if (!source || !nonEmpty(source.id) || !nonEmpty(source.title) || !nonEmpty(source.publisher) ||
-      !nonEmpty(source.urlOrPath) || !nonEmpty(source.accessDate) || !sourceTypes.has(source.sourceType) ||
+      !nonEmpty(source.urlOrPath) || !validIsoDate(source.accessDate) || !sourceTypes.has(source.sourceType) ||
       !nonEmpty(source.relevance) || !sourceClassifications.has(source.classification) || !claimDomains.has(source.claimDomain)) {
       return { error: `Source ${index + 1} is missing required provenance or classification.` };
     }
@@ -516,7 +534,7 @@ export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeAr
   }
   const existingFindings = existingFindingsResolution.content;
   const existingSources = existingSourcesResolution.content;
-  const reconciledFindings = reconcileArtifact(findingsPath, researchContent(input, sourceResolution.sources), existingFindings, reconcileExistingArtifact);
+  const reconciledFindings = reconcileArtifact(findingsPath, researchContent(input, sourceResolution.sources, guidanceDisplay.guidance), existingFindings, reconcileExistingArtifact);
   const reconciledSources = reconcileArtifact(sourcesPath, sourcesContent(input, sourceResolution.sources), existingSources, reconcileExistingArtifact);
   if (reconciledFindings.conflict || reconciledSources.conflict) return gap(skill, mode, "blocked", "existing-artifact-conflict", reconciledFindings.conflict ?? reconciledSources.conflict);
   if (reconciledFindings.error || reconciledSources.error) return gap(skill, mode, "blocked", "existing-artifact-reconciliation", reconciledFindings.error ?? reconciledSources.error);

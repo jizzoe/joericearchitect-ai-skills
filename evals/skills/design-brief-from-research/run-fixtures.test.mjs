@@ -43,7 +43,10 @@ const readArtifact = (artifactPath) => {
 const valid = (value) => assert.deepEqual(validateSkillResult(value), { valid: true, issues: [] });
 const run = (input = base, reader = readArtifact) => {
   const writes = [];
-  const output = executeDesignBriefFromResearch(input, { readArtifact: reader, writeArtifact: (operation) => writes.push(operation) });
+  const output = executeDesignBriefFromResearch(input, {
+    readArtifact: reader,
+    writeArtifact: (operation) => { writes.push(operation); return { committed: true }; }
+  });
   return { output, writes };
 };
 
@@ -53,8 +56,8 @@ test("scenario manifest maps one-to-one to the executable fixtures", () => {
 
 test("trigger and non-trigger select execution behavior and write seven sections", () => {
   let writes = 0;
-  const skipped = executeDesignBriefFromResearch({ ...base, requestKind: "generate-openspec-artifacts" }, { readArtifact, writeArtifact: () => { writes += 1; } });
-  const executed = executeDesignBriefFromResearch(base, { readArtifact, writeArtifact: () => { writes += 1; } });
+  const skipped = executeDesignBriefFromResearch({ ...base, requestKind: "generate-openspec-artifacts" }, { readArtifact, writeArtifact: () => { writes += 1; return { committed: true }; } });
+  const executed = executeDesignBriefFromResearch(base, { readArtifact, writeArtifact: () => { writes += 1; return { committed: true }; } });
   valid(skipped); valid(executed);
   assert.equal(skipped.status, "no-op");
   assert.equal(executed.status, "completed");
@@ -146,6 +149,19 @@ test("confirmed owner decisions require identity, time, and content-bound approv
   assert.equal(invalidNow.openQuestions[0].id, "owner-decision-evidence-required");
 });
 
+test("brief completion requires an explicit committed writer receipt", () => {
+  const missingReceipt = executeDesignBriefFromResearch(base, { readArtifact, writeArtifact: () => undefined });
+  const rejectedReceipt = executeDesignBriefFromResearch(base, { readArtifact, writeArtifact: () => ({ committed: false }) });
+  const thrownWriter = executeDesignBriefFromResearch(base, { readArtifact, writeArtifact: () => { throw new Error("synthetic failure"); } });
+  valid(missingReceipt); valid(rejectedReceipt); valid(thrownWriter);
+  assert.equal(missingReceipt.status, "paused");
+  assert.equal(rejectedReceipt.status, "paused");
+  assert.equal(thrownWriter.status, "paused");
+  assert.equal(missingReceipt.openQuestions[0].id, "artifact-write-failed");
+  assert.equal(rejectedReceipt.openQuestions[0].id, "artifact-write-failed");
+  assert.equal(thrownWriter.openQuestions[0].id, "artifact-write-failed");
+});
+
 test("autonomous brief writes require exact operation authorization", () => {
   const input = {
     ...base,
@@ -155,8 +171,8 @@ test("autonomous brief writes require exact operation authorization", () => {
     now: "2026-08-15T12:00:00.000Z"
   };
   let writes = 0;
-  const allowed = executeDesignBriefFromResearch(input, { readArtifact, writeArtifact: () => { writes += 1; } });
-  const denied = executeDesignBriefFromResearch({ ...input, authorization: { ...input.authorization, allowedMutations: [] } }, { readArtifact, writeArtifact: () => { writes += 1; } });
+  const allowed = executeDesignBriefFromResearch(input, { readArtifact, writeArtifact: () => { writes += 1; return { committed: true }; } });
+  const denied = executeDesignBriefFromResearch({ ...input, authorization: { ...input.authorization, allowedMutations: [] } }, { readArtifact, writeArtifact: () => { writes += 1; return { committed: true }; } });
   valid(allowed); valid(denied);
   assert.equal(allowed.status, "completed");
   assert.equal(denied.status, "paused");

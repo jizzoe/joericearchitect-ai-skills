@@ -41,6 +41,7 @@ const base = {
   topic: "runtime-isolation",
   category: "architecture",
   depth: "standard",
+  modelGuidanceLookupDate: "2026-08-15",
   sources,
   config: { defaults: { researchRoot: "docs/research" } }
 };
@@ -114,6 +115,12 @@ test("generated findings and sources satisfy their content contracts", () => {
   for (const heading of ["Verified facts", "Source-reported claims", "Assistant inferences", "Unknowns", "Recommendations", "Use cases", "SDLC fit", "Project fit"]) {
     assert.match(findings, new RegExp(`## ${heading}`));
   }
+  for (const value of [
+    "## Model guidance provenance",
+    "Lookup date: 2026-08-15",
+    "https://developers.openai.com/codex/models",
+    "https://docs.anthropic.com/en/docs/about-claude/models"
+  ]) assert.equal(findings.includes(value), true);
   for (const field of [source.title, source.publisher, source.urlOrPath, source.accessDate, source.sourceType, source.relevance]) assert.equal(sources.includes(field), true);
 });
 
@@ -122,6 +129,9 @@ test("depth source targets, pause conditions, and pre-execution guidance are enf
   const duplicateSources = run({ ...base, sources: sources.map((entry) => ({ ...entry, urlOrPath: sources[0].urlOrPath })) }).output;
   const secondaryOnly = run({ ...base, sources: sources.map((entry) => ({ ...entry, sourceType: "secondary" })) }).output;
   const misleadingPrimary = run({ ...base, sources: sources.map((entry) => ({ ...entry, sourceType: "not primary" })) }).output;
+  const invalidAccessDate = run({ ...base, sources: sources.map((entry) => ({ ...entry, accessDate: "2026-02-30" })) }).output;
+  const missingGuidanceDate = run({ ...base, modelGuidanceLookupDate: undefined }).output;
+  const invalidGuidanceDate = run({ ...base, modelGuidanceLookupDate: "2026-02-30" }).output;
   const superficialDuplicates = run({
     ...base,
     sources: sources.map((entry, index) => ({
@@ -140,17 +150,22 @@ test("depth source targets, pause conditions, and pre-execution guidance are enf
   }, () => "One local source document.").output;
   const credentialPause = run({ ...base, requiresNewCredentials: true }).output;
   const { output, guidance } = run({ ...base, assistantProvider: undefined });
-  valid(tooShallow); valid(duplicateSources); valid(secondaryOnly); valid(misleadingPrimary); valid(superficialDuplicates); valid(relabeledPath); valid(credentialPause); valid(output);
+  valid(tooShallow); valid(duplicateSources); valid(secondaryOnly); valid(misleadingPrimary); valid(invalidAccessDate);
+  valid(missingGuidanceDate); valid(invalidGuidanceDate); valid(superficialDuplicates); valid(relabeledPath); valid(credentialPause); valid(output);
   assert.equal(tooShallow.status, "blocked");
   assert.equal(tooShallow.openQuestions[0].id, "insufficient-source-depth");
   assert.equal(duplicateSources.status, "blocked");
   assert.equal(secondaryOnly.status, "blocked");
   assert.equal(misleadingPrimary.status, "blocked");
+  assert.equal(invalidAccessDate.status, "blocked");
+  assert.equal(missingGuidanceDate.openQuestions[0].id, "model-guidance-unavailable");
+  assert.equal(invalidGuidanceDate.openQuestions[0].id, "model-guidance-unavailable");
   assert.equal(superficialDuplicates.status, "blocked");
   assert.equal(relabeledPath.status, "blocked");
   assert.equal(credentialPause.openQuestions[0].id, "new-credentials-required");
   assert.equal(guidance.length, 1);
   assert.equal(guidance[0].role, "balanced-standard");
+  assert.equal(guidance[0].lookupDate, "2026-08-15");
   assert.deepEqual(guidance[0].providers.map(({ provider }) => provider), ["codex", "claude"]);
   assert.equal(guidance[0].providers.every(({ freshness }) => freshness.includes("stale-risk")), true);
   assert.equal(guidance[0].sessionModelChanged, false);

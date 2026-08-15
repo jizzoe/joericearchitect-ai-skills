@@ -71,7 +71,11 @@ const validateRequirementsOutcomes = ({ content }) => ({
 const valid = (value) => assert.deepEqual(validateSkillResult(value), { valid: true, issues: [] });
 const run = (input = base, reader = readArtifact, outcomeValidator = validateRequirementsOutcomes) => {
   const writes = [];
-  const output = executeSddRequirementsToPlan(input, { readArtifact: reader, writeArtifact: (operation) => writes.push(operation), validateRequirementsOutcomes: outcomeValidator });
+  const output = executeSddRequirementsToPlan(input, {
+    readArtifact: reader,
+    writeArtifact: (operation) => { writes.push(operation); return { committed: true }; },
+    validateRequirementsOutcomes: outcomeValidator
+  });
   return { output, writes };
 };
 
@@ -81,8 +85,8 @@ test("scenario manifest maps one-to-one to the executable fixtures", () => {
 
 test("trigger and non-trigger select execution behavior and write generated content", () => {
   let writes = 0;
-  const skipped = executeSddRequirementsToPlan({ ...base, requestKind: "choose-product-direction" }, { readArtifact, writeArtifact: () => { writes += 1; } });
-  const executed = executeSddRequirementsToPlan(base, { readArtifact, writeArtifact: () => { writes += 1; }, validateRequirementsOutcomes });
+  const skipped = executeSddRequirementsToPlan({ ...base, requestKind: "choose-product-direction" }, { readArtifact, writeArtifact: () => { writes += 1; return { committed: true }; } });
+  const executed = executeSddRequirementsToPlan(base, { readArtifact, writeArtifact: () => { writes += 1; return { committed: true }; }, validateRequirementsOutcomes });
   valid(skipped); valid(executed);
   assert.equal(skipped.status, "no-op");
   assert.equal(executed.status, "completed");
@@ -224,6 +228,19 @@ test("proposed preapproval is prototype-only, complete, and time bounded", () =>
   assert.equal(accepted.writes[0].content.includes(preapproval.recovery), true);
 });
 
+test("plan completion requires an explicit committed writer receipt", () => {
+  const missingReceipt = executeSddRequirementsToPlan(base, { readArtifact, writeArtifact: () => undefined, validateRequirementsOutcomes });
+  const rejectedReceipt = executeSddRequirementsToPlan(base, { readArtifact, writeArtifact: () => ({ committed: false }), validateRequirementsOutcomes });
+  const thrownWriter = executeSddRequirementsToPlan(base, { readArtifact, writeArtifact: () => { throw new Error("synthetic failure"); }, validateRequirementsOutcomes });
+  valid(missingReceipt); valid(rejectedReceipt); valid(thrownWriter);
+  assert.equal(missingReceipt.status, "paused");
+  assert.equal(rejectedReceipt.status, "paused");
+  assert.equal(thrownWriter.status, "paused");
+  assert.equal(missingReceipt.openQuestions[0].id, "artifact-write-failed");
+  assert.equal(rejectedReceipt.openQuestions[0].id, "artifact-write-failed");
+  assert.equal(thrownWriter.openQuestions[0].id, "artifact-write-failed");
+});
+
 test("autonomous plan writes require exact operation authorization", () => {
   const input = {
     ...base,
@@ -233,8 +250,8 @@ test("autonomous plan writes require exact operation authorization", () => {
     now: "2026-08-15T12:00:00.000Z"
   };
   let writes = 0;
-  const allowed = executeSddRequirementsToPlan(input, { readArtifact, writeArtifact: () => { writes += 1; }, validateRequirementsOutcomes });
-  const denied = executeSddRequirementsToPlan({ ...input, runtime: { permittedOperations: [], permissionGaps: ["local-edit"] } }, { readArtifact, writeArtifact: () => { writes += 1; }, validateRequirementsOutcomes });
+  const allowed = executeSddRequirementsToPlan(input, { readArtifact, writeArtifact: () => { writes += 1; return { committed: true }; }, validateRequirementsOutcomes });
+  const denied = executeSddRequirementsToPlan({ ...input, runtime: { permittedOperations: [], permissionGaps: ["local-edit"] } }, { readArtifact, writeArtifact: () => { writes += 1; return { committed: true }; }, validateRequirementsOutcomes });
   valid(allowed); valid(denied);
   assert.equal(allowed.status, "completed");
   assert.equal(denied.status, "paused");
