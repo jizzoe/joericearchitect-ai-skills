@@ -446,6 +446,8 @@ test("Codex parent transport classifies owned final artifacts without retaining 
     assert.deepEqual(valid.payload, { schemaVersion: 1, findings: [], status: "passed" });
     assert.equal(valid.diagnostics.parse, "valid");
     assert.equal(valid.diagnostics.payload, "valid");
+    fs.writeFileSync(resultPath, JSON.stringify({ schemaVersion: 1, status: "failed", findings: [{ id: "line-suffix", severity: "warning", evidence: "scripts/example.mjs:12", recommendation: "use a file path" }] }));
+    assert.equal(inspectCodexReviewResultArtifact(resultPath).code, "review-launcher-codex-result-payload-invalid");
     fs.writeFileSync(resultPath, JSON.stringify({ schemaVersion: 1, status: "failed", findings: [{ id: "fixture-finding", severity: "high", evidence: "fixture evidence", recommendation: "fixture recommendation" }] }));
     assert.equal(inspectCodexReviewResultArtifact(resultPath).payload.status, "failed");
     fs.symlinkSync(resultPath, linkPath);

@@ -21,6 +21,8 @@ test("review result binds a fresh configured reviewer to one package", () => {
   assert.equal(validateReviewResult({ ...result, unavailableCode: undefined }, { expectedPackage: pack, configuredReviewer, implementerSession: "implementer" }).valid, true);
   assert.equal(validateReviewResult({ ...result, reviewer: { ...result.reviewer, identity: "implementer" } }, { expectedPackage: pack, configuredReviewer, implementerSession: "implementer" }).valid, false);
   assert.equal(validateReviewResult({ ...result, headCommit: "cccccccccccccccccccccccccccccccccccccccc" }, { expectedPackage: pack, configuredReviewer, implementerSession: "implementer" }).valid, false);
+  const lineSuffixedFinding = { id: "line-suffix", severity: "warning", evidence: "scripts/sdd/independent-review-contract.mjs:91", recommendation: "use a repository-relative file path" };
+  assert.equal(validateReviewResult({ ...result, status: "failed", findings: [lineSuffixedFinding] }, { expectedPackage: pack, configuredReviewer, implementerSession: "implementer" }).issues[0].code, "independent-review-result-finding-invalid");
   assert.equal(validateReviewResult({ ...result, startedAt: result.completedAt, completedAt: result.startedAt }, { expectedPackage: pack }).issues[0].code, "independent-review-result-chronology-invalid");
 });
 

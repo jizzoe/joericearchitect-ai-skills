@@ -16,7 +16,7 @@
         "properties": {
           "id": {"type": "string", "minLength": 1},
           "severity": {"enum": ["blocker", "high", "objective-fix", "warning", "false-positive"]},
-          "evidence": {"type": "string", "minLength": 1},
+          "evidence": {"type": "string", "minLength": 1, "pattern": "^[^\\\\/:\\u0000-\\u001F\\u007F]+(?:/[^\\\\/:\\u0000-\\u001F\\u007F]+)*$"},
           "recommendation": {"type": "string", "minLength": 1}
         }
       }

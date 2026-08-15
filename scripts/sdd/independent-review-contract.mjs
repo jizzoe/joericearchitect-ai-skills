@@ -10,6 +10,10 @@ const safePath = (value) => {
   if (!text(value) || /[\\\x00-\x1f\x7f]/.test(value) || path.posix.isAbsolute(value) || path.win32.isAbsolute(value)) return false;
   return value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
 };
+// Reviewer findings identify a committed file, never a line/column location.
+// Keeping the evidence as a path lets the sealed result be checked against the
+// exact detached review tree before it becomes durable evidence.
+const safeFindingEvidencePath = (value) => safePath(value) && !value.includes(":");
 const failure = (code, detail) => ({ valid: false, issues: [{ code, ...(detail ? { detail } : {}) }] });
 const secretLike = /(gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{16,}|-----BEGIN (?:[A-Z ]+)?PRIVATE KEY-----|Bearer\s+[A-Za-z0-9._-]{12,})/i;
 const degradedBoundary = "fresh-separated-reviewer-only";
@@ -88,7 +92,7 @@ export function validateReviewResult(value, { expectedPackage, configuredReviewe
   if (value.reviewer.identity === implementerSession) return failure("independent-review-self-review");
   if (configuredReviewer && (value.reviewer.type !== configuredReviewer.type || value.reviewer.identity !== configuredReviewer.identity || value.attestation.ref !== configuredReviewer.attestation?.ref)) return failure("independent-review-result-attestation-mismatch");
   if (expectedPackage && (value.baseCommit !== expectedPackage.baseCommit || value.headCommit !== expectedPackage.headCommit || value.manifestDigest !== expectedPackage.manifestDigest)) return failure("independent-review-result-stale-input");
-  if (!value.findings.every((finding) => text(finding?.id) && ["blocker", "high", "objective-fix", "warning", "false-positive"].includes(finding.severity) && safePath(finding.evidence) && text(finding.recommendation))) return failure("independent-review-result-finding-invalid");
+  if (!value.findings.every((finding) => text(finding?.id) && ["blocker", "high", "objective-fix", "warning", "false-positive"].includes(finding.severity) && safeFindingEvidencePath(finding.evidence) && text(finding.recommendation))) return failure("independent-review-result-finding-invalid");
   if (Date.parse(value.completedAt) < Date.parse(value.startedAt)) return failure("independent-review-result-chronology-invalid");
   if (value.status === "passed" && value.findings.some((finding) => unresolvedSeverities.has(finding.severity))) return failure("independent-review-result-status-finding-inconsistent");
   return { valid: true, issues: [] };

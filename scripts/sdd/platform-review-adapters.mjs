@@ -434,8 +434,8 @@ export function buildCodexParentStrictReviewToolRequest({ reviewPackage, reposit
   }
 }
 
-export function sealCodexStrictReviewPayload({ payload, reviewPackage, reviewer, executionId = randomUUID(), startedAt = now(), completedAt = now() } = {}) {
-  if (!validFindingPayload(payload) || !reviewPackage || !reviewer?.attestation?.ref) return null;
+export function sealCodexStrictReviewPayload({ payload, reviewPackage, reviewer, reviewPath, executionId = randomUUID(), startedAt = now(), completedAt = now() } = {}) {
+  if (!validFindingPayload(payload) || !findingEvidenceExistsInReviewView(payload, reviewPath) || !reviewPackage || !reviewer?.attestation?.ref) return null;
   const result = {
     schemaVersion: 1,
     reviewRecordId: `strict-${executionId}`,
@@ -498,7 +498,7 @@ export function consumeCodexParentStrictReviewToolResult({ toolRequest, toolResu
     const cleanup = cleanupView();
     return strictParentUnavailable(inspected.diagnostic, cleanup, { diagnostics: inspected.diagnostics });
   }
-  const sealed = sealPayload({ payload: inspected.payload, reviewPackage: state.reviewPackage, reviewer: state.configuredReviewer, executionId: state.executionId, startedAt: state.startedAt, completedAt: clock() });
+  const sealed = sealPayload({ payload: inspected.payload, reviewPackage: state.reviewPackage, reviewer: state.configuredReviewer, reviewPath: state.view.reviewPath, executionId: state.executionId, startedAt: state.startedAt, completedAt: clock() });
   const validation = validateResult(sealed?.result, { expectedPackage: state.reviewPackage, configuredReviewer: state.configuredReviewer, implementerSession: state.implementerSession });
   const cleanup = cleanupView();
   if (!sealed || !validation.valid) {
@@ -973,8 +973,28 @@ function validFindingPayload(value) {
     Array.isArray(value.findings) && value.findings.every((finding) =>
       typeof finding?.id === "string" && finding.id.length > 0 &&
       ["blocker", "high", "objective-fix", "warning", "false-positive"].includes(finding.severity) &&
-      typeof finding.evidence === "string" && finding.evidence.length > 0 &&
+      safeFindingEvidencePath(finding.evidence) &&
       typeof finding.recommendation === "string" && finding.recommendation.length > 0);
+}
+
+function safeFindingEvidencePath(value) {
+  if (typeof value !== "string" || value.length === 0 || /[\\:\x00-\x1f\x7f]/.test(value) || path.posix.isAbsolute(value) || path.win32.isAbsolute(value)) return false;
+  return value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
+}
+
+function findingEvidenceExistsInReviewView(payload, reviewPath) {
+  if (!runtimePath(reviewPath) || !validFindingPayload(payload)) return false;
+  return payload.findings.every((finding) => {
+    const candidate = path.resolve(reviewPath, finding.evidence);
+    const relative = path.relative(reviewPath, candidate);
+    if (relative === "" || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return false;
+    try {
+      const entry = fs.lstatSync(candidate);
+      return entry.isFile() && !entry.isSymbolicLink();
+    } catch {
+      return false;
+    }
+  });
 }
 
 function safeProcessDiagnostic({ adapter, execution, code, category, subject, safeMessage }) {
