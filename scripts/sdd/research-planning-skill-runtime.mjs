@@ -138,13 +138,18 @@ function markdownText(value) {
   return String(value).replace(/\s+/g, " ").trim().replace(/[\\`*_[\]<>#()]/g, "\\$&");
 }
 
+function workspaceLink(value) {
+  const target = String(value).split("/").map((segment) => encodeURIComponent(segment)).join("/");
+  return `[${markdownText(value)}](${target})`;
+}
+
 function bullets(values, empty = "- None supplied.") {
-  return Array.isArray(values) && values.length > 0 ? values.map((value) => `- ${String(value)}`).join("\n") : empty;
+  return Array.isArray(values) && values.length > 0 ? values.map((value) => `- ${markdownText(value)}`).join("\n") : empty;
 }
 
 function researchContent(input, sources) {
   const grouped = new Map([...sourceClassifications].map((classification) => [classification, []]));
-  for (const source of sources) grouped.get(source.classification).push(markdownText(source.claim ?? excerpt(source.content)));
+  for (const source of sources) grouped.get(source.classification).push(source.claim ?? excerpt(source.content));
   const depthSections = {
     quick: ["## Core concepts", "## Top tools and products", "## Key links"],
     standard: ["## Use cases", "## SDLC fit", "## Open-source and paid options", "## Tutorials and articles", "## Project fit"],
@@ -156,7 +161,7 @@ function researchContent(input, sources) {
     `Depth: ${input.depth}`,
     "",
     "## Summary",
-    input.summary ?? `Synthesis of ${sources.length} supplied source${sources.length === 1 ? "" : "s"} for ${input.topic}.`,
+    `Summary: ${markdownText(input.summary ?? `Synthesis of ${sources.length} supplied source${sources.length === 1 ? "" : "s"} for ${input.topic}.`)}`,
     "",
     "## Verified facts",
     bullets(grouped.get("verified-fact")),
@@ -255,43 +260,43 @@ function designBriefContent(input, research, context) {
   const action = input.recommendedNextAction === "openspec-propose" ? "OpenSpec Propose" : "OpenSpec Explore";
   const decisionConfirmed = input.ownerDecisionConfirmed === true;
   return [
-    `# ${input.briefSlug ?? "Design"} design brief`,
+    `# ${markdownText(input.briefSlug ?? "Design")} design brief`,
     "",
     "## 1. Problem and desired outcome",
-    `Problem: ${input.problem}`,
-    `Desired outcome: ${input.desiredOutcome}`,
+    `Problem: ${markdownText(input.problem)}`,
+    `Desired outcome: ${markdownText(input.desiredOutcome)}`,
     "",
     "## 2. Evidence and key findings",
-    ...evidence.map(({ path: sourcePath, content }) => `- [${sourcePath}](${sourcePath}): ${markdownText(excerpt(content))}`),
+    ...evidence.map(({ path: sourcePath, content }) => `- ${workspaceLink(sourcePath)}: ${markdownText(excerpt(content))}`),
     "",
     "## 3. Options considered and tradeoffs",
     bullets(input.options),
     "",
     "## 4. Decisions, assumptions, and owner",
-    `- Owner: ${input.decisionOwner ?? "Not yet named"}`,
-    `- Confirmed decisions: ${decisionConfirmed ? (input.decisions ?? []).join("; ") || input.recommendation : "None; recommendation remains pending owner decision."}`,
-    `- Approval evidence: ${decisionConfirmed ? `${input.decisionApproval.approvedBy} at ${input.decisionApproval.approvedAt}` : "Not supplied."}`,
-    `- Assumptions: ${(input.assumptions ?? []).join("; ") || "None supplied."}`,
+    `- Owner: ${markdownText(input.decisionOwner ?? "Not yet named")}`,
+    `- Confirmed decisions: ${decisionConfirmed ? markdownText((input.decisions ?? []).join("; ") || input.recommendation) : "None; recommendation remains pending owner decision."}`,
+    `- Approval evidence: ${decisionConfirmed ? `${markdownText(input.decisionApproval.approvedBy)} at ${markdownText(input.decisionApproval.approvedAt)}` : "Not supplied."}`,
+    `- Assumptions: ${markdownText((input.assumptions ?? []).join("; ") || "None supplied.")}`,
     "",
     "## 5. Scope, non-goals, constraints, dependencies, and risks",
-    `- Scope: ${input.scope}`,
-    `- Non-goals: ${input.nonGoals}`,
-    `- Constraints: ${(input.constraints ?? []).join("; ") || "None supplied."}`,
-    `- Dependencies: ${(input.dependencies ?? []).join("; ") || "None supplied."}`,
-    `- Risks: ${(input.risks ?? []).join("; ") || "None supplied."}`,
+    `- Scope: ${markdownText(input.scope)}`,
+    `- Non-goals: ${markdownText(input.nonGoals)}`,
+    `- Constraints: ${markdownText((input.constraints ?? []).join("; ") || "None supplied.")}`,
+    `- Dependencies: ${markdownText((input.dependencies ?? []).join("; ") || "None supplied.")}`,
+    `- Risks: ${markdownText((input.risks ?? []).join("; ") || "None supplied.")}`,
     "",
     "## 6. Open questions and blocking decisions",
     bullets(input.unresolvedQuestions),
     "",
     "## 7. Recommended next step",
-    `${decisionConfirmed ? "Owner-confirmed decision" : "Recommendation pending owner confirmation"}: ${input.recommendation}`,
+    `${decisionConfirmed ? "Owner-confirmed decision" : "Recommendation pending owner confirmation"}: ${markdownText(input.recommendation)}`,
     `Recommended workflow action: ${action}. No OpenSpec artifacts were created.`
   ].join("\n") + "\n";
 }
 
 function missingDesignField(input) {
   for (const field of ["problem", "desiredOutcome", "scope", "nonGoals", "recommendation"]) if (!nonEmpty(input[field])) return field;
-  if (!Array.isArray(input.options) || input.options.length === 0) return "options";
+  if (!Array.isArray(input.options) || input.options.length === 0 || !input.options.every(nonEmpty)) return "options";
   return null;
 }
 
@@ -301,7 +306,7 @@ function missingCandidateField(candidate) {
   for (const field of ["outcome", "scope", "nonGoals", "firstAction"]) if (!nonEmpty(candidate[field])) return field;
   if (!deliveryProfiles.has(candidate.deliveryProfile)) return "deliveryProfile";
   for (const field of ["acceptanceEvidence", "sharedResourceHazards", "parallelWork", "evalNeeds", "guardrailNeeds"]) {
-    if (!Array.isArray(candidate[field]) || candidate[field].length === 0) return field;
+    if (!Array.isArray(candidate[field]) || candidate[field].length === 0 || !candidate[field].every(nonEmpty)) return field;
   }
   if (!Array.isArray(candidate.dependencies) || candidate.dependencies.length === 0 || candidate.dependencies.some((dependency) =>
     !dependency || !nonEmpty(dependency.name) || !new Set(["resolved", "unresolved"]).has(dependency.status))) return "dependencies";
@@ -310,7 +315,7 @@ function missingCandidateField(candidate) {
     !new Set(["easy", "moderate", "hard"]).has(candidate.risk.recovery)) return "risk";
   if (!candidate.profileRationale || !nonEmpty(candidate.profileRationale.data) ||
     !nonEmpty(candidate.profileRationale.exposure) || !nonEmpty(candidate.profileRationale.recovery)) return "profileRationale";
-  if (!Array.isArray(candidate.undecidedDecisions)) return "undecidedDecisions";
+  if (!Array.isArray(candidate.undecidedDecisions) || !candidate.undecidedDecisions.every(nonEmpty)) return "undecidedDecisions";
   return null;
 }
 
@@ -337,7 +342,7 @@ function preapprovalIssue(candidate, nowValue) {
 function decisionApprovalIssue(input) {
   if (input.ownerDecisionConfirmed !== true) return null;
   const approval = input.decisionApproval;
-  if (!nonEmpty(input.decisionOwner) || !Array.isArray(input.decisions) || input.decisions.length === 0 ||
+  if (!nonEmpty(input.decisionOwner) || !Array.isArray(input.decisions) || input.decisions.length === 0 || !input.decisions.every(nonEmpty) ||
     !approval || approval.approvedBy !== input.decisionOwner || !nonEmpty(approval.approvedAt) ||
     !/^[0-9a-f]{64}$/.test(approval.sha256 ?? "")) return "Provide owner approval evidence bound to the confirmed decision content.";
   const now = Date.parse(input.now ?? new Date().toISOString());
@@ -363,26 +368,26 @@ function designBriefApprovalIssue(input, designBriefContent) {
 function deliveryPlanContent(input, candidates, resolvedInputs) {
   const nextAction = input.nextOpenSpecAction === "openspec-propose" ? "OpenSpec Propose" : "OpenSpec Explore";
   return [
-    `# ${input.planSlug ?? "Delivery"} plan`,
+    `# ${markdownText(input.planSlug ?? "Delivery")} plan`,
     "",
     ...candidates.flatMap((candidate, index) => {
       const approval = candidate.preapproval
-        ? `Proposed one-change preapproval — target: ${candidate.preapproval.target}; action: ${candidate.preapproval.action}; evidence: ${candidate.preapproval.evidence}; recovery: ${candidate.preapproval.recovery}; expires: ${candidate.preapproval.expiresAt}. This is proposed, not granted.`
+        ? `Proposed one-change preapproval — target: ${markdownText(candidate.preapproval.target)}; action: ${markdownText(candidate.preapproval.action)}; evidence: ${markdownText(candidate.preapproval.evidence)}; recovery: ${markdownText(candidate.preapproval.recovery)}; expires: ${markdownText(candidate.preapproval.expiresAt)}. This is proposed, not granted.`
         : "Normal interactive just-in-time approval applies before merge, merged-topic-branch deletion, and OpenSpec Archive.";
       return [
-        `## Candidate ${index + 1}: ${candidate.name} (proposed)`,
-        `Outcome-oriented milestone: ${candidate.outcome}`,
-        `Delivery profile: ${candidate.deliveryProfile}`,
-        `Profile rationale — data: ${candidate.profileRationale.data}; exposure: ${candidate.profileRationale.exposure}; recovery: ${candidate.profileRationale.recovery}.`,
-        `Scope: ${candidate.scope}`,
-        `Non-goals: ${candidate.nonGoals}`,
+        `## Candidate ${index + 1}: ${markdownText(candidate.name)} (proposed)`,
+        `Outcome-oriented milestone: ${markdownText(candidate.outcome)}`,
+        `Delivery profile: ${markdownText(candidate.deliveryProfile)}`,
+        `Profile rationale — data: ${markdownText(candidate.profileRationale.data)}; exposure: ${markdownText(candidate.profileRationale.exposure)}; recovery: ${markdownText(candidate.profileRationale.recovery)}.`,
+        `Scope: ${markdownText(candidate.scope)}`,
+        `Non-goals: ${markdownText(candidate.nonGoals)}`,
         `Dependencies:\n${bullets(candidate.dependencies.map(({ name, status }) => `${name} (${status})`))}`,
         `Shared-resource hazards:\n${bullets(candidate.sharedResourceHazards)}`,
         `Candidate parallel work:\n${bullets(candidate.parallelWork)}`,
         `Acceptance evidence:\n${bullets(candidate.acceptanceEvidence)}`,
         `Evaluation needs:\n${bullets(candidate.evalNeeds)}`,
         `Guardrail needs:\n${bullets(candidate.guardrailNeeds)}`,
-        `Recommended first change: ${candidate.firstAction}`,
+        `Recommended first change: ${markdownText(candidate.firstAction)}`,
         `Delivery authority: ${approval}`,
         ""
       ];
@@ -390,11 +395,11 @@ function deliveryPlanContent(input, candidates, resolvedInputs) {
     "Live in-flight/actionable/blocked/next-work classification is delegated to dependency-aware-work-selection.",
     "",
     "## Source inputs reviewed",
-    ...resolvedInputs.map(({ path: sourcePath, content }) => `- [${sourcePath}](${sourcePath}): ${markdownText(excerpt(content))}`),
-    `- Target workspace: ${input.targetWorkspace}`,
+    ...resolvedInputs.map(({ path: sourcePath, content }) => `- ${workspaceLink(sourcePath)}: ${markdownText(excerpt(content))}`),
+    `- Target workspace: ${markdownText(input.targetWorkspace)}`,
     "",
     "## Next OpenSpec action",
-    `${nextAction}. It must read ${resolvedInputs.map(({ path: sourcePath }) => sourcePath).join(", ")}. No OpenSpec artifacts or governance records were created.`
+    `${nextAction}. It must read ${markdownText(resolvedInputs.map(({ path: sourcePath }) => sourcePath).join(", "))}. No OpenSpec artifacts or governance records were created.`
   ].join("\n") + "\n";
 }
 

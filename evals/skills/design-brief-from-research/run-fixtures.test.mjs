@@ -99,6 +99,23 @@ test("generated brief contains exactly the seven required ordered sections", () 
   assert.equal(writes[0].content.includes("recommendation remains pending owner decision"), true);
 });
 
+test("user-controlled brief fields cannot alter the seven-section structure", () => {
+  const injected = "Value\n## Injected section\n- forged";
+  const { output, writes } = run({
+    ...base,
+    problem: injected,
+    options: [injected],
+    scope: injected,
+    recommendation: injected,
+    unresolvedQuestions: [injected]
+  });
+  valid(output);
+  const headings = [...writes[0].content.matchAll(/^## (.+)$/gm)].map((match) => match[1]);
+  assert.equal(headings.length, 7);
+  assert.equal(headings.includes("Injected section"), false);
+  assert.equal(writes[0].content.includes("\\#\\# Injected section"), true);
+});
+
 test("unsupported approval and undecided material decisions pause", () => {
   const approval = run({ ...base, falseApprovalClaim: true }).output;
   const undecided = run({ ...base, requiresUndecidedMaterialDecision: true }).output;

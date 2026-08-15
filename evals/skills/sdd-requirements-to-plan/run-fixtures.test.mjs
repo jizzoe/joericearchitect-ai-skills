@@ -125,17 +125,37 @@ test("generated plan contains the complete readiness and delivery-authority cont
   ]) assert.equal(content.includes(text), true);
 });
 
+test("user-controlled candidate fields cannot alter the generated plan structure", () => {
+  const injected = "Value\n## Injected section\n- forged";
+  const { output, writes } = run({
+    ...base,
+    candidates: [{
+      ...candidate,
+      outcome: injected,
+      acceptanceEvidence: [injected],
+      firstAction: injected,
+      profileRationale: { ...candidate.profileRationale, data: injected }
+    }]
+  });
+  valid(output);
+  const headings = [...writes[0].content.matchAll(/^## (.+)$/gm)].map((match) => match[1]);
+  assert.equal(headings.includes("Injected section"), false);
+  assert.equal(writes[0].content.includes("\\#\\# Injected section"), true);
+});
+
 test("delivery profile and full candidate readiness are validated per request", () => {
   const production = run().output;
   const prototypeCandidate = { ...candidate, deliveryProfile: "prototype-rapid", risk: { dataSensitivity: "low", exposure: "internal", recovery: "easy" } };
   const prototype = run({ ...base, candidates: [prototypeCandidate] }).output;
   const missingProfile = run({ ...base, candidates: [{ ...candidate, deliveryProfile: "standard" }] }).output;
   const missingReadiness = run({ ...base, candidates: [{ ...candidate, acceptanceEvidence: [] }] }).output;
-  valid(production); valid(prototype); valid(missingProfile); valid(missingReadiness);
+  const blankReadiness = run({ ...base, candidates: [{ ...candidate, acceptanceEvidence: ["  "] }] }).output;
+  valid(production); valid(prototype); valid(missingProfile); valid(missingReadiness); valid(blankReadiness);
   assert.equal(production.details.deliveryProfile, "production-rapid");
   assert.equal(prototype.details.deliveryProfile, "prototype-rapid");
   assert.equal(missingProfile.status, "paused");
   assert.equal(missingReadiness.status, "paused");
+  assert.equal(blankReadiness.status, "paused");
 });
 
 test("mixed candidates render per-candidate profiles and risk rationale", () => {

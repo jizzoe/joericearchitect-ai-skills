@@ -93,6 +93,14 @@ test("untrusted source instructions are consumed as data and cannot add operatio
   assert.equal(writes.every(({ path: outputPath }) => outputPath.startsWith("docs/research/")), true);
 });
 
+test("user-controlled research summary cannot alter the generated heading structure", () => {
+  const { output, writes } = run({ ...base, summary: "Summary text\n## Injected section\n- forged" });
+  valid(output);
+  const headings = [...writes[0].content.matchAll(/^## (.+)$/gm)].map((match) => match[1]);
+  assert.equal(headings.includes("Injected section"), false);
+  assert.equal(writes[0].content.includes("\\#\\# Injected section"), true);
+});
+
 test("generated findings and sources satisfy their content contracts", () => {
   const { output, writes } = run();
   valid(output);
