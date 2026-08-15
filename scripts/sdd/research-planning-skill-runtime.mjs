@@ -134,7 +134,7 @@ function bullets(values, empty = "- None supplied.") {
   return Array.isArray(values) && values.length > 0 ? values.map((value) => `- ${String(value)}`).join("\n") : empty;
 }
 
-function researchContent(input, sources, existingContent) {
+function researchContent(input, sources) {
   const grouped = new Map([...sourceClassifications].map((classification) => [classification, []]));
   for (const source of sources) grouped.get(source.classification).push(source.claim ?? excerpt(source.content));
   const depthSections = {
@@ -167,12 +167,11 @@ function researchContent(input, sources, existingContent) {
     "",
     ...depthSections[input.depth].flatMap((heading) => [heading, "- See the classified findings and linked sources above.", ""]),
     "## Source material used as data",
-    ...sources.flatMap((source) => [`### ${source.title}`, `> ${excerpt(source.content).replace(/\n/g, "\n> ")}`, ""]),
-    ...(existingContent ? ["## Preserved prior findings", "The prior document is retained verbatim for accuracy reconciliation during this update.", "", existingContent.trim(), ""] : [])
+    ...sources.flatMap((source) => [`### ${source.title}`, `> ${excerpt(source.content).replace(/\n/g, "\n> ")}`, ""])
   ].join("\n").trimEnd() + "\n";
 }
 
-function sourcesContent(input, sources, existingContent) {
+function sourcesContent(input, sources) {
   return [
     `# Sources for ${input.topic}`,
     "",
@@ -185,9 +184,31 @@ function sourcesContent(input, sources, existingContent) {
       `- Relevance: ${source.relevance}`,
       `- Classification: ${source.classification}`,
       ""
-    ]),
-    ...(existingContent ? ["## Preserved prior source record", "", existingContent.trim(), ""] : [])
+    ])
   ].join("\n").trimEnd() + "\n";
+}
+
+function reconcileArtifact(artifactPath, generatedContent, existingContent, reconcileExistingArtifact) {
+  if (!existingContent) return { content: generatedContent, artifactOperation: "created", retained: [], stale: [] };
+  if (typeof reconcileExistingArtifact !== "function") return { error: `Existing artifact requires bounded accuracy reconciliation: ${artifactPath}` };
+  let reconciliation;
+  try {
+    reconciliation = reconcileExistingArtifact(Object.freeze({ artifactPath, generatedContent, existingContent }));
+  } catch {
+    return { error: `Existing artifact reconciliation failed: ${artifactPath}` };
+  }
+  if (!reconciliation || !nonEmpty(reconciliation.content) || !Array.isArray(reconciliation.retained) ||
+    !Array.isArray(reconciliation.stale) || !Array.isArray(reconciliation.conflicts) ||
+    !reconciliation.retained.every(nonEmpty) || !reconciliation.stale.every(nonEmpty) || !reconciliation.conflicts.every(nonEmpty)) {
+    return { error: `Existing artifact reconciliation is incomplete: ${artifactPath}` };
+  }
+  if (reconciliation.conflicts.length > 0) return { conflict: `Existing artifact has unresolved material conflicts: ${artifactPath}` };
+  if (!reconciliation.content.includes(generatedContent.trim()) ||
+    reconciliation.retained.some((item) => !existingContent.includes(item) || !reconciliation.content.includes(item)) ||
+    reconciliation.stale.some((item) => !existingContent.includes(item) || reconciliation.content.includes(item))) {
+    return { error: `Existing artifact reconciliation did not preserve retained content or remove stale content: ${artifactPath}` };
+  }
+  return { content: reconciliation.content, artifactOperation: "updated", retained: reconciliation.retained, stale: reconciliation.stale };
 }
 
 function resolveResearchSources(sources, readArtifact) {
@@ -256,74 +277,76 @@ function missingDesignField(input) {
 
 function missingCandidateField(candidate) {
   if (!candidate || typeof candidate !== "object") return "candidate";
-  for (const field of ["name", "outcome", "scope", "nonGoals", "firstAction", "profileRationale"]) if (!nonEmpty(candidate[field])) return field;
-  for (const field of ["acceptanceEvidence", "dependencies", "sharedResourceHazards", "parallelWork", "evalNeeds", "guardrailNeeds"]) {
+  if (!slugs.test(candidate.name ?? "")) return "name";
+  for (const field of ["outcome", "scope", "nonGoals", "firstAction"]) if (!nonEmpty(candidate[field])) return field;
+  if (!deliveryProfiles.has(candidate.deliveryProfile)) return "deliveryProfile";
+  for (const field of ["acceptanceEvidence", "sharedResourceHazards", "parallelWork", "evalNeeds", "guardrailNeeds"]) {
     if (!Array.isArray(candidate[field]) || candidate[field].length === 0) return field;
   }
+  if (!Array.isArray(candidate.dependencies) || candidate.dependencies.length === 0 || candidate.dependencies.some((dependency) =>
+    !dependency || !nonEmpty(dependency.name) || !new Set(["resolved", "unresolved"]).has(dependency.status))) return "dependencies";
+  if (!candidate.risk || !new Set(["low", "moderate", "high"]).has(candidate.risk.dataSensitivity) ||
+    !new Set(["internal", "external"]).has(candidate.risk.exposure) ||
+    !new Set(["easy", "moderate", "hard"]).has(candidate.risk.recovery)) return "risk";
+  if (!candidate.profileRationale || !nonEmpty(candidate.profileRationale.data) ||
+    !nonEmpty(candidate.profileRationale.exposure) || !nonEmpty(candidate.profileRationale.recovery)) return "profileRationale";
+  if (!Array.isArray(candidate.undecidedDecisions)) return "undecidedDecisions";
   return null;
 }
 
-function preapprovalIssue(input) {
-  const preapproval = input.candidate?.preapproval;
+function preapprovalIssue(candidate, nowValue) {
+  const preapproval = candidate.preapproval;
   if (preapproval === undefined) return null;
   if (!preapproval || typeof preapproval !== "object") return "Provide a structured proposed preapproval.";
-  if (input.deliveryProfile !== "prototype-rapid") return "A one-change preapproval may be proposed only for prototype-rapid.";
+  if (candidate.deliveryProfile !== "prototype-rapid") return "A one-change preapproval may be proposed only for prototype-rapid.";
   for (const field of ["target", "action", "evidence", "recovery", "expiresAt"]) {
     if (!nonEmpty(preapproval[field])) return `Provide the proposed preapproval field: ${field}.`;
   }
   const expiration = Date.parse(preapproval.expiresAt);
-  const now = Date.parse(input.now ?? new Date().toISOString());
+  const now = Date.parse(nowValue ?? new Date().toISOString());
   if (Number.isNaN(expiration) || expiration <= now) return "Provide a valid future proposed preapproval expiration.";
   return null;
 }
 
-function deliveryPlanContent(input, requirements, designBrief) {
-  const candidate = input.candidate;
+function deliveryPlanContent(input, candidates, resolvedInputs) {
   const nextAction = input.nextOpenSpecAction === "openspec-propose" ? "OpenSpec Propose" : "OpenSpec Explore";
-  const approval = candidate.preapproval
-    ? `Proposed one-change preapproval — target: ${candidate.preapproval.target}; action: ${candidate.preapproval.action}; evidence: ${candidate.preapproval.evidence}; recovery: ${candidate.preapproval.recovery}; expires: ${candidate.preapproval.expiresAt}. This is proposed, not granted.`
-    : "Normal interactive just-in-time approval applies before merge, merged-topic-branch deletion, and OpenSpec Archive.";
   return [
     `# ${input.planSlug ?? "Delivery"} plan`,
     "",
-    "## Outcome-oriented milestone",
-    candidate.outcome,
-    "",
-    "## Proposed candidate change",
-    `Proposed change name: ${candidate.name}`,
-    `Delivery profile: ${input.deliveryProfile} — ${candidate.profileRationale}`,
-    "",
-    "## Scope and non-goals",
-    `- Scope: ${candidate.scope}`,
-    `- Non-goals: ${candidate.nonGoals}`,
-    "",
-    "## Dependencies, shared-resource hazards, and parallel work",
-    `Dependencies:\n${bullets(candidate.dependencies)}`,
-    `Shared-resource hazards:\n${bullets(candidate.sharedResourceHazards)}`,
-    `Candidate parallel work:\n${bullets(candidate.parallelWork)}`,
+    ...candidates.flatMap((candidate, index) => {
+      const approval = candidate.preapproval
+        ? `Proposed one-change preapproval — target: ${candidate.preapproval.target}; action: ${candidate.preapproval.action}; evidence: ${candidate.preapproval.evidence}; recovery: ${candidate.preapproval.recovery}; expires: ${candidate.preapproval.expiresAt}. This is proposed, not granted.`
+        : "Normal interactive just-in-time approval applies before merge, merged-topic-branch deletion, and OpenSpec Archive.";
+      return [
+        `## Candidate ${index + 1}: ${candidate.name} (proposed)`,
+        `Outcome-oriented milestone: ${candidate.outcome}`,
+        `Delivery profile: ${candidate.deliveryProfile}`,
+        `Profile rationale — data: ${candidate.profileRationale.data}; exposure: ${candidate.profileRationale.exposure}; recovery: ${candidate.profileRationale.recovery}.`,
+        `Scope: ${candidate.scope}`,
+        `Non-goals: ${candidate.nonGoals}`,
+        `Dependencies:\n${bullets(candidate.dependencies.map(({ name, status }) => `${name} (${status})`))}`,
+        `Shared-resource hazards:\n${bullets(candidate.sharedResourceHazards)}`,
+        `Candidate parallel work:\n${bullets(candidate.parallelWork)}`,
+        `Acceptance evidence:\n${bullets(candidate.acceptanceEvidence)}`,
+        `Evaluation needs:\n${bullets(candidate.evalNeeds)}`,
+        `Guardrail needs:\n${bullets(candidate.guardrailNeeds)}`,
+        `Recommended first change: ${candidate.firstAction}`,
+        `Delivery authority: ${approval}`,
+        ""
+      ];
+    }),
     "Live in-flight/actionable/blocked/next-work classification is delegated to dependency-aware-work-selection.",
     "",
-    "## Acceptance evidence, evaluations, and guardrails",
-    `Acceptance evidence:\n${bullets(candidate.acceptanceEvidence)}`,
-    `Evaluation needs:\n${bullets(candidate.evalNeeds)}`,
-    `Guardrail needs:\n${bullets(candidate.guardrailNeeds)}`,
-    "",
-    "## Recommended first change",
-    candidate.firstAction,
-    "",
-    "## Delivery authority",
-    approval,
-    "",
     "## Source inputs reviewed",
-    `- [${input.requirementsPath}](${input.requirementsPath}): ${excerpt(requirements)}`,
-    `- [${input.designBriefPath}](${input.designBriefPath}): ${excerpt(designBrief)}`,
+    ...resolvedInputs.map(({ path: sourcePath, content }) => `- [${sourcePath}](${sourcePath}): ${excerpt(content)}`),
+    `- Target workspace: ${input.targetWorkspace}`,
     "",
     "## Next OpenSpec action",
-    `${nextAction}. It must read ${input.requirementsPath} and ${input.designBriefPath}. No OpenSpec artifacts or governance records were created.`
+    `${nextAction}. It must read ${resolvedInputs.map(({ path: sourcePath }) => sourcePath).join(", ")}. No OpenSpec artifacts or governance records were created.`
   ].join("\n") + "\n";
 }
 
-export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeArtifact, displayGuidance } = {}) {
+export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeArtifact, displayGuidance, reconcileExistingArtifact } = {}) {
   const skill = "research-topic-workflow";
   const mode = commonMode(input);
   if (input.requestKind !== skill) return noOp(skill, mode);
@@ -359,9 +382,13 @@ export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeAr
   }
   const existingFindings = existingFindingsResolution.content;
   const existingSources = existingSourcesResolution.content;
+  const reconciledFindings = reconcileArtifact(findingsPath, researchContent(input, sourceResolution.sources), existingFindings, reconcileExistingArtifact);
+  const reconciledSources = reconcileArtifact(sourcesPath, sourcesContent(input, sourceResolution.sources), existingSources, reconcileExistingArtifact);
+  if (reconciledFindings.conflict || reconciledSources.conflict) return gap(skill, mode, "blocked", "existing-artifact-conflict", reconciledFindings.conflict ?? reconciledSources.conflict);
+  if (reconciledFindings.error || reconciledSources.error) return gap(skill, mode, "blocked", "existing-artifact-reconciliation", reconciledFindings.error ?? reconciledSources.error);
   const operations = [
-    { operation: "write-findings", path: findingsPath, target: `workspace:${findingsPath}`, contentKind: "research-findings", content: researchContent(input, sourceResolution.sources, existingFindings), artifactOperation: existingFindings ? "updated" : "created" },
-    { operation: "write-sources", path: sourcesPath, target: `workspace:${sourcesPath}`, contentKind: "research-sources", content: sourcesContent(input, sourceResolution.sources, existingSources), artifactOperation: existingSources ? "updated" : "created" }
+    { operation: "write-findings", path: findingsPath, target: `workspace:${findingsPath}`, contentKind: "research-findings", content: reconciledFindings.content, artifactOperation: reconciledFindings.artifactOperation },
+    { operation: "write-sources", path: sourcesPath, target: `workspace:${sourcesPath}`, contentKind: "research-sources", content: reconciledSources.content, artifactOperation: reconciledSources.artifactOperation }
   ];
   const checks = authorize(input, "research-read-only", operations);
   if (checks.some((check) => check.allowed !== true)) return pauseForAuthorization(skill, mode, checks);
@@ -371,6 +398,7 @@ export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeAr
     evidence: [
       { id: "input-validation", type: "validation", subject: `${input.depth} research request and source content`, result: "passed" },
       { id: "source-boundary", type: "validation", subject: "source content treated as untrusted data", result: "passed" },
+      { id: "existing-content-reconciliation", type: "validation", subject: "retained, stale, and conflicting prior content", result: "passed" },
       ...(mode === "autonomous" ? [{ id: "operation-authorization", type: "validation", subject: "research-read-only writes", result: "passed" }] : [])
     ],
     details: { depth: input.depth, sourceIds: sourceResolution.sources.map((source) => source.id), modelGuidanceDisplayed: true, modelRole: guidanceDisplay.guidance.role }
@@ -385,6 +413,7 @@ export function executeDesignBriefFromResearch(input = {}, { readArtifact, write
     return gap(skill, mode, "paused", "missing-research", "Provide at least one resolvable workspace-relative research path.");
   }
   const contextPaths = Array.isArray(input.contextPaths) ? input.contextPaths : [];
+  if (contextPaths.length === 0) return gap(skill, mode, "paused", "missing-context", "Provide at least one relevant requirements, plan, or current-context path.");
   if (contextPaths.some((entry) => !safeWorkspacePath(entry))) return gap(skill, mode, "paused", "missing-context", "Provide only resolvable workspace-relative context paths.");
   const resolvedResearch = resolveArtifacts(input.researchPaths, readArtifact);
   if (resolvedResearch.error) return gap(skill, mode, "paused", "missing-research", resolvedResearch.error);
@@ -422,21 +451,31 @@ export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeAr
   if (input.requestKind !== skill) return noOp(skill, mode);
   if (!safeWorkspacePath(input.requirementsPath)) return gap(skill, mode, "paused", "missing-requirements", "Provide a workspace-relative accepted-requirements path.");
   if (!safeWorkspacePath(input.designBriefPath)) return gap(skill, mode, "paused", "missing-design-brief", "Provide a workspace-relative approved design-brief path.");
-  const resolved = resolveArtifacts([input.requirementsPath, input.designBriefPath], readArtifact);
+  if (!safeWorkspacePath(input.targetWorkspace)) return gap(skill, mode, "paused", "missing-target-workspace", "Provide a safe target repository or workspace path.");
+  if (!Array.isArray(input.currentStatePaths) || input.currentStatePaths.length === 0) return gap(skill, mode, "paused", "missing-current-state", "Provide at least one current-state path.");
+  const resolved = resolveArtifacts([input.requirementsPath, input.designBriefPath, ...input.currentStatePaths], readArtifact);
   if (resolved.error) return gap(skill, mode, "paused", "unresolved-source-path", resolved.error);
-  if (!deliveryProfiles.has(input.deliveryProfile)) return gap(skill, mode, "paused", "missing-delivery-profile", "Select prototype-rapid or production-rapid for this candidate.");
   if (Array.isArray(input.readinessGaps) && input.readinessGaps.length > 0) {
     return gap(skill, mode, "paused", "readiness-gap", String(input.readinessGaps[0]));
   }
-  const missingField = missingCandidateField(input.candidate);
-  if (missingField) return gap(skill, mode, "paused", "readiness-gap", `Provide the candidate readiness field: ${missingField}.`);
-  const invalidPreapproval = preapprovalIssue(input);
-  if (invalidPreapproval) return gap(skill, mode, "paused", "invalid-preapproval", invalidPreapproval);
+  const candidates = Array.isArray(input.candidates) ? input.candidates : [];
+  if (candidates.length === 0) return gap(skill, mode, "paused", "readiness-gap", "Provide at least one candidate change.");
+  for (const candidate of candidates) {
+    const missingField = missingCandidateField(candidate);
+    if (missingField) return gap(skill, mode, "paused", "readiness-gap", `Provide the candidate readiness field for ${candidate?.name ?? "unnamed candidate"}: ${missingField}.`);
+    if (candidate.dependencies.some(({ status }) => status === "unresolved")) return gap(skill, mode, "paused", "unresolved-dependency", `Resolve dependencies for candidate ${candidate.name}.`);
+    if (candidate.undecidedDecisions.length > 0) return gap(skill, mode, "paused", "owner-decision-required", `Resolve the ${candidate.undecidedDecisions[0]} decision for candidate ${candidate.name}.`);
+    if (candidate.deliveryProfile === "prototype-rapid" && (candidate.risk.dataSensitivity === "high" || candidate.risk.exposure === "external" || candidate.risk.recovery === "hard")) {
+      return gap(skill, mode, "paused", "profile-risk-conflict", `The prototype-rapid profile conflicts with the risk constraints for candidate ${candidate.name}.`);
+    }
+    const invalidPreapproval = preapprovalIssue(candidate, input.now);
+    if (invalidPreapproval) return gap(skill, mode, "paused", "invalid-preapproval", invalidPreapproval);
+  }
   const outputPath = input.outputPath ?? (safeWorkspacePath(input.config?.defaults?.planRoot) && slugs.test(input.planSlug ?? "")
     ? path.posix.join(input.config.defaults.planRoot, `${input.planSlug}.md`) : null);
   if (!safeWorkspacePath(outputPath)) return gap(skill, mode, "paused", "missing-output", "Provide a safe workspace-relative delivery-plan output path.");
   if (typeof writeArtifact !== "function") return gap(skill, mode, "paused", "missing-writer", "Provide a bounded artifact writer.");
-  const operations = [{ operation: "local-edit", path: outputPath, target: `workspace:${outputPath}`, contentKind: "delivery-plan", content: deliveryPlanContent(input, resolved.artifacts[0].content, resolved.artifacts[1].content) }];
+  const operations = [{ operation: "local-edit", path: outputPath, target: `workspace:${outputPath}`, contentKind: "delivery-plan", content: deliveryPlanContent(input, candidates, resolved.artifacts) }];
   const checks = authorize(input, "local-implementation", operations);
   if (checks.some((check) => check.allowed !== true)) return pauseForAuthorization(skill, mode, checks);
   performWrites(operations, writeArtifact);
@@ -448,6 +487,6 @@ export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeAr
       ...(mode === "autonomous" ? [{ id: "operation-authorization", type: "validation", subject: "local-implementation plan write", result: "passed" }] : [])
     ],
     nextAction: { kind: input.nextOpenSpecAction === "openspec-propose" ? "openspec-propose" : "openspec-explore", description: "Review the plan and source paths before the next OpenSpec action." },
-    details: { deliveryProfile: input.deliveryProfile, openspecArtifactsCreated: false, governanceRecordsCreated: false, liveStateDelegatedTo: "dependency-aware-work-selection" }
+    details: { deliveryProfile: candidates.length === 1 ? candidates[0].deliveryProfile : "mixed", deliveryProfiles: candidates.map(({ name, deliveryProfile }) => ({ name, deliveryProfile })), openspecArtifactsCreated: false, governanceRecordsCreated: false, liveStateDelegatedTo: "dependency-aware-work-selection" }
   });
 }

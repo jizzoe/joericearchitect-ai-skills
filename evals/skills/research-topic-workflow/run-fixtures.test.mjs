@@ -45,10 +45,10 @@ const base = {
 };
 const valid = (value) => assert.deepEqual(validateSkillResult(value), { valid: true, issues: [] });
 const emptyReader = () => undefined;
-const run = (input = base, readArtifact = emptyReader) => {
+const run = (input = base, readArtifact = emptyReader, reconcileExistingArtifact) => {
   const writes = [];
   const guidance = [];
-  const output = executeResearchTopicWorkflow(input, { readArtifact, writeArtifact: (operation) => writes.push(operation), displayGuidance: (value) => guidance.push(value) });
+  const output = executeResearchTopicWorkflow(input, { readArtifact, writeArtifact: (operation) => writes.push(operation), displayGuidance: (value) => guidance.push(value), reconcileExistingArtifact });
   return { output, writes, guidance };
 };
 
@@ -119,15 +119,25 @@ test("depth source targets, pause conditions, and pre-execution guidance are enf
 test("existing findings and source records are preserved and reported as updates", () => {
   const priorFindings = "# Prior findings\n\nStill-accurate fact.";
   const priorSources = "# Prior sources\n\nStill-current source.";
-  const { output, writes } = run(base, (artifactPath) => {
+  const reader = (artifactPath) => {
     if (artifactPath.endsWith("runtime-isolation-findings.md")) return priorFindings;
     if (artifactPath.endsWith("sources.md")) return priorSources;
     return undefined;
-  });
+  };
+  const reconcile = ({ artifactPath, generatedContent }) => artifactPath.endsWith("sources.md")
+    ? { content: `${generatedContent}\nStill-current source.\n`, retained: ["Still-current source."], stale: ["# Prior sources"], conflicts: [] }
+    : { content: `${generatedContent}\nStill-accurate fact.\n`, retained: ["Still-accurate fact."], stale: ["# Prior findings"], conflicts: [] };
+  const { output, writes } = run(base, reader, reconcile);
   valid(output);
   assert.deepEqual(output.artifacts.map(({ operation }) => operation), ["updated", "updated"]);
-  assert.equal(writes[0].content.includes(priorFindings), true);
-  assert.equal(writes[1].content.includes(priorSources), true);
+  assert.equal(writes[0].content.includes("Still-accurate fact."), true);
+  assert.equal(writes[0].content.includes("# Prior findings"), false);
+  assert.equal(writes[1].content.includes("Still-current source."), true);
+  assert.equal(writes[1].content.includes("# Prior sources"), false);
+  const unreconciled = run(base, reader).output;
+  valid(unreconciled);
+  assert.equal(unreconciled.status, "blocked");
+  assert.equal(unreconciled.openQuestions[0].id, "existing-artifact-reconciliation");
   const unreadable = run(base, () => { throw new Error("permission denied"); }).output;
   valid(unreadable);
   assert.equal(unreadable.status, "blocked");

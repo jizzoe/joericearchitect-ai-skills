@@ -10,10 +10,12 @@
 
 - Failure signature: `independent-review/high/research-existing-content-overwritten/merge-pr`
 - Disposition: objective fix
-- Correction: the bounded reader checks both destination artifacts before
-  writing. Existing content is retained verbatim in a reconciliation section,
-  and the result reports `updated` rather than `created`. A synthetic fixture
-  asserts preservation for both files.
+- Historical correction: the bounded reader checked both destination
+  artifacts and retained their content verbatim. Strict review record
+  `strict-f7e240d5-78e2-4881-a117-810c8e1a948b` found that retaining stale
+  content wholesale was insufficient. The superseding bounded selective-
+  reconciliation correction is recorded in
+  `review-correction-planning-and-reconciliation.md`.
 
 ## Depth source targets
 

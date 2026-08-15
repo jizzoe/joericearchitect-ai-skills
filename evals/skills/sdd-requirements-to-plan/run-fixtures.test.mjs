@@ -18,7 +18,8 @@ const expectedScenarioNames = [
 ];
 const contents = new Map([
   ["docs/requirements/accepted.md", "Outcome: strict isolated review succeeds. Acceptance: no degraded fallback."],
-  ["docs/briefs/approved.md", "Decision: use a sealed read-only reviewer with exact-head evidence."]
+  ["docs/briefs/approved.md", "Decision: use a sealed read-only reviewer with exact-head evidence."],
+  ["docs/context/current.md", "Current state: the strict adapter is configured."]
 ]);
 const candidate = {
   name: "harden-independent-review-runtime",
@@ -26,21 +27,25 @@ const candidate = {
   scope: "Resolve inputs and generate bounded local artifacts.",
   nonGoals: "No GitHub or OpenSpec lifecycle mutation.",
   acceptanceEvidence: ["Exact-head strict review passes"],
-  dependencies: ["Independent-review adapter is configured"],
+  deliveryProfile: "production-rapid",
+  dependencies: [{ name: "Independent-review adapter is configured", status: "resolved" }],
   sharedResourceHazards: ["Generated config is shared by three skills"],
   parallelWork: ["Documentation can be reviewed independently"],
   evalNeeds: ["Synthetic nonexistent-path and untrusted-content fixtures"],
   guardrailNeeds: ["All paths remain workspace-relative"],
   firstAction: "Add executable input-resolution fixtures.",
-  profileRationale: "Production behavior requires strict evidence and recoverable local writes."
+  risk: { dataSensitivity: "moderate", exposure: "internal", recovery: "moderate" },
+  profileRationale: { data: "Moderate data sensitivity.", exposure: "Internal execution boundary.", recovery: "A local commit can be reverted." },
+  undecidedDecisions: []
 };
 const base = {
   requestKind: "sdd-requirements-to-plan",
   mode: "interactive",
   requirementsPath: "docs/requirements/accepted.md",
   designBriefPath: "docs/briefs/approved.md",
-  deliveryProfile: "production-rapid",
-  candidate,
+  targetWorkspace: ".",
+  currentStatePaths: ["docs/context/current.md"],
+  candidates: [candidate],
   planSlug: "research-delivery",
   config: { defaults: { planRoot: "docs/plans" } },
   nextOpenSpecAction: "openspec-propose"
@@ -98,8 +103,8 @@ test("generated plan contains the complete readiness and delivery-authority cont
   const { writes } = run();
   const content = writes[0].content;
   for (const text of [
-    "Outcome-oriented milestone", "Proposed candidate change", "Scope and non-goals",
-    "Dependencies, shared-resource hazards, and parallel work", "Acceptance evidence, evaluations, and guardrails",
+    "Outcome-oriented milestone", "Candidate 1: harden-independent-review-runtime (proposed)", "Scope:",
+    "Shared-resource hazards:", "Acceptance evidence:",
     "Recommended first change", "Normal interactive just-in-time approval", "dependency-aware-work-selection",
     base.requirementsPath, base.designBriefPath, "OpenSpec Propose"
   ]) assert.equal(content.includes(text), true);
@@ -107,14 +112,36 @@ test("generated plan contains the complete readiness and delivery-authority cont
 
 test("delivery profile and full candidate readiness are validated per request", () => {
   const production = run().output;
-  const prototype = run({ ...base, deliveryProfile: "prototype-rapid" }).output;
-  const missingProfile = run({ ...base, deliveryProfile: "standard" }).output;
-  const missingReadiness = run({ ...base, candidate: { ...candidate, acceptanceEvidence: [] } }).output;
+  const prototypeCandidate = { ...candidate, deliveryProfile: "prototype-rapid", risk: { dataSensitivity: "low", exposure: "internal", recovery: "easy" } };
+  const prototype = run({ ...base, candidates: [prototypeCandidate] }).output;
+  const missingProfile = run({ ...base, candidates: [{ ...candidate, deliveryProfile: "standard" }] }).output;
+  const missingReadiness = run({ ...base, candidates: [{ ...candidate, acceptanceEvidence: [] }] }).output;
   valid(production); valid(prototype); valid(missingProfile); valid(missingReadiness);
   assert.equal(production.details.deliveryProfile, "production-rapid");
   assert.equal(prototype.details.deliveryProfile, "prototype-rapid");
   assert.equal(missingProfile.status, "paused");
   assert.equal(missingReadiness.status, "paused");
+});
+
+test("mixed candidates render per-candidate profiles and risk rationale", () => {
+  const prototype = { ...candidate, name: "prototype-review-ui", deliveryProfile: "prototype-rapid", risk: { dataSensitivity: "low", exposure: "internal", recovery: "easy" } };
+  const mixed = run({ ...base, candidates: [candidate, prototype] });
+  valid(mixed.output);
+  assert.equal(mixed.output.status, "completed");
+  assert.equal(mixed.output.details.deliveryProfile, "mixed");
+  assert.equal(mixed.writes[0].content.includes("Delivery profile: production-rapid"), true);
+  assert.equal(mixed.writes[0].content.includes("Delivery profile: prototype-rapid"), true);
+  assert.equal(mixed.writes[0].content.match(/Profile rationale — data:/g).length, 2);
+});
+
+test("structured dependencies, risk, and undecided decisions derive planning pauses", () => {
+  const unresolved = run({ ...base, candidates: [{ ...candidate, dependencies: [{ name: "Review adapter", status: "unresolved" }] }] }).output;
+  const riskConflict = run({ ...base, candidates: [{ ...candidate, deliveryProfile: "prototype-rapid", risk: { dataSensitivity: "high", exposure: "internal", recovery: "easy" } }] }).output;
+  const undecided = run({ ...base, candidates: [{ ...candidate, undecidedDecisions: ["security"] }] }).output;
+  for (const output of [unresolved, riskConflict, undecided]) valid(output);
+  assert.equal(unresolved.openQuestions[0].id, "unresolved-dependency");
+  assert.equal(riskConflict.openQuestions[0].id, "profile-risk-conflict");
+  assert.equal(undecided.openQuestions[0].id, "owner-decision-required");
 });
 
 test("proposed preapproval is prototype-only, complete, and time bounded", () => {
@@ -125,10 +152,11 @@ test("proposed preapproval is prototype-only, complete, and time bounded", () =>
     recovery: "revert the merge commit",
     expiresAt: "2026-08-16T00:00:00.000Z"
   };
-  const wrongProfile = run({ ...base, candidate: { ...candidate, preapproval }, now: "2026-08-15T12:00:00.000Z" }).output;
-  const missingField = run({ ...base, deliveryProfile: "prototype-rapid", candidate: { ...candidate, preapproval: { ...preapproval, recovery: "" } }, now: "2026-08-15T12:00:00.000Z" }).output;
-  const expired = run({ ...base, deliveryProfile: "prototype-rapid", candidate: { ...candidate, preapproval: { ...preapproval, expiresAt: "2026-08-14T00:00:00.000Z" } }, now: "2026-08-15T12:00:00.000Z" }).output;
-  const accepted = run({ ...base, deliveryProfile: "prototype-rapid", candidate: { ...candidate, preapproval }, now: "2026-08-15T12:00:00.000Z" });
+  const prototype = { ...candidate, deliveryProfile: "prototype-rapid", risk: { dataSensitivity: "low", exposure: "internal", recovery: "easy" } };
+  const wrongProfile = run({ ...base, candidates: [{ ...candidate, preapproval }], now: "2026-08-15T12:00:00.000Z" }).output;
+  const missingField = run({ ...base, candidates: [{ ...prototype, preapproval: { ...preapproval, recovery: "" } }], now: "2026-08-15T12:00:00.000Z" }).output;
+  const expired = run({ ...base, candidates: [{ ...prototype, preapproval: { ...preapproval, expiresAt: "2026-08-14T00:00:00.000Z" } }], now: "2026-08-15T12:00:00.000Z" }).output;
+  const accepted = run({ ...base, candidates: [{ ...prototype, preapproval }], now: "2026-08-15T12:00:00.000Z" });
   for (const output of [wrongProfile, missingField, expired, accepted.output]) valid(output);
   assert.equal(wrongProfile.status, "paused");
   assert.equal(missingField.status, "paused");
