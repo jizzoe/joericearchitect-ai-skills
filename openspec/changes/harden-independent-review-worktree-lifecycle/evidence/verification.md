@@ -4,15 +4,16 @@
 
 | Dimension | Status |
 |---|---|
-| Completeness | 18/19 tasks complete; only separately authorized delivery remains |
+| Completeness | 19/19 tasks complete |
 | Correctness | 3/3 requirements and 20/20 scenarios mapped to implementation, tests, or runtime evidence |
 | Coherence | Design followed; canonical policy remains assistant-neutral and wrappers remain thin |
 
 ## Completeness
 
-All implementation tasks, Apply verification, and the exact-head independent
-review are complete. The remaining task is intentionally gated: task 5.3
-requires separate authorization for delivery artifacts and PR linkage.
+All implementation tasks, Apply verification, exact-head independent review,
+and authorized delivery linkage are complete. Issue #95 and PR #96 provide
+the delivery record; Sync, Archive, merge, and GitHub Project mutation remain
+outside this authorization.
 
 The lifecycle request, host-owned view, common diagnostic envelope, direct
 strict parent transport, neutral launch directory, isolated Codex state, and
@@ -36,15 +37,15 @@ on macOS established the previously ambiguous boundary:
 - installed Claude reaches its clean terminal authentication refusal, so Claude
   login remains an external setup prerequisite rather than a sandbox defect.
 
-The final Apply checks passed: 259 Node tests, 23 focused detached-view/adapter
+The final Apply checks passed: 262 Node tests, 23 focused detached-view/adapter
 tests, adapter-drift validation, shared-guardrail validation, whitespace and
 changed-content secret-pattern review, strict validation of this change, and
 all 26 strict OpenSpec items.
 
-The repaired implementation head subsequently received accepted strict Codex
-independent review with zero findings. The record binds the immutable base,
-head, and manifest and confirms fresh, read-only, network-disabled execution
-from a neutral parent with owned cleanup. See
+The repaired implementation and then the linked-tracking head each received an
+accepted strict Codex independent review with zero findings. The latest record
+binds the immutable base, head, and manifest and confirms fresh, read-only,
+network-disabled execution from a neutral parent with owned cleanup. See
 `evidence/strict-independent-review.md`.
 
 ## Coherence
@@ -62,8 +63,6 @@ dependency were added.
 
 ## Issues
 
-- CRITICAL: task 5.3 requires separately authorized delivery artifacts and PR
-  linkage; it is intentionally not started.
 - WARNING: Claude cannot currently act as the reviewer on this machine because
   its CLI is not logged in; Codex is authenticated and does not share this
   prerequisite.
@@ -71,5 +70,6 @@ dependency were added.
 
 ## Assessment
 
-Apply verification and exact-head strict Codex review pass. The change is not
-ready to archive or merge until task 5.3 is separately authorized and complete.
+Apply verification, exact-head strict Codex review, and authorized PR linkage
+pass. The change is ready for a separately authorized Sync, Archive, or merge;
+none of those actions were performed here.

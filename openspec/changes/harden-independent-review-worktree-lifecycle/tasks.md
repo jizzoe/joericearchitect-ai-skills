@@ -90,7 +90,8 @@
   Do not reuse a result after the head changes. Depends on: 5.1. Evidence:
   `evidence/strict-independent-review.md` records the accepted zero-finding
   strict-isolated result bound to the final repaired implementation head.
-- [ ] 5.3 Complete authorized delivery artifacts and PR linkage, including
+- [x] 5.3 Complete authorized delivery artifacts and PR linkage, including
   `OpenSpec change: harden-independent-review-worktree-lifecycle`; do not
   create or mutate GitHub tracking, Sync, Archive, or merge without the
-  applicable separate authorization. Depends on: 5.2.
+  applicable separate authorization. Depends on: 5.2. Evidence:
+  `evidence/delivery-pr.md` records issue #95 and PR #96.
