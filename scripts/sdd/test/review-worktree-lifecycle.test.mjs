@@ -33,7 +33,8 @@ const authorization = {
     repositoryPath: "/fixture",
     baseCommit: reviewPackage.baseCommit,
     headCommit: reviewPackage.headCommit,
-    manifestDigest: reviewPackage.manifestDigest
+    manifestDigest: reviewPackage.manifestDigest,
+    sourceRequestDigest: "a".repeat(64)
   }
 };
 
@@ -73,6 +74,10 @@ test("lifecycle validation rejects expired, unbound, and changed-head requests b
     ...input,
     authorization: { ...authorization, reviewWorktreeLifecycle: { ...authorization.reviewWorktreeLifecycle, headCommit: "4".repeat(40) } }
   }).code, "review-worktree-lifecycle-scope-mismatch");
+  assert.equal(prepareReviewWorktreeLifecycle({
+    ...input,
+    sourceRequestDigest: "b".repeat(64)
+  }).code, "review-worktree-lifecycle-parent-binding-mismatch");
 
   const prepared = prepareReviewWorktreeLifecycle(input, { lifecycleId: "fixture-lifecycle" });
   let called = false;

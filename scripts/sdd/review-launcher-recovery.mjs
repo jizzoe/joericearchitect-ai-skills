@@ -55,10 +55,17 @@ function executableMatches(value, definition) {
 
 export function reviewLauncherRequestDigest({ schemaVersion, launchId, request } = {}) {
   if (schemaVersion !== 1 || !text(launchId) || !request) return null;
-  return createHash("sha256").update(canonicalJson({ schemaVersion, launchId, request })).digest("hex");
+  const digestRequest = structuredClone(request);
+  // The exact lifecycle record names this parent digest. Exclude only that
+  // self-reference from the digest input; host validation separately requires
+  // the field to equal the recomputed parent digest.
+  if (digestRequest.authorization?.reviewWorktreeLifecycle) {
+    delete digestRequest.authorization.reviewWorktreeLifecycle.sourceRequestDigest;
+  }
+  return createHash("sha256").update(canonicalJson({ schemaVersion, launchId, request: digestRequest })).digest("hex");
 }
 
-export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, repositoryPath, strictResult, launcher, runtime, reviewer, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
+export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, repositoryPath, sourceRequestDigest, strictResult, launcher, runtime, reviewer, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
   const packageCheck = validateReviewPackage(reviewPackage);
   if (!packageCheck.valid) return fail(packageCheck.issues[0].code);
   if (!text(authorization?.implementerSession) || !text(reviewer?.identity)) return fail("review-launcher-identity-binding-missing");
@@ -86,7 +93,7 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
   if (!Array.isArray(runtime?.permittedReviewLaunchers) || !runtime.permittedReviewLaunchers.includes(launcher.id)) {
     return fail("review-launcher-runtime-permission-required");
   }
-  const worktreeLifecycle = validateReviewWorktreeLifecycle({ authorization, selectedEntry, transition, reviewPackage, repositoryPath, now });
+  const worktreeLifecycle = validateReviewWorktreeLifecycle({ authorization, selectedEntry, transition, reviewPackage, repositoryPath, sourceRequestDigest, now });
   if (!worktreeLifecycle.allowed) return fail(worktreeLifecycle.code);
   return {
     allowed: true,
@@ -119,8 +126,17 @@ export function prepareReviewLauncherRecovery(request, { launchId = randomUUID()
   delete sealedRequest.now;
   const hostRequest = { schemaVersion: 1, launchId, request: sealedRequest };
   hostRequest.requestDigest = reviewLauncherRequestDigest(hostRequest);
+  // The standing policy authorizes derivation of one exact lifecycle record.
+  // Bind that derived record only after the parent request has been sealed so
+  // its authorization independently names the request it may service without
+  // introducing a recursive parent digest.
+  const lifecycleAuthorization = {
+    ...request.authorization.reviewWorktreeLifecycle,
+    sourceRequestDigest: hostRequest.requestDigest
+  };
+  hostRequest.request.authorization.reviewWorktreeLifecycle = lifecycleAuthorization;
   const worktreeLifecycle = prepareReviewWorktreeLifecycle({
-    authorization: request.authorization,
+    authorization: hostRequest.request.authorization,
     selectedEntry: request.selectedEntry,
     transition: request.transition,
     reviewPackage: request.reviewPackage,
@@ -135,7 +151,8 @@ export function prepareReviewLauncherRecovery(request, { launchId = randomUUID()
     code: "review-launcher-external-host-required",
     hostRequest,
     expectedRecovery: preflight.recovery,
-    worktreeLifecycleRequest: worktreeLifecycle.lifecycleRequest
+    worktreeLifecycleRequest: worktreeLifecycle.lifecycleRequest,
+    worktreeLifecycleAuthorization: worktreeLifecycle.authorization
   };
 }
 
@@ -154,7 +171,7 @@ export function acceptReviewLauncherHostResponse({ prepared, response, runtimeRe
   const requestDigest = reviewLauncherRequestDigest(hostRequest);
   if (prepared?.allowed !== true || prepared.code !== "review-launcher-external-host-required" ||
       requestDigest !== hostRequest?.requestDigest) return fail("review-launcher-prepared-request-invalid");
-  const preflight = validateReviewLauncherRecovery({ ...hostRequest.request, now });
+  const preflight = validateReviewLauncherRecovery({ ...hostRequest.request, sourceRequestDigest: requestDigest, now });
   if (!preflight.allowed) return preflight;
   if (response?.allowed !== true || response.code !== "review-launcher-host-complete" ||
       response.launchId !== hostRequest.launchId || response.requestDigest !== requestDigest ||

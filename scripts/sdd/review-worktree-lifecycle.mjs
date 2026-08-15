@@ -24,13 +24,16 @@ export function reviewWorktreeLifecycleRequestDigest(value) {
   return lifecycleDigest(value);
 }
 
-function validRecord(record, { selectedEntry, transition, reviewPackage, authorization, repositoryPath, now }) {
+function validRecord(record, { selectedEntry, transition, reviewPackage, authorization, repositoryPath, sourceRequestDigest, now }) {
   if (record?.enabled !== true || record.operation !== detachedWorktreeOperation ||
       record.change !== selectedEntry || !Array.isArray(record.transitions) || !record.transitions.includes(transition) ||
       !text(record.repositoryPath) || record.repositoryPath !== repositoryPath ||
       record.baseCommit !== reviewPackage.baseCommit || record.headCommit !== reviewPackage.headCommit ||
       record.manifestDigest !== reviewPackage.manifestDigest) {
     return "review-worktree-lifecycle-scope-mismatch";
+  }
+  if (sourceRequestDigest !== undefined && (!digest(sourceRequestDigest) || record.sourceRequestDigest !== sourceRequestDigest)) {
+    return "review-worktree-lifecycle-parent-binding-mismatch";
   }
   const expiresAt = Date.parse(record.expiresAt);
   const goalExpiresAt = Date.parse(authorization?.expiresAt ?? authorization?.stoppingConditions?.expiresAt);
@@ -41,13 +44,13 @@ function validRecord(record, { selectedEntry, transition, reviewPackage, authori
 }
 
 /** Validate the authorization record before any host lifecycle request exists. */
-export function validateReviewWorktreeLifecycle({ authorization, selectedEntry, transition = "merge-pr", reviewPackage, repositoryPath, now = new Date().toISOString() } = {}) {
+export function validateReviewWorktreeLifecycle({ authorization, selectedEntry, transition = "merge-pr", reviewPackage, repositoryPath, sourceRequestDigest, now = new Date().toISOString() } = {}) {
   const packageCheck = validateReviewPackage(reviewPackage);
   if (!packageCheck.valid) return fail(packageCheck.issues[0].code, { subject: "sealed-review-package", safeMessage: "The sealed review package is not valid for a worktree lifecycle." });
   if (!text(repositoryPath) || !commit(reviewPackage.baseCommit) || !commit(reviewPackage.headCommit) || !digest(reviewPackage.manifestDigest)) {
     return fail("review-worktree-lifecycle-input-incomplete");
   }
-  const issue = validRecord(authorization?.reviewWorktreeLifecycle, { selectedEntry, transition, reviewPackage, authorization, repositoryPath, now });
+  const issue = validRecord(authorization?.reviewWorktreeLifecycle, { selectedEntry, transition, reviewPackage, authorization, repositoryPath, sourceRequestDigest, now });
   if (issue) return fail(issue);
   return {
     allowed: true,
@@ -71,9 +74,9 @@ export function validateReviewWorktreeLifecycle({ authorization, selectedEntry, 
  * argument in this request: the outer host creates its own temporary root.
  */
 export function prepareReviewWorktreeLifecycle(input, { lifecycleId = randomUUID() } = {}) {
+  if (!digest(input?.sourceRequestDigest)) return fail("review-worktree-lifecycle-parent-binding-missing");
   const valid = validateReviewWorktreeLifecycle(input);
   if (!valid.allowed) return valid;
-  if (!digest(input.sourceRequestDigest)) return fail("review-worktree-lifecycle-parent-binding-missing");
   const request = {
     operation: detachedWorktreeOperation,
     sourceRequestDigest: input.sourceRequestDigest,
@@ -85,7 +88,14 @@ export function prepareReviewWorktreeLifecycle(input, { lifecycleId = randomUUID
   };
   const prepared = { schemaVersion, lifecycleId, request };
   prepared.requestDigest = lifecycleDigest(prepared);
-  return { allowed: true, status: "ready", code: "review-worktree-lifecycle-prepared", lifecycleRequest: prepared, lifecycle: valid.lifecycle };
+  return {
+    allowed: true,
+    status: "ready",
+    code: "review-worktree-lifecycle-prepared",
+    lifecycleRequest: prepared,
+    lifecycle: valid.lifecycle,
+    authorization: Object.freeze(structuredClone(input.authorization.reviewWorktreeLifecycle))
+  };
 }
 
 export function validatePreparedReviewWorktreeLifecycle({ lifecycleRequest, sourceRequestDigest, expected, now = new Date().toISOString(), allowExpired = false } = {}) {

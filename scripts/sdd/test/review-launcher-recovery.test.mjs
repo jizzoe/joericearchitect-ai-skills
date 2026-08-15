@@ -120,7 +120,19 @@ test("controller prepares only a fixed external host request", () => {
   assert.equal("now" in prepared.hostRequest.request, false);
   assert.match(prepared.hostRequest.requestDigest, /^[0-9a-f]{64}$/);
   assert.equal(prepared.worktreeLifecycleRequest.request.sourceRequestDigest, prepared.hostRequest.requestDigest);
+  assert.equal(prepared.worktreeLifecycleAuthorization.sourceRequestDigest, prepared.hostRequest.requestDigest);
   assert.equal("temporaryRoot" in prepared.worktreeLifecycleRequest.request, false);
+});
+
+test("host rejects a lifecycle authorization bound to a different parent request", () => {
+  const prepared = prepareReviewLauncherRecovery(baseInput, { launchId: "wrong-lifecycle-parent" });
+  const tampered = structuredClone(prepared.hostRequest);
+  tampered.request.authorization.reviewWorktreeLifecycle.sourceRequestDigest = "f".repeat(64);
+  assert.equal(reviewLauncherRequestDigest(tampered), tampered.requestDigest, "the self-reference is excluded from its parent digest");
+  let created = false;
+  const rejected = executeReviewLauncherHost(tampered, { createView: () => { created = true; }, now: baseInput.now });
+  assert.equal(created, false);
+  assert.equal(rejected.code, "review-worktree-lifecycle-parent-binding-mismatch");
 });
 
 test("production recovery consumes the prepared action or returns terminal unavailable evidence", async () => {

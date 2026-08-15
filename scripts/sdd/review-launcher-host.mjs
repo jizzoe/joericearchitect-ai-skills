@@ -34,7 +34,7 @@ export function executeReviewLauncherHost(hostRequest, {
   const digest = reviewLauncherRequestDigest(hostRequest);
   if (!digest || digest !== hostRequest?.requestDigest) return fail("review-launcher-host-request-invalid");
   const request = hostRequest.request;
-  const preflight = validateReviewLauncherRecovery({ ...request, now });
+  const preflight = validateReviewLauncherRecovery({ ...request, sourceRequestDigest: digest, now });
   if (!preflight.allowed) return preflight;
   const definition = reviewLauncherDefinition(preflight.recovery.launcherKind);
   const invokeAdapter = invoke ?? (preflight.recovery.launcherKind === "claude-detached-restricted-v1" ? runClaudeDegradedReviewAdapter : runCodexDegradedReviewAdapter);
