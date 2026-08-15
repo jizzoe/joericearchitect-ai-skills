@@ -92,16 +92,30 @@ export function diagnosticFromCode({ stage, operation, code, subject, safeMessag
     ? "request-expired"
     : code?.includes("authorization") || code?.includes("self-review") || code?.includes("scope")
       ? "authorization-denied"
+      : code?.includes("authentication") || code?.includes("credential") || code?.includes("login")
+        ? "authentication-unavailable"
+        : code?.includes("network") || code?.includes("connection") || code?.includes("certificate")
+          ? "network-unavailable"
+          : code?.includes("permission") || code?.includes("sandbox") || code?.includes("denied")
+            ? "permission-denied"
       : code?.includes("ownership") || code?.includes("mismatch")
         ? "ownership-invalid"
-        : code?.includes("cleanup")
-          ? "cleanup-failed"
+      : code?.includes("cleanup")
+        ? "cleanup-failed"
+        : code?.includes("artifact")
+          ? "artifact-invalid"
+          : code?.includes("resource") || code?.includes("disk")
+            ? "resource-unavailable"
+            : code?.includes("verification") || code?.includes("identity-changed")
+              ? "verification-failed"
           : code?.includes("result") || code?.includes("output") || code?.includes("schema")
             ? "output-contract-invalid"
-            : code?.includes("runtime") || code?.includes("transport") || code?.includes("capability") || code?.includes("invocation")
+          : code?.includes("runtime") || code?.includes("transport") || code?.includes("capability") || code?.includes("invocation")
               ? "runtime-unavailable"
-              : code?.includes("package") || code?.includes("request") || code?.includes("validation")
+              : code?.includes("package") || code?.includes("request") || code?.includes("validation") || code?.includes("invalid") || code?.includes("malformed")
                 ? "validation-failed"
+                : code?.includes("failed")
+                  ? "execution-failed"
                 : "unclassified-runtime-failure";
   return createReviewDiagnostic({
     stage,

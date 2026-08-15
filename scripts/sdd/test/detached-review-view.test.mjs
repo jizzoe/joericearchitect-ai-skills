@@ -23,6 +23,8 @@ test("detached review view is pinned to committed state and cleanup is ownership
     const request = { repositoryPath: fs.realpathSync(root), headCommit: head, lifecycleRequestDigest: "a".repeat(64), expiresAt: "2026-08-14T00:00:00.000Z" };
     const created = createDetachedReviewView(request, { now: "2026-08-13T12:00:00.000Z" });
     assert.equal(created.available, true);
+    assert.equal(created.view.launchPath, path.join(created.view.temporaryRoot, "review-session"));
+    assert.equal(created.view.reviewPath, path.join(created.view.launchPath, "repository"));
     assert.equal(git(created.view.reviewPath, ["rev-parse", "HEAD"]), head);
     assert.equal(fs.existsSync(path.join(created.view.reviewPath, "unrelated.txt")), false);
     assert.throws(() => git(created.view.reviewPath, ["symbolic-ref", "--quiet", "--short", "HEAD"]));
@@ -45,6 +47,8 @@ test("archived review view materializes only regular exact-head content without 
     fs.writeFileSync(path.join(root, "unrelated.txt"), "dirty\n");
     const created = createArchivedReviewView({ repositoryPath: root, headCommit: head });
     assert.equal(created.available, true, JSON.stringify(created));
+    assert.equal(created.view.launchPath, path.join(created.view.temporaryRoot, "review-session"));
+    assert.equal(created.view.reviewPath, path.join(created.view.launchPath, "repository"));
     assert.equal(fs.readFileSync(path.join(created.view.reviewPath, "tracked.txt"), "utf8"), "committed\n");
     assert.equal(fs.existsSync(path.join(created.view.reviewPath, "unrelated.txt")), false);
     assert.equal(fs.existsSync(path.join(created.view.reviewPath, ".git")), false);

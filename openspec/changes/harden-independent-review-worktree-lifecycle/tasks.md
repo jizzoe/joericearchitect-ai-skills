@@ -67,6 +67,14 @@
   launcher host, parent transport, and recovery-acceptance failures to emit or
   preserve the shared envelope. Add deterministic propagation, redaction, and
   boundary coverage. Depends on: 4.5.
+- [x] 4.7 Add a fixed parent-runtime strict Codex transport that binds the exact
+  package, reviewer, neutral launcher root, canonical executable identity,
+  inner read-only profile, result artifact, expiration, and owned cleanup. Keep
+  authorized-degraded recovery separate. Depends on: 4.6.
+- [x] 4.8 Isolate Codex authentication state outside the model-readable root,
+  exclude repository startup customization, declare Claude allowed tools
+  explicitly, and classify the installed Claude login failure without raw
+  output. Depends on: 4.7.
 
 ## 5. Verification and delivery evidence
 

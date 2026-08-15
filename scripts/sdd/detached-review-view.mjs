@@ -109,13 +109,19 @@ export function createArchivedReviewView({ repositoryPath, headCommit, temporary
     if (!head || head !== headCommit) return archiveUnavailable("independent-review-view-head-not-canonical", "validation-failed", "sealed-head", "The requested review commit is not a canonical commit in the source repository.");
     if (!regularTreeOnly(repository, head)) return archiveUnavailable("independent-review-view-tree-unsafe", "validation-failed", "review-archive", "The requested review archive contains unsupported tree entries.");
     root = fs.mkdtempSync(path.join(temporaryRoot, "ai-skills-review-archive-"));
-    const reviewPath = path.join(root, "repository");
+    // Keep the repository below a neutral launcher directory. Codex and
+    // Claude start from launchPath so repository-owned AGENTS.md, skills, and
+    // other startup customizations are not discovered before review begins.
+    const launchPath = path.join(root, "review-session");
+    const reviewPath = path.join(launchPath, "repository");
+    fs.mkdirSync(launchPath, { mode: 0o700 });
     fs.mkdirSync(reviewPath, { mode: 0o700 });
     const archive = execFileSync("git", ["-C", repository, "archive", "--format=tar", head], { encoding: "buffer", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 128 * 1024 * 1024 });
     execFileSync("tar", ["-xf", "-", "-C", reviewPath], { input: archive, stdio: ["pipe", "ignore", "pipe"], maxBuffer: 128 * 1024 * 1024 });
     const view = Object.freeze({
       kind: "archived-review-view-v1",
       repository,
+      launchPath,
       reviewPath,
       temporaryRoot: root,
       headCommit: head,
@@ -134,14 +140,15 @@ export function createArchivedReviewView({ repositoryPath, headCommit, temporary
 
 export function removeArchivedReviewView(view) {
   if (!view || view.kind !== "archived-review-view-v1" || !commit(view.headCommit) ||
-      typeof view.temporaryRoot !== "string" || typeof view.reviewPath !== "string" ||
-      path.dirname(view.reviewPath) !== view.temporaryRoot ||
+      typeof view.temporaryRoot !== "string" || typeof view.launchPath !== "string" || typeof view.reviewPath !== "string" ||
+      view.launchPath !== path.join(view.temporaryRoot, "review-session") ||
+      view.reviewPath !== path.join(view.launchPath, "repository") ||
       !path.basename(view.temporaryRoot).startsWith("ai-skills-review-archive-")) {
     return archiveCleanupUnavailable("independent-review-view-cleanup-unsafe", "ownership-invalid", "review-archive", "The review archive cannot be removed because ownership could not be verified.");
   }
   try {
     const marker = JSON.parse(fs.readFileSync(path.join(view.temporaryRoot, ".ai-skills-review-view.json"), "utf8"));
-    if (marker.ownershipToken !== view.ownershipToken || marker.reviewPath !== view.reviewPath) {
+    if (marker.ownershipToken !== view.ownershipToken || marker.launchPath !== view.launchPath || marker.reviewPath !== view.reviewPath) {
       return archiveCleanupUnavailable("independent-review-view-cleanup-ownership-mismatch", "ownership-invalid", "review-archive", "The review archive cannot be removed because ownership does not match.");
     }
     fs.rmSync(view.temporaryRoot, { recursive: true, force: false });
@@ -169,6 +176,7 @@ export function createDetachedReviewView({ repositoryPath, headCommit, lifecycle
   }
   let repository;
   let temporaryRoot;
+  let launchPath;
   let reviewPath;
   try {
     repository = realpath(repositoryPath);
@@ -185,7 +193,9 @@ export function createDetachedReviewView({ repositoryPath, headCommit, lifecycle
         code: "review-worktree-temporary-root-invalid", category: "validation-failed", subject: "temporary-root",
         safeMessage: "The review worktree temporary location is not valid." });
     }
-    reviewPath = path.join(temporaryRoot, "repository");
+    launchPath = path.join(temporaryRoot, "review-session");
+    reviewPath = path.join(launchPath, "repository");
+    fs.mkdirSync(launchPath, { mode: 0o700 });
     try {
       runGit(["-C", repository, "worktree", "add", "--detach", reviewPath, head]);
     } catch (error) {
@@ -211,7 +221,7 @@ export function createDetachedReviewView({ repositoryPath, headCommit, lifecycle
         code: "review-worktree-verification-mismatch", category: "verification-failed", subject: "sealed-head",
         safeMessage: "The created review worktree does not match the sealed detached commit." });
     }
-    const view = Object.freeze({ kind: "detached-review-view-v2", repository, reviewPath, temporaryRoot, headCommit: head,
+    const view = Object.freeze({ kind: "detached-review-view-v2", repository, launchPath, reviewPath, temporaryRoot, headCommit: head,
       lifecycleRequestDigest, ownershipToken: randomUUID(), createdAt: new Date(now).toISOString() });
     fs.writeFileSync(ownedMarkerPath(temporaryRoot), `${JSON.stringify(view)}\n`, { mode: 0o600, flag: "wx" });
     return { available: true, status: "available", requestDigest: lifecycleRequestDigest, view };
@@ -227,15 +237,16 @@ export function createDetachedReviewView({ repositoryPath, headCommit, lifecycle
 export function removeDetachedReviewView(view, { now = new Date().toISOString(), runGit = runGitDefault } = {}) {
   const requestDigest = view?.lifecycleRequestDigest;
   if (!view || view.kind !== "detached-review-view-v2" || !commit(view.headCommit) || !digest(requestDigest) ||
-      typeof view.temporaryRoot !== "string" || typeof view.reviewPath !== "string" ||
-      path.dirname(view.reviewPath) !== view.temporaryRoot || !path.basename(view.temporaryRoot).startsWith("ai-skills-review-")) {
+      typeof view.temporaryRoot !== "string" || typeof view.launchPath !== "string" || typeof view.reviewPath !== "string" ||
+      view.launchPath !== path.join(view.temporaryRoot, "review-session") ||
+      view.reviewPath !== path.join(view.launchPath, "repository") || !path.basename(view.temporaryRoot).startsWith("ai-skills-review-")) {
     return { removed: false, ...unavailable({ requestDigest, stage: "review-view-cleanup", operation: cleanupOperation,
       code: "review-worktree-cleanup-unsafe", category: "ownership-invalid", subject: "review-worktree",
       safeMessage: "The review worktree cannot be removed because ownership could not be verified." }) };
   }
   try {
     const marker = JSON.parse(fs.readFileSync(ownedMarkerPath(view.temporaryRoot), "utf8"));
-    if (marker.ownershipToken !== view.ownershipToken || marker.reviewPath !== view.reviewPath || marker.repository !== view.repository ||
+    if (marker.ownershipToken !== view.ownershipToken || marker.launchPath !== view.launchPath || marker.reviewPath !== view.reviewPath || marker.repository !== view.repository ||
         marker.headCommit !== view.headCommit || marker.lifecycleRequestDigest !== requestDigest || marker.createdAt !== view.createdAt) {
       return { removed: false, ...unavailable({ requestDigest, stage: "review-view-cleanup", operation: cleanupOperation,
         code: "review-worktree-cleanup-ownership-mismatch", category: "ownership-invalid", subject: "review-worktree",

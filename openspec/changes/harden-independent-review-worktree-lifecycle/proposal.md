@@ -6,6 +6,13 @@ source `.git` metadata, so a real worktree cannot register even when its
 checkout destination is an owned temporary directory. The failure prevents the
 reviewer from starting and is reported only as a generic unavailable condition.
 
+Runtime diagnosis also proved a second boundary failure: a strict nested Codex
+process can reach its in-process app-server initialization but macOS Seatbelt
+returns `EPERM` because the implementation process is already sandboxed. The
+same strict invocation succeeds outside that parent boundary with Codex's own
+sealed read-only profile. Treating that host launch as degraded prevents an
+available strict reviewer from satisfying the lifecycle.
+
 The protocol needs a bounded, host-owned lifecycle capability that can create
 and remove a sealed exact-head review worktree, while preserving the inner
 reviewer's existing read-only and credential-scrubbed boundary and recording
@@ -31,6 +38,12 @@ not authorize GitHub tracking mutation.
 - Reconcile launcher recovery and protocol documentation with proactive
   capability selection; do not use error-message matching, manual owner-run
   commands, or generic shell escalation as the authorization mechanism.
+- Add a direct, fixed parent-runtime strict Codex transport that starts from a
+  neutral directory, pins the host-owned executable, isolates copied
+  authentication from model-readable paths, retains the inner sealed read-only
+  profile, accepts only a structured result artifact, and validates cleanup.
+- Require Claude's declared read-only tool allowlist explicitly and classify
+  its documented not-logged-in response as authentication unavailability.
 - Add deterministic tests/evals for authorized creation, sandbox denial,
   post-authorization failure, verification mismatch, cleanup failure, request
   binding, expiration, and unchanged inner-reviewer restrictions.

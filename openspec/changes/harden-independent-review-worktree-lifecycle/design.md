@@ -12,6 +12,15 @@ The result-transport repair is a neighboring active change. This repair must
 reuse its final-artifact-only acceptance boundary and safe-diagnostics approach
 without assuming it has already been delivered or changing its scope.
 
+Observed runtime evidence after the initial repair adds one more constraint.
+Inside a managed Codex Seatbelt session, nested `codex exec` reaches in-process
+app-server startup and fails with `Operation not permitted`; the identical
+strict invocation succeeds when the parent runtime launches it across the
+managed boundary, where the child reports its own `read-only` sandbox. A launch
+from the repository directory also discovers repository skills even when user
+config and execpolicy rules are ignored, while a neutral parent directory does
+not.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -26,14 +35,17 @@ without assuming it has already been delivered or changing its scope.
 - Provide deterministic evidence that capability selection occurs before work
   begins, inputs are constrained, the inner policy stays restricted, and an
   exact-head change requires a fresh package and view.
+- Make an available strict reviewer usable from an already sandboxed parent
+  without weakening or relabeling the child reviewer boundary.
+- Exclude repository/user startup customization and reviewer authentication
+  state from the model-readable review workspace.
 
 **Non-Goals:**
 
 - Do not create a generic host shell runner, automatic archive fallback,
   `danger-full-access` mode, or broad persistent approval.
-- Do not solve the independent inspection-environment fallback or change
-  strict/degraded assurance labels, reviewer result acceptance, or correction
-  policy.
+- Do not solve the independent inspection-environment fallback, treat a
+  reduced-assurance reviewer as strict, or change correction policy.
 - Do not prescribe product-specific repository paths, runtime credentials, or
   a GitHub issue/PR transition.
 
@@ -69,6 +81,53 @@ read-only, no-network, credential-scrubbed, noninteractive profile.
 Alternative: give the reviewer a scoped Git-write allowance. Rejected because
 it collapses lifecycle and review boundaries and permits the reviewed state to
 change during review.
+
+### 2a. Cross the parent sandbox without degrading the strict child
+
+When a managed parent denies nested app-server or nested sandbox startup, the
+controller prepares a fixed `require_escalated` shell-tool request for the
+host-owned Codex executable. This is a process-start boundary only. The child
+still starts ephemeral, noninteractive, with the sealed read-only permission
+profile, no command network, and no inherited shell environment. No repository
+script, arbitrary shell text, or model-selected executable runs with parent
+authority.
+
+The transport resolves the configured Codex executable to a canonical regular
+executable and binds its filesystem identity, complete fixed argument vector,
+neutral working directory, exact package, configured reviewer, start/expiry,
+and result path into a request digest. Acceptance rechecks the digest,
+expiration, executable identity, final artifact, package/reviewer binding, and
+ownership-safe cleanup. The parent seals the findings payload into the
+canonical `strict-isolated` result because runtime evidence—not reviewer
+self-attestation—establishes the child controls.
+
+This direct strict transport runs before any degraded-review authorization.
+Only its own denial or unavailability can become strict-unavailable evidence
+eligible for the existing separately authorized degraded path.
+
+Alternative: reuse the existing degraded launcher and rename its result.
+Rejected because that path intentionally lacks the strict transport bindings
+and would misstate assurance.
+
+### 2b. Launch from a neutral root with isolated authentication state
+
+Archive construction creates `review-session/repository` below the owned root.
+Codex and Claude start from `review-session`, not the repository, and the fixed
+prompt treats `repository/` as data. This prevents startup discovery of
+repository AGENTS, skills, and related customization. Codex receives a sibling
+temporary state directory containing only a bounded regular copy of
+`auth.json` when present; config, sessions, skills, plugins, history, and
+process-injection variables are not copied. Because that state is outside the
+runtime workspace root and command environments inherit nothing, model-issued
+commands cannot read the authentication file. Cleanup removes the entire owned
+root.
+
+Claude continues to use a temporary home and hard-fail sandbox settings, and
+now exposes and pre-allows only built-in read/search tools. Bash and every
+mutation/network/delegation tool are removed. The launcher already constructs
+an ambient-secret-free environment, so it does not set the undocumented
+subprocess-scrub switch that installed Claude 2.1.220 uses to override
+`dontAsk` with its default permission mode.
 
 ### 3. Normalize safe lifecycle and reviewer-process diagnostics
 
@@ -172,7 +231,10 @@ repository-specific.
    reviewer restrictions.
 4. Run focused fixtures, the full Node suite, adapter-drift and thin-wrapper
    checks, strict change validation, and `openspec validate --all --strict`.
-5. Deliver only with a fresh exact-head independent-review result. Rollback is
+5. Exercise the fixed parent strict transport against the installed runtime;
+   if Codex succeeds, accept only its validated strict result. Record Claude
+   login as an external setup requirement if its own auth status is absent.
+6. Deliver only with a fresh exact-head independent-review result. Rollback is
    a focused revert of the change; it must restore fail-closed unavailable
    behavior rather than falling back to manual commands or broad privileges.
 

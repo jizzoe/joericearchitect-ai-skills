@@ -21,6 +21,20 @@ identity, or reviewer self-attestation alone MUST NOT establish isolation.
 - **THEN** the system may construct the exact-head view through the outer
   lifecycle and invoke the reviewer with the sealed package
 
+#### Scenario: Managed parent denies a nested strict reviewer
+- **WHEN** the implementation runtime is already sandboxed and denies nested
+  Codex app-server or sandbox startup but permits the configured parent review
+  transport
+- **THEN** the system launches only the fixed host-owned Codex executable
+  across that parent boundary while the child retains its sealed read-only
+  profile, and a validated child result remains `strict-isolated`
+
+#### Scenario: Strict parent transport is unavailable
+- **WHEN** its tool request, runtime approval, executable identity, expiration,
+  result artifact, package binding, or owned cleanup cannot be validated
+- **THEN** the system records strict unavailability with the shared diagnostic
+  envelope and does not relabel a degraded result as strict
+
 #### Scenario: Strict reviewer is unavailable with no authorization
 - **WHEN** the strict adapter cannot prove required isolation for the exact
   package and no active exact degraded authorization exists
@@ -50,6 +64,13 @@ identity, or reviewer self-attestation alone MUST NOT establish isolation.
 - **THEN** the inner reviewer still starts with its configured ephemeral
   read-only or read/search-only boundary and the result remains
   `authorized-degraded`
+
+#### Scenario: Strict reviewer startup excludes repository customization
+- **WHEN** an exact-head archive contains repository instructions, skills,
+  plugins, or other startup customization
+- **THEN** the strict process starts from a neutral parent directory with user
+  configuration ignored, treats the repository child as data, and grants the
+  model no read access to isolated reviewer authentication state
 
 #### Scenario: Worktree lifecycle request is not eligible
 - **WHEN** the selected worktree strategy has a missing, expired, mismatched,
@@ -102,6 +123,12 @@ bind that diagnostic to the same unavailable review result and sealed package.
 - **THEN** the system records an allowlisted safe reviewer-process diagnostic
   with its stable category, subject, optional exit code, and retry guidance
   without persisting subprocess output or environment details
+
+#### Scenario: Claude is not authenticated
+- **WHEN** strict Claude reports that it is not logged in and asks to run its
+  login flow
+- **THEN** the system records Claude authentication unavailability rather than
+  a generic execution or sandbox failure
 
 #### Scenario: Codex reviews an intentional non-Git archive
 - **WHEN** strict Codex reviews the sealed archive view, which intentionally
