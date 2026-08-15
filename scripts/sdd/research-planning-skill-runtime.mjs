@@ -5,6 +5,12 @@ import { checkOperationAuthorization } from "./check-operation-authorization.mjs
 const slugs = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const deliveryProfiles = new Set(["prototype-rapid", "production-rapid"]);
 const depths = new Set(["quick", "standard", "deep"]);
+const depthSourceMinimums = Object.freeze({ quick: 5, standard: 10, deep: 25 });
+const modelRoles = Object.freeze({ quick: "cheap-triage", standard: "balanced-standard", deep: "highest-quality" });
+const lastKnownModels = Object.freeze({
+  codex: { quick: "gpt-5.6-luna", standard: "gpt-5.6-terra", deep: "gpt-5.6-sol", sourceUrl: "https://developers.openai.com/codex/models" },
+  claude: { quick: "Claude Haiku 3.5", standard: "Claude Sonnet 4", deep: "Claude Opus 4.1", sourceUrl: "https://docs.anthropic.com/en/docs/about-claude/models" }
+});
 const sourceClassifications = new Set(["verified-fact", "source-reported-claim", "assistant-inference", "unknown", "recommendation"]);
 
 function safeWorkspacePath(value) {
@@ -81,6 +87,44 @@ function resolveArtifacts(paths, readArtifact) {
   return { artifacts };
 }
 
+function readOptionalArtifact(artifactPath, readArtifact) {
+  if (typeof readArtifact !== "function") return { error: "No bounded artifact reader was supplied." };
+  try {
+    const content = readArtifact(artifactPath);
+    return { content: nonEmpty(content) ? content : null };
+  } catch (error) {
+    if (error?.code === "ENOENT") return { content: null };
+    return { error: `Existing artifact could not be inspected safely: ${artifactPath}` };
+  }
+}
+
+function guidanceFor(input) {
+  const providers = input.assistantProvider === "codex" || input.assistantProvider === "claude"
+    ? [input.assistantProvider] : ["codex", "claude"];
+  return Object.freeze({
+    depth: input.depth,
+    role: modelRoles[input.depth],
+    providers: Object.freeze(providers.map((provider) => Object.freeze({
+      provider,
+      exactModel: lastKnownModels[provider][input.depth],
+      sourceUrl: lastKnownModels[provider].sourceUrl,
+      freshness: "stale-risk; verify current official provider documentation before use"
+    }))),
+    sessionModelChanged: false
+  });
+}
+
+function displayModelGuidance(input, displayGuidance) {
+  if (typeof displayGuidance !== "function") return { error: "Provide a bounded model-guidance display callback." };
+  const guidance = guidanceFor(input);
+  try {
+    displayGuidance(guidance);
+    return { guidance };
+  } catch {
+    return { error: "The model-guidance display callback failed." };
+  }
+}
+
 function excerpt(value, limit = 280) {
   const normalized = String(value).replace(/\s+/g, " ").trim();
   return normalized.length > limit ? `${normalized.slice(0, limit - 1)}…` : normalized;
@@ -90,7 +134,7 @@ function bullets(values, empty = "- None supplied.") {
   return Array.isArray(values) && values.length > 0 ? values.map((value) => `- ${String(value)}`).join("\n") : empty;
 }
 
-function researchContent(input, sources) {
+function researchContent(input, sources, existingContent) {
   const grouped = new Map([...sourceClassifications].map((classification) => [classification, []]));
   for (const source of sources) grouped.get(source.classification).push(source.claim ?? excerpt(source.content));
   const depthSections = {
@@ -123,11 +167,12 @@ function researchContent(input, sources) {
     "",
     ...depthSections[input.depth].flatMap((heading) => [heading, "- See the classified findings and linked sources above.", ""]),
     "## Source material used as data",
-    ...sources.flatMap((source) => [`### ${source.title}`, `> ${excerpt(source.content).replace(/\n/g, "\n> ")}`, ""])
+    ...sources.flatMap((source) => [`### ${source.title}`, `> ${excerpt(source.content).replace(/\n/g, "\n> ")}`, ""]),
+    ...(existingContent ? ["## Preserved prior findings", "The prior document is retained verbatim for accuracy reconciliation during this update.", "", existingContent.trim(), ""] : [])
   ].join("\n").trimEnd() + "\n";
 }
 
-function sourcesContent(input, sources) {
+function sourcesContent(input, sources, existingContent) {
   return [
     `# Sources for ${input.topic}`,
     "",
@@ -140,7 +185,8 @@ function sourcesContent(input, sources) {
       `- Relevance: ${source.relevance}`,
       `- Classification: ${source.classification}`,
       ""
-    ])
+    ]),
+    ...(existingContent ? ["## Preserved prior source record", "", existingContent.trim(), ""] : [])
   ].join("\n").trimEnd() + "\n";
 }
 
@@ -217,6 +263,20 @@ function missingCandidateField(candidate) {
   return null;
 }
 
+function preapprovalIssue(input) {
+  const preapproval = input.candidate?.preapproval;
+  if (preapproval === undefined) return null;
+  if (!preapproval || typeof preapproval !== "object") return "Provide a structured proposed preapproval.";
+  if (input.deliveryProfile !== "prototype-rapid") return "A one-change preapproval may be proposed only for prototype-rapid.";
+  for (const field of ["target", "action", "evidence", "recovery", "expiresAt"]) {
+    if (!nonEmpty(preapproval[field])) return `Provide the proposed preapproval field: ${field}.`;
+  }
+  const expiration = Date.parse(preapproval.expiresAt);
+  const now = Date.parse(input.now ?? new Date().toISOString());
+  if (Number.isNaN(expiration) || expiration <= now) return "Provide a valid future proposed preapproval expiration.";
+  return null;
+}
+
 function deliveryPlanContent(input, requirements, designBrief) {
   const candidate = input.candidate;
   const nextAction = input.nextOpenSpecAction === "openspec-propose" ? "OpenSpec Propose" : "OpenSpec Explore";
@@ -263,7 +323,7 @@ function deliveryPlanContent(input, requirements, designBrief) {
   ].join("\n") + "\n";
 }
 
-export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeArtifact } = {}) {
+export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeArtifact, displayGuidance } = {}) {
   const skill = "research-topic-workflow";
   const mode = commonMode(input);
   if (input.requestKind !== skill) return noOp(skill, mode);
@@ -272,28 +332,48 @@ export function executeResearchTopicWorkflow(input = {}, { readArtifact, writeAr
   if (!depths.has(input.depth)) return gap(skill, mode, "blocked", "missing-depth", "Select quick, standard, or deep research depth.");
   const destination = input.destination ?? input.config?.defaults?.researchRoot;
   if (!safeWorkspacePath(destination)) return gap(skill, mode, "blocked", "missing-destination", "Provide a safe workspace-relative research destination.");
+  const pauseCondition = [
+    [input.requiresNewCredentials, "new-credentials-required", "A source requires new credentials."],
+    [input.requiresUnapprovedConnector, "unapproved-connector-required", "A source requires an unapproved connector."],
+    [input.requiresSensitiveData, "sensitive-data-required", "The request requires access to sensitive data."],
+    [input.sourcesConflict, "conflicting-sources", "Sources conflict on a point material to the recommendation."],
+    [input.requiresUndecidedMaterialDecision, "unauthorized-decision", "The request expands into a decision the user has not authorized."]
+  ].find(([active]) => active === true);
+  if (pauseCondition) return gap(skill, mode, "blocked", pauseCondition[1], pauseCondition[2]);
+  const guidanceDisplay = displayModelGuidance(input, displayGuidance);
+  if (guidanceDisplay.error) return gap(skill, mode, "blocked", "model-guidance-unavailable", guidanceDisplay.error);
   const sourceResolution = resolveResearchSources(input.sources, readArtifact);
   if (sourceResolution.error) return gap(skill, mode, "blocked", "missing-source-material", sourceResolution.error);
+  if (sourceResolution.sources.length < depthSourceMinimums[input.depth]) {
+    return gap(skill, mode, "blocked", "insufficient-source-depth", `${input.depth} research requires at least ${depthSourceMinimums[input.depth]} sources.`);
+  }
   if (typeof writeArtifact !== "function") return gap(skill, mode, "blocked", "missing-writer", "Provide a bounded artifact writer.");
 
   const root = path.posix.join(destination, input.category, input.topic);
   const findingsPath = path.posix.join(root, `${input.topic}-findings.md`);
   const sourcesPath = path.posix.join(root, "sources.md");
+  const existingFindingsResolution = readOptionalArtifact(findingsPath, readArtifact);
+  const existingSourcesResolution = readOptionalArtifact(sourcesPath, readArtifact);
+  if (existingFindingsResolution.error || existingSourcesResolution.error) {
+    return gap(skill, mode, "blocked", "existing-artifact-unreadable", existingFindingsResolution.error ?? existingSourcesResolution.error);
+  }
+  const existingFindings = existingFindingsResolution.content;
+  const existingSources = existingSourcesResolution.content;
   const operations = [
-    { operation: "write-findings", path: findingsPath, target: `workspace:${findingsPath}`, contentKind: "research-findings", content: researchContent(input, sourceResolution.sources) },
-    { operation: "write-sources", path: sourcesPath, target: `workspace:${sourcesPath}`, contentKind: "research-sources", content: sourcesContent(input, sourceResolution.sources) }
+    { operation: "write-findings", path: findingsPath, target: `workspace:${findingsPath}`, contentKind: "research-findings", content: researchContent(input, sourceResolution.sources, existingFindings), artifactOperation: existingFindings ? "updated" : "created" },
+    { operation: "write-sources", path: sourcesPath, target: `workspace:${sourcesPath}`, contentKind: "research-sources", content: sourcesContent(input, sourceResolution.sources, existingSources), artifactOperation: existingSources ? "updated" : "created" }
   ];
   const checks = authorize(input, "research-read-only", operations);
   if (checks.some((check) => check.allowed !== true)) return pauseForAuthorization(skill, mode, checks);
   performWrites(operations, writeArtifact);
   return result(skill, mode, "completed", "Durable research artifacts were written at the selected depth.", {
-    artifacts: operations.map(({ path: subject }) => ({ kind: "file", operation: "created", subject })),
+    artifacts: operations.map(({ path: subject, artifactOperation: operation }) => ({ kind: "file", operation, subject })),
     evidence: [
       { id: "input-validation", type: "validation", subject: `${input.depth} research request and source content`, result: "passed" },
       { id: "source-boundary", type: "validation", subject: "source content treated as untrusted data", result: "passed" },
       ...(mode === "autonomous" ? [{ id: "operation-authorization", type: "validation", subject: "research-read-only writes", result: "passed" }] : [])
     ],
-    details: { depth: input.depth, sourceIds: sourceResolution.sources.map((source) => source.id) }
+    details: { depth: input.depth, sourceIds: sourceResolution.sources.map((source) => source.id), modelGuidanceDisplayed: true, modelRole: guidanceDisplay.guidance.role }
   });
 }
 
@@ -350,6 +430,8 @@ export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeAr
   }
   const missingField = missingCandidateField(input.candidate);
   if (missingField) return gap(skill, mode, "paused", "readiness-gap", `Provide the candidate readiness field: ${missingField}.`);
+  const invalidPreapproval = preapprovalIssue(input);
+  if (invalidPreapproval) return gap(skill, mode, "paused", "invalid-preapproval", invalidPreapproval);
   const outputPath = input.outputPath ?? (safeWorkspacePath(input.config?.defaults?.planRoot) && slugs.test(input.planSlug ?? "")
     ? path.posix.join(input.config.defaults.planRoot, `${input.planSlug}.md`) : null);
   if (!safeWorkspacePath(outputPath)) return gap(skill, mode, "paused", "missing-output", "Provide a safe workspace-relative delivery-plan output path.");

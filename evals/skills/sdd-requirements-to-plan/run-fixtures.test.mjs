@@ -117,6 +117,27 @@ test("delivery profile and full candidate readiness are validated per request", 
   assert.equal(missingReadiness.status, "paused");
 });
 
+test("proposed preapproval is prototype-only, complete, and time bounded", () => {
+  const preapproval = {
+    target: "change:prototype-review",
+    action: "merge-one-change",
+    evidence: "exact-head tests and review",
+    recovery: "revert the merge commit",
+    expiresAt: "2026-08-16T00:00:00.000Z"
+  };
+  const wrongProfile = run({ ...base, candidate: { ...candidate, preapproval }, now: "2026-08-15T12:00:00.000Z" }).output;
+  const missingField = run({ ...base, deliveryProfile: "prototype-rapid", candidate: { ...candidate, preapproval: { ...preapproval, recovery: "" } }, now: "2026-08-15T12:00:00.000Z" }).output;
+  const expired = run({ ...base, deliveryProfile: "prototype-rapid", candidate: { ...candidate, preapproval: { ...preapproval, expiresAt: "2026-08-14T00:00:00.000Z" } }, now: "2026-08-15T12:00:00.000Z" }).output;
+  const accepted = run({ ...base, deliveryProfile: "prototype-rapid", candidate: { ...candidate, preapproval }, now: "2026-08-15T12:00:00.000Z" });
+  for (const output of [wrongProfile, missingField, expired, accepted.output]) valid(output);
+  assert.equal(wrongProfile.status, "paused");
+  assert.equal(missingField.status, "paused");
+  assert.equal(expired.status, "paused");
+  assert.equal(accepted.output.status, "completed");
+  assert.equal(accepted.writes[0].content.includes("This is proposed, not granted."), true);
+  assert.equal(accepted.writes[0].content.includes(preapproval.recovery), true);
+});
+
 test("autonomous plan writes require exact operation authorization", () => {
   const input = {
     ...base,
