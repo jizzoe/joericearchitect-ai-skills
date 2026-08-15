@@ -85,9 +85,11 @@
   `openspec validate harden-independent-review-worktree-lifecycle --strict`,
   and `openspec validate --all --strict`; record only non-sensitive evidence.
   Depends on: 3.3, 4.3.
-- [ ] 5.2 Obtain a fresh exact-head independent review under the repaired
+- [x] 5.2 Obtain a fresh exact-head independent review under the repaired
   lifecycle; resolve or record all findings under the canonical review policy.
-  Do not reuse a result after the head changes. Depends on: 5.1.
+  Do not reuse a result after the head changes. Depends on: 5.1. Evidence:
+  `evidence/strict-independent-review.md` records the accepted zero-finding
+  strict-isolated result bound to the final repaired implementation head.
 - [ ] 5.3 Complete authorized delivery artifacts and PR linkage, including
   `OpenSpec change: harden-independent-review-worktree-lifecycle`; do not
   create or mutate GitHub tracking, Sync, Archive, or merge without the
