@@ -7,6 +7,7 @@ import { createArchivedReviewView, removeArchivedReviewView } from "./detached-r
 import { buildReviewPackage, canonicalJson, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { requiredReviewDenials } from "./review-adapter-contract.mjs";
+import { createReviewDiagnostic, diagnosticFromCode, diagnosticFromError, unavailableOutcome, unclassifiedRuntimeDiagnostic } from "./review-diagnostics.mjs";
 
 const now = () => new Date().toISOString();
 const reviewLauncherHostScript = "scripts/sdd/review-launcher-host.mjs";
@@ -32,30 +33,37 @@ function resultArtifactDiagnostics({ present = false, bytes = 0, sha256 = "", pa
   return { resultArtifactPresent: present, resultArtifactBytes: bytes, resultArtifactSha256: sha256, parse, payload, validation, cleanup };
 }
 
+function artifactUnavailable(code, diagnostics, error) {
+  const diagnostic = error
+    ? diagnosticFromError({ stage: "result-artifact", operation: "inspect-codex-review-result", code, subject: "codex-result-artifact", safeMessage: "The Codex reviewer result artifact could not be safely read or validated.", error })
+    : diagnosticFromCode({ stage: "result-artifact", operation: "inspect-codex-review-result", code, subject: "codex-result-artifact", safeMessage: "The Codex reviewer result artifact is absent or does not meet the required output contract." });
+  return { available: false, ...unavailableOutcome(diagnostic), diagnostics };
+}
+
 export function inspectCodexReviewResultArtifact(resultPath) {
   if (!runtimePath(resultPath)) {
-    return { available: false, code: "review-launcher-codex-result-artifact-path-invalid", diagnostics: resultArtifactDiagnostics() };
+    return artifactUnavailable("review-launcher-codex-result-artifact-path-invalid", resultArtifactDiagnostics());
   }
   let entry;
   try {
     entry = fs.lstatSync(resultPath);
-  } catch {
-    return { available: false, code: "review-launcher-codex-result-artifact-missing", diagnostics: resultArtifactDiagnostics() };
+  } catch (error) {
+    return artifactUnavailable("review-launcher-codex-result-artifact-missing", resultArtifactDiagnostics(), error);
   }
   if (!entry.isFile() || entry.isSymbolicLink()) {
-    return { available: false, code: "review-launcher-codex-result-artifact-invalid", diagnostics: resultArtifactDiagnostics({ present: true }) };
+    return artifactUnavailable("review-launcher-codex-result-artifact-invalid", resultArtifactDiagnostics({ present: true }));
   }
   if (entry.size === 0) {
-    return { available: false, code: "review-launcher-codex-result-artifact-empty", diagnostics: resultArtifactDiagnostics({ present: true }) };
+    return artifactUnavailable("review-launcher-codex-result-artifact-empty", resultArtifactDiagnostics({ present: true }));
   }
   if (entry.size > maximumReviewResultArtifactBytes) {
-    return { available: false, code: "review-launcher-codex-result-artifact-oversized", diagnostics: resultArtifactDiagnostics({ present: true, bytes: entry.size }) };
+    return artifactUnavailable("review-launcher-codex-result-artifact-oversized", resultArtifactDiagnostics({ present: true, bytes: entry.size }));
   }
   let raw;
   try {
     raw = fs.readFileSync(resultPath);
-  } catch {
-    return { available: false, code: "review-launcher-codex-result-artifact-unreadable", diagnostics: resultArtifactDiagnostics({ present: true, bytes: entry.size }) };
+  } catch (error) {
+    return artifactUnavailable("review-launcher-codex-result-artifact-unreadable", resultArtifactDiagnostics({ present: true, bytes: entry.size }), error);
   }
   const diagnostics = resultArtifactDiagnostics({
     present: true,
@@ -65,36 +73,43 @@ export function inspectCodexReviewResultArtifact(resultPath) {
   });
   const payload = parseJsonResult(raw.toString("utf8"));
   if (!payload) {
-    return { available: false, code: "review-launcher-codex-result-artifact-malformed", diagnostics: { ...diagnostics, parse: "invalid" } };
+    return artifactUnavailable("review-launcher-codex-result-artifact-malformed", { ...diagnostics, parse: "invalid" });
   }
   if (!validFindingPayload(payload)) {
-    return { available: false, code: "review-launcher-codex-result-payload-invalid", diagnostics: { ...diagnostics, parse: "valid", payload: "invalid" } };
+    return artifactUnavailable("review-launcher-codex-result-payload-invalid", { ...diagnostics, parse: "valid", payload: "invalid" });
   }
   return { available: true, payload, diagnostics: { ...diagnostics, parse: "valid", payload: "valid" } };
 }
 
 function unavailableCodexParentResult(code, diagnostics, cleanup) {
+  const diagnostic = diagnosticFromCode({ stage: "parent-transport", operation: "consume-codex-review-receipt", code, subject: "codex-parent-review-tool", safeMessage: "The parent review transport could not verify a complete reviewer response." });
   return {
-    status: "unavailable",
-    code,
+    ...unavailableOutcome(diagnostic),
     diagnostics: { ...diagnostics, cleanup: cleanup?.removed === true ? "removed" : cleanup?.code ?? "failed" }
   };
 }
 
+function platformUnavailable(stage, operation, code, subject, safeMessage, error) {
+  const diagnostic = error
+    ? diagnosticFromError({ stage, operation, code, subject, safeMessage, error })
+    : diagnosticFromCode({ stage, operation, code, subject, safeMessage });
+  return { available: false, ...unavailableOutcome(diagnostic) };
+}
+
 export function writePreparedReviewHostRequest(prepared, directoryPath) {
-  if (!validPreparedRecovery(prepared) || !runtimePath(directoryPath)) return { available: false, code: "review-launcher-runtime-request-path-invalid" };
+  if (!validPreparedRecovery(prepared) || !runtimePath(directoryPath)) return platformUnavailable("parent-transport", "write-host-request", "review-launcher-runtime-request-path-invalid", "prepared-host-request", "The prepared host request path is invalid.");
   let directory;
   try {
     directory = fs.lstatSync(directoryPath);
-  } catch {
-    return { available: false, code: "review-launcher-runtime-request-directory-unavailable" };
+  } catch (error) {
+    return platformUnavailable("parent-transport", "write-host-request", "review-launcher-runtime-request-directory-unavailable", "prepared-host-request", "The parent runtime cannot access the host request directory.", error);
   }
-  if (!directory.isDirectory() || directory.isSymbolicLink()) return { available: false, code: "review-launcher-runtime-request-directory-invalid" };
+  if (!directory.isDirectory() || directory.isSymbolicLink()) return platformUnavailable("parent-transport", "write-host-request", "review-launcher-runtime-request-directory-invalid", "prepared-host-request", "The host request directory does not satisfy the transport safety checks.");
   const requestPath = path.join(directoryPath, `review-launcher-${prepared.hostRequest.requestDigest}.json`);
   try {
     fs.writeFileSync(requestPath, `${JSON.stringify(prepared)}\n`, { flag: "wx", mode: 0o400 });
-  } catch {
-    return { available: false, code: "review-launcher-runtime-request-write-failed" };
+  } catch (error) {
+    return platformUnavailable("parent-transport", "write-host-request", "review-launcher-runtime-request-write-failed", "prepared-host-request", "The parent runtime could not write the host request.", error);
   }
   return { available: true, code: "review-launcher-runtime-request-written", requestPath };
 }
@@ -106,7 +121,7 @@ export function buildCodexParentReviewHostToolRequest({ prepared, preparedReques
   injectPackage = writeReviewPackageForView
 } = {}) {
   if (!validPreparedRecovery(prepared) || !runtimePath(preparedRequestPath) || !runtimePath(repositoryPath)) {
-    return { available: false, code: "review-launcher-codex-tool-request-invalid" };
+    return platformUnavailable("parent-transport", "prepare-codex-review-tool", "review-launcher-codex-tool-request-invalid", "prepared-host-request", "The prepared Codex host request is invalid.");
   }
   const expectedName = `review-launcher-${prepared.hostRequest.requestDigest}.json`;
   const hostPath = path.join(repositoryPath, reviewLauncherHostScript);
@@ -116,14 +131,17 @@ export function buildCodexParentReviewHostToolRequest({ prepared, preparedReques
     const stored = JSON.parse(fs.readFileSync(preparedRequestPath, "utf8"));
     if (path.basename(preparedRequestPath) !== expectedName || !requestEntry.isFile() || requestEntry.isSymbolicLink() ||
         !hostEntry.isFile() || hostEntry.isSymbolicLink() || JSON.stringify(stored) !== JSON.stringify(prepared)) {
-      return { available: false, code: "review-launcher-codex-tool-request-invalid" };
+      return platformUnavailable("parent-transport", "prepare-codex-review-tool", "review-launcher-codex-tool-request-invalid", "prepared-host-request", "The stored Codex host request did not pass integrity checks.");
     }
-  } catch {
-    return { available: false, code: "review-launcher-codex-tool-request-invalid" };
+  } catch (error) {
+    return platformUnavailable("parent-transport", "prepare-codex-review-tool", "review-launcher-codex-tool-request-invalid", "prepared-host-request", "The parent runtime could not read the prepared Codex host request.", error);
   }
   const request = prepared.hostRequest.request;
   const created = createView({ repositoryPath, headCommit: request?.reviewPackage?.headCommit });
-  if (!created?.available) return { available: false, code: "review-launcher-codex-view-unavailable", detail: created?.code };
+  if (!created?.available) {
+    const diagnostic = created?.diagnostic ?? diagnosticFromCode({ stage: "archive-view", operation: "create-archived-review-view", code: "review-launcher-codex-view-unavailable", subject: "archived-review-view", safeMessage: "The parent transport could not create the archived review view." });
+    return { available: false, ...unavailableOutcome(diagnostic) };
+  }
   const { view } = created;
   try {
     const rebuilt = rebuildPackage({
@@ -163,9 +181,9 @@ export function buildCodexParentReviewHostToolRequest({ prepared, preparedReques
       hostExecutionModel: "sandbox-prepared-host-owned-executable",
       runtimeState: Object.freeze({ view, resultPath, preparedRequestPath })
     };
-  } catch {
+  } catch (error) {
     removeView(view);
-    return { available: false, code: "review-launcher-codex-tool-request-invalid" };
+    return platformUnavailable("parent-transport", "prepare-codex-review-tool", "review-launcher-codex-tool-request-invalid", "prepared-host-request", "The parent transport could not prepare the Codex review tool request.", error);
   }
 }
 
@@ -379,7 +397,7 @@ export function degradedCapabilityLedger() {
 
 export function probeCodexReviewAdapter({ executable = "codex", attestationRef = "attestations/codex-read-only-v1.json" } = {}) {
   if (!helpIncludes(executable, ["exec", "--help"], ["--config", "--strict-config", "--ephemeral", "--ignore-user-config", "--output-schema"])) {
-    return { available: false, code: "independent-reviewer-codex-runtime-unavailable" };
+    return platformUnavailable("adapter-preflight", "probe-codex-reviewer", "independent-reviewer-codex-runtime-unavailable", "codex-reviewer", "The configured Codex reviewer runtime or required capabilities are unavailable.");
   }
   return { available: true, capability: capabilities({ adapter: "codex", attestationRef, probeReference: "codex-exec-read-only-v1" }) };
 }
@@ -433,9 +451,9 @@ export function buildClaudeDegradedReviewInvocation({ executable = "claude", vie
 }
 
 export function probeClaudeReviewAdapter({ executable = "claude", attestationRef = "attestations/claude-sandbox-v1.json" } = {}) {
-  if (process.platform === "win32") return { available: false, code: "independent-reviewer-claude-native-windows-unsupported" };
+  if (process.platform === "win32") return platformUnavailable("adapter-preflight", "probe-claude-reviewer", "independent-reviewer-claude-native-windows-unsupported", "claude-reviewer", "The configured Claude reviewer boundary is unsupported on this platform.");
   if (!helpIncludes(executable, ["--help"], ["--print", "--settings", "--setting-sources", "--no-session-persistence", "--tools"])) {
-    return { available: false, code: "independent-reviewer-claude-runtime-unavailable" };
+    return platformUnavailable("adapter-preflight", "probe-claude-reviewer", "independent-reviewer-claude-runtime-unavailable", "claude-reviewer", "The configured Claude reviewer runtime or required capabilities are unavailable.");
   }
   return { available: true, capability: capabilities({ adapter: "claude", attestationRef, probeReference: "claude-temporary-strict-sandbox-v1" }) };
 }
@@ -471,22 +489,14 @@ function validFindingPayload(value) {
 }
 
 function safeProcessDiagnostic({ adapter, execution, code, category, subject, safeMessage }) {
-  return Object.freeze({
-    stage: "reviewer-execution",
-    operation: `${adapter}-strict-review`,
-    code,
-    category,
-    subject,
-    ...(Number.isInteger(execution?.status) ? { exitCode: execution.status } : {}),
-    safeMessage
-  });
+  return createReviewDiagnostic({ stage: "reviewer-execution", operation: `${adapter}-strict-review`, code, category, subject, ...(Number.isInteger(execution?.status) ? { exitCode: execution.status } : {}), safeMessage });
 }
 
 function executionText(execution = {}) {
   return `${execution.stdout ?? ""}\n${execution.stderr ?? ""}`;
 }
 
-function diagnoseReviewProcessFailure(adapter, execution = {}) {
+function diagnoseReviewProcessFailure(adapter, execution = {}, { resultMissing = false } = {}) {
   const output = executionText(execution);
   const unavailable = (code, category, subject, safeMessage) => safeProcessDiagnostic({ adapter, execution, code, category, subject, safeMessage });
   if (execution?.error?.code === "ENOENT") {
@@ -507,15 +517,18 @@ function diagnoseReviewProcessFailure(adapter, execution = {}) {
   if (/sandbox.*(?:unavailable|denied|operation not permitted)|failIfUnavailable|permission denied|operation not permitted/i.test(output)) {
     return unavailable(`independent-reviewer-${adapter}-sandbox-unavailable`, "permission-denied", "reviewer-sandbox", "The isolated reviewer sandbox could not start with its required restrictions; use a runtime that supports the configured boundary and retry.");
   }
-  return unavailable(`independent-reviewer-${adapter}-execution-unavailable`, "execution-failed", "reviewer-process", "The isolated reviewer exited without a valid result; inspect the reviewer runtime's local diagnostics and retry after correcting its configuration.");
+  if (resultMissing && execution?.status === 0) {
+    return unavailable(`independent-reviewer-${adapter}-output-contract-invalid`, "output-contract-invalid", "reviewer-result-contract", "The reviewer exited without a valid result artifact; verify its structured-output configuration and retry.");
+  }
+  return unclassifiedRuntimeDiagnostic({ stage: "reviewer-execution", operation: `${adapter}-strict-review`, code: `independent-reviewer-${adapter}-unclassified-runtime-failure`, subject: "reviewer-process", ...(Number.isInteger(execution?.status) ? { exitCode: execution.status } : {}), safeMessage: "The isolated reviewer failed without a classifiable safe signal; inspect its local runtime diagnostics and retry." });
 }
 
-export function diagnoseCodexExecutionFailure(execution = {}) {
-  return diagnoseReviewProcessFailure("codex", execution);
+export function diagnoseCodexExecutionFailure(execution = {}, options = {}) {
+  return diagnoseReviewProcessFailure("codex", execution, options);
 }
 
-export function diagnoseClaudeExecutionFailure(execution = {}) {
-  return diagnoseReviewProcessFailure("claude", execution);
+export function diagnoseClaudeExecutionFailure(execution = {}, options = {}) {
+  return diagnoseReviewProcessFailure("claude", execution, options);
 }
 
 export function classifyCodexExecutionFailure(execution = {}) {
@@ -537,29 +550,29 @@ export function invokeReviewProcess(invocation, view, run, parentEnvironment = p
 
 export function runCodexReviewAdapter({ reviewPackage, view, schemaPath, resultPath, reviewer, attestationRef, executable, run = spawnSync }) {
   const probe = probeCodexReviewAdapter({ executable, attestationRef });
-  if (!probe.available) return { status: "unavailable", result: unavailable(probe.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
+  if (!probe.available) return { ...unavailableOutcome(probe.diagnostic), result: unavailable(probe.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
   const invocation = buildCodexReviewInvocation({ executable, view, schemaPath, resultPath, authenticationEnvironment: codexAuthenticationEnvironment() });
   const execution = invokeReviewProcess(invocation, view, run);
   let result = null;
   try { result = fs.existsSync(resultPath) ? parseJsonResult(fs.readFileSync(resultPath, "utf8")) : null; } catch { result = null; }
   if (execution.status !== 0 || !result) {
-    const diagnostic = diagnoseCodexExecutionFailure(execution);
-    return { status: "unavailable", result: unavailable(diagnostic.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }), diagnostic, execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
+    const diagnostic = diagnoseCodexExecutionFailure(execution, { resultMissing: !result });
+    return { ...unavailableOutcome(diagnostic), result: unavailable(diagnostic.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
   }
   return { status: result.status, result, execution: { status: 0, signal: null, emittedResult: true } };
 }
 
 export function runCodexDegradedReviewAdapter({ reviewPackage, view, schemaPath, resultPath, reviewer, attestationRef, strictResult, degradedAuthorization, executable, run = spawnSync }) {
   const probe = probeCodexReviewAdapter({ executable, attestationRef });
-  if (!probe.available) return { status: "unavailable", result: unavailable(probe.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
+  if (!probe.available) return { ...unavailableOutcome(probe.diagnostic), result: unavailable(probe.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
   const startedAt = now();
   const invocation = buildCodexDegradedReviewInvocation({ executable, view, schemaPath, resultPath, authenticationEnvironment: codexAuthenticationEnvironment() });
   const execution = invokeReviewProcess(invocation, view, run);
   let payload = null;
   try { payload = fs.existsSync(resultPath) ? parseJsonResult(fs.readFileSync(resultPath, "utf8")) : null; } catch { payload = null; }
   if (execution.status !== 0 || !validFindingPayload(payload)) {
-    const diagnostic = diagnoseCodexExecutionFailure(execution);
-    return { status: "unavailable", result: unavailable(diagnostic.code, { reviewPackage, adapter: "codex", reviewer, attestationRef, startedAt }), diagnostic, execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
+    const diagnostic = diagnoseCodexExecutionFailure(execution, { resultMissing: !validFindingPayload(payload) });
+    return { ...unavailableOutcome(diagnostic), result: unavailable(diagnostic.code, { reviewPackage, adapter: "codex", reviewer, attestationRef, startedAt }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
   }
   const sealed = sealCodexDegradedReviewPayload({ payload, reviewPackage, reviewer, attestationRef, strictResult, degradedAuthorization, startedAt });
   return { status: sealed.result.status, result: sealed.result, execution: { status: 0, signal: null, emittedResult: true } };
@@ -607,17 +620,20 @@ export function sealCodexDegradedReviewPayload({ payload, reviewPackage, reviewe
 
 export function runClaudeDegradedReviewAdapter({ reviewPackage, view, schemaPath, reviewer, attestationRef, strictResult, degradedAuthorization, executable, run = spawnSync, probe = probeClaudeReviewAdapter }) {
   const probeResult = probe({ executable, attestationRef });
-  if (!probeResult.available) return { status: "unavailable", result: unavailable(probeResult.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }) };
+  if (!probeResult.available) return { ...unavailableOutcome(probeResult.diagnostic), result: unavailable(probeResult.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }) };
   const startedAt = now();
   let schema = null;
   try { schema = JSON.parse(fs.readFileSync(schemaPath, "utf8")); } catch { schema = null; }
-  if (!schema) return { status: "unavailable", result: unavailable("independent-reviewer-claude-schema-unavailable", { reviewPackage, adapter: "claude", reviewer, attestationRef, startedAt }) };
+  if (!schema) {
+    const diagnostic = diagnosticFromCode({ stage: "adapter-preflight", operation: "load-claude-result-schema", code: "independent-reviewer-claude-schema-unavailable", subject: "reviewer-result-schema", safeMessage: "The Claude reviewer result schema is unavailable." });
+    return { ...unavailableOutcome(diagnostic), result: unavailable(diagnostic.code, { reviewPackage, adapter: "claude", reviewer, attestationRef, startedAt }) };
+  }
   const invocation = buildClaudeDegradedReviewInvocation({ executable, view, schema, reviewerHomePath: prepareReviewerHome(view) });
   const execution = invokeReviewProcess(invocation, view, run);
   const payload = parseJsonResult(execution.stdout);
   if (execution.status !== 0 || !validFindingPayload(payload)) {
-    const diagnostic = diagnoseClaudeExecutionFailure(execution);
-    return { status: "unavailable", result: unavailable(diagnostic.code, { reviewPackage, adapter: "claude", reviewer, attestationRef, startedAt }), diagnostic, execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
+    const diagnostic = diagnoseClaudeExecutionFailure(execution, { resultMissing: !validFindingPayload(payload) });
+    return { ...unavailableOutcome(diagnostic), result: unavailable(diagnostic.code, { reviewPackage, adapter: "claude", reviewer, attestationRef, startedAt }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
   }
   const executionId = randomUUID();
   const result = {
@@ -663,14 +679,21 @@ export function runClaudeDegradedReviewAdapter({ reviewPackage, view, schemaPath
 
 export function runClaudeReviewAdapter({ reviewPackage, view, settingsPath, schema, reviewer, attestationRef, executable, run = spawnSync }) {
   const probe = probeClaudeReviewAdapter({ executable, attestationRef });
-  if (!probe.available) return { status: "unavailable", result: unavailable(probe.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }) };
-  fs.writeFileSync(settingsPath, `${JSON.stringify(createClaudeReviewSettings(view))}\n`, { mode: 0o600 });
-  const invocation = buildClaudeReviewInvocation({ executable, view, settingsPath, schema, reviewerHomePath: prepareReviewerHome(view) });
+  if (!probe.available) return { ...unavailableOutcome(probe.diagnostic), result: unavailable(probe.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }) };
+  let reviewerHomePath;
+  try {
+    fs.writeFileSync(settingsPath, `${JSON.stringify(createClaudeReviewSettings(view))}\n`, { mode: 0o600 });
+    reviewerHomePath = prepareReviewerHome(view);
+  } catch (error) {
+    const diagnostic = diagnosticFromError({ stage: "adapter-preflight", operation: "prepare-claude-reviewer", code: "independent-reviewer-claude-settings-unavailable", subject: "claude-reviewer-settings", safeMessage: "The Claude reviewer isolation settings could not be prepared.", error });
+    return { ...unavailableOutcome(diagnostic), result: unavailable(diagnostic.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }) };
+  }
+  const invocation = buildClaudeReviewInvocation({ executable, view, settingsPath, schema, reviewerHomePath });
   const execution = invokeReviewProcess(invocation, view, run);
   const result = parseJsonResult(execution.stdout);
   if (execution.status !== 0 || !result) {
-    const diagnostic = diagnoseClaudeExecutionFailure(execution);
-    return { status: "unavailable", result: unavailable(diagnostic.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }), diagnostic, execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
+    const diagnostic = diagnoseClaudeExecutionFailure(execution, { resultMissing: !result });
+    return { ...unavailableOutcome(diagnostic), result: unavailable(diagnostic.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
   }
   return { status: result.status, result, execution: { status: 0, signal: null, emittedResult: true } };
 }

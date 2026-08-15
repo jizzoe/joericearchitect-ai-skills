@@ -72,6 +72,12 @@ and safe human message; they MUST distinguish construction, verification,
 cleanup, and reviewer-process outcomes and MUST NOT retain raw stderr, stdout,
 full temporary paths, raw review or package content, command arguments,
 environment values, credentials, or secrets.
+Every review control-plane boundary—including package construction, archive or
+worktree views, adapter preflight and execution, result artifacts, launcher
+host, parent transport, and recovery acceptance—MUST use the same versioned
+diagnostic envelope. A wrapper that receives a valid child diagnostic MUST
+preserve it unchanged unless the wrapper itself fails; the durable record MUST
+bind that diagnostic to the same unavailable review result and sealed package.
 
 #### Scenario: Codex and Claude results are equivalent
 - **WHEN** configured Codex and Claude adapters review the same sealed package
@@ -96,6 +102,11 @@ environment values, credentials, or secrets.
 - **THEN** the system records an allowlisted safe reviewer-process diagnostic
   with its stable category, subject, optional exit code, and retry guidance
   without persisting subprocess output or environment details
+
+#### Scenario: A wrapper receives a child diagnostic
+- **WHEN** a review control-plane child returns a valid unavailable diagnostic
+- **THEN** its caller forwards the same diagnostic without reducing it to a
+  generic wrapper code, detail string, or raw process output
 
 ### Requirement: Review behavior is portable and recoverable
 The system SHALL keep package, validation, finding, and safety policy in one

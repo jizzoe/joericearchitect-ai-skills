@@ -6,18 +6,21 @@ import { validateDegradedIndependentReviewAuthorization } from "./degraded-indep
 import { canonicalJson, validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { prepareReviewWorktreeLifecycle, validatePreparedReviewWorktreeLifecycle, validateReviewWorktreeLifecycle } from "./review-worktree-lifecycle.mjs";
+import { diagnosticFromCode, diagnosticFromError, preservedDiagnostic, unavailableOutcome } from "./review-diagnostics.mjs";
 
 const hostScript = "scripts/sdd/review-launcher-host.mjs";
 const text = (value) => typeof value === "string" && value.trim().length > 0;
-const fail = (code, detail) => ({ allowed: false, status: "unavailable", code, ...(detail ? { detail } : {}) });
+const fail = (code, detail) => {
+  const diagnostic = diagnosticFromCode({ stage: "launcher-recovery", operation: "validate-review-launcher-recovery", code, subject: "review-launcher-recovery", safeMessage: "The external reviewer recovery request is not valid or cannot be completed." });
+  return { allowed: false, ...unavailableOutcome(diagnostic), ...(detail ? { detail } : {}) };
+};
 const terminal = (code, prepared, detail) => ({
   allowed: false,
-  status: "unavailable",
-  code,
+  ...unavailableOutcome(preservedDiagnostic(detail) ?? diagnosticFromCode({ stage: "launcher-recovery", operation: "execute-review-launcher-recovery", code, subject: "review-launcher-recovery", safeMessage: "The external reviewer recovery could not complete through its required transport." })),
   terminal: true,
   manualFallback: false,
   ...(prepared?.hostRequest?.requestDigest ? { requestDigest: prepared.hostRequest.requestDigest } : {}),
-  ...(detail ? { detail } : {})
+  ...(detail && !preservedDiagnostic(detail) ? { detail } : {})
 });
 
 const launcherDefinitions = Object.freeze({
@@ -201,8 +204,9 @@ export async function executePreparedReviewLauncherRecovery(prepared, {
   let transportResult;
   try {
     transportResult = await invokePreparedReviewHost(Object.freeze(structuredClone(prepared)));
-  } catch {
-    return terminal("review-launcher-runtime-transport-failed", prepared);
+  } catch (error) {
+    const diagnostic = diagnosticFromError({ stage: "recovery-transport", operation: "invoke-prepared-review-host", code: "review-launcher-runtime-transport-failed", subject: "review-launcher-transport", safeMessage: "The parent review transport failed before returning a host response.", error });
+    return terminal(diagnostic.code, prepared, { diagnostic });
   }
   if (transportResult?.status === "denied") {
     return terminal("review-launcher-runtime-transport-denied", prepared);
@@ -211,7 +215,7 @@ export async function executePreparedReviewLauncherRecovery(prepared, {
     return terminal("review-launcher-runtime-transport-timed-out", prepared);
   }
   if (transportResult?.status !== "executed") {
-    return terminal("review-launcher-runtime-transport-unavailable", prepared);
+    return terminal(transportResult?.code ?? "review-launcher-runtime-transport-unavailable", prepared, transportResult);
   }
   const accepted = acceptReviewLauncherHostResponse({
     prepared,
@@ -219,12 +223,12 @@ export async function executePreparedReviewLauncherRecovery(prepared, {
     runtimeReceipt: transportResult.runtimeReceipt,
     now: now()
   });
-  return accepted.allowed ? accepted : terminal(accepted.code, prepared, accepted.detail);
+  return accepted.allowed ? accepted : terminal(accepted.code, prepared, accepted);
 }
 
 export async function executeReviewLauncherRecovery(request, options = {}) {
   const prepared = prepareReviewLauncherRecovery(request, options);
-  if (!prepared.allowed) return terminal(prepared.code, prepared, prepared.detail);
+  if (!prepared.allowed) return terminal(prepared.code, prepared, prepared);
   return executePreparedReviewLauncherRecovery(prepared, options);
 }
 

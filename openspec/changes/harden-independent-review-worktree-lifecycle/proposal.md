@@ -24,6 +24,10 @@ not authorize GitHub tracking mutation.
   construction, verification, cleanup, and strict reviewer-process failure
   without retaining raw stderr, paths, review/package content, environment
   values, or credentials.
+- Propagate one versioned safe diagnostic envelope through package construction,
+  archive and worktree views, adapter preflight/execution/result handling,
+  launcher host, parent transport, and recovery acceptance without a wrapper
+  replacing a child failure's triage data.
 - Reconcile launcher recovery and protocol documentation with proactive
   capability selection; do not use error-message matching, manual owner-run
   commands, or generic shell escalation as the authorization mechanism.

@@ -58,6 +58,14 @@
   contract, and generic execution categories. Preserve only stable fields and
   optional numeric exit status; do not retain output, arguments, paths, or
   environment data. Depends on: 4.2.
+- [x] 4.5 Define and validate one versioned, assistant-neutral diagnostic
+  envelope and unavailable-outcome helper for the full independent-review
+  control plane. Keep immutable reviewer-result contracts unchanged and bind
+  durable diagnostic records to their sealed package/result. Depends on: 4.4.
+- [x] 4.6 Convert package, archive/worktree, adapter preflight/process/result,
+  launcher host, parent transport, and recovery-acceptance failures to emit or
+  preserve the shared envelope. Add deterministic propagation, redaction, and
+  boundary coverage. Depends on: 4.5.
 
 ## 5. Verification and delivery evidence
 

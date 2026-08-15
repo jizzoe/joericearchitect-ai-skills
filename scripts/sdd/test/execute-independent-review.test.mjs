@@ -13,7 +13,7 @@ test("capability probe fails closed and executor accepts only a validated immuta
   const out = await executeIndependentReview({ package: reviewPackage, adapter, configuredReviewer: { type: "fixture", identity: "fresh-reviewer", attestation: { ref: "fixture-attestation" } }, implementerSession: "implementer", invoke: async () => result });
   assert.equal(out.status, "passed");
   const unavailable = { ...result, status: "unavailable", unavailableCode: "fixture-runtime-unavailable", attestation: { ...result.attestation, nonInteractive: false, isolatedContext: false, freshContext: false, readOnly: false } };
-  const diagnostic = { stage: "reviewer-execution", operation: "fixture-strict-review", code: unavailable.unavailableCode, category: "runtime-unavailable", subject: "reviewer-executable", exitCode: 1, safeMessage: "Fixture runtime is unavailable." };
+  const diagnostic = { schemaVersion: 1, stage: "reviewer-execution", operation: "fixture-strict-review", code: unavailable.unavailableCode, category: "runtime-unavailable", subject: "reviewer-executable", exitCode: 1, safeMessage: "Fixture runtime is unavailable." };
   const diagnosticOut = await executeIndependentReview({ package: reviewPackage, adapter, configuredReviewer: { type: "fixture", identity: "fresh-reviewer", attestation: { ref: "fixture-attestation" } }, implementerSession: "implementer", invoke: async () => ({ status: "unavailable", result: unavailable, diagnostic }) });
   assert.deepEqual(diagnosticOut.diagnostic, diagnostic);
   assert.equal((await executeIndependentReview({ package: reviewPackage, adapter: {}, invoke: async () => result })).status, "unavailable");

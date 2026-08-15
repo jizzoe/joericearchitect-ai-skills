@@ -88,6 +88,24 @@ They must not persist stdout, stderr, command arguments, environment values,
 or paths. This preserves triage value when an archive view succeeds but the
 reviewer cannot start.
 
+### 3a. Propagate one envelope across every control-plane boundary
+
+Introduce one assistant-neutral `DiagnosticV1` module and return an
+`{ status: "unavailable", code, diagnostic }` outcome whenever a review
+control-plane boundary fails. The diagnostic contains only version, stage,
+operation, stable code, finite category, stable subject, optional numeric exit
+code, and a safe retry message. The immutable `independent-review-result-v1`
+schema remains unchanged; durable review records store a diagnostic as a
+sibling of an unavailable result and bind it to the same package/head.
+
+Leaf boundaries classify local errors in memory, then discard raw details. A
+wrapper forwards a child's valid diagnostic unchanged; it emits a new envelope
+only when the wrapper itself is the failing boundary. This applies uniformly to
+package building, archive/worktree view creation and cleanup, adapter probing,
+settings and process setup, result artifacts, launcher host, parent transport,
+and recovery acceptance. Unrecognized local runtime output returns an explicit
+`unclassified-runtime-failure` category rather than inventing a cause.
+
 Alternative: expose raw Git error text for diagnosis. Rejected because source
 paths, environment data, and package/review text may be sensitive or not
 portable, and raw messages are not a durable API.
@@ -126,6 +144,9 @@ repository-specific.
   digest, and expiration.
 - [A process error could reveal sensitive context] → Map it to finite safe
   diagnostic fields and verify tests never persist raw output or paths.
+- [A wrapper discards useful child triage] → Require every unavailable outcome
+  to carry the common envelope and test that wrapper boundaries preserve it
+  unchanged unless they themselves fail.
 - [Cleanup can fail after a partial registration] → Retain only the validated
   ownership record for a separately authenticated recovery path and fail
   closed; never perform unchecked cleanup.

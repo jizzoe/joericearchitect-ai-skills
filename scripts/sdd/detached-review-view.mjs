@@ -4,6 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { createReviewDiagnostic, diagnosticFromError } from "./review-diagnostics.mjs";
+
 const commit = (value) => typeof value === "string" && /^[0-9a-f]{40}$/.test(value);
 const digest = (value) => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
 const date = (value) => Number.isFinite(Date.parse(value));
@@ -13,36 +15,24 @@ const fail = (code, detail) => ({ available: false, code, ...(detail ? { detail 
 const runGitDefault = (args) => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
 function unavailable({ requestDigest, stage, operation, code, category, subject, exitCode, safeMessage }) {
+  const diagnostic = createReviewDiagnostic({ stage, operation, code, category, subject, ...(Number.isInteger(exitCode) ? { exitCode } : {}), safeMessage });
   return {
     available: false,
     status: "unavailable",
     requestDigest,
-    stage,
-    operation,
-    error: {
-      code,
-      category,
-      subject,
-      ...(Number.isInteger(exitCode) ? { exitCode } : {}),
-      safeMessage
-    }
+    code,
+    diagnostic
   };
 }
 
 function gitFailure(error, { requestDigest, stage, operation, fallbackCode, fallbackSubject, fallbackMessage }) {
   const permissionDenied = error?.code === "EACCES" || error?.code === "EPERM";
-  return unavailable({
-    requestDigest,
-    stage,
-    operation,
-    code: fallbackCode,
-    category: permissionDenied ? "permission-denied" : "execution-failed",
-    subject: permissionDenied ? "source-git-metadata" : fallbackSubject,
-    exitCode: Number.isInteger(error?.status) ? error.status : undefined,
-    safeMessage: permissionDenied
-      ? "The review worktree could not be registered in the source repository."
-      : fallbackMessage
+  const diagnostic = diagnosticFromError({
+    stage, operation, code: fallbackCode, subject: permissionDenied ? "source-git-metadata" : fallbackSubject,
+    error, exitCode: Number.isInteger(error?.status) ? error.status : undefined,
+    safeMessage: permissionDenied ? "The review worktree could not be registered in the source repository." : fallbackMessage
   });
+  return { available: false, status: "unavailable", requestDigest, code: diagnostic.code, diagnostic };
 }
 
 function canonicalRepository(repositoryPath) {
@@ -81,6 +71,21 @@ function cleanupOwnedPath({ repository, reviewPath, temporaryRoot }, runGit) {
   }
 }
 
+function archiveUnavailable(code, category, subject, safeMessage) {
+  const diagnostic = createReviewDiagnostic({ stage: "view-construction", operation: "archive-review-view", code, category, subject, safeMessage });
+  return { available: false, status: "unavailable", code, diagnostic };
+}
+
+function archiveFailure(error, code, subject, safeMessage) {
+  const diagnostic = diagnosticFromError({ stage: "view-construction", operation: "archive-review-view", code, subject, safeMessage, error, exitCode: Number.isInteger(error?.status) ? error.status : undefined });
+  return { available: false, status: "unavailable", code, diagnostic };
+}
+
+function archiveCleanupUnavailable(code, category, subject, safeMessage) {
+  const diagnostic = createReviewDiagnostic({ stage: "view-cleanup", operation: "archive-review-view", code, category, subject, safeMessage });
+  return { removed: false, code, diagnostic };
+}
+
 function regularTreeOnly(repositoryPath, headCommit) {
   try {
     const entries = execFileSync("git", ["-C", repositoryPath, "ls-tree", "-r", "-z", headCommit], { encoding: "buffer", stdio: ["ignore", "pipe", "pipe"] });
@@ -101,8 +106,8 @@ export function createArchivedReviewView({ repositoryPath, headCommit, temporary
   try {
     const repository = canonicalRepository(repositoryPath);
     const head = canonicalCommit(repository, headCommit);
-    if (!head || head !== headCommit) return fail("independent-review-view-head-not-canonical");
-    if (!regularTreeOnly(repository, head)) return fail("independent-review-view-tree-unsafe");
+    if (!head || head !== headCommit) return archiveUnavailable("independent-review-view-head-not-canonical", "validation-failed", "sealed-head", "The requested review commit is not a canonical commit in the source repository.");
+    if (!regularTreeOnly(repository, head)) return archiveUnavailable("independent-review-view-tree-unsafe", "validation-failed", "review-archive", "The requested review archive contains unsupported tree entries.");
     root = fs.mkdtempSync(path.join(temporaryRoot, "ai-skills-review-archive-"));
     const reviewPath = path.join(root, "repository");
     fs.mkdirSync(reviewPath, { mode: 0o700 });
@@ -119,11 +124,11 @@ export function createArchivedReviewView({ repositoryPath, headCommit, temporary
     });
     fs.writeFileSync(path.join(root, ".ai-skills-review-view.json"), `${JSON.stringify(view)}\n`, { mode: 0o600, flag: "wx" });
     return { available: true, view };
-  } catch {
+  } catch (error) {
     if (root && fs.existsSync(root)) {
       try { fs.rmSync(root, { recursive: true, force: true }); } catch { /* preserve the narrow temp path for recovery */ }
     }
-    return fail("independent-review-view-create-failed");
+    return archiveFailure(error, "independent-review-view-create-failed", "review-archive", "The review archive could not be created.");
   }
 }
 
@@ -132,17 +137,17 @@ export function removeArchivedReviewView(view) {
       typeof view.temporaryRoot !== "string" || typeof view.reviewPath !== "string" ||
       path.dirname(view.reviewPath) !== view.temporaryRoot ||
       !path.basename(view.temporaryRoot).startsWith("ai-skills-review-archive-")) {
-    return { removed: false, code: "independent-review-view-cleanup-unsafe" };
+    return archiveCleanupUnavailable("independent-review-view-cleanup-unsafe", "ownership-invalid", "review-archive", "The review archive cannot be removed because ownership could not be verified.");
   }
   try {
     const marker = JSON.parse(fs.readFileSync(path.join(view.temporaryRoot, ".ai-skills-review-view.json"), "utf8"));
     if (marker.ownershipToken !== view.ownershipToken || marker.reviewPath !== view.reviewPath) {
-      return { removed: false, code: "independent-review-view-cleanup-ownership-mismatch" };
+      return archiveCleanupUnavailable("independent-review-view-cleanup-ownership-mismatch", "ownership-invalid", "review-archive", "The review archive cannot be removed because ownership does not match.");
     }
     fs.rmSync(view.temporaryRoot, { recursive: true, force: false });
     return { removed: true };
-  } catch {
-    return { removed: false, code: "independent-review-view-cleanup-failed" };
+  } catch (error) {
+    return { removed: false, code: "independent-review-view-cleanup-failed", diagnostic: diagnosticFromError({ stage: "view-cleanup", operation: "archive-review-view", code: "independent-review-view-cleanup-failed", subject: "review-archive", safeMessage: "The review archive could not be removed.", error }) };
   }
 }
 

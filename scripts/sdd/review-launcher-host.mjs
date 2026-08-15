@@ -9,14 +9,17 @@ import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "
 import { runClaudeDegradedReviewAdapter, runCodexDegradedReviewAdapter, writeReviewPackageForView } from "./platform-review-adapters.mjs";
 import { reviewLauncherDefinition, reviewLauncherRequestDigest, validateReviewLauncherRecovery } from "./review-launcher-recovery.mjs";
 import { cleanupReviewWorktreeLifecycle, executeReviewWorktreeLifecycle, prepareReviewWorktreeLifecycle } from "./review-worktree-lifecycle.mjs";
+import { diagnosticFromCode, diagnosticFromError, preservedDiagnostic, unavailableOutcome } from "./review-diagnostics.mjs";
 
 const hostScript = "scripts/sdd/review-launcher-host.mjs";
 const text = (value) => typeof value === "string" && value.trim().length > 0;
-const fail = (code, detail) => ({ allowed: false, status: "unavailable", code, ...(detail ? { detail } : {}) });
+const fail = (code, detail) => {
+  const diagnostic = diagnosticFromCode({ stage: "launcher-host", operation: "execute-review-launcher-host", code, subject: "review-launcher-host", safeMessage: "The external reviewer host could not complete the requested review." });
+  return { allowed: false, ...unavailableOutcome(diagnostic), ...(detail ? { detail } : {}) };
+};
 const lifecycleUnavailable = (lifecycle) => ({
   allowed: false,
-  status: "unavailable",
-  code: lifecycle?.error?.code ?? "review-worktree-lifecycle-unavailable",
+  ...unavailableOutcome(preservedDiagnostic(lifecycle) ?? diagnosticFromCode({ stage: "worktree-lifecycle", operation: "manage-review-worktree", code: lifecycle?.code ?? "review-worktree-lifecycle-unavailable", subject: "review-worktree", safeMessage: "The external reviewer host could not manage its detached review worktree." })),
   lifecycle
 });
 
@@ -86,7 +89,10 @@ export function executeReviewLauncherHost(hostRequest, {
           degradedAuthorization: preflight.degradedAuthorization,
           executable: request.launcher.executable
         });
-        if (execution?.status === "unavailable") output = fail("review-launcher-inner-reviewer-unavailable", execution.result?.unavailableCode);
+        if (execution?.status === "unavailable") {
+          const diagnostic = preservedDiagnostic(execution) ?? diagnosticFromCode({ stage: "reviewer-execution", operation: "execute-degraded-reviewer", code: execution?.result?.unavailableCode ?? "review-launcher-inner-reviewer-unavailable", subject: "degraded-reviewer", safeMessage: "The external reviewer process did not produce a usable result." });
+          output = { allowed: false, ...unavailableOutcome(diagnostic) };
+        }
         else {
           const configuredReviewer = { ...request.reviewer, attestation: request.reviewer.attestation ?? { ref: request.attestationRef } };
           const validation = validateReviewResult(execution?.result, { expectedPackage: rebuilt.package, configuredReviewer, implementerSession: request.authorization.implementerSession });
@@ -114,8 +120,9 @@ export function executeReviewLauncherHost(hostRequest, {
         }
       }
     }
-  } catch {
-    output = fail("review-launcher-execution-failed");
+  } catch (error) {
+    const diagnostic = diagnosticFromError({ stage: "launcher-host", operation: "execute-review-launcher-host", code: "review-launcher-execution-failed", subject: "review-launcher-host", safeMessage: "The external reviewer host failed while executing the review.", error });
+    output = { allowed: false, ...unavailableOutcome(diagnostic) };
   }
   const cleanup = cleanupReviewWorktreeLifecycle({
     lifecycleRequest: preparedLifecycle.lifecycleRequest,

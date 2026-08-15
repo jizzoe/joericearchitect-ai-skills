@@ -84,7 +84,7 @@ test("lifecycle validation rejects expired, unbound, and changed-head requests b
   }, { createView: () => { called = true; } });
   assert.equal(called, false);
   assert.equal(result.status, "unavailable");
-  assert.equal(result.error.code, "review-worktree-lifecycle-parent-binding-mismatch");
+  assert.equal(result.diagnostic.code, "review-worktree-lifecycle-parent-binding-mismatch");
 
   const changedDraft = { ...reviewPackage, headCommit: "4".repeat(40) };
   delete changedDraft.manifestDigest;
@@ -138,8 +138,8 @@ test("cleanup refuses a view from a different lifecycle request", () => {
     now: input.now
   });
   assert.equal(cleanup.removed, false);
-  assert.equal(cleanup.stage, "review-view-cleanup");
-  assert.equal(cleanup.error.code, "review-worktree-cleanup-request-mismatch");
+  assert.equal(cleanup.diagnostic.stage, "view-cleanup");
+  assert.equal(cleanup.diagnostic.code, "review-worktree-cleanup-request-mismatch");
 });
 
 test("expired lifecycle requests still remove owned views but fail closed", () => {
@@ -156,5 +156,5 @@ test("expired lifecycle requests still remove owned views but fail closed", () =
   assert.equal(removed, true);
   assert.equal(cleanup.removed, true);
   assert.equal(cleanup.status, "unavailable");
-  assert.equal(cleanup.error.code, "review-worktree-lifecycle-expired");
+  assert.equal(cleanup.diagnostic.code, "review-worktree-lifecycle-expired");
 });

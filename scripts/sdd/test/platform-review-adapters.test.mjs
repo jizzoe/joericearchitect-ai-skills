@@ -116,7 +116,7 @@ test("degraded Codex transport is explicitly reduced-assurance and scrubs mutati
 
 test("reviewer subprocess diagnostics expose only safe triage fields", () => {
   assert.equal(classifyCodexExecutionFailure({ stderr: "failed to initialize in-process app-server client: Operation not permitted" }), "independent-reviewer-nested-app-server-denied");
-  assert.equal(classifyCodexExecutionFailure({ stderr: "other failure" }), "independent-reviewer-codex-execution-unavailable");
+  assert.equal(classifyCodexExecutionFailure({ stderr: "other failure" }), "independent-reviewer-codex-unclassified-runtime-failure");
   assert.equal(classifyClaudeExecutionFailure({ stderr: "authentication failed" }), "independent-reviewer-claude-authentication-unavailable");
   const cases = [
     [diagnoseCodexExecutionFailure({ status: 1, stderr: "authentication token expired at /private/secret" }), "independent-reviewer-codex-authentication-unavailable", "authentication-unavailable", "reviewer-authentication"],
@@ -125,7 +125,8 @@ test("reviewer subprocess diagnostics expose only safe triage fields", () => {
     [diagnoseClaudeExecutionFailure({ status: 1, stderr: "network connection timed out for token at /private/secret" }), "independent-reviewer-claude-network-unavailable", "network-unavailable", "reviewer-network"]
   ];
   for (const [diagnostic, code, category, subject] of cases) {
-    assert.deepEqual(Object.keys(diagnostic).sort(), ["category", "code", "exitCode", "operation", "safeMessage", "stage", "subject"]);
+    assert.deepEqual(Object.keys(diagnostic).sort(), ["category", "code", "exitCode", "operation", "safeMessage", "schemaVersion", "stage", "subject"]);
+    assert.equal(diagnostic.schemaVersion, 1);
     assert.equal(diagnostic.code, code);
     assert.equal(diagnostic.category, category);
     assert.equal(diagnostic.subject, subject);

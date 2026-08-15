@@ -2,13 +2,18 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { canonicalJson, validateReviewPackage } from "./independent-review-contract.mjs";
 import { createDetachedReviewView, removeDetachedReviewView } from "./detached-review-view.mjs";
+import { createReviewDiagnostic, unavailableOutcome } from "./review-diagnostics.mjs";
 
 export const detachedWorktreeOperation = "create-detached-review-worktree-v1";
 const schemaVersion = 1;
 const commit = (value) => typeof value === "string" && /^[0-9a-f]{40}$/.test(value);
 const digest = (value) => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
 const text = (value) => typeof value === "string" && value.trim().length > 0;
-const fail = (code, detail) => ({ allowed: false, status: "unavailable", code, ...(detail ? { detail } : {}) });
+const fail = (code, { stage = "lifecycle-validation", operation = "review-worktree-lifecycle", subject = "worktree-lifecycle-request", safeMessage = "The review worktree lifecycle request is not valid." } = {}) => {
+  const category = code.includes("expired") ? "request-expired" : code.includes("package") ? "validation-failed" : "request-invalid";
+  const diagnostic = createReviewDiagnostic({ stage, operation, code, category, subject, safeMessage });
+  return { allowed: false, ...unavailableOutcome(diagnostic) };
+};
 
 function lifecycleDigest({ schemaVersion: version, lifecycleId, request } = {}) {
   if (version !== schemaVersion || !text(lifecycleId) || !request) return null;
@@ -38,7 +43,7 @@ function validRecord(record, { selectedEntry, transition, reviewPackage, authori
 /** Validate the authorization record before any host lifecycle request exists. */
 export function validateReviewWorktreeLifecycle({ authorization, selectedEntry, transition = "merge-pr", reviewPackage, repositoryPath, now = new Date().toISOString() } = {}) {
   const packageCheck = validateReviewPackage(reviewPackage);
-  if (!packageCheck.valid) return fail(packageCheck.issues[0].code);
+  if (!packageCheck.valid) return fail(packageCheck.issues[0].code, { subject: "sealed-review-package", safeMessage: "The sealed review package is not valid for a worktree lifecycle." });
   if (!text(repositoryPath) || !commit(reviewPackage.baseCommit) || !commit(reviewPackage.headCommit) || !digest(reviewPackage.manifestDigest)) {
     return fail("review-worktree-lifecycle-input-incomplete");
   }
@@ -104,18 +109,7 @@ export function validatePreparedReviewWorktreeLifecycle({ lifecycleRequest, sour
 export function executeReviewWorktreeLifecycle({ lifecycleRequest, sourceRequestDigest, expected, now }, { createView = createDetachedReviewView } = {}) {
   const valid = validatePreparedReviewWorktreeLifecycle({ lifecycleRequest, sourceRequestDigest, expected, now });
   if (!valid.allowed) {
-    return {
-      status: "unavailable",
-      requestDigest: lifecycleRequest?.requestDigest,
-      stage: "review-view-construction",
-      operation: "create-detached-worktree",
-      error: {
-        code: valid.code,
-        category: "request-invalid",
-        subject: "worktree-lifecycle-request",
-        safeMessage: "The requested review worktree lifecycle is not valid."
-      }
-    };
+    return { ...valid, requestDigest: lifecycleRequest?.requestDigest };
   }
   return createView({
     repositoryPath: lifecycleRequest.request.repositoryPath,
@@ -129,48 +123,14 @@ export function executeReviewWorktreeLifecycle({ lifecycleRequest, sourceRequest
 export function cleanupReviewWorktreeLifecycle({ lifecycleRequest, sourceRequestDigest, expected, view, now }, { removeView = removeDetachedReviewView } = {}) {
   const valid = validatePreparedReviewWorktreeLifecycle({ lifecycleRequest, sourceRequestDigest, expected, now, allowExpired: true });
   if (!valid.allowed) {
-    return {
-      removed: false,
-      status: "unavailable",
-      requestDigest: lifecycleRequest?.requestDigest,
-      stage: "review-view-cleanup",
-      operation: "remove-detached-worktree",
-      error: {
-        code: valid.code,
-        category: "request-invalid",
-        subject: "worktree-lifecycle-request",
-        safeMessage: "The review worktree lifecycle is no longer valid for cleanup."
-      }
-    };
+    return { removed: false, ...valid, requestDigest: lifecycleRequest?.requestDigest };
   }
   if (view?.lifecycleRequestDigest !== lifecycleRequest.requestDigest) {
-    return {
-      removed: false,
-      status: "unavailable",
-      requestDigest: lifecycleRequest.requestDigest,
-      stage: "review-view-cleanup",
-      operation: "remove-detached-worktree",
-      error: {
-        code: "review-worktree-cleanup-request-mismatch",
-        category: "ownership-invalid",
-        subject: "review-worktree",
-        safeMessage: "The review worktree does not match the lifecycle request."
-      }
-    };
+    const diagnostic = createReviewDiagnostic({ stage: "view-cleanup", operation: "remove-detached-worktree", code: "review-worktree-cleanup-request-mismatch", category: "ownership-invalid", subject: "review-worktree", safeMessage: "The review worktree does not match the lifecycle request." });
+    return { removed: false, requestDigest: lifecycleRequest.requestDigest, ...unavailableOutcome(diagnostic) };
   }
   const cleanup = removeView(view, { now });
   if (cleanup?.removed !== true || !valid.expired) return cleanup;
-  return {
-    ...cleanup,
-    status: "unavailable",
-    requestDigest: lifecycleRequest.requestDigest,
-    stage: "review-view-cleanup",
-    operation: "remove-detached-worktree",
-    error: {
-      code: "review-worktree-lifecycle-expired",
-      category: "request-expired",
-      subject: "worktree-lifecycle-request",
-      safeMessage: "The review worktree was removed after its lifecycle request expired."
-    }
-  };
+  const diagnostic = createReviewDiagnostic({ stage: "view-cleanup", operation: "remove-detached-worktree", code: "review-worktree-lifecycle-expired", category: "request-expired", subject: "worktree-lifecycle-request", safeMessage: "The review worktree was removed after its lifecycle request expired." });
+  return { ...cleanup, requestDigest: lifecycleRequest.requestDigest, ...unavailableOutcome(diagnostic) };
 }
