@@ -22,7 +22,7 @@ const source = {
   publisher: "Example Standards Group",
   urlOrPath: "https://example.invalid/runtime-isolation",
   accessDate: "2026-08-15",
-  sourceType: "primary documentation",
+  sourceType: "primary",
   relevance: "Defines the isolation boundary.",
   classification: "verified-fact",
   claimDomain: "technical",
@@ -115,14 +115,24 @@ test("generated findings and sources satisfy their content contracts", () => {
 test("depth source targets, pause conditions, and pre-execution guidance are enforced", () => {
   const tooShallow = run({ ...base, depth: "deep" }).output;
   const duplicateSources = run({ ...base, sources: sources.map((entry) => ({ ...entry, urlOrPath: sources[0].urlOrPath })) }).output;
-  const secondaryOnly = run({ ...base, sources: sources.map((entry) => ({ ...entry, sourceType: "secondary article" })) }).output;
+  const secondaryOnly = run({ ...base, sources: sources.map((entry) => ({ ...entry, sourceType: "secondary" })) }).output;
+  const misleadingPrimary = run({ ...base, sources: sources.map((entry) => ({ ...entry, sourceType: "not primary" })) }).output;
+  const superficialDuplicates = run({
+    ...base,
+    sources: sources.map((entry, index) => ({
+      ...entry,
+      urlOrPath: `https://example.invalid/runtime-isolation${index % 2 === 0 ? "/" : "#section"}${index > 1 ? `?utm_source=${index}` : ""}`
+    }))
+  }).output;
   const credentialPause = run({ ...base, requiresNewCredentials: true }).output;
   const { output, guidance } = run({ ...base, assistantProvider: undefined });
-  valid(tooShallow); valid(duplicateSources); valid(secondaryOnly); valid(credentialPause); valid(output);
+  valid(tooShallow); valid(duplicateSources); valid(secondaryOnly); valid(misleadingPrimary); valid(superficialDuplicates); valid(credentialPause); valid(output);
   assert.equal(tooShallow.status, "blocked");
   assert.equal(tooShallow.openQuestions[0].id, "insufficient-source-depth");
   assert.equal(duplicateSources.status, "blocked");
   assert.equal(secondaryOnly.status, "blocked");
+  assert.equal(misleadingPrimary.status, "blocked");
+  assert.equal(superficialDuplicates.status, "blocked");
   assert.equal(credentialPause.openQuestions[0].id, "new-credentials-required");
   assert.equal(guidance.length, 1);
   assert.equal(guidance[0].role, "balanced-standard");

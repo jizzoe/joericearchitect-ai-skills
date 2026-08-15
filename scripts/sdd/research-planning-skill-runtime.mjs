@@ -13,6 +13,7 @@ const lastKnownModels = Object.freeze({
   claude: { quick: "Claude Haiku 3.5", standard: "Claude Sonnet 4", deep: "Claude Opus 4.1", sourceUrl: "https://docs.anthropic.com/en/docs/about-claude/models" }
 });
 const sourceClassifications = new Set(["verified-fact", "source-reported-claim", "assistant-inference", "unknown", "recommendation"]);
+const sourceTypes = new Set(["primary", "secondary", "tertiary"]);
 const claimDomains = new Set(["general", "technical", "pricing", "policy", "api", "current-product"]);
 const primaryPreferredDomains = new Set(["technical", "pricing", "policy", "api", "current-product"]);
 const preapprovalTargetPrefixes = Object.freeze({ "merge-pr": "pr:", "archive-change": "change:", "delete-merged-topic-branch": "branch:" });
@@ -20,6 +21,14 @@ const preapprovalTargetPrefixes = Object.freeze({ "merge-pr": "pr:", "archive-ch
 function safeWorkspacePath(value) {
   return typeof value === "string" && value.length > 0 && !path.isAbsolute(value) &&
     !/^[A-Za-z]:[\\/]/.test(value) && !value.split(/[\\/]/).includes("..");
+}
+
+function resolveWorkspacePath(targetWorkspace, artifactPath) {
+  if (!safeWorkspacePath(targetWorkspace) || !safeWorkspacePath(artifactPath)) return null;
+  const workspace = path.posix.normalize(targetWorkspace.replaceAll("\\", "/"));
+  const relative = path.posix.normalize(artifactPath.replaceAll("\\", "/"));
+  const resolved = workspace === "." ? relative : path.posix.join(workspace, relative);
+  return safeWorkspacePath(resolved) ? resolved : null;
 }
 
 function nonEmpty(value) {
@@ -143,6 +152,30 @@ function workspaceLink(value) {
   return `[${markdownText(value)}](${target})`;
 }
 
+function canonicalSourceId(value) {
+  return String(value).normalize("NFKC").trim().toLowerCase();
+}
+
+function canonicalSourceLocation(value) {
+  const raw = String(value).trim();
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    url.hash = "";
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(?:utm_.+|fbclid|gclid)$/i.test(key)) url.searchParams.delete(key);
+    }
+    url.searchParams.sort();
+    url.pathname = url.pathname.split("/").map((segment) => encodeURIComponent(decodeURIComponent(segment))).join("/");
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return url.href;
+  } catch {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) return null;
+    if (!safeWorkspacePath(raw)) return null;
+    return path.posix.normalize(raw.replaceAll("\\", "/")).replace(/\/+$/, "");
+  }
+}
+
 function bullets(values, empty = "- None supplied.") {
   return Array.isArray(values) && values.length > 0 ? values.map((value) => `- ${markdownText(value)}`).join("\n") : empty;
 }
@@ -230,7 +263,7 @@ function resolveResearchSources(sources, readArtifact) {
   const resolved = [];
   for (const [index, source] of sources.entries()) {
     if (!source || !nonEmpty(source.id) || !nonEmpty(source.title) || !nonEmpty(source.publisher) ||
-      !nonEmpty(source.urlOrPath) || !nonEmpty(source.accessDate) || !nonEmpty(source.sourceType) ||
+      !nonEmpty(source.urlOrPath) || !nonEmpty(source.accessDate) || !sourceTypes.has(source.sourceType) ||
       !nonEmpty(source.relevance) || !sourceClassifications.has(source.classification) || !claimDomains.has(source.claimDomain)) {
       return { error: `Source ${index + 1} is missing required provenance or classification.` };
     }
@@ -243,12 +276,15 @@ function resolveResearchSources(sources, readArtifact) {
     if (!nonEmpty(content)) return { error: `Source ${source.id} has no readable content.` };
     resolved.push({ ...source, content });
   }
-  if (new Set(resolved.map(({ id }) => id)).size !== resolved.length || new Set(resolved.map(({ urlOrPath }) => urlOrPath)).size !== resolved.length) {
+  const canonicalIds = resolved.map(({ id }) => canonicalSourceId(id));
+  const canonicalLocations = resolved.map(({ urlOrPath }) => canonicalSourceLocation(urlOrPath));
+  if (canonicalLocations.some((location) => location === null) || new Set(canonicalIds).size !== resolved.length ||
+    new Set(canonicalLocations).size !== resolved.length) {
     return { error: "Research depth requires distinct source identities and locations." };
   }
   for (const domain of primaryPreferredDomains) {
     const domainSources = resolved.filter((source) => source.claimDomain === domain);
-    if (domainSources.length > 0 && !domainSources.some((source) => /\bprimary\b/i.test(source.sourceType))) {
+    if (domainSources.length > 0 && !domainSources.some((source) => source.sourceType === "primary")) {
       return { error: `The ${domain} claims require at least one primary source.` };
     }
   }
@@ -353,9 +389,9 @@ function decisionApprovalIssue(input) {
   return null;
 }
 
-function designBriefApprovalIssue(input, designBriefContent) {
+function designBriefApprovalIssue(input, designBriefContent, resolvedDesignBriefPath) {
   const approval = input.designBriefApproval;
-  if (!approval || approval.path !== input.designBriefPath || !nonEmpty(approval.approvedBy) ||
+  if (!approval || approval.path !== resolvedDesignBriefPath || !nonEmpty(approval.approvedBy) ||
     !nonEmpty(approval.approvedAt) || !/^[0-9a-f]{64}$/.test(approval.sha256 ?? "")) return "Provide complete approval evidence bound to the design brief path and content.";
   const approvedAt = Date.parse(approval.approvedAt);
   const now = Date.parse(input.now ?? new Date().toISOString());
@@ -508,13 +544,19 @@ export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeAr
   const skill = "sdd-requirements-to-plan";
   const mode = commonMode(input);
   if (input.requestKind !== skill) return noOp(skill, mode);
-  if (!safeWorkspacePath(input.requirementsPath)) return gap(skill, mode, "paused", "missing-requirements", "Provide a workspace-relative accepted-requirements path.");
-  if (!safeWorkspacePath(input.designBriefPath)) return gap(skill, mode, "paused", "missing-design-brief", "Provide a workspace-relative approved design-brief path.");
   if (!safeWorkspacePath(input.targetWorkspace)) return gap(skill, mode, "paused", "missing-target-workspace", "Provide a safe target repository or workspace path.");
+  const requirementsPath = resolveWorkspacePath(input.targetWorkspace, input.requirementsPath);
+  const designBriefPath = resolveWorkspacePath(input.targetWorkspace, input.designBriefPath);
+  if (!requirementsPath) return gap(skill, mode, "paused", "missing-requirements", "Provide a target-workspace-relative accepted-requirements path.");
+  if (!designBriefPath) return gap(skill, mode, "paused", "missing-design-brief", "Provide a target-workspace-relative approved design-brief path.");
   if (!Array.isArray(input.currentStatePaths) || input.currentStatePaths.length === 0) return gap(skill, mode, "paused", "missing-current-state", "Provide at least one current-state path.");
-  const resolved = resolveArtifacts([input.requirementsPath, input.designBriefPath, ...input.currentStatePaths], readArtifact);
+  const currentStatePaths = input.currentStatePaths.map((artifactPath) => resolveWorkspacePath(input.targetWorkspace, artifactPath));
+  if (currentStatePaths.some((artifactPath) => artifactPath === null)) {
+    return gap(skill, mode, "paused", "missing-current-state", "Provide only target-workspace-relative current-state paths.");
+  }
+  const resolved = resolveArtifacts([requirementsPath, designBriefPath, ...currentStatePaths], readArtifact);
   if (resolved.error) return gap(skill, mode, "paused", "unresolved-source-path", resolved.error);
-  const invalidApproval = designBriefApprovalIssue(input, resolved.artifacts[1].content);
+  const invalidApproval = designBriefApprovalIssue(input, resolved.artifacts[1].content, designBriefPath);
   if (invalidApproval) return gap(skill, mode, "paused", "design-brief-approval-required", invalidApproval);
   if (Array.isArray(input.readinessGaps) && input.readinessGaps.length > 0) {
     return gap(skill, mode, "paused", "readiness-gap", String(input.readinessGaps[0]));
@@ -532,9 +574,10 @@ export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeAr
     const invalidPreapproval = preapprovalIssue(candidate, input.now);
     if (invalidPreapproval) return gap(skill, mode, "paused", "invalid-preapproval", invalidPreapproval);
   }
-  const outputPath = input.outputPath ?? (safeWorkspacePath(input.config?.defaults?.planRoot) && slugs.test(input.planSlug ?? "")
+  const relativeOutputPath = input.outputPath ?? (safeWorkspacePath(input.config?.defaults?.planRoot) && slugs.test(input.planSlug ?? "")
     ? path.posix.join(input.config.defaults.planRoot, `${input.planSlug}.md`) : null);
-  if (!safeWorkspacePath(outputPath)) return gap(skill, mode, "paused", "missing-output", "Provide a safe workspace-relative delivery-plan output path.");
+  const outputPath = resolveWorkspacePath(input.targetWorkspace, relativeOutputPath);
+  if (!outputPath) return gap(skill, mode, "paused", "missing-output", "Provide a safe target-workspace-relative delivery-plan output path.");
   if (typeof writeArtifact !== "function") return gap(skill, mode, "paused", "missing-writer", "Provide a bounded artifact writer.");
   const operations = [{ operation: "local-edit", path: outputPath, target: `workspace:${outputPath}`, contentKind: "delivery-plan", content: deliveryPlanContent(input, candidates, resolved.artifacts) }];
   const checks = authorize(input, "local-implementation", operations);

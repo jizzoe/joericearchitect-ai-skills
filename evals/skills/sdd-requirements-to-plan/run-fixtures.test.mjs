@@ -231,3 +231,31 @@ test("output path safety and second-workspace defaults are enforced", () => {
   assert.equal(second.artifacts[0].subject, "team-b/plans/research-delivery.md");
   assert.equal(unsafe.status, "paused");
 });
+
+test("all plan reads, writes, and authorization targets resolve inside the named target workspace", () => {
+  const targetContents = new Map([
+    ["team-b/docs/requirements/accepted.md", contents.get(base.requirementsPath)],
+    ["team-b/docs/briefs/approved.md", approvedBriefContent],
+    ["team-b/docs/context/current.md", contents.get(base.currentStatePaths[0])]
+  ]);
+  const input = {
+    ...base,
+    mode: "autonomous",
+    targetWorkspace: "team-b",
+    designBriefApproval: { ...base.designBriefApproval, path: "team-b/docs/briefs/approved.md" },
+    authorization: { allowedMutations: ["local-edit"], targets: ["workspace:team-b/docs/plans"], expiresAt: "2026-08-16T00:00:00.000Z" },
+    runtime: { permittedOperations: ["local-edit"], permissionGaps: [] }
+  };
+  const reads = [];
+  const reader = (artifactPath) => {
+    reads.push(artifactPath);
+    if (!targetContents.has(artifactPath)) throw new Error("ENOENT");
+    return targetContents.get(artifactPath);
+  };
+  const { output, writes } = run(input, reader);
+  valid(output);
+  assert.equal(output.status, "completed");
+  assert.deepEqual(reads, [...targetContents.keys()]);
+  assert.equal(writes[0].path, "team-b/docs/plans/research-delivery.md");
+  assert.equal(writes[0].target, "workspace:team-b/docs/plans/research-delivery.md");
+});
