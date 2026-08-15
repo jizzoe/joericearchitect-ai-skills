@@ -95,6 +95,7 @@ test("Codex adapter uses a fresh read-only noninteractive transport without user
   assert.equal(invocation.args.includes("--sandbox"), false);
   assert.ok(invocation.args.includes("--ephemeral"));
   assert.ok(invocation.args.includes("--ignore-user-config"));
+  assert.ok(invocation.args.includes("--skip-git-repo-check"));
   const probe = probeCodexReviewAdapter();
   assert.equal(typeof probe.available, "boolean");
   if (probe.available) assert.equal(probe.capability.denied.delegatedMutation, true);
@@ -116,11 +117,13 @@ test("degraded Codex transport is explicitly reduced-assurance and scrubs mutati
 
 test("reviewer subprocess diagnostics expose only safe triage fields", () => {
   assert.equal(classifyCodexExecutionFailure({ stderr: "failed to initialize in-process app-server client: Operation not permitted" }), "independent-reviewer-nested-app-server-denied");
+  assert.equal(classifyCodexExecutionFailure({ status: 1, stderr: "WARNING: could not create PATH aliases: Operation not permitted\nNot inside a trusted directory and --skip-git-repo-check was not specified." }), "independent-reviewer-codex-repository-trust-unavailable");
   assert.equal(classifyCodexExecutionFailure({ stderr: "other failure" }), "independent-reviewer-codex-unclassified-runtime-failure");
   assert.equal(classifyClaudeExecutionFailure({ stderr: "authentication failed" }), "independent-reviewer-claude-authentication-unavailable");
   const cases = [
     [diagnoseCodexExecutionFailure({ status: 1, stderr: "authentication token expired at /private/secret" }), "independent-reviewer-codex-authentication-unavailable", "authentication-unavailable", "reviewer-authentication"],
     [diagnoseCodexExecutionFailure({ status: 126, stderr: "sandbox operation not permitted at /private/secret" }), "independent-reviewer-codex-sandbox-unavailable", "permission-denied", "reviewer-sandbox"],
+    [diagnoseCodexExecutionFailure({ status: 1, stderr: "WARNING: alias setup: Operation not permitted\nNot inside a trusted directory and --skip-git-repo-check was not specified." }), "independent-reviewer-codex-repository-trust-unavailable", "runtime-unavailable", "reviewer-working-directory"],
     [diagnoseCodexExecutionFailure({ status: 1, stderr: "output-schema validation failed: /private/secret" }), "independent-reviewer-codex-output-contract-invalid", "output-contract-invalid", "reviewer-result-contract"],
     [diagnoseClaudeExecutionFailure({ status: 1, stderr: "network connection timed out for token at /private/secret" }), "independent-reviewer-claude-network-unavailable", "network-unavailable", "reviewer-network"]
   ];

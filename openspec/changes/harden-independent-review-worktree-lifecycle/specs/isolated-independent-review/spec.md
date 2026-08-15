@@ -103,6 +103,14 @@ bind that diagnostic to the same unavailable review result and sealed package.
   with its stable category, subject, optional exit code, and retry guidance
   without persisting subprocess output or environment details
 
+#### Scenario: Codex reviews an intentional non-Git archive
+- **WHEN** strict Codex reviews the sealed archive view, which intentionally
+  has no `.git` metadata
+- **THEN** its fixed invocation bypasses only the repository-presence preflight
+  while retaining the sealed read-only permission profile; a trusted-directory
+  refusal is reported with its own safe diagnostic rather than as a sandbox
+  failure
+
 #### Scenario: A wrapper receives a child diagnostic
 - **WHEN** a review control-plane child returns a valid unavailable diagnostic
 - **THEN** its caller forwards the same diagnostic without reducing it to a

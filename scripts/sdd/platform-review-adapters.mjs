@@ -369,7 +369,10 @@ function capabilities({ adapter, attestationRef, probeReference }) {
 export function buildCodexReviewInvocation({ executable = "codex", view, schemaPath, resultPath, authenticationEnvironment = {} }) {
   return {
     executable,
-    args: ["exec", "--strict-config", ...codexRestrictedReviewArguments(), "--ephemeral", "--ignore-user-config", "--ignore-rules", "--cd", view.reviewPath, "--output-schema", schemaPath, "--output-last-message", resultPath,
+    // Archive views intentionally contain no .git directory. This bypasses
+    // only Codex's repository-presence preflight; the sealed read-only
+    // permission profile remains the authority boundary.
+    args: ["exec", "--strict-config", ...codexRestrictedReviewArguments(), "--ephemeral", "--ignore-user-config", "--ignore-rules", "--skip-git-repo-check", "--cd", view.reviewPath, "--output-schema", schemaPath, "--output-last-message", resultPath,
       "Review only the committed detached repository view. Read .ai-independent-review-package.json and inspect the exact base-to-head diff. Do not modify files, Git, credentials, network state, or external systems. Return only the required JSON review result."],
     environment: { ...authenticationEnvironment, NO_COLOR: "1" }
   };
@@ -504,6 +507,12 @@ function diagnoseReviewProcessFailure(adapter, execution = {}, { resultMissing =
   }
   if (adapter === "codex" && /in-process app-server client|app-server.*operation not permitted|operation not permitted.*app-server/i.test(output)) {
     return unavailable("independent-reviewer-nested-app-server-denied", "permission-denied", "codex-app-server", "The Codex isolated reviewer cannot start its app-server in this runtime; use a runtime that permits the configured reviewer boundary.");
+  }
+  // A harmless PATH-alias warning can contain "Operation not permitted"
+  // before this terminal preflight refusal. Prefer the specific cause before
+  // considering broad sandbox text.
+  if (adapter === "codex" && /not inside a trusted directory.*--skip-git-repo-check|--skip-git-repo-check was not specified/i.test(output)) {
+    return unavailable("independent-reviewer-codex-repository-trust-unavailable", "runtime-unavailable", "reviewer-working-directory", "The Codex reviewer rejected the sealed non-Git review directory; enable its no-repository preflight bypass and retry.");
   }
   if (/\b(?:authentication|auth|login|sign[ -]?in|credential|token)\b.{0,80}\b(?:failed|invalid|expired|missing|required|denied|unavailable)\b|\b(?:failed|invalid|expired|missing|required|denied|unavailable)\b.{0,80}\b(?:authentication|auth|login|sign[ -]?in|credential|token)\b/i.test(output)) {
     return unavailable(`independent-reviewer-${adapter}-authentication-unavailable`, "authentication-unavailable", "reviewer-authentication", "The isolated reviewer cannot access a valid authentication session; refresh its runtime authentication and retry.");

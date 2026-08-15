@@ -88,6 +88,12 @@ They must not persist stdout, stderr, command arguments, environment values,
 or paths. This preserves triage value when an archive view succeeds but the
 reviewer cannot start.
 
+Codex archive views intentionally omit `.git` metadata. The fixed strict
+invocation therefore enables Codex's no-repository preflight bypass; that flag
+does not alter the sealed read-only permission profile. A terminal
+trusted-directory refusal is classified before broad permission-warning text,
+so an incidental PATH-alias warning cannot mask the actionable cause.
+
 ### 3a. Propagate one envelope across every control-plane boundary
 
 Introduce one assistant-neutral `DiagnosticV1` module and return an

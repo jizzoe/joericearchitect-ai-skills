@@ -55,9 +55,10 @@
   manual host/review command. Depends on: 3.2, 4.1, 4.2.
 - [x] 4.4 Add safe strict reviewer-process diagnostics for Codex and Claude,
   including allowlisted authentication, sandbox/permission, network, output
-  contract, and generic execution categories. Preserve only stable fields and
-  optional numeric exit status; do not retain output, arguments, paths, or
-  environment data. Depends on: 4.2.
+  contract, repository-trust, and generic execution categories. Prefer a
+  terminal specific cause over incidental warning text. Preserve only stable
+  fields and optional numeric exit status; do not retain output, arguments,
+  paths, or environment data. Depends on: 4.2.
 - [x] 4.5 Define and validate one versioned, assistant-neutral diagnostic
   envelope and unavailable-outcome helper for the full independent-review
   control plane. Keep immutable reviewer-result contracts unchanged and bind
