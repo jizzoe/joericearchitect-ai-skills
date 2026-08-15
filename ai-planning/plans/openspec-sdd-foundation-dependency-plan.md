@@ -3,6 +3,7 @@
 Date: 2026-08-08
 Status: Proposed
 Parent plan: [OpenSpec SDD Foundation Implementation Plan](openspec-sdd-foundation-implementation-plan.md)
+Accepted GitHub workflow standard: [GitHub Flow Standards and Best Practices](../standards-and-best-practices/github-flow-standards.md)
 
 ## 1. Purpose
 
@@ -41,13 +42,12 @@ Milestones group outcomes. Changes are independently deliverable OpenSpec units.
 
 Dependencies SHALL NOT be inferred solely from issue-title prefixes or list order.
 
+The accepted GitHub Flow decision changes branch, pull-request, and lifecycle contracts but does not change the milestone/change dependency graph. M2-C1 owns the initial `main`/PR configuration, M4-C1 owns formal issue/branch intake behavior, and M5-C1/M5-C2 own enforcement and PR-state reconciliation.
+
 ## 4. Milestone Dependency Graph
 
 ```text
-M1-C1  Tool and OpenSpec Bootstrap
- |
- v
-M1-C2  Bounded Autonomous Execution
+M1  Tool and OpenSpec Bootstrap
  |
  +--------------------+
  |                    |
@@ -84,9 +84,8 @@ Milestones are outcome groupings, not rigid phase gates. A downstream change may
 | ID | OpenSpec change | Hard dependencies | Can run in parallel with | Blocking output |
 |---|---|---|---|---|
 | M1-C1 | `bootstrap-openspec-foundation` | None; manual bootstrap | None initially | Initialized OpenSpec and assistant workflow ownership |
-| M1-C2 | `enable-bounded-autonomous-sdd-execution` | M1-C1 | None; establishes unattended execution controls | Bounded authorization, review/correction loop, checkpoints, and human-pause policy |
-| M2-C1 | `establish-github-work-intake` | M1-C2 | M3-C1 | Issue forms, Project statuses, non-secret Project config |
-| M3-C1 | `establish-openspec-quality-rules` | M1-C2 | M2-C1 | Artifact quality rules used by later changes |
+| M2-C1 | `establish-github-work-intake` | M1-C1 | M3-C1 | Issue forms, Project statuses, non-secret Project config |
+| M3-C1 | `establish-openspec-quality-rules` | M1-C1 | M2-C1 | Artifact quality rules used by later changes |
 | M3-C2 | `add-openspec-change-tracking` | M3-C1 | Late M2-C1 work after Project identity is stable | Versioned tracking contract and validator |
 | M4-C1 | `add-github-openspec-intake` | M2-C1, M3-C2 | None on the critical integration boundary | Shared GitHub API boundary, issue/OpenSpec intake skills |
 | M4-C2 | `add-openspec-github-lifecycle-sync` | M4-C1 | M5-C1 after shared GitHub modules stabilize | Status transition engine, audit, repair |
@@ -101,7 +100,6 @@ The longest dependency chain is:
 
 ```text
 M1-C1
-  -> M1-C2
   -> M3-C1
   -> M3-C2
   -> M4-C1
@@ -117,7 +115,7 @@ Critical-path changes should receive priority when a choice between equally valu
 
 ## 7. Parallel Work Plan
 
-### Parallel Window A: After M1-C2
+### Parallel Window A: After M1-C1
 
 These changes can proceed concurrently:
 
@@ -252,7 +250,6 @@ GitHub issue dependencies remain the source of truth for blocking relationships.
 | ID | Sequence |
 |---|---:|
 | M1-C1 | 101 |
-| M1-C2 | 102 |
 | M2-C1 | 201 |
 | M3-C1 | 301 |
 | M3-C2 | 302 |

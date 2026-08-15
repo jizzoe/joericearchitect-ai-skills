@@ -3,6 +3,7 @@
 Date: 2026-08-08
 Status: Proposed
 Requirements baseline: [OpenSpec SDD Foundation Requirements](../requirements/openspec-sdd-foundation.md)
+Accepted GitHub workflow standard: [GitHub Flow Standards and Best Practices](../standards-and-best-practices/github-flow-standards.md)
 
 ## 1. Outcome
 
@@ -40,6 +41,7 @@ The implementation will follow these rules:
 6. Built-in OpenSpec, Claude, Codex, and GitHub capabilities are used before repo-owned replacements.
 7. Bootstrap work may use temporary manual linkage until the automation exists. That state will be reconciled later.
 8. Common SDD capabilities are implemented as reusable global AI assets from the start, with product-specific values supplied through configuration rather than embedded in skills, workflows, scripts, or templates.
+9. `main` is the sole permanent development branch; issue-numbered topic branches and contributor forks deliver through squash-merged pull requests to `main`.
 
 ## 3. Current State
 
@@ -212,7 +214,7 @@ Use GitHub Project built-in workflows for:
 
 - Auto-adding managed issue types when possible.
 - Setting newly added items to `Backlog`.
-- Moving closed issues and merged PRs to `Done`.
+- Moving closed linked issues to `Done`.
 - Archiving old completed items later if needed.
 
 Custom Actions will handle only OpenSpec linkage validation and PR-state transitions that built-in workflows cannot express.
@@ -317,17 +319,28 @@ Global foundations created here SHALL therefore:
 
 This first implementation SHALL build reusable interfaces and configuration boundaries now. It SHALL NOT expand scope into implementing the bookkeeping application or product-specific mobile architecture.
 
+### DEC-017: GitHub Flow on `main`
+
+Use the accepted [GitHub Flow standard](../standards-and-best-practices/github-flow-standards.md):
+
+- `main` is the default and sole permanent development branch.
+- Normal pull requests target `main`.
+- Topic branches contain the primary issue number and use `feature/`, `fix/`, `hotfix/`, or `chore/` prefixes.
+- GitHub's Development relationship and a PR closing keyword provide the authoritative issue link; the branch name is human context only.
+- Squash merge is the default merge method.
+- `main` receives a ruleset requiring PR delivery, hardened checks, resolved conversations, and protection from force-push/deletion.
+- Required human approvals begin at zero for solo maintenance and can increase when another trusted maintainer is available.
+- Permanent `development`, `integration`, and `master` branches are not part of the model.
+- Hotfixes branch from and merge back to `main`; there is no merge-down path.
+
+Tags and GitHub Releases are the accepted distribution direction for this AI-assets repository, but release automation remains outside the first-pass scope. Detailed Environment and release mechanics remain subject to the repository owner's review of their companion research.
+
 ## 5. Delivery Structure
 
-The foundation will be delivered through seven milestones and eleven primary
-issues/OpenSpec changes. M1-C2 adds bounded autonomous execution as an explicit
-prerequisite for unattended delivery of the remaining changes.
+The foundation will be delivered through seven milestones and ten primary issues/OpenSpec changes.
 
 ```text
-M1-C1 Bootstrap
-  |
-  v
-M1-C2 Bounded autonomous execution
+M1 Bootstrap
   |
   +--> M2 GitHub intake
   |
@@ -346,18 +359,14 @@ M1-C2 Bounded autonomous execution
       M7 Verification and hardening
 ```
 
-M2 and M3 may proceed in parallel after M1-C2, but M4 requires both. M4-C2
-and M5-C1 may proceed in parallel after M4-C1 stabilizes the shared GitHub
-interfaces. The full dependency graph and parallel-work windows are defined in
-the [dependency plan](openspec-sdd-foundation-dependency-plan.md).
+M2 and M3 may proceed in parallel after M1, but M4 requires both. M4-C2 and M5-C1 may proceed in parallel after M4-C1 stabilizes the shared GitHub interfaces. The full dependency graph and parallel-work windows are defined in the [dependency plan](openspec-sdd-foundation-dependency-plan.md).
 
 ## 6. Milestone 1: Tool and OpenSpec Bootstrap
 
-Progress checkpoint (2026-08-09): M1-C1 is complete. Implementation PR #5,
-Sync PR #6, and Archive PR #7 are merged. Issue #2 is closed and `Done` in
-`AI Skills Development`. The living specs are valid, the change is archived at
-`openspec/changes/archive/2026-08-09-bootstrap-openspec-foundation/`, and
-OpenSpec reports no active changes.
+Progress checkpoint (2026-08-09): implementation and formal OpenSpec
+verification are complete and accepted by the owner. PR #5 targets `main` from
+`feature/2-bootstrap-openspec`, formally closes issue #2 when merged, and is
+ready for review. Delivery is the next gate; sync and archive have not started.
 
 ### Outcome
 
@@ -372,9 +381,8 @@ The first issue and links will be created manually because issue forms, tracking
 | ID | Issue | OpenSpec change |
 |---|---|---|
 | M1-C1 | Bootstrap OpenSpec for Claude and Codex | `bootstrap-openspec-foundation` |
-| M1-C2 | Enable bounded autonomous SDD execution | `enable-bounded-autonomous-sdd-execution` |
 
-### M1-C1 Work
+### Work
 
 1. Create the roadmap issue `Establish OpenSpec SDD foundation` manually.
 2. Create the bootstrap feature issue manually and link it to the roadmap issue.
@@ -388,19 +396,7 @@ The first issue and links will be created manually because issue forms, tracking
 10. Verify generated OpenSpec workflow discovery in both assistants.
 11. Document update and recovery commands.
 
-### M1-C2 Work
-
-1. Complete the executable setup in the [Goal autonomy prerequisites plan](codex-goal-autonomy-prerequisites-implementation-plan.md).
-2. Create the M1-C2 issue and OpenSpec change with reciprocal linkage.
-3. Specify bounded authorization, automated planning review, iterative
-   implementation, objective correction, human-pause, and recovery behavior.
-4. Implement the generic runner and OpenSpec lifecycle adapter from one
-   assistant-neutral canonical source.
-5. Add deterministic tests, evals, security review, and Claude/Codex plus
-   alternate-repository portability evidence.
-6. Pass the disposable end-to-end rehearsal before unattended M2-M7 work.
-
-### Expected M1-C1 Files
+### Expected Files
 
 ```text
 openspec/config.yaml
@@ -413,11 +409,7 @@ AGENTS.md or OpenSpec-managed equivalent
 
 Exact generated paths will follow OpenSpec `1.8.0`; the implementation will verify rather than assume them.
 
-M1-C2 expected assets and ownership boundaries are defined in the
-[bounded autonomous SDD execution plan](bounded-autonomous-sdd-execution-implementation-plan.md)
-and will be finalized by its approved OpenSpec design.
-
-### M1-C1 Verification
+### Verification
 
 - `openspec --version` reports the recorded version.
 - OpenSpec initialization completes without deleting user-authored content.
@@ -427,25 +419,9 @@ and will be finalized by its approved OpenSpec design.
 - The bootstrap design identifies reusable OpenSpec setup behavior and isolates this product's context in configuration.
 - Setup and recovery are documented.
 
-### M1-C2 Verification
-
-- Ordinary Codex sessions retain their existing approval behavior.
-- A named Goal-profile run completes routine authorized transitions without
-  human prompts while preserving the workspace sandbox.
-- Every OpenSpec action and implementation batch runs its applicable
-  validation, independent review, correction, and evidence loop.
-- Human judgment, destructive actions, credentials, governance changes,
-  dependency ambiguity, and repeated failure still pause safely.
-- Checkpoints resume idempotently after interruption or partial failure.
-- The generic runner works through both Claude and Codex and passes a second
-  repository fixture without product-specific constants.
-
 ### Exit Gate
 
-M1-C1 has passed its exit gate. Before unattended M2-M7 execution, M1-C2 must
-implement and validate the authorization, iterative review/correction,
-checkpoint, recovery, and human-pause behavior defined in the
-[bounded autonomous SDD execution plan](bounded-autonomous-sdd-execution-implementation-plan.md).
+Do not begin automated integration until the generated files and update behavior are understood and committed as an intentional bootstrap change.
 
 ## 7. Milestone 2: GitHub Work Intake and Kanban
 
@@ -471,6 +447,8 @@ Feature and bug work can be created consistently and viewed on a basic Kanban bo
 8. Enable built-in auto-add and completed-to-`Done` workflows where supported.
 9. Add `config/sdd-github.json` with the existing Project identity and non-secret configuration.
 10. Create one feature-form issue and one bug-form issue to verify intake behavior.
+11. Set `defaultBranch` to `main` in `config/sdd-github.json`.
+12. Configure squash merge as the normal merge method and establish the non-check portions of the `main` ruleset where safe; required CI checks remain scheduled for M7 after advisory hardening.
 
 ### Expected Files
 
@@ -489,6 +467,8 @@ config/sdd-github.json
 - Closing a test issue moves it to `Done`.
 - No status labels exist.
 - The Project board shows the five required columns.
+- Repository configuration identifies `main` as the sole normal PR target.
+- The PR template requires a formal issue-closing link and states the squash-merge contract.
 - GitHub setup assets can render or validate against an alternate product configuration without containing this product's fixed repository or Project values.
 
 ### Exit Gate
@@ -572,10 +552,11 @@ An assistant can create or consume a GitHub issue, connect it to an OpenSpec cha
 2. Implement duplicate search and create-or-find behavior.
 3. Implement label and Project membership operations.
 4. Implement managed issue-block rendering and replacement.
-5. Build `github-issue-authoring`.
-6. Build `github-issue-to-openspec`.
-7. Generate Claude and Codex exposure from canonical skills.
-8. Add trigger, non-trigger, success, missing-information, and API-failure evals.
+5. Implement issue-numbered topic-branch planning and formal GitHub Development linkage without treating the branch name as the relationship.
+6. Build `github-issue-authoring`.
+7. Build `github-issue-to-openspec`.
+8. Generate Claude and Codex exposure from canonical skills.
+9. Add trigger, non-trigger, success, missing-information, and API-failure evals.
 
 ### M4-C2: Lifecycle Synchronization
 
@@ -640,7 +621,7 @@ Pull request state drives review and completion status, while CI validates OpenS
 ### M5-C1: Linkage and Validation
 
 1. Build `github-pr-linkage`.
-2. Implement PR contract validation.
+2. Implement PR contract validation for formal issue linkage, closing keyword, `main` base, and issue-numbered topic branch.
 3. Add OpenSpec validation for relevant changed paths.
 4. Add tracking and reciprocal-link validation.
 5. Add canonical-skill/platform-exposure drift validation.
@@ -652,7 +633,7 @@ Pull request state drives review and completion status, while CI validates OpenS
 1. Handle draft PR opened: remain `In Progress`.
 2. Handle ready-for-review: move to `In Review`.
 3. Handle conversion back to draft: move to `In Progress`.
-4. Handle merged-to-default: allow closing keyword to close issue and built-in workflow to set `Done`.
+4. Handle squash-merged-to-`main`: allow the closing keyword to close the linked issue and the built-in workflow to set `Done`.
 5. Handle closed-unmerged: return to `In Progress` or retain current state with an explanatory audit result.
 6. Verify no event-recursion dependency.
 7. Test untrusted pull request behavior without exposing Project credentials.
@@ -673,10 +654,12 @@ Workflow names may be consolidated if doing so reduces duplicated setup without 
 ### Verification
 
 - PRs with missing issue or change links fail the advisory check.
+- Normal PRs targeting a branch other than `main` fail with corrective guidance.
+- A branch-name issue number without a formal Development/PR relationship fails linkage validation.
 - A valid draft PR leaves the issue `In Progress`.
 - Marking the PR ready moves the issue to `In Review`.
 - Returning it to draft moves the issue back to `In Progress`.
-- Merging into the default branch closes the issue and moves it to `Done`.
+- Squash-merging into `main` closes the issue and moves it to `Done`.
 - Closing without merge does not mark delivery complete.
 - Fork/untrusted-content scenarios cannot access `PROJECT_TOKEN`.
 - Re-running workflows converges without duplicate updates.
@@ -859,20 +842,17 @@ Create work in this sequence:
 | Order | Milestone | Issue | OpenSpec change | Depends on |
 |---:|---:|---|---|---|
 | 1 | M1-C1 | Bootstrap OpenSpec for Claude and Codex | `bootstrap-openspec-foundation` | Manual bootstrap |
-| 2 | M1-C2 | Enable bounded autonomous SDD execution | `enable-bounded-autonomous-sdd-execution` | M1-C1 |
-| 3 | M2-C1 | Establish GitHub issue intake and Kanban | `establish-github-work-intake` | M1-C2 |
-| 4 | M3-C1 | Establish OpenSpec artifact quality rules | `establish-openspec-quality-rules` | M1-C2 |
-| 5 | M3-C2 | Add versioned OpenSpec change tracking | `add-openspec-change-tracking` | M3-C1 |
-| 6 | M4-C1 | Add GitHub issue authoring and OpenSpec intake | `add-github-openspec-intake` | M2-C1, M3-C2 |
-| 7 | M4-C2 | Synchronize OpenSpec and GitHub lifecycle | `add-openspec-github-lifecycle-sync` | M4-C1 |
-| 8 | M5-C1 | Enforce OpenSpec and PR linkage | `enforce-openspec-pr-linkage` | M4-C1, M3-C2 |
-| 9 | M5-C2 | Reconcile Project status from pull requests | `reconcile-project-status-from-prs` | M4-C2, M5-C1 |
-| 10 | M6-C1 | Add dependency-aware project work selection | `add-dependency-aware-work-selection` | M5-C2 |
-| 11 | M7-C1 | Verify and harden the SDD foundation | `verify-sdd-foundation` | All prior changes |
+| 2 | M2-C1 | Establish GitHub issue intake and Kanban | `establish-github-work-intake` | M1-C1 |
+| 3 | M3-C1 | Establish OpenSpec artifact quality rules | `establish-openspec-quality-rules` | M1-C1 |
+| 4 | M3-C2 | Add versioned OpenSpec change tracking | `add-openspec-change-tracking` | M3-C1 |
+| 5 | M4-C1 | Add GitHub issue authoring and OpenSpec intake | `add-github-openspec-intake` | M2-C1, M3-C2 |
+| 6 | M4-C2 | Synchronize OpenSpec and GitHub lifecycle | `add-openspec-github-lifecycle-sync` | M4-C1 |
+| 7 | M5-C1 | Enforce OpenSpec and PR linkage | `enforce-openspec-pr-linkage` | M4-C1, M3-C2 |
+| 8 | M5-C2 | Reconcile Project status from pull requests | `reconcile-project-status-from-prs` | M4-C2, M5-C1 |
+| 9 | M6-C1 | Add dependency-aware project work selection | `add-dependency-aware-work-selection` | M5-C2 |
+| 10 | M7-C1 | Verify and harden the SDD foundation | `verify-sdd-foundation` | All prior changes |
 
-The roadmap issue `Establish OpenSpec SDD foundation` will be the parent issue
-for these eleven issues. Hard dependencies and safe parallel-work windows are
-defined in the [dependency plan](openspec-sdd-foundation-dependency-plan.md).
+The roadmap issue `Establish OpenSpec SDD foundation` will be the parent issue for these ten issues. Hard dependencies and safe parallel-work windows are defined in the [dependency plan](openspec-sdd-foundation-dependency-plan.md).
 
 ## 14. Definition of Ready
 
@@ -922,7 +902,7 @@ An issue may move to `Done` when:
 | Ambiguous active change | Explicit session selection and switch workflow; never infer from modification time |
 | Reusable assets become product-coupled | Mandatory Reuse Plan, configurable repository collection, alternate-product fixture, and hard-coded-value checks |
 | Premature bookkeeping scope expansion | Test only generic multi-repository portability; defer bookkeeping domain behavior to that product's own specs |
-| Too much initial process | Seven outcome milestones, eleven vertical changes, no per-checkbox issues, standard schema first |
+| Too much initial process | Seven outcome milestones, ten vertical changes, no per-checkbox issues, standard schema first |
 | Checks block bootstrap | Advisory checks until representative tests pass |
 | Third-party supply-chain risk | Minimize dependencies, pin Actions by SHA, document licenses and provenance |
 
@@ -965,28 +945,12 @@ Status: **Resolved**
 Status: **Resolved**
 
 - Run checks as advisory through Milestones 1-6.
-- At Milestone 7, make OpenSpec validation and issue/change/PR linkage required checks on the default branch.
+- At Milestone 7, make OpenSpec validation and issue/change/PR linkage required checks on `main`.
 - Keep full lifecycle reconciliation non-blocking but visible until it has additional operating history.
-
-### USER-005: Bounded Autonomous Goal Execution
-
-Status: **Resolved**
-
-- Use a named `goal` Codex profile so ordinary sessions retain their existing
-  approval behavior.
-- Keep `workspace-write` and `on-request`; route eligible escalations to
-  Auto-review rather than using unrestricted access.
-- Permit one explicit bounded Goal authorization to cover expected lifecycle
-  transitions only after objective planning, implementation, review, delivery,
-  Sync, and Archive gates pass.
-- Work in small batches and automatically correct objective scoped defects.
-- Pause for human judgment, destructive or unexpected actions, credentials,
-  governance changes, dependency ambiguity, or repeated uncorrectable failure.
-- Implement the reusable policy through M1-C2 before unattended M2-M7 work.
 
 ## 18. Next Execution Step
 
-Completed M1-C1 work:
+Completed bootstrap and proposal work:
 
 - GitHub CLI authentication and Project access verified.
 - Existing assistant/OpenSpec files inventoried.
@@ -995,13 +959,8 @@ Completed M1-C1 work:
 - Roadmap issue #1 and M1-C1 issue #2 created and related.
 - Exact six-action workflow generated for Claude and Codex.
 - Proposal, delta specs, design, and tasks generated and strictly validated.
-- Implementation PR #5 merged and issue #2 closed.
-- Living-spec Sync PR #6 merged.
-- Archive PR #7 merged and `bootstrap-openspec-foundation` removed from the
-  active change list.
 
-Next, complete the owner-only prerequisites in the
-[Codex Goal autonomy prerequisites plan](codex-goal-autonomy-prerequisites-implementation-plan.md),
-then create issue M1-C2 and use OpenSpec Propose for
-`enable-bounded-autonomous-sdd-execution`. Do not begin unattended M2-M7 work
-until M1-C2 passes its disposable end-to-end rehearsal and exit gate.
+Review the `bootstrap-openspec-foundation` planning package. After a separate
+explicit apply request, begin implementation at task 2.1. No other milestone
+should begin until M1-C1 passes its exit gate and OpenSpec-generated file
+ownership is understood.

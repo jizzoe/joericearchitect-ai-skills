@@ -653,3 +653,83 @@ change remain untouched.
   delta specs or archive the OpenSpec change.
 - Post-merge evidence must inspect the resulting GitHub and Git state rather
   than inferring success from the merge command's exit status alone.
+
+## 10. Sync M1-C1 Delta Specs Into Living Specs
+
+### Intended Outcome
+
+After implementation delivery, merge both M1-C1 delta specifications into
+durable living capability specs on a short-lived post-delivery branch. Keep the
+OpenSpec change active and stop before Archive so Sync remains independently
+reviewable.
+
+### Prompt
+
+```text
+Use the `openspec-sync-specs` skill for OpenSpec change
+`bootstrap-openspec-foundation`.
+
+This is the post-delivery Sync stage for M1-C1. PR #5 is merged to `main`, issue
+#2 is closed by that PR, and the implementation topic branch is deleted.
+
+Before editing:
+
+1. Verify the working tree is clean and `main` matches `origin/main` at the PR
+   #5 squash commit.
+2. Create and switch to short-lived branch
+   `chore/2-finalize-openspec-foundation` from current `origin/main`. This is a
+   post-delivery lifecycle follow-up associated with issue #2; do not reopen or
+   close the issue.
+3. Explicitly select `bootstrap-openspec-foundation` and run OpenSpec status.
+4. Use `artifactPaths.specs.existingOutputPaths` as the complete delta-spec
+   source. Fetch `openspec instructions specs` exactly once and read both delta
+   specs plus any existing corresponding living specs before writing.
+
+Sync both capabilities:
+
+- `cross-assistant-assets`
+- `sdd-lifecycle`
+
+Create or intelligently merge the living specs under `openspec/specs/`. Keep
+their Purpose and Requirements structure canonical and do not copy delta
+operation headers into living specs. Preserve any existing requirements or
+scenarios not changed by the deltas.
+
+Verification:
+
+- Run `openspec validate --specs`.
+- Run strict validation for `bootstrap-openspec-foundation`.
+- Confirm every delta requirement and scenario is represented in the matching
+  living spec.
+- Confirm the living specs contain no `ADDED`, `MODIFIED`, `REMOVED`, or
+  `RENAMED Requirements` headers.
+- Recompare both capabilities to demonstrate that repeating Sync would be a
+  no-op.
+- Run the standing documentation/code review and correct objective scoped
+  defects; obtain my approval for judgment-based corrections.
+
+If verification passes, commit and push only the synchronized living specs to
+`chore/2-finalize-openspec-foundation` as a durable Sync checkpoint. Do not open
+or modify a pull request in this step.
+
+Do not archive or move the active change, modify its delta specs, mutate issue
+or Project state, or begin another milestone. Report the living spec paths,
+requirements and scenarios synchronized, verification evidence, commit, and
+remaining Archive step, then stop for my review.
+```
+
+### Expected Stopping Point
+
+Both living capability specs are synchronized, validated, committed, and
+pushed on `chore/2-finalize-openspec-foundation`. The original delta specs and
+active change remain in place, issue #2 remains closed, Project state remains
+untouched, and Archive has not started.
+
+### Learning Notes
+
+- Sync changes the living requirements source of truth; it does not claim that
+  implementation was delivered. Delivery was already proven by PR #5.
+- The post-delivery branch prevents Sync or Archive record changes from being
+  pushed directly to protected `main`.
+- Sync and Archive are separate OpenSpec actions even when their resulting
+  repository changes will later share one lifecycle-record pull request.

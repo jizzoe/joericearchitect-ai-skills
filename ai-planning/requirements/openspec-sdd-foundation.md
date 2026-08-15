@@ -2,6 +2,7 @@
 
 Date: 2026-08-08
 Status: Planning baseline
+Accepted GitHub workflow standard: [GitHub Flow Standards and Best Practices](../standards-and-best-practices/github-flow-standards.md)
 
 ## 1. Purpose
 
@@ -124,6 +125,19 @@ Every completion claim SHALL be supported by evidence such as:
 - An explicit blocked reason or known gap.
 
 The lifecycle SHALL never infer success from an attempted command alone.
+
+### 5.5 GitHub Flow
+
+The repository SHALL use the accepted GitHub Flow standard:
+
+- `main` SHALL be the default and sole permanent development branch.
+- Repository changes SHALL use short-lived issue-numbered topic branches or contributor forks.
+- Normal pull requests SHALL target `main` and SHALL be formally linked to their primary issue.
+- Squash merge SHALL be the default merge method.
+- Development, staging, and production SHALL NOT be represented by permanent source branches.
+- Temporary release branches MAY be introduced only under a documented operational policy.
+
+Detailed branch, pull-request, hotfix, ruleset, release, and deployment requirements are in [GitHub Flow Standards and Best Practices](../standards-and-best-practices/github-flow-standards.md).
 
 ## 6. Source-of-Truth Model
 
@@ -421,7 +435,26 @@ The pull request template SHALL require:
 - Attribution/licensing status when third-party material is used.
 - Known gaps or blocked checks.
 
-The workflow SHALL account for GitHub closing keywords only closing issues automatically when the PR targets and merges into the default branch.
+Normal implementation pull requests SHALL target `main`. They SHALL use GitHub's formal Development relationship and a closing keyword when merge means delivery. An issue number in a branch name SHALL NOT be treated as the authoritative relationship.
+
+The workflow SHALL account for GitHub closing keywords only closing issues automatically when the PR targets and merges into `main`, the repository default branch.
+
+Squash merge SHALL be the default merge method. Closing an unmerged pull request SHALL NOT mark delivery complete.
+
+### GH-007: Branch Governance
+
+Topic branches SHALL use an issue-number convention such as:
+
+```text
+feature/<issue-number>-<short-description>
+fix/<issue-number>-<short-description>
+hotfix/<issue-number>-<short-description>
+chore/<issue-number>-<short-description>
+```
+
+The repository SHALL protect `main` with a ruleset that requires pull-request delivery, blocks force pushes and deletion, requires configured checks as they are hardened, and requires review conversations to be resolved where supported.
+
+Required human approvals SHALL initially be zero while the repository has one consistent maintainer. Outside contributors SHALL NOT bypass the ruleset. Topic branches SHOULD be deleted after merge.
 
 ## 11. OpenSpec-to-GitHub Integration Requirements
 
@@ -454,7 +487,7 @@ The following transitions SHALL be automated:
 | Draft PR opened | Link PR; remain `In Progress` |
 | PR marked ready for review | Move to `In Review` |
 | PR returned to draft | Move to `In Progress` |
-| PR merged into default branch | Close through PR closing keyword; move to `Done` |
+| PR squash-merged into `main` | Close through PR closing keyword; move linked issue to `Done` |
 | Sync | Update links if needed; do not imply delivery |
 | Archive | Verify issue is closed and Project status is `Done`; record archive path |
 | Change abandoned | Close as `not planned` with a reason |
@@ -505,7 +538,7 @@ The first pass SHALL implement or configure these responsibilities:
 | Responsibility | Preferred mechanism |
 |---|---|
 | Add matching issues to Project as `Backlog` | Built-in Project auto-add first; Action only if insufficient |
-| Closed issue or merged PR to `Done` | Built-in Project workflow |
+| Closed linked issue to `Done` | Built-in Project workflow |
 | Validate OpenSpec changes | GitHub Action |
 | Validate issue/change/PR linkage | GitHub Action |
 | Reconcile draft, ready-for-review, and merged PR statuses | GitHub Action |
@@ -522,6 +555,8 @@ Validation SHALL include:
 - Tracking metadata schema validation.
 - Reciprocal issue/change linkage.
 - PR issue-closing linkage when merge means delivery.
+- Pull-request base branch is `main` for normal delivery.
+- Topic branch follows the issue-number convention.
 - Relevant tests and evals.
 - Repository formatting/link checks when available.
 
@@ -715,7 +750,7 @@ The SDD foundation is complete when all of the following are demonstrated:
 6. The change and issue contain reciprocal, machine-verifiable links.
 7. Starting implementation moves the issue to `In Progress`.
 8. A draft PR remains `In Progress`; a ready PR moves to `In Review`.
-9. Merging the PR closes the issue and moves it to `Done`.
+9. Squash-merging the PR into `main` closes the issue and moves it to `Done`.
 10. OpenSpec verification reports objective evidence and known gaps.
 11. Archival verifies delivery state and records the archived path.
 12. Re-running synchronization creates no duplicate issue, Project item, block, or comment.
@@ -787,6 +822,7 @@ The implementation plan SHALL resolve these without expanding first-pass scope:
 | Source | Details carried into this baseline |
 |---|---|
 | [GitHub Issues, Projects, and OpenSpec Integration](../research/github-issues.md) | Issue model, Kanban statuses, issue forms, lifecycle mapping, local/Actions synchronization, authentication, security, and initial GitHub skills |
+| [GitHub Flow Standards and Best Practices](../standards-and-best-practices/github-flow-standards.md) | Accepted branch model, issue linkage, pull-request target and merge method, ruleset, hotfix, release, and deployment policy |
 | [Cross-Assistant AI Asset Best Practices](../research/cross-assistant-ai-assets-best-practices.md) | Assistant-neutral `SKILL.md`, progressive disclosure, asset boundaries, quality gates, evidence, MCP separation, script supply-chain review, and eval expectations |
 | [Built-In AI Assets: Claude vs Codex](../research/builtin-ai-assets-claude-vs-codex.md) | Built-in capability reuse, non-duplication boundary, common skill format, and platform adapter separation |
 | [SDLC Skills Repository Review](../research/sdlc-skills-repo-review.md) | Small triggerable skills, deterministic scripts, quality-gate sequencing, read-before-edit guardrails, layered organization, and recommended repo structure |
