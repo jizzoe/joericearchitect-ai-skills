@@ -16,9 +16,9 @@ available strict reviewer from satisfying the lifecycle.
 The protocol needs a bounded, host-owned lifecycle capability that can create
 and remove a sealed exact-head review worktree, while preserving the inner
 reviewer's existing read-only and credential-scrubbed boundary and recording
-safe, actionable unavailable diagnostics. No primary GitHub issue is currently
-linked; this proposal is based on the approved repository design brief and does
-not authorize GitHub tracking mutation.
+safe, actionable unavailable diagnostics. The tracked primary issue is
+[#95](https://github.com/jizzoe/joericearchitect-ai-skills/issues/95); its
+managed block and this change's `tracking.yaml` bind the delivery record.
 
 ## What Changes
 
