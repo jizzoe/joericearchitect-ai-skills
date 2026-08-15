@@ -37,7 +37,11 @@ through `executeSddRequirementsToPlan` in
 reader and writer functions. The runtime resolves the requirements and design
 brief paths, generates the delivery-plan Markdown from their content and the
 explicit per-candidate readiness inputs, and passes it to the writer. Each
-candidate supplies its own delivery profile, data/exposure/recovery rationale,
+execution also supplies a bounded requirements-outcome validator. Its result
+must name at least one observable outcome and bind to the SHA-256 digest of the
+resolved requirements; a missing, failed, or stale validation pauses planning.
+Each candidate supplies its own delivery profile, data/exposure/recovery
+rationale,
 dependency status, risk classification, and undecided-decision list. The
 runtime derives pauses from those fields before writing and supports mixed-
 profile candidate collections. Treat its fixed operation plan as authoritative;

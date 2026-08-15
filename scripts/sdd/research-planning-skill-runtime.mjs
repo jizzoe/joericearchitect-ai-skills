@@ -401,6 +401,23 @@ function designBriefApprovalIssue(input, designBriefContent, resolvedDesignBrief
   return null;
 }
 
+function validateRequirementsOutcomeEvidence(requirements, validateRequirementsOutcomes) {
+  if (typeof validateRequirementsOutcomes !== "function") return { error: "Provide a bounded requirements-outcome validator." };
+  let validation;
+  try {
+    validation = validateRequirementsOutcomes(Object.freeze({ ...requirements }));
+  } catch {
+    return { error: "The bounded requirements-outcome validator failed." };
+  }
+  const digest = createHash("sha256").update(requirements.content).digest("hex");
+  if (!validation || validation.valid !== true || validation.requirementsSha256 !== digest ||
+    !Array.isArray(validation.observableOutcomes) || validation.observableOutcomes.length === 0 ||
+    !validation.observableOutcomes.every(nonEmpty)) {
+    return { error: "The resolved requirements lack content-bound observable outcome evidence." };
+  }
+  return { observableOutcomes: [...validation.observableOutcomes] };
+}
+
 function deliveryPlanContent(input, candidates, resolvedInputs) {
   const nextAction = input.nextOpenSpecAction === "openspec-propose" ? "OpenSpec Propose" : "OpenSpec Explore";
   return [
@@ -540,7 +557,7 @@ export function executeDesignBriefFromResearch(input = {}, { readArtifact, write
   });
 }
 
-export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeArtifact } = {}) {
+export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeArtifact, validateRequirementsOutcomes } = {}) {
   const skill = "sdd-requirements-to-plan";
   const mode = commonMode(input);
   if (input.requestKind !== skill) return noOp(skill, mode);
@@ -556,6 +573,8 @@ export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeAr
   }
   const resolved = resolveArtifacts([requirementsPath, designBriefPath, ...currentStatePaths], readArtifact);
   if (resolved.error) return gap(skill, mode, "paused", "unresolved-source-path", resolved.error);
+  const outcomeValidation = validateRequirementsOutcomeEvidence(resolved.artifacts[0], validateRequirementsOutcomes);
+  if (outcomeValidation.error) return gap(skill, mode, "paused", "requirements-outcomes-required", outcomeValidation.error);
   const invalidApproval = designBriefApprovalIssue(input, resolved.artifacts[1].content, designBriefPath);
   if (invalidApproval) return gap(skill, mode, "paused", "design-brief-approval-required", invalidApproval);
   if (Array.isArray(input.readinessGaps) && input.readinessGaps.length > 0) {
@@ -587,6 +606,7 @@ export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeAr
     artifacts: [{ kind: "file", operation: "created", subject: outputPath }],
     evidence: [
       { id: "input-validation", type: "validation", subject: "resolved requirements, design, profile, and readiness", result: "passed" },
+      { id: "requirements-outcomes", type: "validation", subject: `${requirementsPath} observable outcomes`, result: "passed" },
       { id: "content-boundary", type: "validation", subject: "requirements treated as data and live state delegated", result: "passed" },
       ...(mode === "autonomous" ? [{ id: "operation-authorization", type: "validation", subject: "local-implementation plan write", result: "passed" }] : [])
     ],
