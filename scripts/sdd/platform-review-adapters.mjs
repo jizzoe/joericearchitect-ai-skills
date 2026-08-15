@@ -210,69 +210,76 @@ function executablePlatformTrust({ expectedName, realPath, pathIdentities, candi
   return null;
 }
 
-function pinReviewerExecutable(executable = "codex", expectedName = "codex") {
-  try {
-    // The elevated boundary never accepts a caller-selected path. Resolution
-    // is limited to fixed platform install locations outside repository,
-    // home, and temporary trees.
-    if (!safeIdentity(executable) || executable !== expectedName) return null;
-    const location = trustedReviewerExecutableLocations(expectedName).find(({ candidatePath }) => fs.existsSync(candidatePath));
-    if (!location) return null;
-    const trustedRoot = fs.realpathSync(location.trustedRoot);
-    if (trustedRoot !== location.trustedRoot) return null;
-    const candidatePath = location.candidatePath;
-    const realPath = fs.realpathSync(candidatePath);
-    if (!containedPath(trustedRoot, realPath)) return null;
-    const entry = fs.statSync(realPath);
-    fs.accessSync(realPath, fs.constants.X_OK);
-    if (!entry.isFile()) return null;
-    const realPathChain = pathChain(trustedRoot, realPath);
-    const candidateParentChain = pathChain(trustedRoot, path.dirname(candidatePath));
-    if (!realPathChain.length || !candidateParentChain.length || !mutationDenied([...new Set([...realPathChain, ...candidateParentChain])])) return null;
-    const pathIdentities = realPathChain.map((entryPath) => stablePathIdentity(entryPath));
-    const candidateParentIdentities = candidateParentChain.map((entryPath) => stablePathIdentity(entryPath));
-    const candidateIdentity = stablePathIdentity(candidatePath, { allowSymlink: true });
-    const contentSha256 = executableFileSha256(realPath, entry);
-    if (pathIdentities.some((identity) => !identity) || candidateParentIdentities.some((identity) => !identity) || !candidateIdentity || !contentSha256) return null;
-    const platformTrust = executablePlatformTrust({ expectedName, realPath, pathIdentities, candidateParentIdentities });
-    if (!platformTrust) return null;
-    // Close the verification window around the OS trust check: the same path,
-    // inode metadata, and bytes must still be present immediately afterward.
-    const confirmedPathIdentities = realPathChain.map((entryPath) => stablePathIdentity(entryPath));
-    const confirmedCandidateParentIdentities = candidateParentChain.map((entryPath) => stablePathIdentity(entryPath));
-    const confirmedCandidateIdentity = stablePathIdentity(candidatePath, { allowSymlink: true });
-    const confirmedContentSha256 = executableFileSha256(realPath, entry);
-    if (canonicalJson(confirmedPathIdentities) !== canonicalJson(pathIdentities) ||
-        canonicalJson(confirmedCandidateParentIdentities) !== canonicalJson(candidateParentIdentities) ||
-        canonicalJson(confirmedCandidateIdentity) !== canonicalJson(candidateIdentity) ||
-        confirmedContentSha256 !== contentSha256) return null;
-    return Object.freeze({
-      expectedName,
-      candidatePath,
-      trustedRoot,
-      realPath,
-      device: entry.dev,
-      inode: entry.ino,
-      ownerUserId: entry.uid,
-      ownerGroupId: entry.gid,
-      mode: entry.mode,
-      size: entry.size,
-      modifiedMs: entry.mtimeMs,
-      contentSha256,
-      managedMutationDenied: true,
-      platformTrust,
-      candidateIdentity,
-      pathIdentities: Object.freeze(pathIdentities),
-      candidateParentIdentities: Object.freeze(candidateParentIdentities)
-    });
-  } catch {
-    return null;
+export function resolveTrustedReviewerExecutable(executable = "codex", expectedName = "codex", {
+  locations = trustedReviewerExecutableLocations(expectedName),
+  mutationCheck = mutationDenied,
+  platformTrustCheck = executablePlatformTrust
+} = {}) {
+  // The elevated boundary never accepts a caller-selected path. Production
+  // resolution is limited to fixed platform install locations outside
+  // repository, home, and temporary trees. Evaluate each candidate fully so
+  // one stale or untrusted installation cannot mask a later trusted one.
+  if (!safeIdentity(executable) || executable !== expectedName || !Array.isArray(locations)) return null;
+  for (const location of locations) {
+    try {
+      if (!location || !fs.existsSync(location.candidatePath)) continue;
+      const trustedRoot = fs.realpathSync(location.trustedRoot);
+      if (trustedRoot !== location.trustedRoot) continue;
+      const candidatePath = location.candidatePath;
+      const realPath = fs.realpathSync(candidatePath);
+      if (!containedPath(trustedRoot, realPath)) continue;
+      const entry = fs.statSync(realPath);
+      fs.accessSync(realPath, fs.constants.X_OK);
+      if (!entry.isFile()) continue;
+      const realPathChain = pathChain(trustedRoot, realPath);
+      const candidateParentChain = pathChain(trustedRoot, path.dirname(candidatePath));
+      if (!realPathChain.length || !candidateParentChain.length || !mutationCheck([...new Set([...realPathChain, ...candidateParentChain])])) continue;
+      const pathIdentities = realPathChain.map((entryPath) => stablePathIdentity(entryPath));
+      const candidateParentIdentities = candidateParentChain.map((entryPath) => stablePathIdentity(entryPath));
+      const candidateIdentity = stablePathIdentity(candidatePath, { allowSymlink: true });
+      const contentSha256 = executableFileSha256(realPath, entry);
+      if (pathIdentities.some((identity) => !identity) || candidateParentIdentities.some((identity) => !identity) || !candidateIdentity || !contentSha256) continue;
+      const platformTrust = platformTrustCheck({ expectedName, realPath, pathIdentities, candidateParentIdentities });
+      if (!platformTrust) continue;
+      // Close the verification window around the OS trust check: the same path,
+      // inode metadata, and bytes must still be present immediately afterward.
+      const confirmedPathIdentities = realPathChain.map((entryPath) => stablePathIdentity(entryPath));
+      const confirmedCandidateParentIdentities = candidateParentChain.map((entryPath) => stablePathIdentity(entryPath));
+      const confirmedCandidateIdentity = stablePathIdentity(candidatePath, { allowSymlink: true });
+      const confirmedContentSha256 = executableFileSha256(realPath, entry);
+      if (canonicalJson(confirmedPathIdentities) !== canonicalJson(pathIdentities) ||
+          canonicalJson(confirmedCandidateParentIdentities) !== canonicalJson(candidateParentIdentities) ||
+          canonicalJson(confirmedCandidateIdentity) !== canonicalJson(candidateIdentity) ||
+          confirmedContentSha256 !== contentSha256) continue;
+      return Object.freeze({
+        expectedName,
+        candidatePath,
+        trustedRoot,
+        realPath,
+        device: entry.dev,
+        inode: entry.ino,
+        ownerUserId: entry.uid,
+        ownerGroupId: entry.gid,
+        mode: entry.mode,
+        size: entry.size,
+        modifiedMs: entry.mtimeMs,
+        contentSha256,
+        managedMutationDenied: true,
+        platformTrust,
+        candidateIdentity,
+        pathIdentities: Object.freeze(pathIdentities),
+        candidateParentIdentities: Object.freeze(candidateParentIdentities)
+      });
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 function pinnedExecutableUnchanged(identity) {
   if (!identity || identity.managedMutationDenied !== true || !identity.platformTrust || !safeIdentity(identity.expectedName)) return false;
-  const current = pinReviewerExecutable(identity.expectedName, identity.expectedName);
+  const current = resolveTrustedReviewerExecutable(identity.expectedName, identity.expectedName);
   return current !== null && canonicalJson(current) === canonicalJson(identity);
 }
 
@@ -330,7 +337,7 @@ export function buildCodexParentStrictReviewToolRequest({ reviewPackage, reposit
   rebuildPackage = buildReviewPackage,
   injectPackage = writeReviewPackageForView,
   prepareEnvironment = prepareCodexReviewerEnvironment,
-  pinExecutable = pinReviewerExecutable,
+  pinExecutable = resolveTrustedReviewerExecutable,
   clock = now,
   executionId = randomUUID()
 } = {}) {
