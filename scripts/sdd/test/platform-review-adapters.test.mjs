@@ -304,6 +304,18 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
   const executableIdentity = { realPath: executablePath, device: executableEntry.dev, inode: executableEntry.ino, size: executableEntry.size, modifiedMs: executableEntry.mtimeMs };
   const strictView = { kind: "archived-review-view-v1", launchPath, reviewPath, temporaryRoot: temporary, headCommit: reviewPackage.headCommit, ownershipToken: "fixture" };
   try {
+    const callerSelectedExecutable = `${temporary}/codex`;
+    fs.copyFileSync("/bin/echo", callerSelectedExecutable);
+    fs.chmodSync(callerSelectedExecutable, 0o755);
+    const rejectedExecutable = buildCodexParentStrictReviewToolRequest({
+      reviewPackage,
+      repositoryPath: process.cwd(),
+      reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
+      implementerSession: "implementer-session",
+      attestationRef: "attestations/codex-read-only-v1.json",
+      executable: callerSelectedExecutable
+    });
+    assert.equal(rejectedExecutable.code, "independent-reviewer-codex-executable-identity-unavailable");
     const toolRequest = buildCodexParentStrictReviewToolRequest({
       reviewPackage,
       repositoryPath: process.cwd(),
@@ -348,13 +360,21 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
     assert.equal(tamperedExpiration.code, "independent-reviewer-parent-strict-tool-receipt-invalid");
     const authenticationFailure = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 1, output: "authentication token expired at /private/secret" } }, {
       removeView: () => ({ removed: true }),
+      verifyExecutable: () => true,
       clock: () => "2026-08-15T04:01:00.000Z"
     });
     assert.equal(authenticationFailure.code, "independent-reviewer-codex-authentication-unavailable");
     assert.equal(JSON.stringify(authenticationFailure).includes("/private/secret"), false);
+    const changedExecutable = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
+      removeView: () => ({ removed: true }),
+      verifyExecutable: () => false,
+      clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(changedExecutable.code, "independent-reviewer-codex-executable-identity-changed");
     fs.writeFileSync(toolRequest.runtimeState.resultPath, JSON.stringify({ schemaVersion: 1, findings: [], status: "passed" }));
     const consumed = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
       removeView: (received) => ({ removed: received === strictView }),
+      verifyExecutable: () => true,
       clock: () => "2026-08-15T04:01:00.000Z"
     });
     assert.equal(consumed.status, "passed", JSON.stringify(consumed));

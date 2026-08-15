@@ -39,9 +39,12 @@ not authorize GitHub tracking mutation.
   capability selection; do not use error-message matching, manual owner-run
   commands, or generic shell escalation as the authorization mechanism.
 - Add a direct, fixed parent-runtime strict Codex transport that starts from a
-  neutral directory, pins the host-owned executable, isolates copied
-  authentication from model-readable paths, retains the inner sealed read-only
-  profile, accepts only a structured result artifact, and validates cleanup.
+  neutral directory, resolves the host-owned executable only from fixed
+  platform install locations, proves the managed process cannot mutate its
+  canonical path, binds its content hash and filesystem identity, isolates
+  copied authentication from model-readable paths, retains the inner sealed
+  read-only profile, accepts only a structured result artifact, and validates
+  cleanup.
 - Require Claude's declared read-only tool allowlist explicitly and classify
   its documented not-logged-in response as authentication unavailability.
 - Add deterministic tests/evals for authorized creation, sandbox denial,

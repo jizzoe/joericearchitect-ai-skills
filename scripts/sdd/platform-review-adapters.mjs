@@ -107,36 +107,130 @@ function environmentArguments(environment) {
     .map(([name, value]) => `${name}=${value}`);
 }
 
-function pinReviewerExecutable(executable = "codex", expectedName = "codex", parentEnvironment = process.env) {
+function trustedReviewerExecutableLocations(expectedName) {
+  if (expectedName !== "codex") return [];
+  if (process.platform === "darwin") {
+    return [
+      { candidatePath: "/opt/homebrew/bin/codex", trustedRoot: "/opt/homebrew" },
+      { candidatePath: "/usr/local/bin/codex", trustedRoot: "/usr/local" },
+      { candidatePath: "/usr/bin/codex", trustedRoot: "/usr" }
+    ];
+  }
+  if (process.platform === "linux") {
+    return [
+      { candidatePath: "/usr/local/bin/codex", trustedRoot: "/usr/local" },
+      { candidatePath: "/usr/bin/codex", trustedRoot: "/usr" },
+      { candidatePath: "/bin/codex", trustedRoot: "/bin" }
+    ];
+  }
+  return [];
+}
+
+function containedPath(root, target) {
+  const relative = path.relative(root, target);
+  return relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+function pathChain(root, target) {
+  if (!containedPath(root, target)) return [];
+  const entries = [];
+  let current = target;
+  while (true) {
+    entries.push(current);
+    if (current === root) return entries.reverse();
+    const parent = path.dirname(current);
+    if (parent === current) return [];
+    current = parent;
+  }
+}
+
+function executableFileSha256(filePath, expected) {
+  if (!expected?.isFile() || expected.size <= 0 || expected.size > 512 * 1024 * 1024) return null;
+  const descriptor = fs.openSync(filePath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
   try {
-    const expectedNames = process.platform === "win32" ? [expectedName, `${expectedName}.exe`] : [expectedName];
-    if (!safeIdentity(executable) || !expectedNames.includes(path.basename(executable).toLowerCase())) return null;
-    let candidate = executable;
-    if (!path.isAbsolute(candidate)) {
-      const searchPath = codexAuthenticationEnvironment(parentEnvironment).PATH ?? "";
-      candidate = searchPath.split(path.delimiter).map((directory) => path.join(directory, executable)).find((entry) => fs.existsSync(entry));
+    const opened = fs.fstatSync(descriptor);
+    if (!opened.isFile() || opened.dev !== expected.dev || opened.ino !== expected.ino || opened.size !== expected.size) return null;
+    const digest = createHash("sha256");
+    const buffer = Buffer.allocUnsafe(1024 * 1024);
+    let position = 0;
+    while (position < opened.size) {
+      const bytes = fs.readSync(descriptor, buffer, 0, Math.min(buffer.length, opened.size - position), position);
+      if (bytes <= 0) return null;
+      digest.update(buffer.subarray(0, bytes));
+      position += bytes;
     }
-    if (!candidate) return null;
-    const realPath = fs.realpathSync(candidate);
+    return digest.digest("hex");
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
+function stablePathIdentity(filePath, { allowSymlink = false } = {}) {
+  const entry = fs.lstatSync(filePath);
+  if ((!allowSymlink && entry.isSymbolicLink()) || (!entry.isFile() && !entry.isDirectory() && !entry.isSymbolicLink())) return null;
+  return Object.freeze({ path: filePath, device: entry.dev, inode: entry.ino, ownerUserId: entry.uid, ownerGroupId: entry.gid, mode: entry.mode, size: entry.size, modifiedMs: entry.mtimeMs });
+}
+
+function mutationDenied(paths) {
+  return paths.every((entry) => {
+    try {
+      fs.accessSync(entry, fs.constants.W_OK);
+      return false;
+    } catch (error) {
+      return ["EACCES", "EPERM", "EROFS"].includes(error?.code);
+    }
+  });
+}
+
+function pinReviewerExecutable(executable = "codex", expectedName = "codex") {
+  try {
+    // The elevated boundary never accepts a caller-selected path. Resolution
+    // is limited to fixed platform install locations outside repository,
+    // home, and temporary trees.
+    if (!safeIdentity(executable) || executable !== expectedName) return null;
+    const location = trustedReviewerExecutableLocations(expectedName).find(({ candidatePath }) => fs.existsSync(candidatePath));
+    if (!location) return null;
+    const trustedRoot = fs.realpathSync(location.trustedRoot);
+    if (trustedRoot !== location.trustedRoot) return null;
+    const candidatePath = location.candidatePath;
+    const realPath = fs.realpathSync(candidatePath);
+    if (!containedPath(trustedRoot, realPath)) return null;
     const entry = fs.statSync(realPath);
     fs.accessSync(realPath, fs.constants.X_OK);
     if (!entry.isFile()) return null;
-    return Object.freeze({ realPath, device: entry.dev, inode: entry.ino, size: entry.size, modifiedMs: entry.mtimeMs });
+    const realPathChain = pathChain(trustedRoot, realPath);
+    const candidateParentChain = pathChain(trustedRoot, path.dirname(candidatePath));
+    if (!realPathChain.length || !candidateParentChain.length || !mutationDenied([...new Set([...realPathChain, ...candidateParentChain])])) return null;
+    const pathIdentities = realPathChain.map((entryPath) => stablePathIdentity(entryPath));
+    const candidateIdentity = stablePathIdentity(candidatePath, { allowSymlink: true });
+    const contentSha256 = executableFileSha256(realPath, entry);
+    if (pathIdentities.some((identity) => !identity) || !candidateIdentity || !contentSha256) return null;
+    return Object.freeze({
+      expectedName,
+      candidatePath,
+      trustedRoot,
+      realPath,
+      device: entry.dev,
+      inode: entry.ino,
+      ownerUserId: entry.uid,
+      ownerGroupId: entry.gid,
+      mode: entry.mode,
+      size: entry.size,
+      modifiedMs: entry.mtimeMs,
+      contentSha256,
+      mutationDenied: true,
+      candidateIdentity,
+      pathIdentities: Object.freeze(pathIdentities)
+    });
   } catch {
     return null;
   }
 }
 
 function pinnedExecutableUnchanged(identity) {
-  if (!identity || !runtimePath(identity.realPath)) return false;
-  try {
-    const entry = fs.statSync(identity.realPath);
-    fs.accessSync(identity.realPath, fs.constants.X_OK);
-    return entry.isFile() && entry.dev === identity.device && entry.ino === identity.inode &&
-      entry.size === identity.size && entry.mtimeMs === identity.modifiedMs;
-  } catch {
-    return false;
-  }
+  if (!identity || identity.mutationDenied !== true || !safeIdentity(identity.expectedName)) return false;
+  const current = pinReviewerExecutable(identity.expectedName, identity.expectedName);
+  return current !== null && canonicalJson(current) === canonicalJson(identity);
 }
 
 function strictToolRequestDigest(evidence) {
@@ -316,6 +410,7 @@ export function consumeCodexParentStrictReviewToolResult({ toolRequest, toolResu
   inspectResult = inspectCodexReviewResultArtifact,
   sealPayload = sealCodexStrictReviewPayload,
   validateResult = validateReviewResult,
+  verifyExecutable = pinnedExecutableUnchanged,
   clock = now
 } = {}) {
   const cleanupView = () => toolRequest?.runtimeState?.view ? removeView(toolRequest.runtimeState.view) : { removed: false, code: "independent-review-view-cleanup-unsafe" };
@@ -338,7 +433,7 @@ export function consumeCodexParentStrictReviewToolResult({ toolRequest, toolResu
     const diagnostic = createReviewDiagnostic({ stage: "parent-transport", operation: "consume-codex-strict-review-tool", code: "independent-reviewer-parent-strict-request-expired", category: "request-expired", subject: "strict-review-tool-request", safeMessage: "The strict Codex parent-tool request expired before its result was accepted." });
     return strictParentUnavailable(diagnostic, cleanup);
   }
-  if (!pinnedExecutableUnchanged(state.executableIdentity)) {
+  if (!verifyExecutable(state.executableIdentity)) {
     const cleanup = cleanupView();
     const diagnostic = createReviewDiagnostic({ stage: "parent-transport", operation: "verify-codex-reviewer-executable", code: "independent-reviewer-codex-executable-identity-changed", category: "verification-failed", subject: "codex-reviewer-executable", safeMessage: "The configured Codex executable changed after the strict request was prepared." });
     return strictParentUnavailable(diagnostic, cleanup);

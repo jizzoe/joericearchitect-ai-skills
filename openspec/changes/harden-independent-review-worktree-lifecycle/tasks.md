@@ -69,8 +69,10 @@
   boundary coverage. Depends on: 4.5.
 - [x] 4.7 Add a fixed parent-runtime strict Codex transport that binds the exact
   package, reviewer, neutral launcher root, canonical executable identity,
-  inner read-only profile, result artifact, expiration, and owned cleanup. Keep
-  authorized-degraded recovery separate. Depends on: 4.6.
+  content hash and managed-process write denial, inner read-only profile,
+  result artifact, expiration, and owned cleanup. Reject caller-selected
+  executable paths and keep authorized-degraded recovery separate. Depends on:
+  4.6.
 - [x] 4.8 Isolate Codex authentication state outside the model-readable root,
   exclude repository startup customization, declare Claude allowed tools
   explicitly, and classify the installed Claude login failure without raw

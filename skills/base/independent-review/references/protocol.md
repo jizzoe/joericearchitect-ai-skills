@@ -46,8 +46,10 @@ reviewer's isolation capability. Before recording durable strict
 unavailability, prepare a direct parent strict request with
 `buildCodexParentStrictReviewToolRequest`. The request binds the exact package,
 configured distinct reviewer, attestation, neutral working directory,
-canonical host-owned Codex executable identity, fixed arguments, start/expiry,
-and final artifact. Invoke the returned argument vector only through the
+canonical host-owned Codex executable identity and content hash from a fixed
+platform install location, managed-process write denial for its path, fixed
+arguments, start/expiry, and final artifact. Caller-selected executable paths
+are ineligible. Invoke the returned argument vector only through the
 actual shell tool with `require_escalated`; never run repository code with that
 authority. The child still uses the sealed read-only permission profile, no
 command network, no inherited command environment, and ephemeral execution.

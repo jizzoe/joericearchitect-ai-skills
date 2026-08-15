@@ -25,9 +25,12 @@ identity, or reviewer self-attestation alone MUST NOT establish isolation.
 - **WHEN** the implementation runtime is already sandboxed and denies nested
   Codex app-server or sandbox startup but permits the configured parent review
   transport
-- **THEN** the system launches only the fixed host-owned Codex executable
-  across that parent boundary while the child retains its sealed read-only
-  profile, and a validated child result remains `strict-isolated`
+- **THEN** the system resolves only the bare Codex adapter name through fixed
+  platform install locations, proves the managed process cannot mutate its
+  canonical target or containing path, binds its content and filesystem
+  identity, and launches only that executable across the parent boundary while
+  the child retains its sealed read-only profile and a validated child result
+  remains `strict-isolated`
 
 #### Scenario: Strict parent transport is unavailable
 - **WHEN** its tool request, runtime approval, executable identity, expiration,

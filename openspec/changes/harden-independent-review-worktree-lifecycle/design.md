@@ -92,14 +92,19 @@ profile, no command network, and no inherited shell environment. No repository
 script, arbitrary shell text, or model-selected executable runs with parent
 authority.
 
-The transport resolves the configured Codex executable to a canonical regular
-executable and binds its filesystem identity, complete fixed argument vector,
+The transport accepts only the bare configured adapter name and resolves it
+through a fixed platform install-location allowlist; it rejects caller-chosen,
+workspace, home, and temporary executable paths. The canonical target must
+remain under the corresponding trusted installation root, every target and
+containing-path component must be non-writable to the managed implementation
+process, and the request binds the target content hash, ownership/mode and
+filesystem identities. It also binds the complete fixed argument vector,
 neutral working directory, exact package, configured reviewer, start/expiry,
-and result path into a request digest. Acceptance rechecks the digest,
-expiration, executable identity, final artifact, package/reviewer binding, and
-ownership-safe cleanup. The parent seals the findings payload into the
-canonical `strict-isolated` result because runtime evidence—not reviewer
-self-attestation—establishes the child controls.
+and result path into a request digest. Acceptance re-resolves and rechecks the
+allowlist, write denial, hash, identities, digest, expiration, final artifact,
+package/reviewer binding, and ownership-safe cleanup. The parent seals the
+findings payload into the canonical `strict-isolated` result because runtime
+evidence—not reviewer self-attestation—establishes the child controls.
 
 This direct strict transport runs before any degraded-review authorization.
 Only its own denial or unavailability can become strict-unavailable evidence
