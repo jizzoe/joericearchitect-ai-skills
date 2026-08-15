@@ -47,9 +47,11 @@ unavailability, prepare a direct parent strict request with
 `buildCodexParentStrictReviewToolRequest`. The request binds the exact package,
 configured distinct reviewer, attestation, neutral working directory,
 canonical host-owned Codex executable identity and content hash from a fixed
-platform install location, managed-process write denial for its path, fixed
-arguments, start/expiry, and final artifact. Caller-selected executable paths
-are ineligible. Invoke the returned argument vector only through the
+platform install location, an OS-backed signer or root-owned non-writable path
+policy, fixed arguments, start/expiry, and final artifact. Managed-sandbox
+write denial is defense in depth, not host-ownership proof. Caller-selected
+executable paths are ineligible. Invoke the returned argument vector only
+through the
 actual shell tool with `require_escalated`; never run repository code with that
 authority. The child still uses the sealed read-only permission profile, no
 command network, no inherited command environment, and ephemeral execution.

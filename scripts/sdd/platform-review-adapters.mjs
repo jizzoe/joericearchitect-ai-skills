@@ -13,6 +13,10 @@ const now = () => new Date().toISOString();
 const reviewLauncherHostScript = "scripts/sdd/review-launcher-host.mjs";
 const maximumReviewResultArtifactBytes = 1024 * 1024;
 const maximumAuthenticationArtifactBytes = 1024 * 1024;
+const macosCodexCodeRequirement = '=identifier "codex" and anchor apple generic' +
+  ' and certificate 1[field.1.2.840.113635.100.6.2.6] exists' +
+  ' and certificate leaf[field.1.2.840.113635.100.6.1.13] exists' +
+  ' and certificate leaf[subject.OU] = "2DC432GLL2"';
 const operationalReviewEnvironmentNames = Object.freeze([
   "PATH", "Path", "SYSTEMROOT", "SystemRoot", "COMSPEC", "PATHEXT", "PROGRAMDATA",
   "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "LC_CTYPE", "TERM",
@@ -182,6 +186,30 @@ function mutationDenied(paths) {
   });
 }
 
+function executablePlatformTrust({ expectedName, realPath, pathIdentities, candidateParentIdentities }) {
+  if (expectedName !== "codex") return null;
+  if (process.platform === "darwin") {
+    const verification = spawnSync("/usr/bin/codesign", ["--verify", "--strict", "--verbose=0", "-R", macosCodexCodeRequirement, realPath], {
+      encoding: "utf8",
+      timeout: 10_000,
+      env: { HOME: "/var/empty", PATH: "/usr/bin:/bin" }
+    });
+    if (verification.status !== 0 || verification.error) return null;
+    return Object.freeze({
+      mechanism: "macos-code-requirement-v1",
+      identifier: "codex",
+      teamIdentifier: "2DC432GLL2",
+      requirementSha256: createHash("sha256").update(macosCodexCodeRequirement).digest("hex")
+    });
+  }
+  if (process.platform === "linux") {
+    const protectedPaths = [...pathIdentities, ...candidateParentIdentities];
+    if (!protectedPaths.length || protectedPaths.some((identity) => identity.ownerUserId !== 0 || (identity.mode & 0o022) !== 0)) return null;
+    return Object.freeze({ mechanism: "root-owned-path-v1", ownerUserId: 0, forbiddenModeBits: 0o022 });
+  }
+  return null;
+}
+
 function pinReviewerExecutable(executable = "codex", expectedName = "codex") {
   try {
     // The elevated boundary never accepts a caller-selected path. Resolution
@@ -202,9 +230,22 @@ function pinReviewerExecutable(executable = "codex", expectedName = "codex") {
     const candidateParentChain = pathChain(trustedRoot, path.dirname(candidatePath));
     if (!realPathChain.length || !candidateParentChain.length || !mutationDenied([...new Set([...realPathChain, ...candidateParentChain])])) return null;
     const pathIdentities = realPathChain.map((entryPath) => stablePathIdentity(entryPath));
+    const candidateParentIdentities = candidateParentChain.map((entryPath) => stablePathIdentity(entryPath));
     const candidateIdentity = stablePathIdentity(candidatePath, { allowSymlink: true });
     const contentSha256 = executableFileSha256(realPath, entry);
-    if (pathIdentities.some((identity) => !identity) || !candidateIdentity || !contentSha256) return null;
+    if (pathIdentities.some((identity) => !identity) || candidateParentIdentities.some((identity) => !identity) || !candidateIdentity || !contentSha256) return null;
+    const platformTrust = executablePlatformTrust({ expectedName, realPath, pathIdentities, candidateParentIdentities });
+    if (!platformTrust) return null;
+    // Close the verification window around the OS trust check: the same path,
+    // inode metadata, and bytes must still be present immediately afterward.
+    const confirmedPathIdentities = realPathChain.map((entryPath) => stablePathIdentity(entryPath));
+    const confirmedCandidateParentIdentities = candidateParentChain.map((entryPath) => stablePathIdentity(entryPath));
+    const confirmedCandidateIdentity = stablePathIdentity(candidatePath, { allowSymlink: true });
+    const confirmedContentSha256 = executableFileSha256(realPath, entry);
+    if (canonicalJson(confirmedPathIdentities) !== canonicalJson(pathIdentities) ||
+        canonicalJson(confirmedCandidateParentIdentities) !== canonicalJson(candidateParentIdentities) ||
+        canonicalJson(confirmedCandidateIdentity) !== canonicalJson(candidateIdentity) ||
+        confirmedContentSha256 !== contentSha256) return null;
     return Object.freeze({
       expectedName,
       candidatePath,
@@ -218,9 +259,11 @@ function pinReviewerExecutable(executable = "codex", expectedName = "codex") {
       size: entry.size,
       modifiedMs: entry.mtimeMs,
       contentSha256,
-      mutationDenied: true,
+      managedMutationDenied: true,
+      platformTrust,
       candidateIdentity,
-      pathIdentities: Object.freeze(pathIdentities)
+      pathIdentities: Object.freeze(pathIdentities),
+      candidateParentIdentities: Object.freeze(candidateParentIdentities)
     });
   } catch {
     return null;
@@ -228,7 +271,7 @@ function pinReviewerExecutable(executable = "codex", expectedName = "codex") {
 }
 
 function pinnedExecutableUnchanged(identity) {
-  if (!identity || identity.mutationDenied !== true || !safeIdentity(identity.expectedName)) return false;
+  if (!identity || identity.managedMutationDenied !== true || !identity.platformTrust || !safeIdentity(identity.expectedName)) return false;
   const current = pinReviewerExecutable(identity.expectedName, identity.expectedName);
   return current !== null && canonicalJson(current) === canonicalJson(identity);
 }

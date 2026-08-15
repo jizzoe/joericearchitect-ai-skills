@@ -95,16 +95,19 @@ authority.
 The transport accepts only the bare configured adapter name and resolves it
 through a fixed platform install-location allowlist; it rejects caller-chosen,
 workspace, home, and temporary executable paths. The canonical target must
-remain under the corresponding trusted installation root, every target and
-containing-path component must be non-writable to the managed implementation
-process, and the request binds the target content hash, ownership/mode and
-filesystem identities. It also binds the complete fixed argument vector,
-neutral working directory, exact package, configured reviewer, start/expiry,
-and result path into a request digest. Acceptance re-resolves and rechecks the
-allowlist, write denial, hash, identities, digest, expiration, final artifact,
-package/reviewer binding, and ownership-safe cleanup. The parent seals the
-findings payload into the canonical `strict-isolated` result because runtime
-evidence—not reviewer self-attestation—establishes the child controls.
+remain under the corresponding installation root and satisfy an OS-backed
+trust policy. On macOS, the Security subsystem must validate an explicit
+Developer ID code requirement for the `codex` identifier and OpenAI team
+`2DC432GLL2`; on Linux, the target and containing paths must be root-owned and
+not group/other-writable. Managed-sandbox write denial remains defense in depth,
+not proof of host ownership. The request binds the target content hash,
+code-trust evidence, ownership/mode and filesystem identities, complete fixed
+argument vector, neutral working directory, exact package, configured reviewer,
+start/expiry, and result path. Acceptance re-resolves and repeats the platform
+trust, hash, identity, digest, expiration, final-artifact, package/reviewer, and
+ownership-safe cleanup checks. The parent seals the findings payload into the
+canonical `strict-isolated` result because runtime evidence—not reviewer
+self-attestation—establishes the child controls.
 
 This direct strict transport runs before any degraded-review authorization.
 Only its own denial or unavailability can become strict-unavailable evidence
