@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import test from "node:test";
 
@@ -16,9 +17,10 @@ const expectedScenarioNames = [
   "output-path safety: plan stays at the configured workspace-relative output path",
   "portability: second workspace uses a different planRoot default"
 ];
+const approvedBriefContent = "Decision: use a sealed read-only reviewer with exact-head evidence.";
 const contents = new Map([
   ["docs/requirements/accepted.md", "Outcome: strict isolated review succeeds. Acceptance: no degraded fallback."],
-  ["docs/briefs/approved.md", "Decision: use a sealed read-only reviewer with exact-head evidence."],
+  ["docs/briefs/approved.md", approvedBriefContent],
   ["docs/context/current.md", "Current state: the strict adapter is configured."]
 ]);
 const candidate = {
@@ -43,6 +45,13 @@ const base = {
   mode: "interactive",
   requirementsPath: "docs/requirements/accepted.md",
   designBriefPath: "docs/briefs/approved.md",
+  designBriefApproval: {
+    path: "docs/briefs/approved.md",
+    approvedBy: "decision-owner",
+    approvedAt: "2026-08-15T10:00:00.000Z",
+    sha256: createHash("sha256").update(approvedBriefContent).digest("hex")
+  },
+  now: "2026-08-15T12:00:00.000Z",
   targetWorkspace: ".",
   currentStatePaths: ["docs/context/current.md"],
   candidates: [candidate],
@@ -81,10 +90,14 @@ test("missing and nonexistent inputs and readiness gaps return structured paused
   const missing = executeSddRequirementsToPlan({ ...base, requirementsPath: undefined });
   const nonexistent = run({ ...base, requirementsPath: "docs/requirements/missing.md" }).output;
   const gap = run({ ...base, readinessGaps: ["Observable acceptance evidence is missing."] }).output;
-  valid(missing); valid(nonexistent); valid(gap);
+  const unapproved = run({ ...base, designBriefApproval: undefined }).output;
+  const staleApproval = run({ ...base, designBriefApproval: { ...base.designBriefApproval, sha256: "0".repeat(64) } }).output;
+  valid(missing); valid(nonexistent); valid(gap); valid(unapproved); valid(staleApproval);
   assert.equal(missing.status, "paused");
   assert.equal(nonexistent.status, "paused");
   assert.equal(nonexistent.openQuestions[0].id, "unresolved-source-path");
+  assert.equal(unapproved.openQuestions[0].id, "design-brief-approval-required");
+  assert.equal(staleApproval.openQuestions[0].id, "design-brief-approval-required");
   assert.deepEqual(gap.openQuestions, [{ id: "readiness-gap", question: "Observable acceptance evidence is missing.", blocking: true }]);
 });
 
@@ -147,7 +160,7 @@ test("structured dependencies, risk, and undecided decisions derive planning pau
 test("proposed preapproval is prototype-only, complete, and time bounded", () => {
   const preapproval = {
     target: "change:prototype-review",
-    action: "merge-one-change",
+    action: "archive-change",
     evidence: "exact-head tests and review",
     recovery: "revert the merge commit",
     expiresAt: "2026-08-16T00:00:00.000Z"
@@ -156,11 +169,15 @@ test("proposed preapproval is prototype-only, complete, and time bounded", () =>
   const wrongProfile = run({ ...base, candidates: [{ ...candidate, preapproval }], now: "2026-08-15T12:00:00.000Z" }).output;
   const missingField = run({ ...base, candidates: [{ ...prototype, preapproval: { ...preapproval, recovery: "" } }], now: "2026-08-15T12:00:00.000Z" }).output;
   const expired = run({ ...base, candidates: [{ ...prototype, preapproval: { ...preapproval, expiresAt: "2026-08-14T00:00:00.000Z" } }], now: "2026-08-15T12:00:00.000Z" }).output;
+  const wrongAction = run({ ...base, candidates: [{ ...prototype, preapproval: { ...preapproval, action: "publish-release" } }], now: "2026-08-15T12:00:00.000Z" }).output;
+  const wrongTarget = run({ ...base, candidates: [{ ...prototype, preapproval: { ...preapproval, target: "branch:prototype-review" } }], now: "2026-08-15T12:00:00.000Z" }).output;
   const accepted = run({ ...base, candidates: [{ ...prototype, preapproval }], now: "2026-08-15T12:00:00.000Z" });
-  for (const output of [wrongProfile, missingField, expired, accepted.output]) valid(output);
+  for (const output of [wrongProfile, missingField, expired, wrongAction, wrongTarget, accepted.output]) valid(output);
   assert.equal(wrongProfile.status, "paused");
   assert.equal(missingField.status, "paused");
   assert.equal(expired.status, "paused");
+  assert.equal(wrongAction.status, "paused");
+  assert.equal(wrongTarget.status, "paused");
   assert.equal(accepted.output.status, "completed");
   assert.equal(accepted.writes[0].content.includes("This is proposed, not granted."), true);
   assert.equal(accepted.writes[0].content.includes(preapproval.recovery), true);

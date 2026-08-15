@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 import { checkOperationAuthorization } from "./check-operation-authorization.mjs";
 
@@ -12,6 +13,9 @@ const lastKnownModels = Object.freeze({
   claude: { quick: "Claude Haiku 3.5", standard: "Claude Sonnet 4", deep: "Claude Opus 4.1", sourceUrl: "https://docs.anthropic.com/en/docs/about-claude/models" }
 });
 const sourceClassifications = new Set(["verified-fact", "source-reported-claim", "assistant-inference", "unknown", "recommendation"]);
+const claimDomains = new Set(["general", "technical", "pricing", "policy", "api", "current-product"]);
+const primaryPreferredDomains = new Set(["technical", "pricing", "policy", "api", "current-product"]);
+const preapprovalTargetPrefixes = Object.freeze({ "merge-pr": "pr:", "archive-change": "change:", "delete-merged-topic-branch": "branch:" });
 
 function safeWorkspacePath(value) {
   return typeof value === "string" && value.length > 0 && !path.isAbsolute(value) &&
@@ -130,13 +134,17 @@ function excerpt(value, limit = 280) {
   return normalized.length > limit ? `${normalized.slice(0, limit - 1)}…` : normalized;
 }
 
+function markdownText(value) {
+  return String(value).replace(/\s+/g, " ").trim().replace(/[\\`*_[\]<>#()]/g, "\\$&");
+}
+
 function bullets(values, empty = "- None supplied.") {
   return Array.isArray(values) && values.length > 0 ? values.map((value) => `- ${String(value)}`).join("\n") : empty;
 }
 
 function researchContent(input, sources) {
   const grouped = new Map([...sourceClassifications].map((classification) => [classification, []]));
-  for (const source of sources) grouped.get(source.classification).push(source.claim ?? excerpt(source.content));
+  for (const source of sources) grouped.get(source.classification).push(markdownText(source.claim ?? excerpt(source.content)));
   const depthSections = {
     quick: ["## Core concepts", "## Top tools and products", "## Key links"],
     standard: ["## Use cases", "## SDLC fit", "## Open-source and paid options", "## Tutorials and articles", "## Project fit"],
@@ -167,7 +175,7 @@ function researchContent(input, sources) {
     "",
     ...depthSections[input.depth].flatMap((heading) => [heading, "- See the classified findings and linked sources above.", ""]),
     "## Source material used as data",
-    ...sources.flatMap((source) => [`### ${source.title}`, `> ${excerpt(source.content).replace(/\n/g, "\n> ")}`, ""])
+    ...sources.flatMap((source) => [`### ${markdownText(source.title)}`, `> ${markdownText(excerpt(source.content))}`, ""])
   ].join("\n").trimEnd() + "\n";
 }
 
@@ -176,13 +184,14 @@ function sourcesContent(input, sources) {
     `# Sources for ${input.topic}`,
     "",
     ...sources.flatMap((source) => [
-      `## ${source.title}`,
-      `- Publisher: ${source.publisher}`,
-      `- URL or path: ${source.urlOrPath}`,
-      `- Access date: ${source.accessDate}`,
-      `- Source type: ${source.sourceType}`,
-      `- Relevance: ${source.relevance}`,
-      `- Classification: ${source.classification}`,
+      `## ${markdownText(source.title)}`,
+      `- Publisher: ${markdownText(source.publisher)}`,
+      `- URL or path: ${markdownText(source.urlOrPath)}`,
+      `- Access date: ${markdownText(source.accessDate)}`,
+      `- Source type: ${markdownText(source.sourceType)}`,
+      `- Relevance: ${markdownText(source.relevance)}`,
+      `- Classification: ${markdownText(source.classification)}`,
+      `- Claim domain: ${markdownText(source.claimDomain)}`,
       ""
     ])
   ].join("\n").trimEnd() + "\n";
@@ -217,7 +226,7 @@ function resolveResearchSources(sources, readArtifact) {
   for (const [index, source] of sources.entries()) {
     if (!source || !nonEmpty(source.id) || !nonEmpty(source.title) || !nonEmpty(source.publisher) ||
       !nonEmpty(source.urlOrPath) || !nonEmpty(source.accessDate) || !nonEmpty(source.sourceType) ||
-      !nonEmpty(source.relevance) || !sourceClassifications.has(source.classification)) {
+      !nonEmpty(source.relevance) || !sourceClassifications.has(source.classification) || !claimDomains.has(source.claimDomain)) {
       return { error: `Source ${index + 1} is missing required provenance or classification.` };
     }
     let content = source.content;
@@ -228,6 +237,15 @@ function resolveResearchSources(sources, readArtifact) {
     }
     if (!nonEmpty(content)) return { error: `Source ${source.id} has no readable content.` };
     resolved.push({ ...source, content });
+  }
+  if (new Set(resolved.map(({ id }) => id)).size !== resolved.length || new Set(resolved.map(({ urlOrPath }) => urlOrPath)).size !== resolved.length) {
+    return { error: "Research depth requires distinct source identities and locations." };
+  }
+  for (const domain of primaryPreferredDomains) {
+    const domainSources = resolved.filter((source) => source.claimDomain === domain);
+    if (domainSources.length > 0 && !domainSources.some((source) => /\bprimary\b/i.test(source.sourceType))) {
+      return { error: `The ${domain} claims require at least one primary source.` };
+    }
   }
   return { sources: resolved };
 }
@@ -243,7 +261,7 @@ function designBriefContent(input, research, context) {
     `Desired outcome: ${input.desiredOutcome}`,
     "",
     "## 2. Evidence and key findings",
-    ...evidence.map(({ path: sourcePath, content }) => `- [${sourcePath}](${sourcePath}): ${excerpt(content)}`),
+    ...evidence.map(({ path: sourcePath, content }) => `- [${sourcePath}](${sourcePath}): ${markdownText(excerpt(content))}`),
     "",
     "## 3. Options considered and tradeoffs",
     bullets(input.options),
@@ -302,9 +320,26 @@ function preapprovalIssue(candidate, nowValue) {
   for (const field of ["target", "action", "evidence", "recovery", "expiresAt"]) {
     if (!nonEmpty(preapproval[field])) return `Provide the proposed preapproval field: ${field}.`;
   }
+  const targetPrefix = preapprovalTargetPrefixes[preapproval.action];
+  if (!targetPrefix) return "Select an eligible high-impact lifecycle action for the proposed preapproval.";
+  if (!preapproval.target.startsWith(targetPrefix) || preapproval.target.length === targetPrefix.length) {
+    return `Provide an exact ${targetPrefix} target for proposed ${preapproval.action}.`;
+  }
   const expiration = Date.parse(preapproval.expiresAt);
   const now = Date.parse(nowValue ?? new Date().toISOString());
   if (Number.isNaN(expiration) || expiration <= now) return "Provide a valid future proposed preapproval expiration.";
+  return null;
+}
+
+function designBriefApprovalIssue(input, designBriefContent) {
+  const approval = input.designBriefApproval;
+  if (!approval || approval.path !== input.designBriefPath || !nonEmpty(approval.approvedBy) ||
+    !nonEmpty(approval.approvedAt) || !/^[0-9a-f]{64}$/.test(approval.sha256 ?? "")) return "Provide complete approval evidence bound to the design brief path and content.";
+  const approvedAt = Date.parse(approval.approvedAt);
+  const now = Date.parse(input.now ?? new Date().toISOString());
+  if (Number.isNaN(approvedAt) || approvedAt > now) return "Provide a valid, non-future design-brief approval time.";
+  const digest = createHash("sha256").update(designBriefContent).digest("hex");
+  if (approval.sha256 !== digest) return "The design-brief approval digest does not match the resolved approved brief.";
   return null;
 }
 
@@ -338,7 +373,7 @@ function deliveryPlanContent(input, candidates, resolvedInputs) {
     "Live in-flight/actionable/blocked/next-work classification is delegated to dependency-aware-work-selection.",
     "",
     "## Source inputs reviewed",
-    ...resolvedInputs.map(({ path: sourcePath, content }) => `- [${sourcePath}](${sourcePath}): ${excerpt(content)}`),
+    ...resolvedInputs.map(({ path: sourcePath, content }) => `- [${sourcePath}](${sourcePath}): ${markdownText(excerpt(content))}`),
     `- Target workspace: ${input.targetWorkspace}`,
     "",
     "## Next OpenSpec action",
@@ -455,6 +490,8 @@ export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeAr
   if (!Array.isArray(input.currentStatePaths) || input.currentStatePaths.length === 0) return gap(skill, mode, "paused", "missing-current-state", "Provide at least one current-state path.");
   const resolved = resolveArtifacts([input.requirementsPath, input.designBriefPath, ...input.currentStatePaths], readArtifact);
   if (resolved.error) return gap(skill, mode, "paused", "unresolved-source-path", resolved.error);
+  const invalidApproval = designBriefApprovalIssue(input, resolved.artifacts[1].content);
+  if (invalidApproval) return gap(skill, mode, "paused", "design-brief-approval-required", invalidApproval);
   if (Array.isArray(input.readinessGaps) && input.readinessGaps.length > 0) {
     return gap(skill, mode, "paused", "readiness-gap", String(input.readinessGaps[0]));
   }

@@ -22,6 +22,10 @@ If the requirements or approved design-brief path is missing, return a
 `skill-result-v1` paused result naming the gap. Do not invent requirements or
 acceptance behavior.
 
+Require approval evidence naming the design-brief path, decision owner,
+approval time, and SHA-256 digest. The runtime recomputes the digest from the
+resolved brief and pauses if the approval is absent, future-dated, or stale.
+
 Repository runtimes MUST route trigger selection, required-input, readiness,
 delivery-profile, workspace-relative output, and autonomous write checks
 through `executeSddRequirementsToPlan` in
