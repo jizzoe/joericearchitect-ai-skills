@@ -38,7 +38,10 @@ standing grants, noncanonical commits, or content outside the sealed package.
 6. If detached-view creation or strict reviewer startup is denied by the outer
    sandbox, use `scripts/sdd/review-launcher-recovery.mjs` to validate and
    prepare a sealed host request only when the exact degraded authorization,
-   configured launcher, and active runtime permission all validate. Pass the
+   configured launcher, active runtime permission, and a separately bound
+   worktree-lifecycle authorization all validate. That lifecycle request binds
+   repository, base/head/manifest, transition, parent digest, and expiration;
+   it never accepts a caller-selected destination. Pass the
    prepared request immediately to the configured parent-runtime transport and
    call `executePreparedReviewLauncherRecovery`; never return the intermediate
    host-required state as an owner action. A Codex parent uses

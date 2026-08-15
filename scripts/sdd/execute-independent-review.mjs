@@ -15,9 +15,12 @@ export async function executeIndependentReview({ package: reviewPackage, adapter
   const probe = probeIndependentReviewAdapter(adapter);
   if (!probe.available) return { status: "unavailable", code: probe.code };
   if (typeof invoke !== "function") return { status: "unavailable", code: "independent-reviewer-invocation-unavailable" };
-  const result = await invoke(Object.freeze(structuredClone(reviewPackage)));
+  const invoked = await invoke(Object.freeze(structuredClone(reviewPackage)));
+  const result = invoked?.result ?? invoked;
   const resultValidation = validateReviewResult(result, { expectedPackage: reviewPackage, configuredReviewer, implementerSession });
-  return resultValidation.valid ? { status: result.status, result } : { status: "unavailable", code: resultValidation.issues[0].code };
+  return resultValidation.valid
+    ? { status: result.status, result, ...(invoked?.diagnostic ? { diagnostic: invoked.diagnostic } : {}) }
+    : { status: "unavailable", code: resultValidation.issues[0].code };
 }
 
 export function probeDegradedIndependentReviewAdapter(adapter) {
@@ -65,7 +68,7 @@ export async function executeAuthorizedIndependentReview({ package: reviewPackag
     occurredAt: clock()
   });
   if (!durable) {
-    return { status: "unavailable", code: "strict-unavailable-evidence-not-durable", strictResult: candidate, requiresPersistence: true };
+    return { status: "unavailable", code: "strict-unavailable-evidence-not-durable", strictResult: candidate, requiresPersistence: true, ...(strict.diagnostic ? { diagnostic: strict.diagnostic } : {}) };
   }
   const strictResult = durable;
   const authorizationCheck = validateDegradedIndependentReviewAuthorization({ authorization, selectedEntry, transition, reviewPackage, strictResult, correctionAttempts, derivedCorrection, correctionEvidence, now });

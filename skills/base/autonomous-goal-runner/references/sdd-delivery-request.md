@@ -57,6 +57,12 @@ are not cryptographically authenticated in the first release. The selection is
 the owner's affirmative reduced-assurance risk choice; derive the exact
 authorization only when the package and transition exist.
 
+When recovery needs a detached worktree, authorization also derives one
+request-bound lifecycle record for the canonical repository, package commits,
+manifest, transition, parent digest, and expiry. The runtime chooses its
+temporary root and cleanup removes only the marker-proven lifecycle-owned view;
+failures use safe structured diagnostics and never turn into a manual command.
+
 The preset is authorization, not runtime permission. If the configured launcher
 cannot run under the platform's active permission policy, record terminal
 unavailable evidence and pause without asking the owner to run or relay

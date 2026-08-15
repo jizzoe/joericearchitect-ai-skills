@@ -132,14 +132,18 @@ therefore is not a security boundary against an adversarial implementation
 process.
 
 When the selected concise request policy is `strict-first-degraded`, it also
-authorizes deriving an exact launcher record after strict unavailability for
-the same selected entry, transition, base, head, manifest, correction envelope,
-and expiration. That policy does not create runtime permission. The configured
-launcher and active runtime must independently permit either
+authorizes deriving an exact launcher record and, for a Git-aware review view,
+an exact outer worktree-lifecycle record after strict unavailability for the
+same selected entry, transition, canonical repository, base, head, manifest,
+correction envelope, and expiration. The lifecycle operation is limited to
+create/remove of one detached worktree at a host-generated temporary location
+and is bound to the parent request digest. That policy does not create runtime
+permission. The configured launcher and active runtime must independently permit either
 `codex-detached-read-only-v1` or `claude-detached-restricted-v1`; otherwise
 pause with the permission gap. The Codex launcher requests an inner read-only
 sandbox. The Claude launcher exposes only read/search tools. Both preserve a
-fresh sealed review attempt and accept no arbitrary shell text, but their
+fresh sealed review attempt and accept no arbitrary shell text or caller-chosen
+worktree destination, but their
 ordinary request/evidence files and basename-checked executable path are not
 authenticated by an OS-protected key or capability. This limitation is an
 explicit accepted risk only for authorized degraded review and never applies

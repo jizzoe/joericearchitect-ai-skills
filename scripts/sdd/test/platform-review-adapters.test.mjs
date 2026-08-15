@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, createClaudeReviewSettings, degradedCapabilityLedger, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
+import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, createClaudeReviewSettings, degradedCapabilityLedger, diagnoseClaudeExecutionFailure, diagnoseCodexExecutionFailure, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 
@@ -114,9 +114,26 @@ test("degraded Codex transport is explicitly reduced-assurance and scrubs mutati
   assert.ok(ledger.instructionConstrained.includes("githubMutation"));
 });
 
-test("Codex nested app-server denial receives a stable launcher-recovery code", () => {
+test("reviewer subprocess diagnostics expose only safe triage fields", () => {
   assert.equal(classifyCodexExecutionFailure({ stderr: "failed to initialize in-process app-server client: Operation not permitted" }), "independent-reviewer-nested-app-server-denied");
   assert.equal(classifyCodexExecutionFailure({ stderr: "other failure" }), "independent-reviewer-codex-execution-unavailable");
+  assert.equal(classifyClaudeExecutionFailure({ stderr: "authentication failed" }), "independent-reviewer-claude-authentication-unavailable");
+  const cases = [
+    [diagnoseCodexExecutionFailure({ status: 1, stderr: "authentication token expired at /private/secret" }), "independent-reviewer-codex-authentication-unavailable", "authentication-unavailable", "reviewer-authentication"],
+    [diagnoseCodexExecutionFailure({ status: 126, stderr: "sandbox operation not permitted at /private/secret" }), "independent-reviewer-codex-sandbox-unavailable", "permission-denied", "reviewer-sandbox"],
+    [diagnoseCodexExecutionFailure({ status: 1, stderr: "output-schema validation failed: /private/secret" }), "independent-reviewer-codex-output-contract-invalid", "output-contract-invalid", "reviewer-result-contract"],
+    [diagnoseClaudeExecutionFailure({ status: 1, stderr: "network connection timed out for token at /private/secret" }), "independent-reviewer-claude-network-unavailable", "network-unavailable", "reviewer-network"]
+  ];
+  for (const [diagnostic, code, category, subject] of cases) {
+    assert.deepEqual(Object.keys(diagnostic).sort(), ["category", "code", "exitCode", "operation", "safeMessage", "stage", "subject"]);
+    assert.equal(diagnostic.code, code);
+    assert.equal(diagnostic.category, category);
+    assert.equal(diagnostic.subject, subject);
+    assert.equal(diagnostic.stage, "reviewer-execution");
+    assert.equal(diagnostic.exitCode, diagnostic.code.includes("sandbox") ? 126 : 1);
+    assert.equal(JSON.stringify(diagnostic).includes("/private/secret"), false);
+    assert.equal(JSON.stringify(diagnostic).includes("token expired"), false);
+  }
 });
 
 test("Codex parent transport builds only the fixed escalated host tool request and consumes its result", () => {
@@ -388,9 +405,9 @@ test("degraded Claude adapter seals findings with Claude-specific reduced-assura
   assert.equal(output.result.attestation.readOnly, false);
 });
 
-test("Claude sandbox denial receives a stable launcher-recovery code", () => {
+test("Claude sandbox and authentication denial receive stable diagnostics", () => {
   assert.equal(classifyClaudeExecutionFailure({ stderr: "sandbox unavailable because failIfUnavailable was set" }), "independent-reviewer-claude-sandbox-unavailable");
-  assert.equal(classifyClaudeExecutionFailure({ stderr: "authentication failed" }), "independent-reviewer-claude-execution-unavailable");
+  assert.equal(classifyClaudeExecutionFailure({ stderr: "authentication failed" }), "independent-reviewer-claude-authentication-unavailable");
 });
 
 test("unavailable transport output remains exact-head data and cannot claim isolation", () => {

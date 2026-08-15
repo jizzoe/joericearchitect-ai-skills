@@ -42,6 +42,15 @@ implementer/reviewer identities all match. The implementer identity is sealed
 into the digest-bound request; missing identity or self-review fails before
 view creation and is rechecked before response acceptance.
 
+Detached-worktree recovery also requires its own exact lifecycle record. It
+binds the canonical repository, base/head/manifest, change and transition,
+expiry, and parent request digest. The host receives no destination or arbitrary
+Git arguments: it creates a runtime-owned temporary root, verifies the detached
+head, and returns request-bound safe JSON diagnostics. Cleanup requires the
+matching ownership marker and lifecycle digest; expiration never broadens
+authority, though it may still remove an already-owned view before returning
+unavailable evidence.
+
 The in-sandbox recovery controller validates authorization and emits only a
 digest-bound structured host request. It can safely materialize an exact-head
 archive in an owned temporary root but cannot invoke the reviewer across the
@@ -92,6 +101,12 @@ recorded separately. The receipt names its real transport source and never uses
 a misleading trusted-runtime attestation. If permission, configuration, runtime receipt,
 detached setup, inner startup, result validation, or cleanup fails, return the
 stable terminal unavailable code and pause without a manual fallback.
+
+For strict Codex or Claude subprocess failure after view creation, retain a
+safe reviewer-process diagnostic with stage, operation, stable code, category,
+subject, and optional numeric exit code. Classify only allowlisted
+authentication, sandbox/permission, network, and output-contract failures;
+discard subprocess output, command arguments, paths, and environment values.
 
 ## Authorized Degraded Path
 

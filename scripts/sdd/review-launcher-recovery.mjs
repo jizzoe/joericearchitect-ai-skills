@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
 import { canonicalJson, validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
+import { prepareReviewWorktreeLifecycle, validatePreparedReviewWorktreeLifecycle, validateReviewWorktreeLifecycle } from "./review-worktree-lifecycle.mjs";
 
 const hostScript = "scripts/sdd/review-launcher-host.mjs";
 const text = (value) => typeof value === "string" && value.trim().length > 0;
@@ -54,7 +55,7 @@ export function reviewLauncherRequestDigest({ schemaVersion, launchId, request }
   return createHash("sha256").update(canonicalJson({ schemaVersion, launchId, request })).digest("hex");
 }
 
-export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, strictResult, launcher, runtime, reviewer, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
+export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, repositoryPath, strictResult, launcher, runtime, reviewer, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
   const packageCheck = validateReviewPackage(reviewPackage);
   if (!packageCheck.valid) return fail(packageCheck.issues[0].code);
   if (!text(authorization?.implementerSession) || !text(reviewer?.identity)) return fail("review-launcher-identity-binding-missing");
@@ -82,6 +83,8 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
   if (!Array.isArray(runtime?.permittedReviewLaunchers) || !runtime.permittedReviewLaunchers.includes(launcher.id)) {
     return fail("review-launcher-runtime-permission-required");
   }
+  const worktreeLifecycle = validateReviewWorktreeLifecycle({ authorization, selectedEntry, transition, reviewPackage, repositoryPath, now });
+  if (!worktreeLifecycle.allowed) return fail(worktreeLifecycle.code);
   return {
     allowed: true,
     status: "ready",
@@ -100,7 +103,8 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
       expiresAt: new Date(expires).toISOString(),
       parentLaunchPermission: "runtime-permitted",
       innerBoundary: definition.innerBoundary,
-      sealedPackageOnly: true
+      sealedPackageOnly: true,
+      worktreeLifecycle: worktreeLifecycle.lifecycle
     })
   };
 }
@@ -112,12 +116,23 @@ export function prepareReviewLauncherRecovery(request, { launchId = randomUUID()
   delete sealedRequest.now;
   const hostRequest = { schemaVersion: 1, launchId, request: sealedRequest };
   hostRequest.requestDigest = reviewLauncherRequestDigest(hostRequest);
+  const worktreeLifecycle = prepareReviewWorktreeLifecycle({
+    authorization: request.authorization,
+    selectedEntry: request.selectedEntry,
+    transition: request.transition,
+    reviewPackage: request.reviewPackage,
+    repositoryPath: request.repositoryPath,
+    sourceRequestDigest: hostRequest.requestDigest,
+    now: request.now
+  }, { lifecycleId: `worktree-${launchId}` });
+  if (!worktreeLifecycle.allowed) return worktreeLifecycle;
   return {
     allowed: true,
     status: "host-launch-required",
     code: "review-launcher-external-host-required",
     hostRequest,
-    expectedRecovery: preflight.recovery
+    expectedRecovery: preflight.recovery,
+    worktreeLifecycleRequest: worktreeLifecycle.lifecycleRequest
   };
 }
 
@@ -142,6 +157,18 @@ export function acceptReviewLauncherHostResponse({ prepared, response, runtimeRe
       response.launchId !== hostRequest.launchId || response.requestDigest !== requestDigest ||
       response.launcherId !== preflight.recovery.launcherId || response.launcherKind !== preflight.recovery.launcherKind ||
       response.hostScript !== hostScript || !text(response.hostExecutionId)) return fail("review-launcher-host-response-invalid");
+  const lifecycle = validatePreparedReviewWorktreeLifecycle({
+    lifecycleRequest: prepared.worktreeLifecycleRequest,
+    sourceRequestDigest: requestDigest,
+    expected: preflight.recovery.worktreeLifecycle,
+    now
+  });
+  if (!lifecycle.allowed) return fail(lifecycle.code);
+  if (response.worktreeLifecycle?.operation !== preflight.recovery.worktreeLifecycle.operation ||
+      response.worktreeLifecycle?.requestDigest !== prepared.worktreeLifecycleRequest.requestDigest ||
+      response.worktreeLifecycle?.expiresAt !== preflight.recovery.worktreeLifecycle.expiresAt) {
+    return fail("review-launcher-worktree-lifecycle-evidence-invalid");
+  }
   const receipt = runtimeReceipt ?? runtimeLaunchEvidence;
   if (!validRuntimeReceipt(receipt, prepared, response)) return fail("review-launcher-runtime-receipt-invalid");
   const request = hostRequest.request;

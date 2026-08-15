@@ -20,13 +20,14 @@ test("detached review view is pinned to committed state and cleanup is ownership
     git(root, ["add", "tracked.txt"]); git(root, ["commit", "-m", "fixture"]);
     const head = git(root, ["rev-parse", "HEAD"]);
     fs.writeFileSync(path.join(root, "unrelated.txt"), "dirty\n");
-    const created = createDetachedReviewView({ repositoryPath: root, headCommit: head });
+    const request = { repositoryPath: fs.realpathSync(root), headCommit: head, lifecycleRequestDigest: "a".repeat(64), expiresAt: "2026-08-14T00:00:00.000Z" };
+    const created = createDetachedReviewView(request, { now: "2026-08-13T12:00:00.000Z" });
     assert.equal(created.available, true);
     assert.equal(git(created.view.reviewPath, ["rev-parse", "HEAD"]), head);
     assert.equal(fs.existsSync(path.join(created.view.reviewPath, "unrelated.txt")), false);
     assert.throws(() => git(created.view.reviewPath, ["symbolic-ref", "--quiet", "--short", "HEAD"]));
-    assert.equal(removeDetachedReviewView({ ...created.view, ownershipToken: "wrong" }).removed, false);
-    assert.equal(removeDetachedReviewView(created.view).removed, true);
+    assert.equal(removeDetachedReviewView({ ...created.view, ownershipToken: "wrong" }, { now: "2026-08-13T12:00:00.000Z" }).removed, false);
+    assert.equal(removeDetachedReviewView(created.view, { now: "2026-08-13T12:00:00.000Z" }).removed, true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

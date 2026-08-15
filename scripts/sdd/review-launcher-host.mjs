@@ -8,10 +8,17 @@ import { buildReviewPackage, canonicalJson, validateReviewResult } from "./indep
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { runClaudeDegradedReviewAdapter, runCodexDegradedReviewAdapter, writeReviewPackageForView } from "./platform-review-adapters.mjs";
 import { reviewLauncherDefinition, reviewLauncherRequestDigest, validateReviewLauncherRecovery } from "./review-launcher-recovery.mjs";
+import { cleanupReviewWorktreeLifecycle, executeReviewWorktreeLifecycle, prepareReviewWorktreeLifecycle } from "./review-worktree-lifecycle.mjs";
 
 const hostScript = "scripts/sdd/review-launcher-host.mjs";
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const fail = (code, detail) => ({ allowed: false, status: "unavailable", code, ...(detail ? { detail } : {}) });
+const lifecycleUnavailable = (lifecycle) => ({
+  allowed: false,
+  status: "unavailable",
+  code: lifecycle?.error?.code ?? "review-worktree-lifecycle-unavailable",
+  lifecycle
+});
 
 export function executeReviewLauncherHost(hostRequest, {
   createView = createDetachedReviewView,
@@ -30,8 +37,23 @@ export function executeReviewLauncherHost(hostRequest, {
   const invokeAdapter = invoke ?? (preflight.recovery.launcherKind === "claude-detached-restricted-v1" ? runClaudeDegradedReviewAdapter : runCodexDegradedReviewAdapter);
   if (!definition) return fail("review-launcher-capability-unavailable");
   if (!text(request.repositoryPath) || !request.reviewer || !text(request.reviewer.type) || !text(request.reviewer.identity) || !text(request.attestationRef)) return fail("review-launcher-input-incomplete");
-  const created = createView({ repositoryPath: request.repositoryPath, headCommit: request.reviewPackage.headCommit });
-  if (!created?.available) return fail("review-launcher-detached-view-unavailable", created?.code);
+  const preparedLifecycle = prepareReviewWorktreeLifecycle({
+    authorization: request.authorization,
+    selectedEntry: request.selectedEntry,
+    transition: request.transition,
+    reviewPackage: request.reviewPackage,
+    repositoryPath: request.repositoryPath,
+    sourceRequestDigest: digest,
+    now
+  }, { lifecycleId: `worktree-${hostRequest.launchId}` });
+  if (!preparedLifecycle.allowed) return fail(preparedLifecycle.code);
+  const created = executeReviewWorktreeLifecycle({
+    lifecycleRequest: preparedLifecycle.lifecycleRequest,
+    sourceRequestDigest: digest,
+    expected: preflight.recovery.worktreeLifecycle,
+    now
+  }, { createView });
+  if (!created?.available) return lifecycleUnavailable(created);
   const { view } = created;
   let output;
   try {
@@ -81,6 +103,11 @@ export function executeReviewLauncherHost(hostRequest, {
             launcherKind: preflight.recovery.launcherKind,
             hostScript,
             hostExecutionId,
+            worktreeLifecycle: {
+              operation: preparedLifecycle.lifecycle.operation,
+              requestDigest: preparedLifecycle.lifecycleRequest.requestDigest,
+              expiresAt: preparedLifecycle.lifecycle.expiresAt
+            },
             result: execution.result,
             launcherEvidence: preflight.recovery
           };
@@ -90,15 +117,21 @@ export function executeReviewLauncherHost(hostRequest, {
   } catch {
     output = fail("review-launcher-execution-failed");
   }
-  const cleanup = removeView(view);
-  if (cleanup?.removed !== true) return fail("review-launcher-cleanup-failed", cleanup?.code);
+  const cleanup = cleanupReviewWorktreeLifecycle({
+    lifecycleRequest: preparedLifecycle.lifecycleRequest,
+    sourceRequestDigest: digest,
+    expected: preflight.recovery.worktreeLifecycle,
+    view,
+    now
+  }, { removeView });
+  if (cleanup?.removed !== true || cleanup.status !== "removed") return lifecycleUnavailable(cleanup);
   return output.allowed ? { ...output, cleanup: { removed: true } } : output;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const inputPath = process.argv[2];
   if (!inputPath || process.argv.length !== 3) {
-    console.error("Usage: review-launcher-host.mjs <prepared-request.json>");
+    console.error(JSON.stringify(fail("review-launcher-host-runtime-input-missing")));
     process.exit(2);
   }
   const prepared = JSON.parse(fs.readFileSync(inputPath, "utf8"));
