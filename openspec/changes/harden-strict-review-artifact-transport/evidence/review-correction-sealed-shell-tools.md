@@ -100,3 +100,18 @@ or newly trust an executable, and it never re-runs the mutation-denial or
 platform-trust proofs. Regression coverage confirms both unchanged and changed
 sealed files and prohibits resolver use from this receipt verifier. A fresh
 exact-head strict review is required after this objective correction.
+
+## Follow-up strict review finding: color capability preflight
+
+- Review record: `strict-2e5db36d-7a0b-48d0-9b16-840774b3a31d`
+- Reviewed head: `595656cd268c857b87fc95c5abde1208291723b6`
+- Assurance: `strict-isolated`; the parent-owned final artifact was present,
+  schema-valid, and the owned view was removed.
+- Finding: objective fix. The sealed launch uses `--color never`, but the
+  managed capability probe did not require that CLI option.
+
+The managed preflight now verifies `--color` alongside every other switch in
+the strict invocation. An incompatible pinned CLI therefore fails before any
+elevated request is prepared. The existing probe fixture asserts the complete
+required switch set. A fresh exact-head strict review is required after this
+objective correction.

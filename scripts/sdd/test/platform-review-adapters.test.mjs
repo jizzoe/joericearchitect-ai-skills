@@ -131,6 +131,7 @@ test("Codex adapter uses a fresh read-only noninteractive transport without user
   const missingFinalFileCapability = probeCodexReviewAdapter({ executable: "fixture-codex" }, {
     help: (_executable, _arguments, required) => {
       assert.ok(required.includes("--output-last-message"));
+      assert.ok(required.includes("--color"));
       return false;
     }
   });

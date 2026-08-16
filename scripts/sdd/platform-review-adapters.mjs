@@ -952,7 +952,7 @@ export function degradedCapabilityLedger() {
 }
 
 export function probeCodexReviewAdapter({ executable = "codex", attestationRef = "attestations/codex-read-only-v1.json" } = {}, { help = helpIncludes } = {}) {
-  if (!help(executable, ["exec", "--help"], ["--config", "--strict-config", "--ephemeral", "--ignore-user-config", "--output-schema", "--output-last-message"])) {
+  if (!help(executable, ["exec", "--help"], ["--config", "--strict-config", "--ephemeral", "--ignore-user-config", "--color", "--output-schema", "--output-last-message"])) {
     return platformUnavailable("adapter-preflight", "probe-codex-reviewer", "independent-reviewer-codex-runtime-unavailable", "codex-reviewer", "The configured Codex reviewer runtime or required capabilities are unavailable.");
   }
   return { available: true, capability: capabilities({ adapter: "codex", attestationRef, probeReference: "codex-exec-read-only-v1" }) };
