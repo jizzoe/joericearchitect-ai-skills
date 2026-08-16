@@ -1,6 +1,12 @@
 import path from "node:path";
 
 const classifications = new Set(["required", "recommended", "repository-selected", "not-applicable"]);
+const classificationPrecedence = new Map([
+  ["repository-selected", 0],
+  ["required", 1],
+  ["recommended", 2],
+  ["not-applicable", 3]
+]);
 const secret = /(password|secret|token|api[_-]?key|authorization|bearer|oauth|otp|mfa|private[_-]?key)/i;
 const id = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const workspace = (value) => typeof value === "string" && value.trim().length > 0 && !/[\x00-\x1f\x7f]/.test(value) && !/^[a-z]:/i.test(value) && !path.posix.isAbsolute(value) && !path.win32.isAbsolute(value) && !value.split(/[\\/]/).includes("..");
@@ -75,12 +81,18 @@ export function validateStandardsPack(value) {
   if (!workspace(value.target?.path)) issues.push({ code: "unsafe-target-path", subject: "target.path" });
   if (!Array.isArray(value.rules) || !value.rules.length) issues.push({ code: "missing-rules", subject: "rules" });
   const ruleIds = new Set();
+  let previousPrecedence = -1;
   for (const rule of items(value.rules)) {
     if (!only(rule, new Set(["id", "classification", "source", "scope", "reason"]))) issues.push({ code: "invalid-rule", subject: "rules" });
     if (!id.test(rule?.id ?? "")) issues.push({ code: "invalid-rule-id", subject: "rules" });
     else if (ruleIds.has(rule.id)) issues.push({ code: "duplicate-rule-id", subject: rule.id });
     else ruleIds.add(rule.id);
     if (!classifications.has(rule?.classification)) issues.push({ code: "invalid-classification", subject: rule?.id ?? "rules" });
+    const precedence = classificationPrecedence.get(rule?.classification);
+    if (precedence !== undefined) {
+      if (precedence < previousPrecedence) issues.push({ code: "invalid-rule-precedence", subject: rule?.id ?? "rules" });
+      previousPrecedence = Math.max(previousPrecedence, precedence);
+    }
     if (!source(rule?.source)) issues.push({ code: "unsafe-source", subject: rule?.id ?? "rules" });
     if (!workspace(rule?.scope)) issues.push({ code: "unsafe-rule-scope", subject: rule?.id ?? "rules" });
     if (rule?.classification === "not-applicable" && !text(rule.reason)) issues.push({ code: "missing-not-applicable-reason", subject: rule?.id ?? "rules" });

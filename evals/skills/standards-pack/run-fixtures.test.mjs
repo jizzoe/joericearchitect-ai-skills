@@ -91,6 +91,7 @@ test("unsafe and incomplete records fail closed", () => {
     [{ ...valid, overrides: { ruleId: "official-rule" } }, "invalid-overrides"],
     [{ ...valid, overrides: [{ ruleId: "missing-rule", scope: "src", reason: "local policy", status: "resolved" }] }, "unknown-override-rule"],
     [{ ...valid, rules: [...valid.rules, valid.rules[0]] }, "duplicate-rule-id"],
+    [{ ...valid, rules: [valid.rules[1], valid.rules[0], valid.rules[2]] }, "invalid-rule-precedence"],
     [{ ...valid, expectedEvidence: undefined }, "missing-expected-evidence"],
     [{ ...valid, expectedEvidence: { id: "lint" } }, "missing-expected-evidence"],
     [{ ...valid, expectedEvidence: ["npm test"] }, "invalid-expected-evidence"],

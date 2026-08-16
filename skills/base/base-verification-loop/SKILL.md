@@ -95,6 +95,8 @@ evidence for readiness.
 Validate with `scripts/validation/validate-implementation-quality.mjs`. Supply
 a validation-context JSON file as its second argument. The context carries the
 applicable local-implementation authorization and durable correction checkpoint;
+when standards coverage is claimed, it also carries the same validated selection
+record as `standardsSelectionRecord`, which the result must match exactly;
 a production-ready result additionally carries the canonical owner's complete
 review authorization input. Self-reported correction budgets, correction
 histories, review summaries, or top-level evidence records cannot establish

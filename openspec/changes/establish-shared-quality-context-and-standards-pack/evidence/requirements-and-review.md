@@ -5,10 +5,10 @@
 | Requirement | Implementation evidence |
 | --- | --- |
 | Shared, bounded standards-pack context | `skills/base/_shared/standards-pack.md` and `skills/base/_shared/context-management.md` define the selection contract, provenance, classification, gap, and progressive-loading rules. |
-| Safe, deterministic selection record | `scripts/validation/lib/standards-pack.mjs` rejects unknown fields, unsafe paths or sources, malformed IDs, unresolved overrides, and incomplete not-applicable records; `scripts/validation/validate-standards-pack.mjs` exposes the validator. |
-| Quality consumers use the record | `base-code-review` and `base-verification-loop` require the same validated selection record and record absent or unreviewed coverage as a gap. |
+| Safe, deterministic selection record | `scripts/validation/lib/standards-pack.mjs` rejects unknown fields, unsafe paths or sources, malformed IDs, unresolved overrides, incomplete not-applicable records, and out-of-precedence classifications; `scripts/validation/validate-standards-pack.mjs` exposes the validator. |
+| Quality consumers use the record | `base-code-review` and `base-verification-loop` require the same validated selection record, validate their reported selected rules, scoped overrides, and not-applicable classifications against it, and record absent or unreviewed coverage as a gap. |
 | User discovery | `README.md` links both shared references. |
-| Synthetic safe and unsafe coverage | `evals/skills/standards-pack/run-fixtures.test.mjs` covers valid selection, unknown fields, parent traversal, credential-like source, incomplete not-applicable status, unresolved overrides, and an empty rule set. |
+| Synthetic safe and unsafe coverage | `evals/skills/standards-pack/run-fixtures.test.mjs` covers valid selection, precedence, unknown fields, parent traversal, credential-like source, incomplete not-applicable status, unresolved overrides, and an empty rule set; implementation-quality fixtures prove review and verification selection reporting binds to the supplied record. |
 
 ## Implementation review
 

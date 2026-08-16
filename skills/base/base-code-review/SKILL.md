@@ -66,8 +66,11 @@ summary in `details`; `standardsSelection` carries selected rule IDs, scoped
 overrides, and not-applicable rule IDs (or empty arrays when not requested).
 Reference the shared top-level evidence array by stable ID. Validate the result
 with `scripts/validation/validate-implementation-quality.mjs` before rendering
-Markdown. The report order is findings, evidence gaps, scope, summary, then
-next action.
+Markdown. When standards coverage is claimed, supply that same selection record
+as `standardsSelectionRecord` in the validation context; the validator rejects
+rule IDs, override scopes, and not-applicable classifications that do not match
+the validated record. The report order is findings, evidence gaps, scope,
+summary, then next action.
 
 On sensitive content, unexpected scope, destructive or external mutation,
 material decision, ambiguous state, or exhausted correction budget, preserve

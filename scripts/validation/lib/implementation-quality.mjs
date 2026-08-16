@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { checkOperationAuthorization } from "../../sdd/check-operation-authorization.mjs";
 import { validateSkillResult } from "../validate-base-skill-contracts.mjs";
+import { validateStandardsPack } from "./standards-pack.mjs";
 
 export const reviewSeverities = ["blocker", "high", "medium", "low"];
 export const reviewDispositions = ["objective-fix", "human-decision", "warning", "false-positive"];
@@ -43,6 +44,7 @@ const checkCategories = new Set([
 ]);
 const secretKey = /^(?:password|secret|token|credential|api[_-]?key|authorization|otp|mfa|private[_-]?key|pii|personal[_-]?data)$/i;
 const secretValue = /(?:gh[pousr]_[A-Za-z0-9]{20,}|Bearer\s+\S+|AKIA[A-Z0-9]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/;
+const standardsRuleId = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function issue(code, subject, detail) {
   return { code, subject, ...(detail === undefined ? {} : { detail }) };
@@ -118,6 +120,58 @@ function validateEvidenceReferences(ids, subject, evidenceById, issues, { nonEmp
   }
 }
 
+function sameScopedOverrides(left, right) {
+  return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((item, index) =>
+    item?.ruleId === right[index]?.ruleId && item?.scope === right[index]?.scope);
+}
+
+function validateStandardsSelection(selection, subject, issues, standardsSelectionRecord) {
+  if (!exactKeys(selection, new Set(["selectedRuleIds", "scopedOverrides", "notApplicableRuleIds"]), subject, issues)) return;
+  required(selection, ["selectedRuleIds", "scopedOverrides", "notApplicableRuleIds"], subject, issues);
+  for (const key of ["selectedRuleIds", "notApplicableRuleIds"]) {
+    const field = `${subject}.${key}`;
+    if (!Array.isArray(selection?.[key])) {
+      issues.push(issue("invalid-array", field));
+      continue;
+    }
+    const ids = new Set();
+    selection[key].forEach((ruleId, index) => {
+      if (!standardsRuleId.test(ruleId ?? "")) issues.push(issue("invalid-standards-rule-id", `${field}[${index}]`));
+      else if (ids.has(ruleId)) issues.push(issue("duplicate-standards-rule-id", `${field}[${index}]`, ruleId));
+      ids.add(ruleId);
+    });
+  }
+  if (!Array.isArray(selection?.scopedOverrides)) issues.push(issue("invalid-array", `${subject}.scopedOverrides`));
+  else {
+    const overrides = new Set();
+    selection.scopedOverrides.forEach((override, index) => {
+      const itemSubject = `${subject}.scopedOverrides[${index}]`;
+      if (!exactKeys(override, new Set(["ruleId", "scope"]), itemSubject, issues)) return;
+      required(override, ["ruleId", "scope"], itemSubject, issues);
+      if (!standardsRuleId.test(override?.ruleId ?? "")) issues.push(issue("invalid-standards-rule-id", `${itemSubject}.ruleId`));
+      if (!workspacePath(override?.scope)) issues.push(issue("unsafe-workspace-path", `${itemSubject}.scope`));
+      const key = `${override?.ruleId}\u0000${override?.scope}`;
+      if (overrides.has(key)) issues.push(issue("duplicate-standards-override", itemSubject, key));
+      overrides.add(key);
+    });
+  }
+  const hasSelection = [selection?.selectedRuleIds, selection?.scopedOverrides, selection?.notApplicableRuleIds]
+    .some((value) => Array.isArray(value) && value.length > 0);
+  if (!hasSelection && standardsSelectionRecord === undefined) return;
+  const recordValidation = validateStandardsPack(standardsSelectionRecord);
+  if (!recordValidation.valid) {
+    issues.push(issue("invalid-standards-selection-record", subject));
+    return;
+  }
+  const rules = standardsSelectionRecord.rules;
+  const expectedSelected = rules.filter((rule) => rule.classification !== "not-applicable").map((rule) => rule.id);
+  const expectedNotApplicable = rules.filter((rule) => rule.classification === "not-applicable").map((rule) => rule.id);
+  const expectedOverrides = standardsSelectionRecord.overrides.map(({ ruleId, scope }) => ({ ruleId, scope }));
+  if (!sameStringArray(selection.selectedRuleIds, expectedSelected)) issues.push(issue("standards-selection-record-mismatch", `${subject}.selectedRuleIds`));
+  if (!sameStringArray(selection.notApplicableRuleIds, expectedNotApplicable)) issues.push(issue("standards-selection-record-mismatch", `${subject}.notApplicableRuleIds`));
+  if (!sameScopedOverrides(selection.scopedOverrides, expectedOverrides)) issues.push(issue("standards-selection-record-mismatch", `${subject}.scopedOverrides`));
+}
+
 function validateFinding(finding, index, evidenceById, issues, { subjectRoot = "result.details.findings", allowResolution = false } = {}) {
   const subject = `${subjectRoot}[${index}]`;
   const keys = new Set(["id", "severity", "disposition", "subject", "evidenceIds", "impact", "recommendation", ...(allowResolution ? ["resolution"] : [])]);
@@ -142,7 +196,7 @@ export function sortReviewFindings(findings = []) {
   });
 }
 
-function validateReviewDetails(result, issues) {
+function validateReviewDetails(result, issues, { standardsSelectionRecord } = {}) {
   const details = result.details;
   const subject = "result.details";
   const keys = new Set(["reviewedScope", "findings", "coverage", "standardsSelection", "evidenceGaps", "scopeSummary"]);
@@ -157,19 +211,7 @@ function validateReviewDetails(result, issues) {
     validateEvidenceReferences(details.reviewedScope.evidenceIds, `${subject}.reviewedScope.evidenceIds`, evidenceById, issues);
   }
 
-  if (exactKeys(details.standardsSelection, new Set(["selectedRuleIds", "scopedOverrides", "notApplicableRuleIds"]), `${subject}.standardsSelection`, issues)) {
-    required(details.standardsSelection, ["selectedRuleIds", "scopedOverrides", "notApplicableRuleIds"], `${subject}.standardsSelection`, issues);
-    validateStringArray(details.standardsSelection.selectedRuleIds, `${subject}.standardsSelection.selectedRuleIds`, issues);
-    validateStringArray(details.standardsSelection.notApplicableRuleIds, `${subject}.standardsSelection.notApplicableRuleIds`, issues);
-    if (!Array.isArray(details.standardsSelection.scopedOverrides)) issues.push(issue("invalid-array", `${subject}.standardsSelection.scopedOverrides`));
-    else details.standardsSelection.scopedOverrides.forEach((override, index) => {
-      const itemSubject = `${subject}.standardsSelection.scopedOverrides[${index}]`;
-      if (!exactKeys(override, new Set(["ruleId", "scope"]), itemSubject, issues)) return;
-      required(override, ["ruleId", "scope"], itemSubject, issues);
-      if (!nonEmpty(override.ruleId)) issues.push(issue("invalid-standards-rule-id", `${itemSubject}.ruleId`));
-      if (!workspacePath(override.scope)) issues.push(issue("unsafe-workspace-path", `${itemSubject}.scope`));
-    });
-  }
+  validateStandardsSelection(details.standardsSelection, `${subject}.standardsSelection`, issues, standardsSelectionRecord);
 
   if (!Array.isArray(details.findings)) issues.push(issue("invalid-array", `${subject}.findings`));
   else {
@@ -505,18 +547,19 @@ function validateCorrectionAuthorization(details, localImplementationAuthorizati
   return valid;
 }
 
-function validateVerificationDetails(result, issues, { productionReviewAuthorization, localImplementationAuthorization } = {}) {
+function validateVerificationDetails(result, issues, { productionReviewAuthorization, localImplementationAuthorization, standardsSelectionRecord } = {}) {
   const details = result.details;
   const subject = "result.details";
-  const keys = new Set(["profile", "uiScope", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness", "productionGate"]);
+  const keys = new Set(["profile", "uiScope", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness", "standardsSelection", "productionGate"]);
   if (!exactKeys(details, keys, subject, issues)) return;
-  required(details, ["profile", "uiScope", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness"], subject, issues);
+  required(details, ["profile", "uiScope", "intendedBehavior", "criticalPath", "changedPaths", "selectedChecks", "evidenceBindings", "correctionBudget", "correctionAttempts", "reviewedPaths", "localReviewFindings", "unresolvedGaps", "recoverySteps", "binding", "readiness", "standardsSelection"], subject, issues);
   const evidenceById = new Map((result.evidence ?? []).map((item) => [item.id, item]));
   if (!deliveryProfiles.includes(details.profile)) issues.push(issue("invalid-delivery-profile", `${subject}.profile`));
   validateUiScope(details.uiScope, `${subject}.uiScope`, issues);
   if (!nonEmpty(details.intendedBehavior)) issues.push(issue("invalid-intended-behavior", `${subject}.intendedBehavior`));
   if (!nonEmpty(details.criticalPath)) issues.push(issue("invalid-critical-path", `${subject}.criticalPath`));
   validateStringArray(details.changedPaths, `${subject}.changedPaths`, issues, { paths: true, nonEmptyArray: true });
+  validateStandardsSelection(details.standardsSelection, `${subject}.standardsSelection`, issues, standardsSelectionRecord);
   validateStringArray(details.reviewedPaths, `${subject}.reviewedPaths`, issues, { paths: true });
   if (Array.isArray(details.reviewedPaths) && new Set(details.reviewedPaths).size !== details.reviewedPaths.length) issues.push(issue("duplicate-reviewed-path", `${subject}.reviewedPaths`));
   const reviewedPathCoverage = Array.isArray(details.changedPaths) && Array.isArray(details.reviewedPaths)
@@ -689,7 +732,7 @@ export function validateImplementationQualityResult(result, options = {}) {
   issues.push(...shared.issues.map((item) => ({ ...item, code: `skill-result.${item.code}` })));
   if (!isObject(result)) return { valid: false, issues };
   scanSensitive(result, "result", issues);
-  if (result.skill === "base-code-review") validateReviewDetails(result, issues);
+  if (result.skill === "base-code-review") validateReviewDetails(result, issues, options);
   else if (result.skill === "base-verification-loop") validateVerificationDetails(result, issues, options);
   else issues.push(issue("unsupported-implementation-quality-skill", "result.skill", result.skill));
   return { valid: issues.length === 0, issues };
