@@ -120,9 +120,21 @@ test("Codex adapter uses a fresh read-only noninteractive transport without user
   assert.ok(invocation.args.includes("--ephemeral"));
   assert.ok(invocation.args.includes("--ignore-user-config"));
   assert.ok(invocation.args.includes("--skip-git-repo-check"));
+  assert.equal(invocation.args[invocation.args.indexOf("--color") + 1], "never");
+  assert.equal(invocation.args[invocation.args.indexOf("--output-last-message") + 1], "/tmp/result.json");
+  assert.match(invocation.args.at(-1), /Use bounded reads only/);
   const probe = probeCodexReviewAdapter();
   assert.equal(typeof probe.available, "boolean");
   if (probe.available) assert.equal(probe.capability.denied.delegatedMutation, true);
+  const missingFinalFileCapability = probeCodexReviewAdapter({ executable: "fixture-codex" }, {
+    help: (_executable, _arguments, required) => {
+      assert.ok(required.includes("--output-last-message"));
+      return false;
+    }
+  });
+  assert.equal(missingFinalFileCapability.code, "independent-reviewer-codex-runtime-unavailable");
+  const completeCapability = probeCodexReviewAdapter({ executable: "fixture-codex" }, { help: () => true });
+  assert.equal(completeCapability.available, true);
 });
 
 test("degraded Codex transport is explicitly reduced-assurance and scrubs mutation credentials", () => {
@@ -316,6 +328,20 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       executable: callerSelectedExecutable
     });
     assert.equal(rejectedExecutable.code, "independent-reviewer-codex-executable-identity-unavailable");
+    let attemptedView = false;
+    const unavailablePreflight = buildCodexParentStrictReviewToolRequest({
+      reviewPackage,
+      repositoryPath: process.cwd(),
+      reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
+      implementerSession: "implementer-session",
+      attestationRef: "attestations/codex-read-only-v1.json"
+    }, {
+      pinExecutable: () => null,
+      createView: () => { attemptedView = true; return { available: true, view: strictView }; }
+    });
+    assert.equal(unavailablePreflight.code, "independent-reviewer-codex-preflight-boundary-unavailable");
+    assert.equal(unavailablePreflight.diagnostic.stage, "adapter-preflight");
+    assert.equal(attemptedView, false);
     const toolRequest = buildCodexParentStrictReviewToolRequest({
       reviewPackage,
       repositoryPath: process.cwd(),
@@ -328,11 +354,13 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       injectPackage: () => `${reviewPath}/.ai-independent-review-package.json`,
       prepareEnvironment: () => ({ available: true, environment: { HOME: `${temporary}/reviewer-home`, CODEX_HOME: `${temporary}/reviewer-home/codex`, PATH: "/usr/bin", NO_COLOR: "1" } }),
       pinExecutable: () => executableIdentity,
+      probeRuntime: () => ({ available: true, capability: {} }),
       clock: () => "2026-08-15T04:00:00.000Z",
       executionId: "strict-execution"
     });
     assert.equal(toolRequest.available, true, JSON.stringify(toolRequest));
     assert.equal(toolRequest.transport, "codex-parent-strict-exec-tool-v1");
+    assert.deepEqual(toolRequest.runtimeState.artifactDelivery, { channel: "owned-final-file-v1", outputSchema: true, outputLastMessage: true, color: "never", permissionProfile: "sealed-review" });
     assert.equal(toolRequest.workingDirectory, launchPath);
     assert.ok(toolRequest.arguments.includes(executablePath));
     assert.ok(toolRequest.arguments.includes(launchPath));
@@ -350,6 +378,14 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       clock: () => "2026-08-15T04:01:00.000Z"
     });
     assert.equal(tamperedResultPath.code, "independent-reviewer-parent-strict-tool-receipt-invalid");
+    const tamperedArtifactDelivery = consumeCodexParentStrictReviewToolResult({
+      toolRequest: { ...toolRequest, runtimeState: { ...toolRequest.runtimeState, artifactDelivery: { ...toolRequest.runtimeState.artifactDelivery, channel: "stdout-v1" } } },
+      toolResult: { exit_code: 0, output: "{}" }
+    }, {
+      removeView: () => ({ removed: true }),
+      clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(tamperedArtifactDelivery.code, "independent-reviewer-parent-strict-tool-receipt-invalid");
     const tamperedExpiration = consumeCodexParentStrictReviewToolResult({
       toolRequest: { ...toolRequest, runtimeState: { ...toolRequest.runtimeState, expiresAt: "2026-08-16T04:00:00.000Z" } },
       toolResult: { exit_code: 0, output: "{}" }
@@ -430,6 +466,7 @@ test("Codex parent transport classifies owned final artifacts without retaining 
   const linkPath = `${temporary}/result-link.json`;
   try {
     assert.equal(inspectCodexReviewResultArtifact(resultPath).code, "review-launcher-codex-result-artifact-missing");
+    assert.match(inspectCodexReviewResultArtifact(resultPath).diagnostic.safeMessage, /final-result artifact/);
     fs.writeFileSync(resultPath, "");
     assert.equal(inspectCodexReviewResultArtifact(resultPath).code, "review-launcher-codex-result-artifact-empty");
     fs.writeFileSync(resultPath, "not json");
@@ -457,6 +494,13 @@ test("Codex parent transport classifies owned final artifacts without retaining 
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
   }
+});
+
+test("strict parent transport keeps reusable contracts free of product-specific values", () => {
+  const source = fs.readFileSync(new URL("../platform-review-adapters.mjs", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /joericearchitect|home-roots-reinvest|jizzoe|AI Skills Development/i);
+  assert.match(source, /owned-final-file-v1/);
+  assert.match(source, /output-last-message/);
 });
 
 test("degraded adapter seals reviewer findings into parent-owned exact-package evidence", () => {
