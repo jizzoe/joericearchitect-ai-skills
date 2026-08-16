@@ -419,9 +419,18 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
     const changedExecutable = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
       removeView: () => ({ removed: true }),
       verifyExecutable: () => false,
+      inspectResult: () => ({ available: true, diagnostics: { resultArtifactPresent: true, parse: "valid", payload: "valid" } }),
       clock: () => "2026-08-15T04:01:00.000Z"
     });
     assert.equal(changedExecutable.code, "independent-reviewer-codex-executable-identity-changed");
+    assert.equal(changedExecutable.diagnostics.artifactReceipt, "valid");
+    const expired = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
+      removeView: () => ({ removed: true }),
+      inspectResult: () => ({ available: true, diagnostics: { resultArtifactPresent: true, parse: "valid", payload: "valid" } }),
+      clock: () => "2026-08-15T04:20:00.000Z"
+    });
+    assert.equal(expired.code, "independent-reviewer-parent-strict-request-expired");
+    assert.equal(expired.diagnostics.artifactReceipt, "valid");
     fs.writeFileSync(toolRequest.runtimeState.resultPath, JSON.stringify({ schemaVersion: 1, findings: [], status: "passed" }));
     const consumed = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
       removeView: (received) => ({ removed: received === strictView }),

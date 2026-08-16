@@ -542,20 +542,20 @@ export function consumeCodexParentStrictReviewToolResult({ toolRequest, toolResu
     const diagnostic = diagnosticFromCode({ stage: "parent-transport", operation: "consume-codex-strict-review-tool", code: "independent-reviewer-parent-strict-tool-receipt-invalid", subject: "strict-review-tool-receipt", safeMessage: "The strict Codex parent-tool receipt does not match its prepared request." });
     return strictParentUnavailable(diagnostic, cleanup);
   }
+  // The structural seal fixes resultPath, so every subsequent completed
+  // receipt can record its owned-artifact state even when a later acceptance
+  // condition (such as expiry or identity change) fails.
+  const inspected = inspectResult(state.resultPath);
   if (Date.parse(state.expiresAt) <= Date.parse(clock())) {
     const cleanup = cleanupView();
     const diagnostic = createReviewDiagnostic({ stage: "parent-transport", operation: "consume-codex-strict-review-tool", code: "independent-reviewer-parent-strict-request-expired", category: "request-expired", subject: "strict-review-tool-request", safeMessage: "The strict Codex parent-tool request expired before its result was accepted." });
-    return strictParentUnavailable(diagnostic, cleanup);
+    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: strictArtifactReceiptDiagnostics(inspected) });
   }
   if (!verifyExecutable(state.executableIdentity)) {
     const cleanup = cleanupView();
     const diagnostic = createReviewDiagnostic({ stage: "parent-transport", operation: "verify-codex-reviewer-executable", code: "independent-reviewer-codex-executable-identity-changed", category: "verification-failed", subject: "codex-reviewer-executable", safeMessage: "The configured Codex executable changed after the strict request was prepared." });
-    return strictParentUnavailable(diagnostic, cleanup);
+    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: strictArtifactReceiptDiagnostics(inspected) });
   }
-  // Always inspect the sealed artifact before cleanup. A process failure does
-  // not make a missing, malformed, or unexpectedly valid final artifact
-  // irrelevant to the transport diagnosis.
-  const inspected = inspectResult(state.resultPath);
   if (toolResult?.exit_code !== 0) {
     const diagnostic = diagnoseCodexExecutionFailure({ status: toolResult?.exit_code, stderr: toolResult?.output ?? "" }, { resultMissing: true });
     const cleanup = cleanupView();

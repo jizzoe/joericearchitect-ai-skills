@@ -115,3 +115,19 @@ the strict invocation. An incompatible pinned CLI therefore fails before any
 elevated request is prepared. The existing probe fixture asserts the complete
 required switch set. A fresh exact-head strict review is required after this
 objective correction.
+
+## Follow-up strict review finding: pre-acceptance artifact receipt
+
+- Review record: `strict-711d8a95-b54a-407c-b915-f888eae5de02`
+- Reviewed head: `44279eb9315678ddd9e5c5a50ecb02d731daecd9`
+- Assurance: `strict-isolated`; the parent-owned final artifact was present,
+  schema-valid, and the owned view was removed.
+- Finding: objective fix. Structurally valid receipts that were expired or had
+  a changed sealed identity returned before recording artifact state.
+
+The result path is now inspected immediately after structural request
+validation—when it is known to be sealed—and its normalized state accompanies
+expiry, identity-change, process, and normal receipt outcomes. Structurally
+invalid receipts still fail closed without reading a potentially untrusted
+path. Regression coverage exercises the expiry and identity-change branches.
+A fresh exact-head strict review is required after this objective correction.
