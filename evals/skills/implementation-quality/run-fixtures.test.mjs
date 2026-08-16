@@ -144,6 +144,14 @@ test("valid code-review result is findings-first and shared-contract compliant",
   assert.match(markdown, /- The supplied changed path list is complete\./);
   assert.match(markdown, /HIGH finding-high-validation/);
 
+  const selectedStandards = clone(result);
+  selectedStandards.details.standardsSelection = {
+    selectedRuleIds: ["repository-style"],
+    scopedOverrides: [{ ruleId: "repository-style", scope: "src" }],
+    notApplicableRuleIds: ["expo-rule"]
+  };
+  assert.deepEqual(validateResult(selectedStandards), { valid: true, issues: [] });
+
   const emptyAssumptions = clone(result);
   emptyAssumptions.assumptions = [];
   assert.match(renderImplementationQualityMarkdown(emptyAssumptions), /## Assumptions\n\nNone\./);
@@ -158,6 +166,7 @@ test("review validator rejects malformed, duplicate, unsafe, unsupported, and mi
     ["duplicate", (value) => { value.details.findings[1].id = value.details.findings[0].id; }, "duplicate-finding-id"],
     ["unsafe path", (value) => { value.details.findings[0].subject = "../outside.mjs"; }, "unsafe-workspace-path"],
     ["unsupported severity", (value) => { value.details.findings[0].severity = "critical"; }, "invalid-finding-severity"],
+    ["unsafe standards override scope", (value) => { value.details.standardsSelection.scopedOverrides = [{ ruleId: "repository-style", scope: "../outside" }]; }, "unsafe-workspace-path"],
     ["unknown details key", (value) => { value.details.extra = true; }, "unknown-key"],
     ["sensitive details", (value) => { value.details.scopeSummary = ["ghp_", "A".repeat(20)].join(""); }, "sensitive-value"],
     ["personal data field", (value) => { value.details.pii = "synthetic@example.invalid"; }, "sensitive-key"]
