@@ -43,13 +43,18 @@ const publicIpv6 = (segments) => {
       (segments[0] === 0x3fff && (segments[1] & 0xfff0) === 0) || segments[0] === 0x5f00) return false;
   return true;
 };
+const publicDomain = (value) => {
+  const labels = value.split(".");
+  if (labels.length < 2 || ["localhost", "local", "internal", "invalid", "test", "example"].includes(labels.at(-1))) return false;
+  return labels.every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));
+};
 const publicHost = (host) => {
   const value = host.toLowerCase().replace(/^\[|\]$/g, "");
   if (value === "localhost" || value.endsWith(".localhost")) return false;
   const ipv4 = value.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (ipv4) return publicIpv4(ipv4.slice(1).map(Number));
   const ipv6 = ipv6Segments(value);
-  return ipv6 ? publicIpv6(ipv6) : true;
+  return ipv6 ? publicIpv6(ipv6) : publicDomain(value);
 };
 const source = (value) => {
   if (typeof value !== "string" || !value || secret.test(value)) return false;

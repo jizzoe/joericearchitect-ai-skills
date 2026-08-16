@@ -11,8 +11,8 @@ const valid = {
   target: { path: "fixtures/second-workspace" },
   rules: [
     { id: "repository-style", classification: "repository-selected", source: "config/quality.md", scope: "repository" },
-    { id: "official-rule", classification: "required", source: "https://example.invalid/official", scope: "src" },
-    { id: "expo-rule", classification: "not-applicable", source: "https://example.invalid/expo", scope: "repository", reason: "target is not Expo" }
+    { id: "official-rule", classification: "required", source: "https://example.com/official", scope: "src" },
+    { id: "expo-rule", classification: "not-applicable", source: "https://example.com/expo", scope: "repository", reason: "target is not Expo" }
   ],
   overrides: [],
   expectedEvidence: ["lint"],
@@ -63,6 +63,10 @@ test("unsafe and incomplete records fail closed", () => {
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://198.18.0.1/standard" }] }, "unsafe-source"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://224.0.0.1/standard" }] }, "unsafe-source"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://255.255.255.255/standard" }] }, "unsafe-source"],
+    [{ ...valid, rules: [{ ...valid.rules[0], source: "https://intranet/standard" }] }, "unsafe-source"],
+    [{ ...valid, rules: [{ ...valid.rules[0], source: "https://service.local/standard" }] }, "unsafe-source"],
+    [{ ...valid, rules: [{ ...valid.rules[0], source: "https://service.internal/standard" }] }, "unsafe-source"],
+    [{ ...valid, rules: [{ ...valid.rules[0], source: "https://example.invalid/standard" }] }, "unsafe-source"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://[::1]/standard" }] }, "unsafe-source"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://[::]/standard" }] }, "unsafe-source"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://[::ffff:127.0.0.1]/standard" }] }, "unsafe-source"],
