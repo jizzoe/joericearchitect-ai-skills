@@ -3,7 +3,7 @@ import test from "node:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { advanceControllerRecord, createControllerRecord, inspectControllerRecord, persistControllerRecord } from "../autonomous-sdd-controller.mjs";
+import { advanceControllerRecord, authorizationDigest, createControllerRecord, inspectControllerRecord, persistControllerRecord } from "../autonomous-sdd-controller.mjs";
 import { inspectCheckpoint } from "../checkpoint.mjs";
 import { checkAdapterDrift } from "../check-adapter-drift.mjs";
 import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
@@ -27,6 +27,12 @@ test("controller rejects expired, stale, and conflicting context", () => {
   const stale = structuredClone(created.record);
   stale.steps[0] = { id: "propose", status: "complete", evidence: { current: false } };
   assert.deepEqual(inspectControllerRecord(stale, { authorization, repository: "owner/repository", now: started }), { classification: "continue", reason: "controller-phase-stale", nextPhase: "propose" });
+  const forgedSelection = structuredClone(created.record);
+  forgedSelection.selectedEntry = "different-change";
+  assert.equal(inspectControllerRecord(forgedSelection, { authorization, repository: "owner/repository", now: started }).reason, "controller-context-conflict");
+  const differentTarget = structuredClone(authorization);
+  differentTarget.target = { kind: "change", entries: ["different-change"] };
+  assert.notEqual(authorizationDigest(authorization), authorizationDigest(differentTarget));
 });
 
 test("every lifecycle entry resumes only the first incomplete controller phase", () => {
@@ -46,6 +52,7 @@ test("controller persists only contained paths and advances ordered current evid
     const persisted = persistControllerRecord({ repositoryPath: root, record: created.record });
     assert.equal(persisted.valid, true);
     assert.deepEqual(JSON.parse(fs.readFileSync(persisted.path, "utf8")).steps, created.record.steps);
+    assert.equal(fs.readdirSync(path.dirname(persisted.path)).some((entry) => entry.endsWith(".tmp")), false);
     assert.equal(persistControllerRecord({ repositoryPath: root, record: { ...created.record, checkpointPath: "../escape.json" } }).reason, "controller-record-path-escape");
     assert.equal(advanceControllerRecord(created.record, "planning-review", { current: true }).reason, "controller-phase-advance-out-of-order");
     const advanced = advanceControllerRecord(created.record, "propose", { current: true, reference: "proposal" });

@@ -8,7 +8,15 @@ const phases = Object.freeze([
 ]);
 
 const text = (value) => typeof value === "string" && value.trim().length > 0;
-const canonical = (value) => JSON.stringify(value, Object.keys(value).sort());
+const canonical = (value) => {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
+  }
+  return value;
+};
+const selectedByAuthorization = (selectedEntry, authorization) =>
+  text(selectedEntry) && Array.isArray(authorization?.target?.entries) && authorization.target.entries.includes(selectedEntry);
 
 export function authorizationDigest(authorization) {
   const source = {
@@ -20,7 +28,7 @@ export function authorizationDigest(authorization) {
     independentReviewPolicy: authorization?.independentReviewPolicy,
     expiresAt: authorization?.expiresAt
   };
-  return crypto.createHash("sha256").update(canonical(source)).digest("hex");
+  return crypto.createHash("sha256").update(JSON.stringify(canonical(source))).digest("hex");
 }
 
 export function createControllerRecord({ authorization, repository, checkpointPath }) {
@@ -48,7 +56,7 @@ export function inspectControllerRecord(record, { authorization, repository, now
   if (!record || record.schemaVersion !== 1 || !text(record.selectedEntry) || !text(record.repository) || !text(record.checkpointPath) || !Array.isArray(record.steps)) {
     return { classification: "paused", reason: "controller-record-invalid", nextPhase: null };
   }
-  if (record.repository !== repository || record.authorizationDigest !== authorizationDigest(authorization) || record.expiresAt !== authorization?.expiresAt) {
+  if (!selectedByAuthorization(record.selectedEntry, authorization) || record.repository !== repository || record.authorizationDigest !== authorizationDigest(authorization) || record.expiresAt !== authorization?.expiresAt) {
     return { classification: "paused", reason: "controller-context-conflict", nextPhase: null };
   }
   if (Date.parse(record.expiresAt) <= Date.parse(now)) return { classification: "paused", reason: "controller-context-expired", nextPhase: null };
@@ -84,7 +92,27 @@ export function persistControllerRecord({ repositoryPath, record }) {
   const root = path.resolve(repositoryPath);
   const destination = path.resolve(root, record.checkpointPath);
   if (destination !== root && !destination.startsWith(`${root}${path.sep}`)) return { valid: false, reason: "controller-record-path-escape" };
-  fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.writeFileSync(destination, `${JSON.stringify(record, null, 2)}\n`);
-  return { valid: true, path: destination };
+  const directory = path.dirname(destination);
+  const temporary = path.join(directory, `.${path.basename(destination)}.${process.pid}.${crypto.randomUUID()}.tmp`);
+  try {
+    fs.mkdirSync(directory, { recursive: true });
+    const descriptor = fs.openSync(temporary, "wx", 0o600);
+    try {
+      fs.writeFileSync(descriptor, `${JSON.stringify(record, null, 2)}\n`);
+      fs.fsyncSync(descriptor);
+    } finally {
+      fs.closeSync(descriptor);
+    }
+    fs.renameSync(temporary, destination);
+    const directoryDescriptor = fs.openSync(directory, "r");
+    try {
+      fs.fsyncSync(directoryDescriptor);
+    } finally {
+      fs.closeSync(directoryDescriptor);
+    }
+    return { valid: true, path: destination };
+  } catch {
+    try { fs.unlinkSync(temporary); } catch {}
+    return { valid: false, reason: "controller-record-persist-failed" };
+  }
 }
