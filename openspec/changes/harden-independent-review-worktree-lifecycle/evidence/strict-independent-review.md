@@ -47,3 +47,24 @@ This second record confirms that adding the linked issue and tracking metadata
 did not introduce a finding or degraded fallback. The task-completion evidence
 commit is delivery documentation only; it does not change the reviewed
 implementation.
+
+## Final correction review
+
+Two subsequent strict reviews identified bounded objective fixes in the result
+evidence-path and detached-worktree cleanup boundaries. Each was corrected,
+tested, and rereviewed under its own failure-signature budget; see
+`review-correction-finding-evidence-path.md` and
+`review-correction-wrapper-cleanup.md`.
+
+The final repaired implementation received a fresh accepted result:
+
+- Review record: `strict-5a128cf5-d705-498a-a9bf-1e494468c169`
+- Base commit: `8342a0da642d340fe506ddfb8200ec5427ff295b`
+- Reviewed head: `7a40ba3638ce2d6312a5b5a349235b76d0fbb10d`
+- Immutable manifest digest:
+  `f4c9a3fec6d75f058d6b4129cb13d8f5581d936b623847cd74b74cd3fff2b4a1`
+- Completed: 2026-08-16T00:05:43.651Z
+- Result: `passed` with zero findings under `strict-isolated`
+
+The owned review archive was removed successfully, and no degraded fallback
+was used.

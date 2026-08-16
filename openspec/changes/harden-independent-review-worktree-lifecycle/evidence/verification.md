@@ -37,15 +37,16 @@ on macOS established the previously ambiguous boundary:
 - installed Claude reaches its clean terminal authentication refusal, so Claude
   login remains an external setup prerequisite rather than a sandbox defect.
 
-The final Apply checks passed: 262 Node tests, 23 focused detached-view/adapter
+The final Apply checks passed: 263 Node tests, 23 focused detached-view/adapter
 tests, adapter-drift validation, shared-guardrail validation, whitespace and
 changed-content secret-pattern review, strict validation of this change, and
 all 26 strict OpenSpec items.
 
-The repaired implementation and then the linked-tracking head each received an
-accepted strict Codex independent review with zero findings. The latest record
-binds the immutable base, head, and manifest and confirms fresh, read-only,
-network-disabled execution from a neutral parent with owned cleanup. See
+The repaired implementation, linked-tracking head, and final corrected head
+each received an accepted strict Codex independent review with zero findings.
+The latest record binds the immutable base, head, and manifest and confirms
+fresh, read-only, network-disabled execution from a neutral parent with owned
+cleanup. See
 `evidence/strict-independent-review.md`.
 
 ## Coherence
