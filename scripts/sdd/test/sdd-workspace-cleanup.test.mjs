@@ -10,7 +10,7 @@ const evidence = {
 const resource = (values = {}) => ({
   entry: "complete-delivery", repository: "owner/repository", role: "change-workspace", id: "resource", owned: true,
   deliveryCurrent: true, headCommit: head, ownershipToken: "owned-token", recoveryReference: "cleanup-recovery-1",
-  deliveryEvidence: { current: true, reference: "archive-pr-1", headCommit: head }, ...values
+  deliveryEvidence: { current: true, reference: "archive-pr-1", headCommit: head, deliveredHeadCommit: head }, ...values
 });
 
 test("cleanup plans only exact clean owned delivered resources", () => {
@@ -27,7 +27,7 @@ test("cleanup plans only exact clean owned delivered resources", () => {
 
 test("cleanup requires final delivery evidence and permits forced local deletion only with exact proof", () => {
   assert.equal(planWorkspaceCleanup({ ...evidence, archiveVisible: false }).classification, "paused");
-  const plan = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", id: "squash", squashOrRebaseEvidence: { merged: true, pullRequest: "42", finalHeadCommit: head } })] });
+  const plan = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", id: "squash", squashOrRebaseEvidence: { merged: true, pullRequest: "42", topicHeadCommit: head, finalHeadCommit: head } })] });
   assert.equal(plan.resources[0].actions[0].force, true);
   const result = executeWorkspaceCleanup(plan, { deleteLocalBranch: (id, { force }) => ({ committed: id === "squash" && force }), inspectResource: (item) => ({ ...item, exists: true }), persistOutcome: () => ({ persisted: true }) });
   assert.equal(result.classification, "completed");
@@ -70,7 +70,7 @@ test("cleanup will not mutate unless each action outcome can be persisted", () =
 });
 
 test("cleanup rejects stale resources and delivery evidence that no longer matches final delivery", () => {
-  const staleEvidence = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", ancestryMerged: true, deliveryEvidence: { current: true, reference: "other-archive", headCommit: head } })] });
+  const staleEvidence = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", ancestryMerged: true, deliveryEvidence: { current: true, reference: "other-archive", headCommit: head, deliveredHeadCommit: head } })] });
   assert.equal(staleEvidence.resources[0].reason, "cleanup-resource-record-invalid");
   const plan = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", ancestryMerged: true })] });
   const result = executeWorkspaceCleanup(plan, {
@@ -80,4 +80,15 @@ test("cleanup rejects stale resources and delivery evidence that no longer match
   });
   assert.equal(result.classification, "partial");
   assert.equal(result.outcomes[0].receipt, "fresh-resource-mismatch");
+});
+
+test("squash cleanup binds the topic head and distinct delivered head to one merged pull request", () => {
+  const topicHead = "b".repeat(40);
+  const deliveredHead = "c".repeat(40);
+  const plan = planWorkspaceCleanup({
+    ...evidence,
+    deliveryEvidence: { current: true, reference: "archive-pr-99", headCommit: deliveredHead },
+    resources: [resource({ kind: "branch", headCommit: topicHead, deliveryEvidence: { current: true, reference: "archive-pr-99", headCommit: topicHead, deliveredHeadCommit: deliveredHead }, squashOrRebaseEvidence: { merged: true, pullRequest: "99", topicHeadCommit: topicHead, finalHeadCommit: deliveredHead } })]
+  });
+  assert.equal(plan.resources[0].actions[0].force, true);
 });

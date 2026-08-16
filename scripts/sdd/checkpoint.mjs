@@ -110,7 +110,7 @@ function invalidCleanupRecord(input) {
     if (!record || !["worktree", "branch"].includes(record.kind) || typeof record.id !== "string" || !record.id || seen.has(key) || record.entry !== entry.name || record.owned !== true || record.deliveryCurrent !== true ||
         typeof record.repository !== "string" || !record.repository || typeof record.role !== "string" || !record.role || !/^[0-9a-f]{40}$/i.test(record.headCommit ?? "") ||
         typeof record.ownershipToken !== "string" || !record.ownershipToken || typeof record.recoveryReference !== "string" || !record.recoveryReference ||
-        record.deliveryEvidence?.current !== true || typeof record.deliveryEvidence?.reference !== "string" || !record.deliveryEvidence.reference || record.deliveryEvidence.headCommit !== record.headCommit) return "invalid-cleanup-record";
+        record.deliveryEvidence?.current !== true || typeof record.deliveryEvidence?.reference !== "string" || !record.deliveryEvidence.reference || record.deliveryEvidence.headCommit !== record.headCommit || !/^[0-9a-f]{40}$/i.test(record.deliveryEvidence.deliveredHeadCommit ?? "")) return "invalid-cleanup-record";
     seen.add(key);
   }
   return null;

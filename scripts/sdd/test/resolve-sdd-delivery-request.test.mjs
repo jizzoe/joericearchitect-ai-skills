@@ -105,6 +105,14 @@ test("ship-sdd aliases preserve explicit target and only override duration", () 
   assert.equal(prototype.effectiveAuthorization.expiresAt, "2026-08-13T20:00:00.000Z");
 });
 
+test("ship-sdd accepts an explicitly ordered bracketed queue and resolves exact brief scope", () => {
+  const result = resolveShipSddRequest("ship-sdd [first-change, second-change] prod 12h", { goalStartedAt: started });
+  assert.equal(result.ready, true);
+  assert.deepEqual(result.effectiveAuthorization.target.entries, ["first-change", "second-change"]);
+  assert.equal(result.effectiveAuthorization.deliveryPreparation.outputPath, "ai-planning/design-briefs/first-change.md");
+  assert.deepEqual(result.effectiveAuthorization.allowedMutations, ["write-design-brief"]);
+});
+
 test("ship-sdd rejects omitted targets and malformed aliases before selection", () => {
   for (const value of ["ship-sdd prod", "ship-sdd target unknown", "apply target prod"]) {
     assert.equal(resolveShipSddRequest(value, { goalStartedAt: started }).ready, false);

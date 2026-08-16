@@ -172,6 +172,12 @@ export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date
         "deployment", "release", "credential-or-scope-change", "external-message", "unrelated-mutation"
       ])
     }),
+    deliveryPreparation: Object.freeze({
+      selectedEntry: target.entries[0],
+      outputPath: `ai-planning/design-briefs/${target.entries[0]}.md`
+    }),
+    allowedMutations: Object.freeze(["write-design-brief"]),
+    targets: Object.freeze([`workspace:ai-planning/design-briefs/${target.entries[0]}.md`]),
     review: Object.freeze({
       strictFirst: true,
       degradedFallbackAuthorized: degraded,
@@ -188,13 +194,14 @@ export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date
 
 export function resolveShipSddRequest(command, options = {}) {
   if (typeof command !== "string") return resolveSddDeliveryRequest({}, options);
-  const parts = command.trim().split(/\s+/);
-  if (parts[0] !== "ship-sdd") {
+  const match = command.trim().match(/^ship-sdd\s+(\[[^\]]+\]|\S+)\s+(prod|prototype)(?:\s+(\S+))?$/);
+  if (!match) {
     return { ready: false, classification: "invalid", issues: [issue("invalid-delivery-request-input", "target", "expected ship-sdd")], clarification: "Use ship-sdd <change-or-ordered-queue> <prod|prototype> [duration]." };
   }
-  const [_, target, alias, duration, ...extra] = parts;
+  const [, rawTarget, alias, duration] = match;
+  const target = rawTarget.startsWith("[") ? rawTarget.slice(1, -1).split(",").map((entry) => entry.trim()) : rawTarget;
   const preset = shorthandProfiles[alias];
-  if (extra.length || !preset || !target) {
+  if (!preset || !target) {
     return { ready: false, classification: "invalid", issues: [issue("invalid-delivery-request-input", !target ? "target" : "qualityProfile")], clarification: "Use ship-sdd <change-or-ordered-queue> <prod|prototype> [duration]." };
   }
   return resolveSddDeliveryRequest({ target, ...preset, ...(duration ? { expiration: duration } : {}) }, options);
