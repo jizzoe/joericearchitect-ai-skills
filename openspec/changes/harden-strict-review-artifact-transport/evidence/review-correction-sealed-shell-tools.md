@@ -52,3 +52,18 @@ diagnostic can therefore occur only when every otherwise trusted candidate
 fails that proof alone. A regression fixture covers the combined trust and
 mutation failure. A fresh exact-head strict review is required after this
 objective correction.
+
+## Follow-up strict review finding: YAML scalar round-trip
+
+- Review record: `strict-b6f2afce-05b8-4066-9297-e6ff50233fa9`
+- Reviewed head: `447b6412237507d8dcee407eeedb8c0d3c3bbe45`
+- Assurance: `strict-isolated`; the parent-owned final artifact was present,
+  schema-valid, and the owned view was removed.
+- Finding: objective fix. The tracking serializer emitted raw scalar-array
+  values, which could misparse YAML-significant path strings.
+
+All serialized strings now use JSON-compatible YAML quoting, and the parser
+decodes quoted list values before deciding whether they are YAML mappings. The
+regression test round-trips colon-bearing, boolean-looking, numeric-looking,
+quoted, and backslash-containing path values.
+A fresh exact-head strict review is required after this objective correction.

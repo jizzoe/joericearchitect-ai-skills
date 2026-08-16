@@ -62,7 +62,29 @@ test("unknown safe fields validate and survive helper updates", () => {
   assert.equal(updated.review_notes, "local-only fixture metadata");
   assert.equal(updated.github.issue, 43);
   assert.equal(validateTrackingObject(updated, { expectedChange: "add-report-export-review" }).valid, true);
-  assert.match(stringifyTracking(updated), /review_notes: local-only fixture metadata/);
+  assert.match(stringifyTracking(updated), /review_notes: "local-only fixture metadata"/);
+});
+
+test("tracking serialization round-trips scalar arrays with YAML-significant strings", () => {
+  const source = {
+    schema_version: 1,
+    openspec: { change: "feature:true" },
+    github: {
+      repository: "example/repository",
+      issue: 7,
+      issue_url: "https://example.test/issues/7",
+      project_owner: "owner",
+      project_number: 2
+    },
+    implementation_repositories: [{
+      repository: "example/repository",
+      default_branch: "true",
+      paths: ["plan:strict", "true", "007", "quoted \"value\"", "backslash\\value"]
+    }]
+  };
+  const rendered = stringifyTracking(source);
+  assert.match(rendered, /- "plan:strict"/);
+  assert.deepEqual(parseTrackingYaml(rendered), source);
 });
 
 test("CLI emits deterministic normalized JSON", () => {

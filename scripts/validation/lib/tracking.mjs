@@ -11,10 +11,23 @@ function scalar(value) {
   if (/^-?\d+$/.test(trimmed)) return Number(trimmed);
   if (trimmed === "true") return true;
   if (trimmed === "false") return false;
-  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return trimmed.slice(1, -1);
+    }
+  }
+  if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
     return trimmed.slice(1, -1);
   }
   return trimmed;
+}
+
+function quotedScalar(value) {
+  const trimmed = value.trim();
+  return (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"));
 }
 
 function parseBlock(lines, start, indent) {
@@ -36,7 +49,7 @@ function parseBlock(lines, start, indent) {
     if (Array.isArray(container)) {
       if (!line.startsWith("- ")) break;
       const itemText = line.slice(2);
-      if (itemText.includes(":")) {
+      if (!quotedScalar(itemText) && itemText.includes(":")) {
         const [key, rest] = splitKeyValue(itemText, index);
         const item = {};
         if (rest === "") {
@@ -229,7 +242,8 @@ export function mergeTracking(existing, patch) {
 
 export function stringifyTracking(value, indent = 0) {
   const lines = [];
-  const stringifyScalarArray = (items, itemIndent) => items.map((item) => `${" ".repeat(itemIndent)}- ${item}`);
+  const stringifyScalar = (item) => typeof item === "string" ? JSON.stringify(item) : String(item);
+  const stringifyScalarArray = (items, itemIndent) => items.map((item) => `${" ".repeat(itemIndent)}- ${stringifyScalar(item)}`);
   for (const [key, child] of Object.entries(value)) {
     const prefix = " ".repeat(indent);
     if (Array.isArray(child)) {
@@ -245,7 +259,7 @@ export function stringifyTracking(value, indent = 0) {
             lines.push(`${" ".repeat(indent + 2)}- ${firstKey}:`);
             lines.push(stringifyTracking(firstValue, indent + 4));
           } else {
-            lines.push(`${" ".repeat(indent + 2)}- ${firstKey}: ${firstValue}`);
+            lines.push(`${" ".repeat(indent + 2)}- ${firstKey}: ${stringifyScalar(firstValue)}`);
           }
           for (const [nestedKey, nestedValue] of entries.slice(1)) {
             if (Array.isArray(nestedValue)) {
@@ -255,18 +269,18 @@ export function stringifyTracking(value, indent = 0) {
               lines.push(`${" ".repeat(indent + 4)}${nestedKey}:`);
               lines.push(stringifyTracking(nestedValue, indent + 6));
             } else {
-              lines.push(`${" ".repeat(indent + 4)}${nestedKey}: ${nestedValue}`);
+              lines.push(`${" ".repeat(indent + 4)}${nestedKey}: ${stringifyScalar(nestedValue)}`);
             }
           }
         } else {
-          lines.push(`${" ".repeat(indent + 2)}- ${item}`);
+          lines.push(`${" ".repeat(indent + 2)}- ${stringifyScalar(item)}`);
         }
       }
     } else if (child && typeof child === "object") {
       lines.push(`${prefix}${key}:`);
       lines.push(stringifyTracking(child, indent + 2));
     } else {
-      lines.push(`${prefix}${key}: ${child}`);
+      lines.push(`${prefix}${key}: ${stringifyScalar(child)}`);
     }
   }
   return lines.join("\n");
