@@ -24,7 +24,8 @@ const authorization = {
   expiresAt: "2026-08-14T00:00:00.000Z",
   implementerSession: "implementer",
   degradedIndependentReview: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic owner risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
-  reviewLauncher: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", boundary: "detached-exact-head-inner-read-only", launcherId: "codex-review-launcher", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest }
+  reviewLauncher: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", boundary: "detached-exact-head-inner-read-only", launcherId: "codex-review-launcher", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
+  reviewWorktreeLifecycle: { enabled: true, operation: "create-detached-review-worktree-v1", change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", repositoryPath: "/fixture", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest }
 };
 const launcher = { id: "codex-review-launcher", kind: "codex-detached-read-only-v1", hostScript: "scripts/sdd/review-launcher-host.mjs", enabled: true, executable: "/opt/tools/codex", detachedView: true, innerReadOnlySandbox: true, ephemeral: true, sealedPackageOnly: true, credentialScrubbed: true, nonInteractive: true };
 const runtime = { permittedReviewLaunchers: ["codex-review-launcher"] };
@@ -50,14 +51,14 @@ function hostRun(prepared, result = validResult(), viewHead = reviewPackage.head
   const reviewPath = path.join(temporaryRoot, "repository");
   fs.mkdirSync(path.join(reviewPath, "schemas"), { recursive: true });
   fs.writeFileSync(path.join(reviewPath, "schemas", "independent-review-findings-v1.schema.json"), "{}\n");
-  const view = { kind: "detached-review-view-v1", repository: "/fixture", reviewPath, temporaryRoot, headCommit: viewHead, ownershipToken: "fixture", createdAt: "2026-08-13T13:00:00.000Z" };
+  const view = { kind: "detached-review-view-v2", repository: "/fixture", reviewPath, temporaryRoot, headCommit: viewHead, lifecycleRequestDigest: prepared.worktreeLifecycleRequest.requestDigest, ownershipToken: "fixture", createdAt: "2026-08-13T13:00:00.000Z" };
   let removed = false;
   let invoked = false;
   const response = executeReviewLauncherHost(prepared.hostRequest, {
     hostExecutionId: "host-execution-1",
     now,
     createView: () => ({ available: true, view }),
-    removeView: (received) => { removed = received === view; fs.rmSync(temporaryRoot, { recursive: true, force: true }); return { removed }; },
+    removeView: (received) => { removed = received === view; fs.rmSync(temporaryRoot, { recursive: true, force: true }); return { removed, status: removed ? "removed" : "unavailable", requestDigest: received.lifecycleRequestDigest }; },
     rebuildPackage: (input) => {
       assert.equal(input.repositoryPath, reviewPath);
       assert.equal(input.baseCommit, prepared.hostRequest.request.reviewPackage.baseCommit);
@@ -118,6 +119,20 @@ test("controller prepares only a fixed external host request", () => {
   assert.equal(prepared.hostRequest.request.launcher.hostScript, "scripts/sdd/review-launcher-host.mjs");
   assert.equal("now" in prepared.hostRequest.request, false);
   assert.match(prepared.hostRequest.requestDigest, /^[0-9a-f]{64}$/);
+  assert.equal(prepared.worktreeLifecycleRequest.request.sourceRequestDigest, prepared.hostRequest.requestDigest);
+  assert.equal(prepared.worktreeLifecycleAuthorization.sourceRequestDigest, prepared.hostRequest.requestDigest);
+  assert.equal("temporaryRoot" in prepared.worktreeLifecycleRequest.request, false);
+});
+
+test("host rejects a lifecycle authorization bound to a different parent request", () => {
+  const prepared = prepareReviewLauncherRecovery(baseInput, { launchId: "wrong-lifecycle-parent" });
+  const tampered = structuredClone(prepared.hostRequest);
+  tampered.request.authorization.reviewWorktreeLifecycle.sourceRequestDigest = "f".repeat(64);
+  assert.equal(reviewLauncherRequestDigest(tampered), tampered.requestDigest, "the self-reference is excluded from its parent digest");
+  let created = false;
+  const rejected = executeReviewLauncherHost(tampered, { createView: () => { created = true; }, now: baseInput.now });
+  assert.equal(created, false);
+  assert.equal(rejected.code, "review-worktree-lifecycle-parent-binding-mismatch");
 });
 
 test("production recovery consumes the prepared action or returns terminal unavailable evidence", async () => {
@@ -258,7 +273,7 @@ test("recovery accepts a durable derived objective-correction chain", () => {
   const derivedStrict = { ...strictResult, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest };
   const failureSource = { kind: "independent-review", reviewRecordId: "review-fixture", findingId: "fixture-failure", severity: "high", evidence: "scripts/sdd/review-launcher-recovery.mjs", transition: "merge-pr" };
   const correctionEvidence = { id: "correction-1", change: "change", attempt: 1, failureSource, failureSignature: "independent-review/fixture-failure/scripts/sdd/review-launcher-recovery.mjs/merge-pr", classification: "objective-fix", behaviorPreserving: true, current: true, ancestryVerified: true, evidenceReference: "checkpoint:correction-1", baseCommit: derived.baseCommit, previousHead: reviewPackage.headCommit, previousManifestDigest: reviewPackage.manifestDigest, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest };
-  const derivedAuthorization = { ...authorization, degradedIndependentReview: { ...authorization.degradedIndependentReview, allowDerivedObjectiveCorrections: true, derivedCorrections: [correctionEvidence] }, reviewLauncher: { ...authorization.reviewLauncher, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest } };
+  const derivedAuthorization = { ...authorization, degradedIndependentReview: { ...authorization.degradedIndependentReview, allowDerivedObjectiveCorrections: true, derivedCorrections: [correctionEvidence] }, reviewLauncher: { ...authorization.reviewLauncher, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest }, reviewWorktreeLifecycle: { ...authorization.reviewWorktreeLifecycle, headCommit: derived.headCommit, manifestDigest: derived.manifestDigest } };
   const result = validateReviewLauncherRecovery({ ...baseInput, reviewPackage: derived, strictResult: derivedStrict, authorization: derivedAuthorization, correctionAttempts: 1, derivedCorrection: true, correctionEvidence });
   assert.equal(result.allowed, true, JSON.stringify(result));
 });

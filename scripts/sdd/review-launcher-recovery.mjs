@@ -5,18 +5,22 @@ import fs from "node:fs";
 import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
 import { canonicalJson, validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
+import { prepareReviewWorktreeLifecycle, validatePreparedReviewWorktreeLifecycle, validateReviewWorktreeLifecycle } from "./review-worktree-lifecycle.mjs";
+import { diagnosticFromCode, diagnosticFromError, preservedDiagnostic, unavailableOutcome } from "./review-diagnostics.mjs";
 
 const hostScript = "scripts/sdd/review-launcher-host.mjs";
 const text = (value) => typeof value === "string" && value.trim().length > 0;
-const fail = (code, detail) => ({ allowed: false, status: "unavailable", code, ...(detail ? { detail } : {}) });
+const fail = (code, detail) => {
+  const diagnostic = diagnosticFromCode({ stage: "launcher-recovery", operation: "validate-review-launcher-recovery", code, subject: "review-launcher-recovery", safeMessage: "The external reviewer recovery request is not valid or cannot be completed." });
+  return { allowed: false, ...unavailableOutcome(diagnostic), ...(detail ? { detail } : {}) };
+};
 const terminal = (code, prepared, detail) => ({
   allowed: false,
-  status: "unavailable",
-  code,
+  ...unavailableOutcome(preservedDiagnostic(detail) ?? diagnosticFromCode({ stage: "launcher-recovery", operation: "execute-review-launcher-recovery", code, subject: "review-launcher-recovery", safeMessage: "The external reviewer recovery could not complete through its required transport." })),
   terminal: true,
   manualFallback: false,
   ...(prepared?.hostRequest?.requestDigest ? { requestDigest: prepared.hostRequest.requestDigest } : {}),
-  ...(detail ? { detail } : {})
+  ...(detail && !preservedDiagnostic(detail) ? { detail } : {})
 });
 
 const launcherDefinitions = Object.freeze({
@@ -51,10 +55,17 @@ function executableMatches(value, definition) {
 
 export function reviewLauncherRequestDigest({ schemaVersion, launchId, request } = {}) {
   if (schemaVersion !== 1 || !text(launchId) || !request) return null;
-  return createHash("sha256").update(canonicalJson({ schemaVersion, launchId, request })).digest("hex");
+  const digestRequest = structuredClone(request);
+  // The exact lifecycle record names this parent digest. Exclude only that
+  // self-reference from the digest input; host validation separately requires
+  // the field to equal the recomputed parent digest.
+  if (digestRequest.authorization?.reviewWorktreeLifecycle) {
+    delete digestRequest.authorization.reviewWorktreeLifecycle.sourceRequestDigest;
+  }
+  return createHash("sha256").update(canonicalJson({ schemaVersion, launchId, request: digestRequest })).digest("hex");
 }
 
-export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, strictResult, launcher, runtime, reviewer, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
+export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, repositoryPath, sourceRequestDigest, strictResult, launcher, runtime, reviewer, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
   const packageCheck = validateReviewPackage(reviewPackage);
   if (!packageCheck.valid) return fail(packageCheck.issues[0].code);
   if (!text(authorization?.implementerSession) || !text(reviewer?.identity)) return fail("review-launcher-identity-binding-missing");
@@ -82,6 +93,8 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
   if (!Array.isArray(runtime?.permittedReviewLaunchers) || !runtime.permittedReviewLaunchers.includes(launcher.id)) {
     return fail("review-launcher-runtime-permission-required");
   }
+  const worktreeLifecycle = validateReviewWorktreeLifecycle({ authorization, selectedEntry, transition, reviewPackage, repositoryPath, sourceRequestDigest, now });
+  if (!worktreeLifecycle.allowed) return fail(worktreeLifecycle.code);
   return {
     allowed: true,
     status: "ready",
@@ -100,7 +113,8 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
       expiresAt: new Date(expires).toISOString(),
       parentLaunchPermission: "runtime-permitted",
       innerBoundary: definition.innerBoundary,
-      sealedPackageOnly: true
+      sealedPackageOnly: true,
+      worktreeLifecycle: worktreeLifecycle.lifecycle
     })
   };
 }
@@ -112,12 +126,33 @@ export function prepareReviewLauncherRecovery(request, { launchId = randomUUID()
   delete sealedRequest.now;
   const hostRequest = { schemaVersion: 1, launchId, request: sealedRequest };
   hostRequest.requestDigest = reviewLauncherRequestDigest(hostRequest);
+  // The standing policy authorizes derivation of one exact lifecycle record.
+  // Bind that derived record only after the parent request has been sealed so
+  // its authorization independently names the request it may service without
+  // introducing a recursive parent digest.
+  const lifecycleAuthorization = {
+    ...request.authorization.reviewWorktreeLifecycle,
+    sourceRequestDigest: hostRequest.requestDigest
+  };
+  hostRequest.request.authorization.reviewWorktreeLifecycle = lifecycleAuthorization;
+  const worktreeLifecycle = prepareReviewWorktreeLifecycle({
+    authorization: hostRequest.request.authorization,
+    selectedEntry: request.selectedEntry,
+    transition: request.transition,
+    reviewPackage: request.reviewPackage,
+    repositoryPath: request.repositoryPath,
+    sourceRequestDigest: hostRequest.requestDigest,
+    now: request.now
+  }, { lifecycleId: `worktree-${launchId}` });
+  if (!worktreeLifecycle.allowed) return worktreeLifecycle;
   return {
     allowed: true,
     status: "host-launch-required",
     code: "review-launcher-external-host-required",
     hostRequest,
-    expectedRecovery: preflight.recovery
+    expectedRecovery: preflight.recovery,
+    worktreeLifecycleRequest: worktreeLifecycle.lifecycleRequest,
+    worktreeLifecycleAuthorization: worktreeLifecycle.authorization
   };
 }
 
@@ -136,12 +171,24 @@ export function acceptReviewLauncherHostResponse({ prepared, response, runtimeRe
   const requestDigest = reviewLauncherRequestDigest(hostRequest);
   if (prepared?.allowed !== true || prepared.code !== "review-launcher-external-host-required" ||
       requestDigest !== hostRequest?.requestDigest) return fail("review-launcher-prepared-request-invalid");
-  const preflight = validateReviewLauncherRecovery({ ...hostRequest.request, now });
+  const preflight = validateReviewLauncherRecovery({ ...hostRequest.request, sourceRequestDigest: requestDigest, now });
   if (!preflight.allowed) return preflight;
   if (response?.allowed !== true || response.code !== "review-launcher-host-complete" ||
       response.launchId !== hostRequest.launchId || response.requestDigest !== requestDigest ||
       response.launcherId !== preflight.recovery.launcherId || response.launcherKind !== preflight.recovery.launcherKind ||
       response.hostScript !== hostScript || !text(response.hostExecutionId)) return fail("review-launcher-host-response-invalid");
+  const lifecycle = validatePreparedReviewWorktreeLifecycle({
+    lifecycleRequest: prepared.worktreeLifecycleRequest,
+    sourceRequestDigest: requestDigest,
+    expected: preflight.recovery.worktreeLifecycle,
+    now
+  });
+  if (!lifecycle.allowed) return fail(lifecycle.code);
+  if (response.worktreeLifecycle?.operation !== preflight.recovery.worktreeLifecycle.operation ||
+      response.worktreeLifecycle?.requestDigest !== prepared.worktreeLifecycleRequest.requestDigest ||
+      response.worktreeLifecycle?.expiresAt !== preflight.recovery.worktreeLifecycle.expiresAt) {
+    return fail("review-launcher-worktree-lifecycle-evidence-invalid");
+  }
   const receipt = runtimeReceipt ?? runtimeLaunchEvidence;
   if (!validRuntimeReceipt(receipt, prepared, response)) return fail("review-launcher-runtime-receipt-invalid");
   const request = hostRequest.request;
@@ -174,8 +221,9 @@ export async function executePreparedReviewLauncherRecovery(prepared, {
   let transportResult;
   try {
     transportResult = await invokePreparedReviewHost(Object.freeze(structuredClone(prepared)));
-  } catch {
-    return terminal("review-launcher-runtime-transport-failed", prepared);
+  } catch (error) {
+    const diagnostic = diagnosticFromError({ stage: "recovery-transport", operation: "invoke-prepared-review-host", code: "review-launcher-runtime-transport-failed", subject: "review-launcher-transport", safeMessage: "The parent review transport failed before returning a host response.", error });
+    return terminal(diagnostic.code, prepared, { diagnostic });
   }
   if (transportResult?.status === "denied") {
     return terminal("review-launcher-runtime-transport-denied", prepared);
@@ -184,7 +232,7 @@ export async function executePreparedReviewLauncherRecovery(prepared, {
     return terminal("review-launcher-runtime-transport-timed-out", prepared);
   }
   if (transportResult?.status !== "executed") {
-    return terminal("review-launcher-runtime-transport-unavailable", prepared);
+    return terminal(transportResult?.code ?? "review-launcher-runtime-transport-unavailable", prepared, transportResult);
   }
   const accepted = acceptReviewLauncherHostResponse({
     prepared,
@@ -192,12 +240,12 @@ export async function executePreparedReviewLauncherRecovery(prepared, {
     runtimeReceipt: transportResult.runtimeReceipt,
     now: now()
   });
-  return accepted.allowed ? accepted : terminal(accepted.code, prepared, accepted.detail);
+  return accepted.allowed ? accepted : terminal(accepted.code, prepared, accepted);
 }
 
 export async function executeReviewLauncherRecovery(request, options = {}) {
   const prepared = prepareReviewLauncherRecovery(request, options);
-  if (!prepared.allowed) return terminal(prepared.code, prepared, prepared.detail);
+  if (!prepared.allowed) return terminal(prepared.code, prepared, prepared);
   return executePreparedReviewLauncherRecovery(prepared, options);
 }
 

@@ -27,18 +27,33 @@ standing grants, noncanonical commits, or content outside the sealed package.
    conclusion.
 3. Create a disposable detached view at the exact head and capability-probe the
    selected adapter. Invoke only `scripts/sdd/platform-review-adapters.mjs`.
-4. Validate every returned `independent-review-result-v1` with the shared
+4. If a managed parent denies nested Codex app-server or sandbox startup, call
+   `buildCodexParentStrictReviewToolRequest` for the same exact package,
+   configured reviewer, attestation, and distinct implementer identity. Issue
+   its fixed `/usr/bin/env` argument vector as the actual shell-tool call with
+   the returned working directory and `sandbox_permissions:
+   "require_escalated"`; do not execute repository code outside the parent
+   sandbox. Pass only the direct tool result to
+   `consumeCodexParentStrictReviewToolResult`. This is still strict: the outer
+   boundary starts the process, while the child Codex process enforces the
+   sealed read-only permission profile. A denied, expired, changed-executable,
+   malformed-result, or cleanup failure remains strict `unavailable`.
+5. Validate every returned `independent-review-result-v1` with the shared
    canonical validator. An unavailable, malformed, self-review, writable, or
    stale result pauses the transition.
-5. An `authorized-degraded` result is eligible only after strict review has a
+6. An `authorized-degraded` result is eligible only after both the ordinary
+   strict subprocess and any applicable parent strict transport have a
    durable unavailable result for the exact sealed package and active bounded
    authorization names the selected change, transition, expiration, risk
    reason, and `fresh-separated-reviewer-only` boundary. It MUST retain the
    strict record and capability ledger and MUST NOT be called strict-isolated.
-6. If detached-view creation or strict reviewer startup is denied by the outer
-   sandbox, use `scripts/sdd/review-launcher-recovery.mjs` to validate and
+7. If detached-view creation or the parent strict transport remains unavailable,
+   use `scripts/sdd/review-launcher-recovery.mjs` to validate and
    prepare a sealed host request only when the exact degraded authorization,
-   configured launcher, and active runtime permission all validate. Pass the
+   configured launcher, active runtime permission, and a separately bound
+   worktree-lifecycle authorization all validate. That lifecycle request binds
+   repository, base/head/manifest, transition, parent digest, and expiration;
+   it never accepts a caller-selected destination. Pass the
    prepared request immediately to the configured parent-runtime transport and
    call `executePreparedReviewLauncherRecovery`; never return the intermediate
    host-required state as an owner action. A Codex parent uses
@@ -58,11 +73,11 @@ standing grants, noncanonical commits, or content outside the sealed package.
    identity remain best-effort, non-security-verifiable evidence. Missing,
    denied, timed-out, malformed, or failed transports return terminal
    machine-readable unavailable evidence with no manual fallback.
-7. Preserve each finding and use the canonical finding state machine. Apply a
+8. Preserve each finding and use the canonical finding state machine. Apply a
    bounded objective correction only when it is behavior-preserving and
    evidence-backed; rerun affected checks and obtain a fresh review for every
    new head.
-8. Record only the normalized result, non-sensitive execution reference,
+9. Record only the normalized result, non-sensitive execution reference,
    dispositions, and cleanup result in the durable checkpoint. Remove a review
    view only through its ownership-guarded cleanup helper.
 

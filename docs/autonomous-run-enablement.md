@@ -69,6 +69,13 @@ archive or detached view, sealed package, credential scrubbing, a fixed logical
 host protocol, expiration checks, and
 structured findings.
 
+When the detached-worktree strategy is selected, it additionally requires a
+separate lifecycle authorization bound to the repository, base, head,
+manifest, transition, parent-request digest, and expiration. The host selects
+the disposable temporary root itself, reports only safe structured diagnostics,
+and removes only a marker-proven owned view; an expired request may still clean
+up that owned view but remains unavailable.
+
 The parent runtime transport is separate from the inner reviewer. In Codex it
 prepares the exact-head archive inside the sandbox, then issues only the fixed
 host-owned reviewer invocation as a shell-tool request with escalated sandbox

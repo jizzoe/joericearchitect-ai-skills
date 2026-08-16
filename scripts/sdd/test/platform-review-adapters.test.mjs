@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, createClaudeReviewSettings, degradedCapabilityLedger, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
+import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexParentStrictReviewToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, consumeCodexParentStrictReviewToolResult, createClaudeReviewSettings, degradedCapabilityLedger, diagnoseClaudeExecutionFailure, diagnoseCodexExecutionFailure, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, prepareCodexReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, resolveTrustedReviewerExecutable, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 
@@ -10,7 +10,7 @@ const packageFixture = () => {
   value.manifestDigest = packageDigest(value);
   return value;
 };
-const view = { reviewPath: "/tmp/ai-skills-review-fixture/repository" };
+const view = { temporaryRoot: "/tmp/ai-skills-review-fixture", launchPath: "/tmp/ai-skills-review-fixture/review-session", reviewPath: "/tmp/ai-skills-review-fixture/review-session/repository" };
 
 test("review package injection rejects a pre-existing symlink without changing its target", () => {
   const temporary = fs.mkdtempSync("/tmp/review-package-injection-");
@@ -87,6 +87,30 @@ test("strict and degraded reviewer subprocesses receive only allowlisted operati
   assert.deepEqual(isolatedReviewerEnvironment("relative/home"), {});
 });
 
+test("Codex reviewer state copies only bounded authentication outside the neutral workspace", () => {
+  const temporary = fs.mkdtempSync("/tmp/codex-reviewer-state-");
+  const parentHome = `${temporary}/parent-home`;
+  const temporaryRoot = `${temporary}/view`;
+  const launchPath = `${temporaryRoot}/review-session`;
+  const reviewPath = `${launchPath}/repository`;
+  fs.mkdirSync(`${parentHome}/.codex/skills/fixture`, { recursive: true });
+  fs.mkdirSync(reviewPath, { recursive: true });
+  fs.writeFileSync(`${parentHome}/.codex/auth.json`, "fixture-auth\n", { mode: 0o600 });
+  fs.writeFileSync(`${parentHome}/.codex/config.toml`, "model = 'fixture'\n");
+  fs.writeFileSync(`${parentHome}/.codex/skills/fixture/SKILL.md`, "untrusted fixture\n");
+  try {
+    const prepared = prepareCodexReviewerEnvironment({ temporaryRoot, launchPath, reviewPath }, { HOME: parentHome });
+    assert.equal(prepared.available, true, JSON.stringify(prepared));
+    assert.equal(prepared.environment.HOME.startsWith(launchPath), false);
+    assert.equal(prepared.environment.CODEX_HOME.startsWith(launchPath), false);
+    assert.equal(fs.readFileSync(`${prepared.environment.CODEX_HOME}/auth.json`, "utf8"), "fixture-auth\n");
+    assert.equal(fs.existsSync(`${prepared.environment.CODEX_HOME}/config.toml`), false);
+    assert.equal(fs.existsSync(`${prepared.environment.CODEX_HOME}/skills`), false);
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
 test("Codex adapter uses a fresh read-only noninteractive transport without user configuration", () => {
   const invocation = buildCodexReviewInvocation({ view, schemaPath: "/tmp/result-schema.json", resultPath: "/tmp/result.json" });
   assert.equal(invocation.args[0], "exec");
@@ -95,6 +119,7 @@ test("Codex adapter uses a fresh read-only noninteractive transport without user
   assert.equal(invocation.args.includes("--sandbox"), false);
   assert.ok(invocation.args.includes("--ephemeral"));
   assert.ok(invocation.args.includes("--ignore-user-config"));
+  assert.ok(invocation.args.includes("--skip-git-repo-check"));
   const probe = probeCodexReviewAdapter();
   assert.equal(typeof probe.available, "boolean");
   if (probe.available) assert.equal(probe.capability.denied.delegatedMutation, true);
@@ -114,9 +139,29 @@ test("degraded Codex transport is explicitly reduced-assurance and scrubs mutati
   assert.ok(ledger.instructionConstrained.includes("githubMutation"));
 });
 
-test("Codex nested app-server denial receives a stable launcher-recovery code", () => {
+test("reviewer subprocess diagnostics expose only safe triage fields", () => {
   assert.equal(classifyCodexExecutionFailure({ stderr: "failed to initialize in-process app-server client: Operation not permitted" }), "independent-reviewer-nested-app-server-denied");
-  assert.equal(classifyCodexExecutionFailure({ stderr: "other failure" }), "independent-reviewer-codex-execution-unavailable");
+  assert.equal(classifyCodexExecutionFailure({ status: 1, stderr: "WARNING: could not create PATH aliases: Operation not permitted\nNot inside a trusted directory and --skip-git-repo-check was not specified." }), "independent-reviewer-codex-repository-trust-unavailable");
+  assert.equal(classifyCodexExecutionFailure({ stderr: "other failure" }), "independent-reviewer-codex-unclassified-runtime-failure");
+  assert.equal(classifyClaudeExecutionFailure({ stderr: "authentication failed" }), "independent-reviewer-claude-authentication-unavailable");
+  const cases = [
+    [diagnoseCodexExecutionFailure({ status: 1, stderr: "authentication token expired at /private/secret" }), "independent-reviewer-codex-authentication-unavailable", "authentication-unavailable", "reviewer-authentication"],
+    [diagnoseCodexExecutionFailure({ status: 126, stderr: "sandbox operation not permitted at /private/secret" }), "independent-reviewer-codex-sandbox-unavailable", "permission-denied", "reviewer-sandbox"],
+    [diagnoseCodexExecutionFailure({ status: 1, stderr: "WARNING: alias setup: Operation not permitted\nNot inside a trusted directory and --skip-git-repo-check was not specified." }), "independent-reviewer-codex-repository-trust-unavailable", "runtime-unavailable", "reviewer-working-directory"],
+    [diagnoseCodexExecutionFailure({ status: 1, stderr: "output-schema validation failed: /private/secret" }), "independent-reviewer-codex-output-contract-invalid", "output-contract-invalid", "reviewer-result-contract"],
+    [diagnoseClaudeExecutionFailure({ status: 1, stderr: "network connection timed out for token at /private/secret" }), "independent-reviewer-claude-network-unavailable", "network-unavailable", "reviewer-network"]
+  ];
+  for (const [diagnostic, code, category, subject] of cases) {
+    assert.deepEqual(Object.keys(diagnostic).sort(), ["category", "code", "exitCode", "operation", "safeMessage", "schemaVersion", "stage", "subject"]);
+    assert.equal(diagnostic.schemaVersion, 1);
+    assert.equal(diagnostic.code, code);
+    assert.equal(diagnostic.category, category);
+    assert.equal(diagnostic.subject, subject);
+    assert.equal(diagnostic.stage, "reviewer-execution");
+    assert.equal(diagnostic.exitCode, diagnostic.code.includes("sandbox") ? 126 : 1);
+    assert.equal(JSON.stringify(diagnostic).includes("/private/secret"), false);
+    assert.equal(JSON.stringify(diagnostic).includes("token expired"), false);
+  }
 });
 
 test("Codex parent transport builds only the fixed escalated host tool request and consumes its result", () => {
@@ -131,11 +176,11 @@ test("Codex parent transport builds only the fixed escalated host tool request a
     expectedRecovery: { hostScript: "scripts/sdd/review-launcher-host.mjs", launcherId: "codex-review-launcher", launcherKind: "codex-detached-read-only-v1" }
   };
   const temporary = fs.mkdtempSync("/tmp/codex-parent-transport-");
-  const reviewPath = `${temporary}/repository`;
-  fs.mkdirSync(reviewPath);
-  fs.mkdirSync(`${reviewPath}/schemas`);
+  const launchPath = `${temporary}/review-session`;
+  const reviewPath = `${launchPath}/repository`;
+  fs.mkdirSync(`${reviewPath}/schemas`, { recursive: true });
   fs.writeFileSync(`${reviewPath}/schemas/independent-review-findings-v1.schema.json`, "{}\n");
-  const viewForTransport = { kind: "archived-review-view-v1", reviewPath, temporaryRoot: temporary, headCommit: reviewPackage.headCommit, ownershipToken: "fixture" };
+  const viewForTransport = { kind: "archived-review-view-v1", launchPath, reviewPath, temporaryRoot: temporary, headCommit: reviewPackage.headCommit, ownershipToken: "fixture" };
   try {
     const written = writePreparedReviewHostRequest(prepared, temporary);
     assert.equal(written.available, true, JSON.stringify(written));
@@ -149,7 +194,8 @@ test("Codex parent transport builds only the fixed escalated host tool request a
     }, {
       createView: () => ({ available: true, view: viewForTransport }),
       rebuildPackage: () => ({ valid: true, package: reviewPackage }),
-      injectPackage: () => `${reviewPath}/.ai-independent-review-package.json`
+      injectPackage: () => `${reviewPath}/.ai-independent-review-package.json`,
+      prepareEnvironment: () => ({ available: true, environment: { HOME: `${temporary}/reviewer-home`, PATH: "/usr/bin", NO_COLOR: "1" } })
     });
     assert.equal(toolRequest.available, true, JSON.stringify(toolRequest));
     assert.equal(toolRequest.tool, "exec_command");
@@ -246,6 +292,128 @@ test("Codex parent transport builds only the fixed escalated host tool request a
   }
 });
 
+test("Codex parent strict transport binds a neutral view, pinned executable, result, and cleanup", () => {
+  const temporary = fs.mkdtempSync("/tmp/codex-parent-strict-");
+  const launchPath = `${temporary}/review-session`;
+  const reviewPath = `${launchPath}/repository`;
+  fs.mkdirSync(`${reviewPath}/schemas`, { recursive: true });
+  fs.writeFileSync(`${reviewPath}/schemas/independent-review-findings-v1.schema.json`, "{}\n");
+  const reviewPackage = packageFixture();
+  const executablePath = fs.realpathSync("/bin/echo");
+  const executableEntry = fs.statSync(executablePath);
+  const executableIdentity = { realPath: executablePath, device: executableEntry.dev, inode: executableEntry.ino, size: executableEntry.size, modifiedMs: executableEntry.mtimeMs };
+  const strictView = { kind: "archived-review-view-v1", launchPath, reviewPath, temporaryRoot: temporary, headCommit: reviewPackage.headCommit, ownershipToken: "fixture" };
+  try {
+    const callerSelectedExecutable = `${temporary}/codex`;
+    fs.copyFileSync("/bin/echo", callerSelectedExecutable);
+    fs.chmodSync(callerSelectedExecutable, 0o755);
+    const rejectedExecutable = buildCodexParentStrictReviewToolRequest({
+      reviewPackage,
+      repositoryPath: process.cwd(),
+      reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
+      implementerSession: "implementer-session",
+      attestationRef: "attestations/codex-read-only-v1.json",
+      executable: callerSelectedExecutable
+    });
+    assert.equal(rejectedExecutable.code, "independent-reviewer-codex-executable-identity-unavailable");
+    const toolRequest = buildCodexParentStrictReviewToolRequest({
+      reviewPackage,
+      repositoryPath: process.cwd(),
+      reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
+      implementerSession: "implementer-session",
+      attestationRef: "attestations/codex-read-only-v1.json"
+    }, {
+      createView: () => ({ available: true, view: strictView }),
+      rebuildPackage: () => ({ valid: true, package: reviewPackage }),
+      injectPackage: () => `${reviewPath}/.ai-independent-review-package.json`,
+      prepareEnvironment: () => ({ available: true, environment: { HOME: `${temporary}/reviewer-home`, CODEX_HOME: `${temporary}/reviewer-home/codex`, PATH: "/usr/bin", NO_COLOR: "1" } }),
+      pinExecutable: () => executableIdentity,
+      clock: () => "2026-08-15T04:00:00.000Z",
+      executionId: "strict-execution"
+    });
+    assert.equal(toolRequest.available, true, JSON.stringify(toolRequest));
+    assert.equal(toolRequest.transport, "codex-parent-strict-exec-tool-v1");
+    assert.equal(toolRequest.workingDirectory, launchPath);
+    assert.ok(toolRequest.arguments.includes(executablePath));
+    assert.ok(toolRequest.arguments.includes(launchPath));
+    assert.equal(toolRequest.arguments.includes(reviewPath), false, "Codex starts from the neutral parent rather than repository context");
+    const tampered = consumeCodexParentStrictReviewToolResult({ toolRequest: { ...toolRequest, workingDirectory: reviewPath }, toolResult: { exit_code: 0, output: "{}" } }, {
+      removeView: () => ({ removed: true }),
+      clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(tampered.code, "independent-reviewer-parent-strict-tool-receipt-invalid");
+    const tamperedResultPath = consumeCodexParentStrictReviewToolResult({
+      toolRequest: { ...toolRequest, runtimeState: { ...toolRequest.runtimeState, resultPath: `${temporary}/attacker-selected.json` } },
+      toolResult: { exit_code: 0, output: "{}" }
+    }, {
+      removeView: () => ({ removed: true }),
+      clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(tamperedResultPath.code, "independent-reviewer-parent-strict-tool-receipt-invalid");
+    const tamperedExpiration = consumeCodexParentStrictReviewToolResult({
+      toolRequest: { ...toolRequest, runtimeState: { ...toolRequest.runtimeState, expiresAt: "2026-08-16T04:00:00.000Z" } },
+      toolResult: { exit_code: 0, output: "{}" }
+    }, {
+      removeView: () => ({ removed: true }),
+      clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(tamperedExpiration.code, "independent-reviewer-parent-strict-tool-receipt-invalid");
+    const authenticationFailure = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 1, output: "authentication token expired at /private/secret" } }, {
+      removeView: () => ({ removed: true }),
+      verifyExecutable: () => true,
+      clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(authenticationFailure.code, "independent-reviewer-codex-authentication-unavailable");
+    assert.equal(JSON.stringify(authenticationFailure).includes("/private/secret"), false);
+    const changedExecutable = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
+      removeView: () => ({ removed: true }),
+      verifyExecutable: () => false,
+      clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(changedExecutable.code, "independent-reviewer-codex-executable-identity-changed");
+    fs.writeFileSync(toolRequest.runtimeState.resultPath, JSON.stringify({ schemaVersion: 1, findings: [], status: "passed" }));
+    const consumed = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
+      removeView: (received) => ({ removed: received === strictView }),
+      verifyExecutable: () => true,
+      clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(consumed.status, "passed", JSON.stringify(consumed));
+    assert.equal(consumed.result.assuranceLevel, "strict-isolated");
+    assert.equal(consumed.result.attestation.readOnly, true);
+    assert.equal(consumed.result.headCommit, reviewPackage.headCommit);
+    assert.equal(consumed.runtimeReceipt.outsideManagedSandbox, true);
+    assert.equal(consumed.runtimeReceipt.innerPermissionProfile, "sealed-review");
+    assert.equal(consumed.runtimeReceipt.repositoryContext, "neutral-parent");
+    assert.equal(consumed.cleanup.removed, true);
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test("Codex executable resolution continues past an invalid fixed candidate", () => {
+  const temporary = fs.realpathSync(fs.mkdtempSync("/tmp/codex-fixed-candidates-"));
+  const staleCandidate = `${temporary}/stale-codex`;
+  const validCandidate = `${temporary}/codex`;
+  fs.mkdirSync(staleCandidate);
+  fs.copyFileSync("/bin/echo", validCandidate);
+  fs.chmodSync(validCandidate, 0o755);
+  try {
+    const resolved = resolveTrustedReviewerExecutable("codex", "codex", {
+      locations: [
+        { candidatePath: staleCandidate, trustedRoot: temporary },
+        { candidatePath: validCandidate, trustedRoot: temporary }
+      ],
+      mutationCheck: () => true,
+      platformTrustCheck: () => ({ mechanism: "fixture-platform-trust-v1" })
+    });
+    assert.equal(resolved.candidatePath, validCandidate);
+    assert.equal(resolved.realPath, fs.realpathSync(validCandidate));
+    assert.equal(resolved.platformTrust.mechanism, "fixture-platform-trust-v1");
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
 test("Codex parent transport rejects unvalidated request paths and arbitrary payloads", () => {
   const invalid = buildCodexParentReviewHostToolRequest({
     prepared: { allowed: true, code: "review-launcher-external-host-required", hostRequest: { requestDigest: "a".repeat(64) }, expectedRecovery: { hostScript: "scripts/sdd/review-launcher-host.mjs" } },
@@ -278,6 +446,8 @@ test("Codex parent transport classifies owned final artifacts without retaining 
     assert.deepEqual(valid.payload, { schemaVersion: 1, findings: [], status: "passed" });
     assert.equal(valid.diagnostics.parse, "valid");
     assert.equal(valid.diagnostics.payload, "valid");
+    fs.writeFileSync(resultPath, JSON.stringify({ schemaVersion: 1, status: "failed", findings: [{ id: "line-suffix", severity: "warning", evidence: "scripts/example.mjs:12", recommendation: "use a file path" }] }));
+    assert.equal(inspectCodexReviewResultArtifact(resultPath).code, "review-launcher-codex-result-payload-invalid");
     fs.writeFileSync(resultPath, JSON.stringify({ schemaVersion: 1, status: "failed", findings: [{ id: "fixture-finding", severity: "high", evidence: "fixture evidence", recommendation: "fixture recommendation" }] }));
     assert.equal(inspectCodexReviewResultArtifact(resultPath).payload.status, "failed");
     fs.symlinkSync(resultPath, linkPath);
@@ -310,7 +480,8 @@ test("degraded adapter seals reviewer findings into parent-owned exact-package e
       attestationRef: "degraded-attestation",
       strictResult,
       degradedAuthorization: { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only" },
-      run
+      run,
+      prepareEnvironment: () => ({ available: true, environment: { HOME: temporary, PATH: "/usr/bin", NO_COLOR: "1" } })
     });
     assert.equal(output.status, "passed");
     assert.equal(output.result.assuranceLevel, "authorized-degraded");
@@ -350,6 +521,10 @@ test("Claude adapter uses a temporary strict sandbox configuration without inher
   assert.equal(invocation.args[invocation.args.indexOf("--setting-sources") + 1], "");
   assert.equal(invocation.args.includes("--bare"), false);
   assert.ok(invocation.args.includes("--no-session-persistence"));
+  assert.ok(invocation.args.includes("--allowed-tools"));
+  assert.equal(invocation.args[invocation.args.indexOf("--allowed-tools") + 1], "Read,Glob,Grep");
+  assert.match(invocation.args[invocation.args.indexOf("--disallowed-tools") + 1], /Bash/);
+  assert.equal("CLAUDE_CODE_SUBPROCESS_ENV_SCRUB" in invocation.environment, false);
   const probe = probeClaudeReviewAdapter();
   assert.equal(typeof probe.available, "boolean");
 });
@@ -388,9 +563,10 @@ test("degraded Claude adapter seals findings with Claude-specific reduced-assura
   assert.equal(output.result.attestation.readOnly, false);
 });
 
-test("Claude sandbox denial receives a stable launcher-recovery code", () => {
+test("Claude sandbox and authentication denial receive stable diagnostics", () => {
   assert.equal(classifyClaudeExecutionFailure({ stderr: "sandbox unavailable because failIfUnavailable was set" }), "independent-reviewer-claude-sandbox-unavailable");
-  assert.equal(classifyClaudeExecutionFailure({ stderr: "authentication failed" }), "independent-reviewer-claude-execution-unavailable");
+  assert.equal(classifyClaudeExecutionFailure({ stderr: "authentication failed" }), "independent-reviewer-claude-authentication-unavailable");
+  assert.equal(classifyClaudeExecutionFailure({ stderr: "Not logged in · Please run /login" }), "independent-reviewer-claude-authentication-unavailable");
 });
 
 test("unavailable transport output remains exact-head data and cannot claim isolation", () => {

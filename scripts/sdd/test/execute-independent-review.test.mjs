@@ -12,6 +12,10 @@ test("capability probe fails closed and executor accepts only a validated immuta
   const result = file("valid-result.json"); result.manifestDigest = reviewPackage.manifestDigest;
   const out = await executeIndependentReview({ package: reviewPackage, adapter, configuredReviewer: { type: "fixture", identity: "fresh-reviewer", attestation: { ref: "fixture-attestation" } }, implementerSession: "implementer", invoke: async () => result });
   assert.equal(out.status, "passed");
+  const unavailable = { ...result, status: "unavailable", unavailableCode: "fixture-runtime-unavailable", attestation: { ...result.attestation, nonInteractive: false, isolatedContext: false, freshContext: false, readOnly: false } };
+  const diagnostic = { schemaVersion: 1, stage: "reviewer-execution", operation: "fixture-strict-review", code: unavailable.unavailableCode, category: "runtime-unavailable", subject: "reviewer-executable", exitCode: 1, safeMessage: "Fixture runtime is unavailable." };
+  const diagnosticOut = await executeIndependentReview({ package: reviewPackage, adapter, configuredReviewer: { type: "fixture", identity: "fresh-reviewer", attestation: { ref: "fixture-attestation" } }, implementerSession: "implementer", invoke: async () => ({ status: "unavailable", result: unavailable, diagnostic }) });
+  assert.deepEqual(diagnosticOut.diagnostic, diagnostic);
   assert.equal((await executeIndependentReview({ package: reviewPackage, adapter: {}, invoke: async () => result })).status, "unavailable");
 });
 
@@ -176,7 +180,8 @@ test("production orchestration automatically consumes recoverable host requests"
     expiresAt: "2026-08-14T00:00:00.000Z",
     implementerSession: "implementer",
     degradedIndependentReview: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic exact fallback", fallbackBoundary: "fresh-separated-reviewer-only", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
-    reviewLauncher: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", boundary: "detached-exact-head-inner-read-only", launcherId: "codex-review-launcher", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest }
+    reviewLauncher: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", boundary: "detached-exact-head-inner-read-only", launcherId: "codex-review-launcher", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
+    reviewWorktreeLifecycle: { enabled: true, operation: "create-detached-review-worktree-v1", change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", repositoryPath: "/fixture", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest }
   };
   const launcherRecovery = {
     launcher: { id: "codex-review-launcher", kind: "codex-detached-read-only-v1", hostScript: "scripts/sdd/review-launcher-host.mjs", enabled: true, executable: "/opt/tools/codex", detachedView: true, innerReadOnlySandbox: true, ephemeral: true, sealedPackageOnly: true, credentialScrubbed: true, nonInteractive: true },
@@ -211,6 +216,7 @@ test("production orchestration automatically consumes recoverable host requests"
         launchId: prepared.hostRequest.launchId, requestDigest: prepared.hostRequest.requestDigest,
         launcherId: "codex-review-launcher", launcherKind: "codex-detached-read-only-v1",
         hostScript: "scripts/sdd/review-launcher-host.mjs", hostExecutionId: "host-runtime-execution",
+        worktreeLifecycle: { operation: prepared.expectedRecovery.worktreeLifecycle.operation, requestDigest: prepared.worktreeLifecycleRequest.requestDigest, expiresAt: prepared.expectedRecovery.worktreeLifecycle.expiresAt },
         result, launcherEvidence: prepared.expectedRecovery, cleanup: { removed: true }
       };
       return {

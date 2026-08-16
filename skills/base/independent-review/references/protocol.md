@@ -29,18 +29,58 @@ enables its OS sandbox, denies review-view writes and home reads, disables
 unsandboxed fallback, removes mutation tools, and fails if sandboxing is
 unavailable. Neither path changes ordinary user settings.
 
+The archive places the exact repository at `review-session/repository` and
+starts the reviewer from the neutral `review-session` parent. Repository
+AGENTS, skills, plugins, rules, and similar startup customization are therefore
+not discovered as execution instructions; the fixed prompt treats all content
+under `repository/` as review data. Codex uses sibling temporary state that
+copies only a bounded regular authentication artifact when present. It does
+not copy config, sessions, skills, plugins, or history, and the sealed command
+profile cannot read that sibling state.
+
 ### Outer-sandbox launcher recovery
 
+If the managed implementation sandbox denies the nested Codex app-server or
+sandbox, that denial describes the parent nesting boundary, not the child
+reviewer's isolation capability. Before recording durable strict
+unavailability, prepare a direct parent strict request with
+`buildCodexParentStrictReviewToolRequest`. The request binds the exact package,
+configured distinct reviewer, attestation, neutral working directory,
+canonical host-owned Codex executable identity and content hash from a fixed
+platform install location, an OS-backed signer or root-owned non-writable path
+policy, fixed arguments, start/expiry, and final artifact. Managed-sandbox
+write denial is defense in depth, not host-ownership proof. Caller-selected
+executable paths are ineligible. Invoke the returned argument vector only
+through the
+actual shell tool with `require_escalated`; never run repository code with that
+authority. The child still uses the sealed read-only permission profile, no
+command network, no inherited command environment, and ephemeral execution.
+Accept it only through `consumeCodexParentStrictReviewToolResult`, which
+rechecks the request digest, executable identity, expiration, structured
+artifact, canonical package/result bindings, and owned cleanup. The parent
+seals the findings into `strict-isolated` evidence; reviewer self-attestation
+alone is never trusted.
+
 If the managed implementation sandbox denies owned worktree creation, the
-nested Codex app-server, or Claude's strict sandbox, record the applicable
-stable unavailable code. A package-only same-session retry is not an acceptable
-substitute. The runner may invoke only the configured
+direct parent strict transport, or Claude's strict sandbox, record the
+applicable stable unavailable code. A package-only same-session retry is not
+an acceptable substitute. Only after strict unavailability is durable may the
+runner invoke the configured
 `codex-detached-read-only-v1` or `claude-detached-restricted-v1` launcher when
 the current change, transition, base, head, manifest, expiration, degraded
 authorization, launcher ID, runtime permission, and non-empty distinct
 implementer/reviewer identities all match. The implementer identity is sealed
 into the digest-bound request; missing identity or self-review fails before
 view creation and is rechecked before response acceptance.
+
+Detached-worktree recovery also requires its own exact lifecycle record. It
+binds the canonical repository, base/head/manifest, change and transition,
+expiry, and parent request digest. The host receives no destination or arbitrary
+Git arguments: it creates a runtime-owned temporary root, verifies the detached
+head, and returns request-bound safe JSON diagnostics. Cleanup requires the
+matching ownership marker and lifecycle digest; expiration never broadens
+authority, though it may still remove an already-owned view before returning
+unavailable evidence.
 
 The in-sandbox recovery controller validates authorization and emits only a
 digest-bound structured host request. It can safely materialize an exact-head
@@ -67,11 +107,14 @@ text. Every adapter probe
 and strict or degraded reviewer subprocess receives only allowlisted
 cross-platform operational environment variables and fixed adapter overrides,
 not the caller's ambient credential values or process-injection variables.
-Codex retains only the home/profile locations needed by its parent CLI for
-authentication, while a strict-config OS permission profile limits model-
-generated commands to minimal runtime paths and the archived workspace,
-disables tool network access, and inherits no parent environment. Claude uses
-an empty launcher-owned temporary home and isolated config/cache/data paths.
+Codex retains only isolated authentication state needed by its parent CLI,
+while a strict-config OS permission profile limits model-generated commands to
+minimal runtime paths and the archived workspace, disables tool network
+access, and inherits no parent environment. Claude uses an empty launcher-owned
+temporary home and isolated config/cache/data paths, declares its allowed tools
+explicitly as read/search-only, denies Bash, receives no ambient secret
+variables, and classifies an installed-runtime login refusal as authentication
+unavailability.
 The in-sandbox controller seals the request-bound normalized response and
 removes only its ownership-guarded view after the tool result returns.
 
@@ -92,6 +135,12 @@ recorded separately. The receipt names its real transport source and never uses
 a misleading trusted-runtime attestation. If permission, configuration, runtime receipt,
 detached setup, inner startup, result validation, or cleanup fails, return the
 stable terminal unavailable code and pause without a manual fallback.
+
+For strict Codex or Claude subprocess failure after view creation, retain a
+safe reviewer-process diagnostic with stage, operation, stable code, category,
+subject, and optional numeric exit code. Classify only allowlisted
+authentication, sandbox/permission, network, and output-contract failures;
+discard subprocess output, command arguments, paths, and environment values.
 
 ## Authorized Degraded Path
 
