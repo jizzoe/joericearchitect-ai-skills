@@ -338,7 +338,10 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       implementerSession: "implementer-session",
       attestationRef: "attestations/codex-read-only-v1.json"
     }, {
-      pinExecutable: () => null,
+      pinExecutable: (_executable, _expectedName, { preflight }) => {
+        preflight.failure = "managed-mutation-proof-unavailable";
+        return null;
+      },
       createView: () => { attemptedView = true; return { available: true, view: strictView }; }
     });
     assert.equal(unavailablePreflight.code, "independent-reviewer-codex-preflight-boundary-unavailable");
@@ -447,6 +450,80 @@ test("Codex executable resolution continues past an invalid fixed candidate", ()
     assert.equal(resolved.candidatePath, validCandidate);
     assert.equal(resolved.realPath, fs.realpathSync(validCandidate));
     assert.equal(resolved.platformTrust.mechanism, "fixture-platform-trust-v1");
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test("Codex strict preflight reserves boundary-unavailable for the managed mutation proof", () => {
+  const reviewPackage = packageFixture();
+  const request = () => ({
+    reviewPackage,
+    repositoryPath: process.cwd(),
+    reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
+    implementerSession: "implementer-session",
+    attestationRef: "attestations/codex-read-only-v1.json"
+  });
+  for (const failure of ["executable-identity-unavailable", "candidate-missing", "platform-trust-unavailable", "identity-unstable", undefined]) {
+    const outcome = buildCodexParentStrictReviewToolRequest(request(), {
+      pinExecutable: (_executable, _expectedName, { preflight }) => {
+        if (failure) preflight.failure = failure;
+        return null;
+      }
+    });
+    assert.equal(outcome.code, "independent-reviewer-codex-executable-identity-unavailable", failure);
+  }
+  const boundary = buildCodexParentStrictReviewToolRequest(request(), {
+    pinExecutable: (_executable, _expectedName, { preflight }) => {
+      preflight.failure = "managed-mutation-proof-unavailable";
+      return null;
+    }
+  });
+  assert.equal(boundary.code, "independent-reviewer-codex-preflight-boundary-unavailable");
+});
+
+test("Codex executable resolution classifies mutation denial separately from missing and failed trust", () => {
+  const temporary = fs.realpathSync(fs.mkdtempSync("/tmp/codex-preflight-classification-"));
+  const candidate = `${temporary}/codex`;
+  fs.copyFileSync("/bin/echo", candidate);
+  fs.chmodSync(candidate, 0o755);
+  try {
+    const mutationPreflight = {};
+    assert.equal(resolveTrustedReviewerExecutable("codex", "codex", {
+      locations: [{ candidatePath: candidate, trustedRoot: temporary }],
+      mutationCheck: () => false,
+      platformTrustCheck: () => ({ mechanism: "fixture-platform-trust-v1" }),
+      preflight: mutationPreflight
+    }), null);
+    assert.equal(mutationPreflight.failure, "managed-mutation-proof-unavailable");
+
+    const missingPreflight = {};
+    assert.equal(resolveTrustedReviewerExecutable("codex", "codex", {
+      locations: [{ candidatePath: `${temporary}/missing-codex`, trustedRoot: temporary }],
+      preflight: missingPreflight
+    }), null);
+    assert.equal(missingPreflight.failure, "executable-identity-unavailable");
+
+    const trustPreflight = {};
+    assert.equal(resolveTrustedReviewerExecutable("codex", "codex", {
+      locations: [{ candidatePath: candidate, trustedRoot: temporary }],
+      mutationCheck: () => true,
+      platformTrustCheck: () => null,
+      preflight: trustPreflight
+    }), null);
+    assert.equal(trustPreflight.failure, "executable-identity-unavailable");
+
+    const unstablePreflight = {};
+    assert.equal(resolveTrustedReviewerExecutable("codex", "codex", {
+      locations: [{ candidatePath: candidate, trustedRoot: temporary }],
+      mutationCheck: () => true,
+      platformTrustCheck: () => {
+        fs.writeFileSync(candidate, "changed");
+        return { mechanism: "fixture-platform-trust-v1" };
+      },
+      preflight: unstablePreflight
+    }), null);
+    assert.equal(unstablePreflight.failure, "executable-identity-unavailable");
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
   }

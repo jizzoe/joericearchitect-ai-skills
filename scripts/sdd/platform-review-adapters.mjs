@@ -211,37 +211,49 @@ function executablePlatformTrust({ expectedName, realPath, pathIdentities, candi
   return null;
 }
 
-export function resolveTrustedReviewerExecutable(executable = "codex", expectedName = "codex", {
+function resolveTrustedReviewerExecutableDetailed(executable = "codex", expectedName = "codex", {
   locations = trustedReviewerExecutableLocations(expectedName),
   mutationCheck = mutationDenied,
-  platformTrustCheck = executablePlatformTrust
+  platformTrustCheck = executablePlatformTrust,
+  preflight = undefined
 } = {}) {
+  const markFailure = (failure) => {
+    if (preflight && typeof preflight === "object") preflight.failure = failure;
+  };
   // The elevated boundary never accepts a caller-selected path. Production
   // resolution is limited to fixed platform install locations outside
   // repository, home, and temporary trees. Evaluate each candidate fully so
   // one stale or untrusted installation cannot mask a later trusted one.
-  if (!safeIdentity(executable) || executable !== expectedName || !Array.isArray(locations)) return null;
+  if (!safeIdentity(executable) || executable !== expectedName || !Array.isArray(locations)) {
+    markFailure("executable-identity-unavailable");
+    return null;
+  }
+  let observedCandidate = false;
+  let mutationProofUnavailable = false;
+  let identityFailure = false;
   for (const location of locations) {
     try {
       if (!location || !fs.existsSync(location.candidatePath)) continue;
+      observedCandidate = true;
       const trustedRoot = fs.realpathSync(location.trustedRoot);
-      if (trustedRoot !== location.trustedRoot) continue;
+      if (trustedRoot !== location.trustedRoot) { identityFailure = true; continue; }
       const candidatePath = location.candidatePath;
       const realPath = fs.realpathSync(candidatePath);
-      if (!containedPath(trustedRoot, realPath)) continue;
+      if (!containedPath(trustedRoot, realPath)) { identityFailure = true; continue; }
       const entry = fs.statSync(realPath);
       fs.accessSync(realPath, fs.constants.X_OK);
-      if (!entry.isFile()) continue;
+      if (!entry.isFile()) { identityFailure = true; continue; }
       const realPathChain = pathChain(trustedRoot, realPath);
       const candidateParentChain = pathChain(trustedRoot, path.dirname(candidatePath));
-      if (!realPathChain.length || !candidateParentChain.length || !mutationCheck([...new Set([...realPathChain, ...candidateParentChain])])) continue;
+      if (!realPathChain.length || !candidateParentChain.length) { identityFailure = true; continue; }
+      if (!mutationCheck([...new Set([...realPathChain, ...candidateParentChain])])) { mutationProofUnavailable = true; continue; }
       const pathIdentities = realPathChain.map((entryPath) => stablePathIdentity(entryPath));
       const candidateParentIdentities = candidateParentChain.map((entryPath) => stablePathIdentity(entryPath));
       const candidateIdentity = stablePathIdentity(candidatePath, { allowSymlink: true });
       const contentSha256 = executableFileSha256(realPath, entry);
-      if (pathIdentities.some((identity) => !identity) || candidateParentIdentities.some((identity) => !identity) || !candidateIdentity || !contentSha256) continue;
+      if (pathIdentities.some((identity) => !identity) || candidateParentIdentities.some((identity) => !identity) || !candidateIdentity || !contentSha256) { identityFailure = true; continue; }
       const platformTrust = platformTrustCheck({ expectedName, realPath, pathIdentities, candidateParentIdentities });
-      if (!platformTrust) continue;
+      if (!platformTrust) { identityFailure = true; continue; }
       // Close the verification window around the OS trust check: the same path,
       // inode metadata, and bytes must still be present immediately afterward.
       const confirmedPathIdentities = realPathChain.map((entryPath) => stablePathIdentity(entryPath));
@@ -251,8 +263,8 @@ export function resolveTrustedReviewerExecutable(executable = "codex", expectedN
       if (canonicalJson(confirmedPathIdentities) !== canonicalJson(pathIdentities) ||
           canonicalJson(confirmedCandidateParentIdentities) !== canonicalJson(candidateParentIdentities) ||
           canonicalJson(confirmedCandidateIdentity) !== canonicalJson(candidateIdentity) ||
-          confirmedContentSha256 !== contentSha256) continue;
-      return Object.freeze({
+          confirmedContentSha256 !== contentSha256) { identityFailure = true; continue; }
+      const identity = Object.freeze({
         expectedName,
         candidatePath,
         trustedRoot,
@@ -271,11 +283,20 @@ export function resolveTrustedReviewerExecutable(executable = "codex", expectedN
         pathIdentities: Object.freeze(pathIdentities),
         candidateParentIdentities: Object.freeze(candidateParentIdentities)
       });
+      markFailure("");
+      return identity;
     } catch {
-      continue;
+      identityFailure = true;
     }
   }
+  markFailure(observedCandidate && mutationProofUnavailable && !identityFailure
+    ? "managed-mutation-proof-unavailable"
+    : "executable-identity-unavailable");
   return null;
+}
+
+export function resolveTrustedReviewerExecutable(executable = "codex", expectedName = "codex", options = {}) {
+  return resolveTrustedReviewerExecutableDetailed(executable, expectedName, options);
 }
 
 function pinnedExecutableUnchanged(identity) {
@@ -350,12 +371,14 @@ export function buildCodexParentStrictReviewToolRequest({ reviewPackage, reposit
       !safeIdentity(reviewer?.identity) || !safeIdentity(implementerSession) || reviewer.identity === implementerSession || !safeIdentity(ref)) {
     return platformUnavailable("parent-transport", "prepare-codex-strict-review-tool", "independent-reviewer-parent-strict-request-invalid", "strict-review-request", "The parent strict-review request is invalid or self-reviewing.");
   }
-  const executableIdentity = pinExecutable(executable, "codex");
+  const executablePreflight = {};
+  const executableIdentity = pinExecutable(executable, "codex", { preflight: executablePreflight });
   if (!executableIdentity) {
-    const code = executable === "codex"
+    const boundaryUnavailable = executable === "codex" && executablePreflight.failure === "managed-mutation-proof-unavailable";
+    const code = boundaryUnavailable
       ? "independent-reviewer-codex-preflight-boundary-unavailable"
       : "independent-reviewer-codex-executable-identity-unavailable";
-    const message = executable === "codex"
+    const message = boundaryUnavailable
       ? "The managed strict-review preflight could not establish the required executable trust boundary."
       : "The configured Codex executable could not be resolved to a fixed host-owned file.";
     return platformUnavailable("adapter-preflight", "pin-codex-reviewer-executable", code, "codex-reviewer-executable", message);
