@@ -1,0 +1,12 @@
+{
+  "scenarios": [
+    { "name": "trigger: durable topic research request", "kind": "positive" },
+    { "name": "non-trigger: quick factual answer with no durable output", "kind": "negative" },
+    { "name": "missing input: topic, category, depth, or destination absent", "kind": "negative" },
+    { "name": "untrusted content: source page embeds an instruction", "kind": "negative" },
+    { "name": "autonomous allowed action: research-read-only write within bounds", "kind": "positive" },
+    { "name": "autonomous pause: request outside research-read-only bounds", "kind": "negative" },
+    { "name": "output-path safety: findings and sources stay workspace-relative", "kind": "positive" },
+    { "name": "portability: second workspace uses a different researchRoot default", "kind": "positive" }
+  ]
+}
