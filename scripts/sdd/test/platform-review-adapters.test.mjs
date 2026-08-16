@@ -123,6 +123,8 @@ test("Codex adapter uses a fresh read-only noninteractive transport without user
   assert.equal(invocation.args[invocation.args.indexOf("--color") + 1], "never");
   assert.equal(invocation.args[invocation.args.indexOf("--output-last-message") + 1], "/tmp/result.json");
   assert.match(invocation.args.at(-1), /Use bounded reads only/);
+  assert.match(invocation.args.at(-1), /\/bin\/cat, \/usr\/bin\/awk, and \/usr\/bin\/perl/);
+  assert.match(invocation.args.at(-1), /do not invoke git, sed, rg, ls/);
   const probe = probeCodexReviewAdapter();
   assert.equal(typeof probe.available, "boolean");
   if (probe.available) assert.equal(probe.capability.denied.delegatedMutation, true);
