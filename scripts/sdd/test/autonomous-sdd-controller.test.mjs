@@ -36,6 +36,9 @@ test("controller rejects expired, stale, and conflicting context", () => {
   const differentTarget = structuredClone(authorization);
   differentTarget.target = { kind: "change", entries: ["different-change"] };
   assert.notEqual(authorizationDigest(authorization), authorizationDigest(differentTarget));
+  const narrowedScope = structuredClone(authorization);
+  narrowedScope.allowedMutations = ["different-operation"];
+  assert.notEqual(authorizationDigest(authorization), authorizationDigest(narrowedScope));
 });
 
 test("every lifecycle entry resumes only the first incomplete controller phase", () => {

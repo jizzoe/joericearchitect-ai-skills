@@ -38,16 +38,7 @@ function safeContainedDestination(repositoryPath, checkpointPath) {
 }
 
 export function authorizationDigest(authorization) {
-  const source = {
-    schemaVersion: authorization?.schemaVersion,
-    target: authorization?.target,
-    mode: authorization?.mode,
-    qualityProfile: authorization?.qualityProfile,
-    authorizationProfile: authorization?.authorizationProfile,
-    independentReviewPolicy: authorization?.independentReviewPolicy,
-    expiresAt: authorization?.expiresAt
-  };
-  return crypto.createHash("sha256").update(JSON.stringify(canonical(source))).digest("hex");
+  return crypto.createHash("sha256").update(JSON.stringify(canonical(authorization))).digest("hex");
 }
 
 export function createControllerRecord({ authorization, repository, checkpointPath }) {
