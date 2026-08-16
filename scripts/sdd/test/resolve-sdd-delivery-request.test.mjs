@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolveSddDeliveryRequest, sddDeliveryRequestInputs } from "../resolve-sdd-delivery-request.mjs";
+import { resolveSddDeliveryRequest, resolveShipSddRequest, sddDeliveryRequestInputs } from "../resolve-sdd-delivery-request.mjs";
 
 const complete = {
   target: "add-research-and-planning-base-skills",
@@ -89,5 +89,24 @@ test("duration overflow returns a structured invalid-input clarification", () =>
     assert.equal(result.ready, false);
     assert.equal(result.classification, "invalid");
     assert.equal(result.issues[0].field, "expiration");
+  }
+});
+
+test("ship-sdd aliases preserve explicit target and only override duration", () => {
+  const prod = resolveShipSddRequest("ship-sdd complete-delivery prod", { goalStartedAt: started });
+  assert.equal(prod.ready, true);
+  assert.equal(prod.effectiveAuthorization.target.entries[0], "complete-delivery");
+  assert.equal(prod.effectiveAuthorization.qualityProfile, "production-rapid");
+  assert.equal(prod.effectiveAuthorization.independentReviewPolicy, "strict-only");
+  assert.equal(prod.effectiveAuthorization.expiresAt, "2026-08-13T16:00:00.000Z");
+  const prototype = resolveShipSddRequest("ship-sdd complete-delivery prototype 8h", { goalStartedAt: started });
+  assert.equal(prototype.ready, true);
+  assert.equal(prototype.effectiveAuthorization.qualityProfile, "prototype-rapid");
+  assert.equal(prototype.effectiveAuthorization.expiresAt, "2026-08-13T20:00:00.000Z");
+});
+
+test("ship-sdd rejects omitted targets and malformed aliases before selection", () => {
+  for (const value of ["ship-sdd prod", "ship-sdd target unknown", "apply target prod"]) {
+    assert.equal(resolveShipSddRequest(value, { goalStartedAt: started }).ready, false);
   }
 });

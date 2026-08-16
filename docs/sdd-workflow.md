@@ -27,6 +27,23 @@ Proposal and apply are separate authorization boundaries. A proposal creates
 planning artifacts only. Implementation begins only after an explicit apply
 request for a named change.
 
+## Autonomous Delivery Continuation
+
+Use `ship-sdd <change-or-ordered-queue> prod|prototype [duration]` only for a
+complete bounded delivery. The target is always explicit; `prod` resolves to a
+four-hour autonomous production-rapid strict-only `sdd-delivery` run, while
+`prototype` selects strict-first-degraded review. The controller records the
+normalized authorization and selected entry before lifecycle work, then resumes
+only the first incomplete evidenced phase. A bare generated Propose, Apply,
+Verify, Sync, or Archive action remains at its ordinary phase boundary.
+
+After Archive, exact owned-resource cleanup audits first and changes only clean,
+recorded, confirmed-delivered local worktrees and branches. Legacy, primary,
+locked, dirty, ambiguous, unregistered, or evidence-mismatched resources stay
+intact with a durable recovery classification. Missing credentials or runtime
+permission pause only the affected external transition; they never broaden
+authorization or permit a manual workaround.
+
 ## Prerequisites
 
 - Git.

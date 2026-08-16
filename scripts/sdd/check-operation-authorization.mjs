@@ -8,7 +8,7 @@ export const profileOperations = {
   "research-read-only": new Set(["read-source", "write-findings", "write-sources", "write-result", "notify-state"]),
   "local-implementation": new Set(["read-workspace", "local-edit", "run-test", "run-validation", "objective-correction", "write-result", "notify-state"]),
   "tracker-maintenance": new Set(["read-tracker", "backup-tracker", "upsert-allowlisted-record", "write-reconciliation-report", "write-result", "notify-state"]),
-  "sdd-delivery": new Set(["read-workspace", "run-test", "run-validation", "issue-create-or-update", "project-update", "draft-pr-create-or-update", "run-lifecycle-action", "write-result", "notify-state"])
+  "sdd-delivery": new Set(["read-workspace", "write-design-brief", "run-test", "run-validation", "issue-create-or-update", "project-update", "draft-pr-create-or-update", "run-lifecycle-action", "write-result", "notify-state"])
 };
 
 export const highImpactLifecycleActions = new Set(["merge-pr", "archive-change", "delete-merged-topic-branch"]);

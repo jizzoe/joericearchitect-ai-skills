@@ -11,7 +11,7 @@ const artifactOperations = new Set(["read", "created", "updated", "unchanged"]);
 const evidenceTypes = new Set(["command", "validation", "test", "review", "screenshot", "accessibility", "record", "other"]);
 const evidenceResults = new Set(["passed", "failed", "not-applicable", "informational"]);
 const nextActionKinds = new Set(["continue", "user-decision", "resume", "openspec-explore", "openspec-propose", "none"]);
-export const operationVocabulary = new Set(["read-source", "write-findings", "write-sources", "write-result", "read-workspace", "local-edit", "run-test", "run-validation", "objective-correction", "read-tracker", "backup-tracker", "upsert-allowlisted-record", "write-reconciliation-report", "issue-create-or-update", "project-update", "draft-pr-create-or-update", "run-lifecycle-action", "notify-state"]);
+export const operationVocabulary = new Set(["read-source", "write-findings", "write-sources", "write-result", "read-workspace", "local-edit", "write-design-brief", "run-test", "run-validation", "objective-correction", "read-tracker", "backup-tracker", "upsert-allowlisted-record", "write-reconciliation-report", "issue-create-or-update", "project-update", "draft-pr-create-or-update", "run-lifecycle-action", "notify-state"]);
 const secretPattern = /(password|secret|token|apikey|api[_-]?key|refresh[_-]?token|authorization|bearer\s+|oauth|otp|mfa|private[_-]?key)/i;
 
 function issue(code, subject, detail) {

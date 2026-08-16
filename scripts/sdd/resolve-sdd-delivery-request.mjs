@@ -6,6 +6,10 @@ const modes = ["autonomous", "interactive"];
 const qualityProfiles = ["production-rapid", "prototype-rapid"];
 const authorizationProfiles = ["sdd-delivery"];
 const reviewPolicies = ["strict-only", "strict-first-degraded"];
+const shorthandProfiles = Object.freeze({
+  prod: Object.freeze({ mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-only", expiration: "4h" }),
+  prototype: Object.freeze({ mode: "autonomous", qualityProfile: "prototype-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-first-degraded", expiration: "4h" })
+});
 
 export const sddDeliveryRequestInputs = Object.freeze([
   Object.freeze({
@@ -180,6 +184,20 @@ export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date
   });
 
   return { ready: true, classification: "resolved", issues: [], effectiveAuthorization };
+}
+
+export function resolveShipSddRequest(command, options = {}) {
+  if (typeof command !== "string") return resolveSddDeliveryRequest({}, options);
+  const parts = command.trim().split(/\s+/);
+  if (parts[0] !== "ship-sdd") {
+    return { ready: false, classification: "invalid", issues: [issue("invalid-delivery-request-input", "target", "expected ship-sdd")], clarification: "Use ship-sdd <change-or-ordered-queue> <prod|prototype> [duration]." };
+  }
+  const [_, target, alias, duration, ...extra] = parts;
+  const preset = shorthandProfiles[alias];
+  if (extra.length || !preset || !target) {
+    return { ready: false, classification: "invalid", issues: [issue("invalid-delivery-request-input", !target ? "target" : "qualityProfile")], clarification: "Use ship-sdd <change-or-ordered-queue> <prod|prototype> [duration]." };
+  }
+  return resolveSddDeliveryRequest({ target, ...preset, ...(duration ? { expiration: duration } : {}) }, options);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

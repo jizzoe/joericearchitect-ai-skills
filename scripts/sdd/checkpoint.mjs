@@ -100,6 +100,19 @@ function invalidCorrectionRecord(input) {
   return result.valid ? null : result.reason;
 }
 
+function invalidCleanupRecord(input) {
+  const entry = input.selectedEntry;
+  if (!entry || entry.cleanupRecords === undefined) return null;
+  if (!Array.isArray(entry.cleanupRecords)) return "selected-entry-invalid-cleanup-records";
+  const seen = new Set();
+  for (const record of entry.cleanupRecords) {
+    const key = `${record?.kind}:${record?.id}`;
+    if (!record || !["worktree", "branch"].includes(record.kind) || typeof record.id !== "string" || !record.id || seen.has(key) || record.entry !== entry.name || record.owned !== true || record.deliveryCurrent !== true) return "invalid-cleanup-record";
+    seen.add(key);
+  }
+  return null;
+}
+
 export function inspectCheckpoint(input) {
   const steps = input.steps ?? [];
   const recordIssue = invalidDerivedRecord(input);
@@ -112,6 +125,8 @@ export function inspectCheckpoint(input) {
   if (applyEvidenceIssue) return { classification: "human-decision", firstIncomplete: null, reason: applyEvidenceIssue };
   const correctionIssue = invalidCorrectionRecord(input);
   if (correctionIssue) return { classification: "human-decision", firstIncomplete: null, reason: correctionIssue };
+  const cleanupIssue = invalidCleanupRecord(input);
+  if (cleanupIssue) return { classification: "human-decision", firstIncomplete: null, reason: cleanupIssue };
 
   const conflict = steps.find((step) => step.durableConflict === true);
   if (conflict) {
