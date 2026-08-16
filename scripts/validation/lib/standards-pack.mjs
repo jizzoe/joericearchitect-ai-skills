@@ -7,13 +7,37 @@ const workspace = (value) => typeof value === "string" && value.length > 0 && !p
 const text = (value) => typeof value === "string" && value.trim().length > 0 && !secret.test(value);
 const only = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.has(key));
 const items = (value) => Array.isArray(value) ? value : [];
+const publicIpv4 = (octets) => !octets.some((part) => part > 255) && octets[0] !== 0 && octets[0] !== 10 && octets[0] !== 127 && !(octets[0] === 169 && octets[1] === 254) && !(octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) && !(octets[0] === 192 && octets[1] === 168);
+const ipv6Segments = (value) => {
+  if (!/^[0-9a-f:.]+$/i.test(value) || value.split("::").length > 2) return null;
+  const expanded = value.includes(".") ? value.replace(/((?:\d{1,3}\.){3}\d{1,3})$/, (matched) => {
+    const octets = matched.split(".").map(Number);
+    if (octets.length !== 4 || octets.some((part) => part > 255)) return "invalid";
+    return `${((octets[0] << 8) | octets[1]).toString(16)}:${((octets[2] << 8) | octets[3]).toString(16)}`;
+  }) : value;
+  if (expanded.includes("invalid")) return null;
+  const [left, right = ""] = expanded.split("::");
+  const head = left ? left.split(":") : [];
+  const tail = right ? right.split(":") : [];
+  const groups = expanded.includes("::") ? [...head, ...Array(8 - head.length - tail.length).fill("0"), ...tail] : head;
+  if (groups.length !== 8 || groups.some((group) => !/^[0-9a-f]{1,4}$/i.test(group))) return null;
+  return groups.map((group) => Number.parseInt(group, 16));
+};
+const publicIpv6 = (segments) => {
+  // A public source must be global-unicast, not merely syntactically valid.
+  if ((segments[0] & 0xe000) !== 0x2000) return false;
+  // IETF protocol, documentation, and other special-purpose allocations.
+  if ((segments[0] === 0x2001 && (segments[1] < 0x0200 || segments[1] === 0x0db8)) ||
+      (segments[0] === 0x3fff && (segments[1] & 0xfff0) === 0) || segments[0] === 0x5f00) return false;
+  return true;
+};
 const publicHost = (host) => {
   const value = host.toLowerCase().replace(/^\[|\]$/g, "");
-  if (value === "localhost" || value.endsWith(".localhost") || value === "::1" || value.startsWith("fe80:") || value.startsWith("fc") || value.startsWith("fd")) return false;
+  if (value === "localhost" || value.endsWith(".localhost")) return false;
   const ipv4 = value.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (!ipv4) return true;
-  const octets = ipv4.slice(1).map(Number);
-  return !octets.some((part) => part > 255) && octets[0] !== 0 && octets[0] !== 10 && octets[0] !== 127 && !(octets[0] === 169 && octets[1] === 254) && !(octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) && !(octets[0] === 192 && octets[1] === 168);
+  if (ipv4) return publicIpv4(ipv4.slice(1).map(Number));
+  const ipv6 = ipv6Segments(value);
+  return ipv6 ? publicIpv6(ipv6) : true;
 };
 const source = (value) => {
   if (typeof value !== "string" || !value || secret.test(value)) return false;

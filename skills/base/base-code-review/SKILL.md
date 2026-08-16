@@ -41,8 +41,9 @@ portability, configuration ownership, generated artifacts, unrelated changes,
 and UI accessibility, responsive layout, or interaction risk when applicable.
 Record every unreviewed applicable area as an evidence gap.
 When stack-standard coverage is claimed, consume the supplied validated
-selection record, report selected rule IDs and scoped overrides, and report a
-gap rather than claim coverage when the record is absent or invalid.
+selection record, report selected rule IDs, scoped overrides, and
+not-applicable classifications, and report a gap rather than claim coverage
+when the record is absent or invalid.
 
 ## Findings
 

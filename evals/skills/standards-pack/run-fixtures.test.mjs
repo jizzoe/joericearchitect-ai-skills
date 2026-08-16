@@ -31,6 +31,7 @@ test("valid selection records preserve precedence, override, exclusion, portabil
     assert.match(content, /validated\s+selection record/);
     assert.match(content, /standards-pack\.md/);
   }
+  assert.match(fs.readFileSync("skills/base/base-code-review/SKILL.md", "utf8"), /not-applicable classifications/);
   assert.match(fs.readFileSync("skills/base/base-verification-loop/SKILL.md", "utf8"), /not-applicable classifications/);
 });
 
@@ -59,6 +60,10 @@ test("unsafe and incomplete records fail closed", () => {
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://127.0.0.1/standard" }] }, "unsafe-source"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://192.168.1.5/standard" }] }, "unsafe-source"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://[::1]/standard" }] }, "unsafe-source"],
+    [{ ...valid, rules: [{ ...valid.rules[0], source: "https://[::]/standard" }] }, "unsafe-source"],
+    [{ ...valid, rules: [{ ...valid.rules[0], source: "https://[::ffff:127.0.0.1]/standard" }] }, "unsafe-source"],
+    [{ ...valid, rules: [{ ...valid.rules[0], source: "https://[ff02::1]/standard" }] }, "unsafe-source"],
+    [{ ...valid, rules: [{ ...valid.rules[0], source: "https://[2001:db8::1]/standard" }] }, "unsafe-source"],
     [{ ...valid, rules: { id: "not-an-array" } }, "missing-rules"],
     [{ ...valid, rules: [{ ...valid.rules[2], reason: "" }] }, "missing-not-applicable-reason"],
     [{ ...valid, rules: [{ ...valid.rules[0], scope: "" }] }, "unsafe-rule-scope"],

@@ -10,8 +10,8 @@ changes. When applicable, it MUST also evaluate mobile or web accessibility,
 responsive layout, and interaction risk, and MUST explicitly report review
 areas that were not applicable or lacked evidence. When stack standards are in
 scope, it MUST consume a validated standards selection record, report selected
-rules and scoped overrides, and report a gap rather than claim coverage when
-the record is absent or invalid.
+rules, scoped overrides, and not-applicable classifications, and report a gap
+rather than claim coverage when the record is absent or invalid.
 
 #### Scenario: Change has security and UI impact
 - **WHEN** the bounded scope includes untrusted input and user-interface changes
@@ -26,8 +26,8 @@ the record is absent or invalid.
 #### Scenario: Stack-standard review has valid selection
 - **WHEN** a bounded review requests stack-standard coverage with a valid
   selection record
-- **THEN** its result identifies selected rules and scoped overrides without
-  applying unselected-stack guidance
+- **THEN** its result identifies selected rules, scoped overrides, and
+  not-applicable classifications without applying unselected-stack guidance
 
 #### Scenario: Stack-standard review lacks selection
 - **WHEN** stack-standard coverage is requested without a valid selection record
