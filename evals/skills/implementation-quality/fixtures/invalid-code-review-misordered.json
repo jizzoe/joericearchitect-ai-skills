@@ -16,6 +16,7 @@
       { "id": "high", "severity": "high", "disposition": "objective-fix", "subject": "src/service.mjs", "evidenceIds": ["review-source"], "impact": "Material issue.", "recommendation": "Correct separately." }
     ],
     "coverage": [],
+    "standardsSelection": { "selectedRuleIds": [], "scopedOverrides": [], "notApplicableRuleIds": [] },
     "evidenceGaps": [],
     "scopeSummary": "Invalid ordering fixture."
   }

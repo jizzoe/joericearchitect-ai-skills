@@ -61,8 +61,10 @@ security, licensing, governance, data-ownership, or scope choices are
 ## Result
 
 Emit `skill-result-v1` with `skill: base-code-review`. Put reviewed scope,
-ordered findings, coverage, evidence gaps, and scope summary in `details` and
-reference the shared top-level evidence array by stable ID. Validate the result
+ordered findings, coverage, `standardsSelection`, evidence gaps, and scope
+summary in `details`; `standardsSelection` carries selected rule IDs, scoped
+overrides, and not-applicable rule IDs (or empty arrays when not requested).
+Reference the shared top-level evidence array by stable ID. Validate the result
 with `scripts/validation/validate-implementation-quality.mjs` before rendering
 Markdown. The report order is findings, evidence gaps, scope, summary, then
 next action.

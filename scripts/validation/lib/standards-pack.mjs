@@ -3,7 +3,7 @@ import path from "node:path";
 const classifications = new Set(["required", "recommended", "repository-selected", "not-applicable"]);
 const secret = /(password|secret|token|api[_-]?key|authorization|bearer|oauth|otp|mfa|private[_-]?key)/i;
 const id = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const workspace = (value) => typeof value === "string" && value.trim().length > 0 && !/[\x00-\x1f\x7f]/.test(value) && !path.posix.isAbsolute(value) && !path.win32.isAbsolute(value) && !value.split(/[\\/]/).includes("..");
+const workspace = (value) => typeof value === "string" && value.trim().length > 0 && !/[\x00-\x1f\x7f]/.test(value) && !/^[a-z]:/i.test(value) && !path.posix.isAbsolute(value) && !path.win32.isAbsolute(value) && !value.split(/[\\/]/).includes("..");
 const text = (value) => typeof value === "string" && value.trim().length > 0 && !secret.test(value);
 const only = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.has(key));
 const items = (value) => Array.isArray(value) ? value : [];

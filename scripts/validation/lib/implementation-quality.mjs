@@ -145,7 +145,7 @@ export function sortReviewFindings(findings = []) {
 function validateReviewDetails(result, issues) {
   const details = result.details;
   const subject = "result.details";
-  const keys = new Set(["reviewedScope", "findings", "coverage", "evidenceGaps", "scopeSummary"]);
+  const keys = new Set(["reviewedScope", "findings", "coverage", "standardsSelection", "evidenceGaps", "scopeSummary"]);
   if (!exactKeys(details, keys, subject, issues)) return;
   required(details, [...keys], subject, issues);
   const evidenceById = new Map((result.evidence ?? []).map((item) => [item.id, item]));
@@ -155,6 +155,20 @@ function validateReviewDetails(result, issues) {
     validateStringArray(details.reviewedScope.targets, `${subject}.reviewedScope.targets`, issues, { paths: true, nonEmptyArray: true });
     validateStringArray(details.reviewedScope.contextPaths, `${subject}.reviewedScope.contextPaths`, issues, { paths: true });
     validateEvidenceReferences(details.reviewedScope.evidenceIds, `${subject}.reviewedScope.evidenceIds`, evidenceById, issues);
+  }
+
+  if (exactKeys(details.standardsSelection, new Set(["selectedRuleIds", "scopedOverrides", "notApplicableRuleIds"]), `${subject}.standardsSelection`, issues)) {
+    required(details.standardsSelection, ["selectedRuleIds", "scopedOverrides", "notApplicableRuleIds"], `${subject}.standardsSelection`, issues);
+    validateStringArray(details.standardsSelection.selectedRuleIds, `${subject}.standardsSelection.selectedRuleIds`, issues);
+    validateStringArray(details.standardsSelection.notApplicableRuleIds, `${subject}.standardsSelection.notApplicableRuleIds`, issues);
+    if (!Array.isArray(details.standardsSelection.scopedOverrides)) issues.push(issue("invalid-array", `${subject}.standardsSelection.scopedOverrides`));
+    else details.standardsSelection.scopedOverrides.forEach((override, index) => {
+      const itemSubject = `${subject}.standardsSelection.scopedOverrides[${index}]`;
+      if (!exactKeys(override, new Set(["ruleId", "scope"]), itemSubject, issues)) return;
+      required(override, ["ruleId", "scope"], itemSubject, issues);
+      if (!nonEmpty(override.ruleId)) issues.push(issue("invalid-standards-rule-id", `${itemSubject}.ruleId`));
+      if (!workspacePath(override.scope)) issues.push(issue("unsafe-workspace-path", `${itemSubject}.scope`));
+    });
   }
 
   if (!Array.isArray(details.findings)) issues.push(issue("invalid-array", `${subject}.findings`));
