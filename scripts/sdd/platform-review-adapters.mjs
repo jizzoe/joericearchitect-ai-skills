@@ -246,7 +246,6 @@ function resolveTrustedReviewerExecutableDetailed(executable = "codex", expected
       const realPathChain = pathChain(trustedRoot, realPath);
       const candidateParentChain = pathChain(trustedRoot, path.dirname(candidatePath));
       if (!realPathChain.length || !candidateParentChain.length) { identityFailure = true; continue; }
-      if (!mutationCheck([...new Set([...realPathChain, ...candidateParentChain])])) { mutationProofUnavailable = true; continue; }
       const pathIdentities = realPathChain.map((entryPath) => stablePathIdentity(entryPath));
       const candidateParentIdentities = candidateParentChain.map((entryPath) => stablePathIdentity(entryPath));
       const candidateIdentity = stablePathIdentity(candidatePath, { allowSymlink: true });
@@ -264,6 +263,10 @@ function resolveTrustedReviewerExecutableDetailed(executable = "codex", expected
           canonicalJson(confirmedCandidateParentIdentities) !== canonicalJson(candidateParentIdentities) ||
           canonicalJson(confirmedCandidateIdentity) !== canonicalJson(candidateIdentity) ||
           confirmedContentSha256 !== contentSha256) { identityFailure = true; continue; }
+      // The special boundary diagnosis is safe only after this candidate has
+      // completed every other fixed-location, identity, and platform-trust
+      // check. A simultaneous trust failure must remain an identity failure.
+      if (!mutationCheck([...new Set([...realPathChain, ...candidateParentChain])])) { mutationProofUnavailable = true; continue; }
       const identity = Object.freeze({
         expectedName,
         candidatePath,

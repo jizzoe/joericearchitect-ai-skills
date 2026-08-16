@@ -35,3 +35,20 @@ mixed failures retain the executable-identity diagnostic. Focused deterministic
 coverage exercises both the production resolver classification and the parent
 strict-request mapping. A fresh exact-head strict review is required after this
 objective correction.
+
+## Follow-up strict review finding: combined trust failures
+
+- Review record: `strict-23903a11-6333-4f8f-b38f-20b4dd78b00d`
+- Reviewed head: `a5a807c448ce2d16b675320272ae7a522a42bb55`
+- Assurance: `strict-isolated`; the parent-owned final artifact was present,
+  schema-valid, and the owned view was removed.
+- Finding: objective fix. A candidate that failed both platform trust and the
+  mutation-denial check could be classified as a boundary-only failure because
+  mutation was checked too early.
+
+The resolver now completes identity, content-stability, and platform-trust
+checks before evaluating managed mutation denial. The dedicated boundary
+diagnostic can therefore occur only when every otherwise trusted candidate
+fails that proof alone. A regression fixture covers the combined trust and
+mutation failure. A fresh exact-head strict review is required after this
+objective correction.

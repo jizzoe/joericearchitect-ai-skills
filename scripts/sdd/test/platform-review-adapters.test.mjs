@@ -513,6 +513,15 @@ test("Codex executable resolution classifies mutation denial separately from mis
     }), null);
     assert.equal(trustPreflight.failure, "executable-identity-unavailable");
 
+    const combinedPreflight = {};
+    assert.equal(resolveTrustedReviewerExecutable("codex", "codex", {
+      locations: [{ candidatePath: candidate, trustedRoot: temporary }],
+      mutationCheck: () => false,
+      platformTrustCheck: () => null,
+      preflight: combinedPreflight
+    }), null);
+    assert.equal(combinedPreflight.failure, "executable-identity-unavailable");
+
     const unstablePreflight = {};
     assert.equal(resolveTrustedReviewerExecutable("codex", "codex", {
       locations: [{ candidatePath: candidate, trustedRoot: temporary }],
