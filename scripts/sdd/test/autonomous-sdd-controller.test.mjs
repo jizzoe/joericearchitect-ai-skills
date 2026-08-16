@@ -27,6 +27,9 @@ test("controller rejects expired, stale, and conflicting context", () => {
   const stale = structuredClone(created.record);
   stale.steps[0] = { id: "propose", status: "complete", evidence: { current: false } };
   assert.deepEqual(inspectControllerRecord(stale, { authorization, repository: "owner/repository", now: started }), { classification: "continue", reason: "controller-phase-stale", nextPhase: "propose" });
+  const refreshed = advanceControllerRecord(stale, "propose", { current: true, reference: "fresh-proposal" });
+  assert.equal(refreshed.valid, true);
+  assert.equal(inspectControllerRecord(refreshed.record, { authorization, repository: "owner/repository", now: started }).nextPhase, "planning-review");
   const forgedSelection = structuredClone(created.record);
   forgedSelection.selectedEntry = "different-change";
   assert.equal(inspectControllerRecord(forgedSelection, { authorization, repository: "owner/repository", now: started }).reason, "controller-context-conflict");

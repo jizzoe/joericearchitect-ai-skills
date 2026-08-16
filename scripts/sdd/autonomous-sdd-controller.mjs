@@ -92,7 +92,8 @@ export function inspectControllerRecord(record, { authorization, repository, now
 
 export function advanceControllerRecord(record, phase, evidence) {
   const index = phases.indexOf(phase);
-  if (index < 0 || record?.steps?.[index]?.status === "complete" || evidence?.current !== true) {
+  const existing = record?.steps?.[index];
+  if (index < 0 || evidence?.current !== true || (existing?.status === "complete" && existing.evidence?.current === true)) {
     return { valid: false, reason: "controller-phase-advance-invalid" };
   }
   if (record.steps.slice(0, index).some((step) => step.status !== "complete" || step.evidence?.current !== true)) {
