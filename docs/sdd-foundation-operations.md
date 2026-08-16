@@ -23,6 +23,14 @@ Use the lifecycle order:
 7. Archive the completed OpenSpec change.
 8. Confirm issue closure and Project `Done` convergence.
 
+For one complete authorized autonomous delivery, normalize a target-explicit
+`ship-sdd` request and persist the selected-entry controller record before the
+first lifecycle action. Reruns must reread that record and advance only the
+first incomplete evidenced checkpoint. Generated standalone lifecycle actions
+do not inherit this authority. After Archive convergence, use the exact-owned
+cleanup finalizer in audit, apply, or resume mode; never infer ownership or
+delete a dirty, legacy, primary, locked, or remote resource.
+
 ## Recovery
 
 - Re-read Git, GitHub issue/PR, Project, and OpenSpec state before resuming.
@@ -45,4 +53,3 @@ Use the lifecycle order:
 - Living specs live under `openspec/specs/<capability>/spec.md`.
 - Archive completed changes under `openspec/changes/archive/YYYY-MM-DD-<change>/`.
 - Sync and Archive are separate PR checkpoints.
-

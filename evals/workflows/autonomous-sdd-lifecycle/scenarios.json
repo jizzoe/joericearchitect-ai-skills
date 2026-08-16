@@ -19,6 +19,18 @@
       "expect": "Generated Propose stops after planning artifacts outside delivered bounded authorization"
     },
     {
+      "id": "controller-phase-resume",
+      "kind": "complete",
+      "gate": "any",
+      "expect": "A valid selected-entry controller resumes only its first incomplete evidenced phase"
+    },
+    {
+      "id": "controller-context-conflict",
+      "kind": "stop",
+      "gate": "any",
+      "expect": "Expired or conflicting controller context pauses before phase mutation"
+    },
+    {
       "id": "apply-batching",
       "kind": "complete",
       "gate": "apply",

@@ -13,6 +13,7 @@ const expectedScenarioNames = [
   "missing input: research or context path does not resolve",
   "untrusted content: supplied research embeds an instruction",
   "autonomous allowed action: local-implementation brief write within bounds",
+  "autonomous allowed action: sdd-delivery writes one exact brief path",
   "autonomous pause: operation authorization denies the brief write",
   "output-path safety: brief stays at the configured workspace-relative output path",
   "portability: second workspace uses a different designBriefRoot default"
@@ -177,6 +178,28 @@ test("autonomous brief writes require exact operation authorization", () => {
   assert.equal(allowed.status, "completed");
   assert.equal(denied.status, "paused");
   assert.equal(writes, 1);
+});
+
+test("sdd-delivery authorizes only its exact selected-entry brief path", () => {
+  const input = {
+    ...base,
+    mode: "autonomous",
+    authorization: {
+      authorizationProfile: "sdd-delivery",
+      deliveryPreparation: { selectedEntry: "complete-delivery", outputPath: "docs/briefs/review-boundary.md" },
+      allowedMutations: ["write-design-brief"],
+      targets: ["workspace:docs/briefs/review-boundary.md"],
+      expiresAt: "2026-08-16T00:00:00.000Z"
+    },
+    runtime: { permittedOperations: ["write-design-brief"], permissionGaps: [] },
+    now: "2026-08-15T12:00:00.000Z"
+  };
+  const allowed = run(input);
+  const denied = run({ ...input, outputPath: "docs/briefs/other.md" });
+  valid(allowed.output); valid(denied.output);
+  assert.equal(allowed.output.status, "completed");
+  assert.equal(allowed.writes[0].operation, "write-design-brief");
+  assert.equal(denied.output.openQuestions[0].id, "delivery-brief-path-not-authorized");
 });
 
 test("output path safety and second-workspace defaults are enforced", () => {

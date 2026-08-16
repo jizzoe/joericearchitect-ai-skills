@@ -20,9 +20,14 @@ published choices, and perform no selection or mutation.
 1. Inspect durable state: Git, OpenSpec active changes, tasks, issues,
    Projects, pull requests, living specs, archive paths, and current evidence.
 2. Select one change through the authorized queue or dependency-aware policy.
-3. Run OpenSpec Explore or Propose only when required by the selected state.
-4. Stop after Propose unless the delivered bounded runner and active
-   authorization permit Apply.
+3. Create or resume the versioned selected-entry controller record before a
+   lifecycle action. It binds normalized authorization, selected entry,
+   repository, expiry, checkpoint reference, and current phase; it contains no
+   credentials or standing approval.
+4. Run OpenSpec Explore or Propose only when required by the first incomplete
+   evidenced controller checkpoint. Generated phases retain their ordinary
+   boundary without a valid controller context; a valid context returns control
+   to this workflow for the next authorized checkpoint.
 5. Before Apply, run planning review for scope, non-goals, issue linkage,
    requirements, scenarios, design decisions, dependencies, security,
    recovery, attribution, portability, stable task IDs, task dependencies, and
@@ -60,6 +65,9 @@ published choices, and perform no selection or mutation.
    operations are proven reflected.
 11. Archive only after implementation and Sync are delivered and the archive
     move is content-preserving.
+12. Run exact owned-resource finalization only after Archive, issue, Project,
+    default-branch, and delivery evidence are current. Ineligible resources are
+    recorded with their recovery state and never inferred or removed.
 
 ## Required References
 

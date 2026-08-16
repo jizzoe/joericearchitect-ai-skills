@@ -603,8 +603,14 @@ export function executeDesignBriefFromResearch(input = {}, { readArtifact, write
     ? path.posix.join(input.config.defaults.designBriefRoot, `${input.briefSlug}.md`) : null);
   if (!safeWorkspacePath(outputPath)) return gap(skill, mode, "paused", "missing-output", "Provide a safe workspace-relative brief output path.");
   if (typeof writeArtifact !== "function") return gap(skill, mode, "paused", "missing-writer", "Provide a bounded artifact writer.");
-  const operations = [{ operation: "local-edit", path: outputPath, target: `workspace:${outputPath}`, contentKind: "design-brief", content: designBriefContent(input, resolvedResearch.artifacts, resolvedContext.artifacts) }];
-  const checks = authorize(input, "local-implementation", operations);
+  const deliveryPreparation = input.authorization?.authorizationProfile === "sdd-delivery" ? input.authorization.deliveryPreparation : null;
+  if (mode === "autonomous" && input.authorization?.authorizationProfile === "sdd-delivery" &&
+      (!deliveryPreparation || !slugs.test(deliveryPreparation.selectedEntry ?? "") || deliveryPreparation.outputPath !== outputPath)) {
+    return gap(skill, mode, "paused", "delivery-brief-path-not-authorized", "Provide one exact selected-entry design-brief output path in the delivery authorization.");
+  }
+  const deliveryScoped = mode === "autonomous" && deliveryPreparation;
+  const operations = [{ operation: deliveryScoped ? "write-design-brief" : "local-edit", path: outputPath, target: `workspace:${outputPath}`, contentKind: "design-brief", content: designBriefContent(input, resolvedResearch.artifacts, resolvedContext.artifacts) }];
+  const checks = authorize(input, deliveryScoped ? "sdd-delivery" : "local-implementation", operations);
   if (checks.some((check) => check.allowed !== true)) return pauseForAuthorization(skill, mode, checks);
   const writeResult = performWrites(operations, writeArtifact);
   if (writeResult.error) return gap(skill, mode, "paused", "artifact-write-failed", writeResult.error);
@@ -613,7 +619,7 @@ export function executeDesignBriefFromResearch(input = {}, { readArtifact, write
     evidence: [
       { id: "input-validation", type: "validation", subject: "resolved research and context content", result: "passed" },
       { id: "source-boundary", type: "validation", subject: "research content treated as untrusted data", result: "passed" },
-      ...(mode === "autonomous" ? [{ id: "operation-authorization", type: "validation", subject: "local-implementation brief write", result: "passed" }] : [])
+      ...(mode === "autonomous" ? [{ id: "operation-authorization", type: "validation", subject: deliveryScoped ? "sdd-delivery exact brief write" : "local-implementation brief write", result: "passed" }] : [])
     ],
     nextAction: { kind: input.recommendedNextAction === "openspec-propose" ? "openspec-propose" : "openspec-explore", description: "Review the brief before starting the recommended OpenSpec action." },
     details: { sections: 7, openspecArtifactsCreated: false, recommendationConfirmedAsDecision: input.ownerDecisionConfirmed === true }

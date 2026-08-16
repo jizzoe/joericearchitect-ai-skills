@@ -14,7 +14,7 @@ test("lifecycle scenarios cover required gates and outcomes", () => {
     assert.equal(gates.has(gate), true, `missing ${gate} gate`);
   }
 
-  for (const id of ["delivery-request-preflight-gap", "independent-review-rereview", "independent-review-unavailable", "degraded-review-launcher-recovery"]) {
+  for (const id of ["delivery-request-preflight-gap", "controller-phase-resume", "controller-context-conflict", "independent-review-rereview", "independent-review-unavailable", "degraded-review-launcher-recovery"]) {
     assert.equal(scenarios.some((scenario) => scenario.id === id), true, `missing ${id} scenario`);
   }
 

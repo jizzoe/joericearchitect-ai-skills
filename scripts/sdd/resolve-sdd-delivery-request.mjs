@@ -6,6 +6,10 @@ const modes = ["autonomous", "interactive"];
 const qualityProfiles = ["production-rapid", "prototype-rapid"];
 const authorizationProfiles = ["sdd-delivery"];
 const reviewPolicies = ["strict-only", "strict-first-degraded"];
+const shorthandProfiles = Object.freeze({
+  prod: Object.freeze({ mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-only", expiration: "4h" }),
+  prototype: Object.freeze({ mode: "autonomous", qualityProfile: "prototype-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-first-degraded", expiration: "4h" })
+});
 
 export const sddDeliveryRequestInputs = Object.freeze([
   Object.freeze({
@@ -168,6 +172,16 @@ export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date
         "deployment", "release", "credential-or-scope-change", "external-message", "unrelated-mutation"
       ])
     }),
+    deliveryPreparation: Object.freeze({
+      selectedEntry: target.entries[0],
+      outputPath: `ai-planning/design-briefs/${target.entries[0]}.md`
+    }),
+    allowedMutations: Object.freeze([
+      "read-workspace", "write-design-brief", "run-test", "run-validation",
+      "issue-create-or-update", "project-update", "draft-pr-create-or-update",
+      "run-lifecycle-action", "write-result", "notify-state"
+    ]),
+    targets: Object.freeze([`workspace:ai-planning/design-briefs/${target.entries[0]}.md`]),
     review: Object.freeze({
       strictFirst: true,
       degradedFallbackAuthorized: degraded,
@@ -180,6 +194,21 @@ export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date
   });
 
   return { ready: true, classification: "resolved", issues: [], effectiveAuthorization };
+}
+
+export function resolveShipSddRequest(command, options = {}) {
+  if (typeof command !== "string") return resolveSddDeliveryRequest({}, options);
+  const match = command.trim().match(/^ship-sdd\s+(\[[^\]]+\]|\S+)\s+(prod|prototype)(?:\s+(\S+))?$/);
+  if (!match) {
+    return { ready: false, classification: "invalid", issues: [issue("invalid-delivery-request-input", "target", "expected ship-sdd")], clarification: "Use ship-sdd <change-or-ordered-queue> <prod|prototype> [duration]." };
+  }
+  const [, rawTarget, alias, duration] = match;
+  const target = rawTarget.startsWith("[") ? rawTarget.slice(1, -1).split(",").map((entry) => entry.trim()) : rawTarget;
+  const preset = shorthandProfiles[alias];
+  if (!preset || !target) {
+    return { ready: false, classification: "invalid", issues: [issue("invalid-delivery-request-input", !target ? "target" : "qualityProfile")], clarification: "Use ship-sdd <change-or-ordered-queue> <prod|prototype> [duration]." };
+  }
+  return resolveSddDeliveryRequest({ target, ...preset, ...(duration ? { expiration: duration } : {}) }, options);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -24,6 +24,26 @@ const REQUIRED_ADAPTERS = [
     phrases: ["canonical autonomous SDD lifecycle", "must not duplicate"]
   },
   {
+    adapter: ".claude/skills/autonomous-sdd-delivery/SKILL.md",
+    canonical: "skills/base/autonomous-sdd-delivery/SKILL.md",
+    phrases: ["canonical instructions", "must not duplicate canonical"]
+  },
+  {
+    adapter: ".agents/skills/autonomous-sdd-delivery/SKILL.md",
+    canonical: "skills/base/autonomous-sdd-delivery/SKILL.md",
+    phrases: ["canonical instructions", "must not duplicate canonical"]
+  },
+  {
+    adapter: ".claude/skills/sdd-workspace-cleanup/SKILL.md",
+    canonical: "skills/base/sdd-workspace-cleanup/SKILL.md",
+    phrases: ["canonical instructions", "must not duplicate canonical"]
+  },
+  {
+    adapter: ".agents/skills/sdd-workspace-cleanup/SKILL.md",
+    canonical: "skills/base/sdd-workspace-cleanup/SKILL.md",
+    phrases: ["canonical instructions", "must not duplicate canonical"]
+  },
+  {
     adapter: ".claude/skills/independent-review/SKILL.md",
     canonical: "skills/base/independent-review/SKILL.md",
     phrases: ["canonical instructions", "must not duplicate"]
