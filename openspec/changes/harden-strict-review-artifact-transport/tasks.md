@@ -34,7 +34,7 @@
 
 - [x] 4.1 Run the focused independent-review, adapter, and regression suites;
   record commands and passing results in durable change evidence.
-- [ ] 4.2 Run a bounded live strict Codex acceptance probe for the configured
+- [x] 4.2 Run a bounded live strict Codex acceptance probe for the configured
   signed executable and record only normalized success or safe unavailability
   evidence.
 - [x] 4.3 Run `node --test`, `openspec validate --all --strict`, whitespace,

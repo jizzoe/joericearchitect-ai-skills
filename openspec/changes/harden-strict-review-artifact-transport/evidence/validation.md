@@ -2,9 +2,9 @@
 
 ## Deterministic checks
 
-- `node --test scripts/sdd/test/platform-review-adapters.test.mjs`: 22 passed,
+- `node --test scripts/sdd/test/platform-review-adapters.test.mjs`: 24 passed,
   0 failed.
-- `node --test`: 304 passed, 0 failed.
+- `node --test`: 306 passed, 0 failed.
 - `openspec validate --all --strict`: 28 passed, 0 failed.
 
 ## Scope and safety review
