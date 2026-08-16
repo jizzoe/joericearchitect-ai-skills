@@ -10,6 +10,10 @@ change. Read [review contract](references/review-contract.md) before producing a
 result and use [evaluation matrix](references/evaluation-matrix.md) when
 evaluating or changing the skill itself.
 
+For claimed stack-standard coverage, also read the shared
+[standards-pack selection](../_shared/standards-pack.md) and
+[context-management policy](../_shared/context-management.md).
+
 ## Required Inputs
 
 Require the target repository or workspace, bounded changed paths or diff,
@@ -36,6 +40,9 @@ data, authorization, untrusted input, dependencies and supply chain,
 portability, configuration ownership, generated artifacts, unrelated changes,
 and UI accessibility, responsive layout, or interaction risk when applicable.
 Record every unreviewed applicable area as an evidence gap.
+When stack-standard coverage is claimed, consume the supplied validated
+selection record, report selected rule IDs and scoped overrides, and report a
+gap rather than claim coverage when the record is absent or invalid.
 
 ## Findings
 

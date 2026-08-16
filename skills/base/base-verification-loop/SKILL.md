@@ -29,6 +29,12 @@ caller-reported counts must match and cannot reset the budget.
 
 ## Required Loop
 
+For claimed stack-standard coverage, read the shared
+[standards-pack selection](../_shared/standards-pack.md) and
+[context-management policy](../_shared/context-management.md). Use only the
+validated selection record and repository-declared command evidence; absent
+selection or tooling is a gap, never an invented command or passing claim.
+
 1. Bind the behavior, acceptance evidence, target paths, mode, profile, and
    authorization.
 2. Identify the smallest reproduction or critical path.
