@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: harden-strict-review-artifact-transport
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 104
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/104
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - openspec/changes/harden-strict-review-artifact-transport/
