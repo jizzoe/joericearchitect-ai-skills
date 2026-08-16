@@ -3,11 +3,23 @@ import path from "node:path";
 const classifications = new Set(["required", "recommended", "repository-selected", "not-applicable"]);
 const secret = /(password|secret|token|api[_-]?key|authorization|bearer|oauth|otp|mfa|private[_-]?key)/i;
 const id = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const workspace = (value) => typeof value === "string" && value.length > 0 && !path.posix.isAbsolute(value) && !path.win32.isAbsolute(value) && !value.split(/[\\/]/).includes("..");
+const workspace = (value) => typeof value === "string" && value.trim().length > 0 && !/[\x00-\x1f\x7f]/.test(value) && !path.posix.isAbsolute(value) && !path.win32.isAbsolute(value) && !value.split(/[\\/]/).includes("..");
 const text = (value) => typeof value === "string" && value.trim().length > 0 && !secret.test(value);
 const only = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.has(key));
 const items = (value) => Array.isArray(value) ? value : [];
-const publicIpv4 = (octets) => !octets.some((part) => part > 255) && octets[0] !== 0 && octets[0] !== 10 && octets[0] !== 127 && !(octets[0] === 169 && octets[1] === 254) && !(octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) && !(octets[0] === 192 && octets[1] === 168);
+const publicIpv4 = (octets) => {
+  if (octets.some((part) => part > 255) || octets[0] === 0 || octets[0] === 10 || octets[0] === 127 || octets[0] >= 224) return false;
+  if ((octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127) ||
+      (octets[0] === 169 && octets[1] === 254) ||
+      (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
+      (octets[0] === 192 && octets[1] === 168) ||
+      (octets[0] === 192 && octets[1] === 0 && octets[2] === 0) ||
+      (octets[0] === 192 && octets[1] === 0 && octets[2] === 2) ||
+      (octets[0] === 198 && (octets[1] === 18 || octets[1] === 19)) ||
+      (octets[0] === 198 && octets[1] === 51 && octets[2] === 100) ||
+      (octets[0] === 203 && octets[1] === 0 && octets[2] === 113)) return false;
+  return true;
+};
 const ipv6Segments = (value) => {
   if (!/^[0-9a-f:.]+$/i.test(value) || value.split("::").length > 2) return null;
   const expanded = value.includes(".") ? value.replace(/((?:\d{1,3}\.){3}\d{1,3})$/, (matched) => {
