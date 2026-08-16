@@ -350,6 +350,13 @@ function strictParentUnavailable(diagnostic, cleanup, additional = {}) {
   };
 }
 
+function strictArtifactReceiptDiagnostics(inspected) {
+  return {
+    artifactReceipt: inspected?.available === true ? "valid" : inspected?.diagnostic?.code ?? "unavailable",
+    ...(inspected?.diagnostics ? { artifactDiagnostics: inspected.diagnostics } : {})
+  };
+}
+
 /**
  * Prepare a fixed outer tool invocation for a strict Codex reviewer. The
  * parent boundary grants only process startup; the launched Codex process
@@ -526,12 +533,15 @@ export function consumeCodexParentStrictReviewToolResult({ toolRequest, toolResu
     const diagnostic = createReviewDiagnostic({ stage: "parent-transport", operation: "verify-codex-reviewer-executable", code: "independent-reviewer-codex-executable-identity-changed", category: "verification-failed", subject: "codex-reviewer-executable", safeMessage: "The configured Codex executable changed after the strict request was prepared." });
     return strictParentUnavailable(diagnostic, cleanup);
   }
+  // Always inspect the sealed artifact before cleanup. A process failure does
+  // not make a missing, malformed, or unexpectedly valid final artifact
+  // irrelevant to the transport diagnosis.
+  const inspected = inspectResult(state.resultPath);
   if (toolResult?.exit_code !== 0) {
     const diagnostic = diagnoseCodexExecutionFailure({ status: toolResult?.exit_code, stderr: toolResult?.output ?? "" }, { resultMissing: true });
     const cleanup = cleanupView();
-    return strictParentUnavailable(diagnostic, cleanup);
+    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: strictArtifactReceiptDiagnostics(inspected) });
   }
-  const inspected = inspectResult(state.resultPath);
   if (!inspected?.available) {
     const cleanup = cleanupView();
     return strictParentUnavailable(inspected.diagnostic, cleanup, { diagnostics: inspected.diagnostics });

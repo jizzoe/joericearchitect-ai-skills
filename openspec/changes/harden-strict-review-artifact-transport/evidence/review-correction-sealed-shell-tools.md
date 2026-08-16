@@ -67,3 +67,20 @@ decodes quoted list values before deciding whether they are YAML mappings. The
 regression test round-trips colon-bearing, boolean-looking, numeric-looking,
 quoted, and backslash-containing path values.
 A fresh exact-head strict review is required after this objective correction.
+
+## Follow-up strict review finding: nonzero process receipt
+
+- Review record: `strict-ff1ebcd9-6839-483e-9d77-55ffac331560`
+- Reviewed head: `2bee1a39a7d897586ce6e29f2de2ee7919b5c83e`
+- Assurance: `strict-isolated`; the parent-owned final artifact was present,
+  schema-valid, and the owned view was removed.
+- Finding: objective fix. A nonzero Codex process result returned before
+  inspecting the configured artifact path, so the artifact receipt state was
+  not recorded.
+
+The strict consumer now inspects the sealed final-artifact path before cleanup
+for every completed process. A nonzero process preserves its safe execution
+diagnostic while recording whether the artifact was valid, missing, or another
+artifact-invalid state. Regression coverage verifies both absent and valid
+artifacts accompanying a nonzero exit. A fresh exact-head strict review is
+required after this objective correction.

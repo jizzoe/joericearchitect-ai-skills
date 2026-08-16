@@ -406,6 +406,15 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
     });
     assert.equal(authenticationFailure.code, "independent-reviewer-codex-authentication-unavailable");
     assert.equal(JSON.stringify(authenticationFailure).includes("/private/secret"), false);
+    assert.equal(authenticationFailure.diagnostics.artifactReceipt, "review-launcher-codex-result-artifact-missing");
+    const nonzeroWithArtifact = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 1, output: "authentication failed" } }, {
+      removeView: () => ({ removed: true }),
+      verifyExecutable: () => true,
+      inspectResult: () => ({ available: true, diagnostics: { resultArtifactPresent: true, parse: "valid", payload: "valid" } }),
+      clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(nonzeroWithArtifact.code, "independent-reviewer-codex-authentication-unavailable");
+    assert.equal(nonzeroWithArtifact.diagnostics.artifactReceipt, "valid");
     const changedExecutable = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
       removeView: () => ({ removed: true }),
       verifyExecutable: () => false,
