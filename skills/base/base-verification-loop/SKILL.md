@@ -34,6 +34,8 @@ For claimed stack-standard coverage, read the shared
 [context-management policy](../_shared/context-management.md). Use only the
 validated selection record and repository-declared command evidence; absent
 selection or tooling is a gap, never an invented command or passing claim.
+Report selected rule IDs, scoped overrides, not-applicable classifications, and
+role-specific evidence gaps in the verification result.
 
 1. Bind the behavior, acceptance evidence, target paths, mode, profile, and
    authorization.

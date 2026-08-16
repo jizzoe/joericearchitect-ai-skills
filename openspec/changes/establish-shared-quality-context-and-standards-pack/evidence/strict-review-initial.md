@@ -24,3 +24,9 @@ The strict review of corrected commit
 `strict-0da4604b-91a5-4cce-8978-34c99ce79904`, found malformed collection,
 referential-integrity, and private-host validation gaps. Its archive cleanup
 succeeded; those findings are disposed in the next correction record.
+
+The strict review of corrected commit
+`bb309c07f54f938acbf0efa1efa3c56101553fcb`, record
+`strict-02dd1adc-5125-41fd-8a36-efd6b5b72a06`, found verification result
+metadata and deterministic CLI-error handling gaps. Its archive cleanup
+succeeded; those findings are disposed in the next correction record.

@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { validateStandardsPack } from "../../../scripts/validation/lib/standards-pack.mjs";
 
@@ -28,6 +31,21 @@ test("valid selection records preserve precedence, override, exclusion, portabil
     assert.match(content, /validated\s+selection record/);
     assert.match(content, /standards-pack\.md/);
   }
+  assert.match(fs.readFileSync("skills/base/base-verification-loop/SKILL.md", "utf8"), /not-applicable classifications/);
+});
+
+test("CLI returns structured failures for unreadable and malformed input", () => {
+  const missing = spawnSync(process.execPath, ["scripts/validation/validate-standards-pack.mjs", "missing-record.json"], { encoding: "utf8" });
+  assert.equal(missing.status, 1);
+  assert.deepEqual(JSON.parse(missing.stdout), { valid: false, issues: [{ code: "invalid-input" }] });
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "standards-pack-fixture-"));
+  const malformed = path.join(root, "record.json");
+  try {
+    fs.writeFileSync(malformed, "{");
+    const result = spawnSync(process.execPath, ["scripts/validation/validate-standards-pack.mjs", malformed], { encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.deepEqual(JSON.parse(result.stdout), { valid: false, issues: [{ code: "invalid-input" }] });
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
 test("unsafe and incomplete records fail closed", () => {
