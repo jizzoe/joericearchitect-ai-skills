@@ -398,10 +398,12 @@ function missingCandidateField(candidate) {
   if (!slugs.test(candidate.name ?? "")) return "name";
   for (const field of ["outcome", "scope", "nonGoals", "firstAction"]) if (!nonEmpty(candidate[field])) return field;
   if (!deliveryProfiles.has(candidate.deliveryProfile)) return "deliveryProfile";
-  for (const field of ["acceptanceEvidence", "sharedResourceHazards", "parallelWork", "evalNeeds", "guardrailNeeds"]) {
-    if (!Array.isArray(candidate[field]) || candidate[field].length === 0 || !candidate[field].every(nonEmpty)) return field;
+  if (!Array.isArray(candidate.acceptanceEvidence) || candidate.acceptanceEvidence.length === 0 ||
+      !candidate.acceptanceEvidence.every(nonEmpty)) return "acceptanceEvidence";
+  for (const field of ["sharedResourceHazards", "parallelWork", "evalNeeds", "guardrailNeeds"]) {
+    if (!Array.isArray(candidate[field]) || !candidate[field].every(nonEmpty)) return field;
   }
-  if (!Array.isArray(candidate.dependencies) || candidate.dependencies.length === 0 || candidate.dependencies.some((dependency) =>
+  if (!Array.isArray(candidate.dependencies) || candidate.dependencies.some((dependency) =>
     !dependency || !nonEmpty(dependency.name) || !new Set(["resolved", "unresolved"]).has(dependency.status))) return "dependencies";
   if (!candidate.risk || !new Set(["low", "moderate", "high"]).has(candidate.risk.dataSensitivity) ||
     !new Set(["internal", "external"]).has(candidate.risk.exposure) ||
@@ -486,6 +488,7 @@ function deliveryPlanContent(input, candidates, resolvedInputs) {
         : "Normal interactive just-in-time approval applies before merge, merged-topic-branch deletion, and OpenSpec Archive.";
       return [
         `## Candidate ${index + 1}: ${markdownText(candidate.name)} (proposed)`,
+        `Readiness: ${input.nextOpenSpecAction === "openspec-propose" ? "Propose-ready" : "Explore-ready"}.`,
         `Outcome-oriented milestone: ${markdownText(candidate.outcome)}`,
         `Delivery profile: ${markdownText(candidate.deliveryProfile)}`,
         `Profile rationale — data: ${markdownText(candidate.profileRationale.data)}; exposure: ${markdownText(candidate.profileRationale.exposure)}; recovery: ${markdownText(candidate.profileRationale.recovery)}.`,

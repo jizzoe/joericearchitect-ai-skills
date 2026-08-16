@@ -95,6 +95,27 @@ test("trigger and non-trigger select execution behavior and write generated cont
   assert.equal(writes, 1);
 });
 
+test("dependency-free candidates render explicit none entries and remain Propose-ready", () => {
+  const { output, writes } = run({
+    ...base,
+    candidates: [{
+      ...candidate,
+      dependencies: [],
+      sharedResourceHazards: [],
+      parallelWork: [],
+      evalNeeds: [],
+      guardrailNeeds: []
+    }],
+    nextOpenSpecAction: "openspec-propose"
+  });
+  valid(output);
+  assert.equal(output.status, "completed");
+  assert.match(writes[0].content, /Readiness: Propose-ready\./);
+  assert.match(writes[0].content, /Dependencies:\n- None supplied\./);
+  assert.match(writes[0].content, /Shared-resource hazards:\n- None supplied\./);
+  assert.match(writes[0].content, /Evaluation needs:\n- None supplied\./);
+});
+
 test("missing and nonexistent inputs and readiness gaps return structured paused results", () => {
   const missing = executeSddRequirementsToPlan({ ...base, requirementsPath: undefined });
   const nonexistent = run({ ...base, requirementsPath: "docs/requirements/missing.md" }).output;
