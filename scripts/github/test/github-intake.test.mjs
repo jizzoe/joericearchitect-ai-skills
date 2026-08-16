@@ -12,7 +12,7 @@ import {
   replaceManagedBlock
 } from "../lib/issues.mjs";
 import { planAddToProject, planSetProjectStatus } from "../lib/projects.mjs";
-import { validateTrackingObject } from "../../validation/lib/tracking.mjs";
+import { parseTrackingYaml, validateTrackingObject } from "../../validation/lib/tracking.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../..");
@@ -109,7 +109,11 @@ test("issue-to-OpenSpec intake produces managed block and valid tracking", () =>
   assert.equal(result.ok, true);
   assert.match(result.managedBlock, /OpenSpec change: `add-example-capability`/);
   assert.equal(validateTrackingObject(result.tracking, { expectedChange: "add-example-capability" }).valid, true);
-  assert.ok(Object.keys(result.files).some((file) => file.endsWith("tracking.yaml")));
+  const trackingPath = Object.keys(result.files).find((file) => file.endsWith("tracking.yaml"));
+  assert.ok(trackingPath);
+  const parsedTracking = parseTrackingYaml(result.files[trackingPath]);
+  assert.equal(validateTrackingObject(parsedTracking, { expectedChange: "add-example-capability" }).valid, true);
+  assert.deepEqual(parsedTracking.implementation_repositories[0].paths, ["openspec/changes/add-example-capability/"]);
 });
 
 test("issue-to-OpenSpec intake fails without required issue data", () => {

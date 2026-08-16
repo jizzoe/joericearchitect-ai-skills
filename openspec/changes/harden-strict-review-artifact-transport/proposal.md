@@ -14,8 +14,7 @@ managed-preflight versus elevated-launch boundary explicit, observable, and
 regression-tested. It does not weaken strict review by accepting transcript,
 stdout, or JSONL output as evidence.
 
-Primary GitHub issue: not yet linked. Intake must create or reuse the
-repository issue before delivery; this proposal remains planning-only.
+Primary GitHub issue: [#104](https://github.com/jizzoe/joericearchitect-ai-skills/issues/104).
 
 ## What Changes
 

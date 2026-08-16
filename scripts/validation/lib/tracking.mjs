@@ -229,6 +229,7 @@ export function mergeTracking(existing, patch) {
 
 export function stringifyTracking(value, indent = 0) {
   const lines = [];
+  const stringifyScalarArray = (items, itemIndent) => items.map((item) => `${" ".repeat(itemIndent)}- ${item}`);
   for (const [key, child] of Object.entries(value)) {
     const prefix = " ".repeat(indent);
     if (Array.isArray(child)) {
@@ -237,14 +238,20 @@ export function stringifyTracking(value, indent = 0) {
         if (item && typeof item === "object" && !Array.isArray(item)) {
           const entries = Object.entries(item);
           const [firstKey, firstValue] = entries[0];
-          if (firstValue && typeof firstValue === "object") {
+          if (Array.isArray(firstValue)) {
+            lines.push(`${" ".repeat(indent + 2)}- ${firstKey}:`);
+            lines.push(...stringifyScalarArray(firstValue, indent + 4));
+          } else if (firstValue && typeof firstValue === "object") {
             lines.push(`${" ".repeat(indent + 2)}- ${firstKey}:`);
             lines.push(stringifyTracking(firstValue, indent + 4));
           } else {
             lines.push(`${" ".repeat(indent + 2)}- ${firstKey}: ${firstValue}`);
           }
           for (const [nestedKey, nestedValue] of entries.slice(1)) {
-            if (nestedValue && typeof nestedValue === "object") {
+            if (Array.isArray(nestedValue)) {
+              lines.push(`${" ".repeat(indent + 4)}${nestedKey}:`);
+              lines.push(...stringifyScalarArray(nestedValue, indent + 6));
+            } else if (nestedValue && typeof nestedValue === "object") {
               lines.push(`${" ".repeat(indent + 4)}${nestedKey}:`);
               lines.push(stringifyTracking(nestedValue, indent + 6));
             } else {
