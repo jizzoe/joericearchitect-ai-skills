@@ -41,9 +41,10 @@ export function authorizationDigest(authorization) {
   return crypto.createHash("sha256").update(JSON.stringify(canonical(authorization))).digest("hex");
 }
 
-export function createControllerRecord({ authorization, repository, checkpointPath }) {
-  const entry = authorization?.target?.entries?.[0];
-  if (!entry || !text(repository) || !text(checkpointPath) || authorization?.mode !== "autonomous" || authorization?.authorizationProfile !== "sdd-delivery") {
+export function createControllerRecord({ authorization, repository, checkpointPath, selectedEntry } = {}) {
+  const entries = authorization?.target?.entries;
+  const entry = selectedEntry ?? entries?.[0];
+  if (!selectedByAuthorization(entry, authorization) || !text(repository) || !text(checkpointPath) || authorization?.mode !== "autonomous" || authorization?.authorizationProfile !== "sdd-delivery") {
     return { valid: false, reason: "controller-record-input-invalid" };
   }
   return {
@@ -52,6 +53,8 @@ export function createControllerRecord({ authorization, repository, checkpointPa
       schemaVersion: 1,
       authorizationDigest: authorizationDigest(authorization),
       selectedEntry: entry,
+      queueEntries: [...entries],
+      queueIndex: entries.indexOf(entry),
       repository,
       expiresAt: authorization.expiresAt,
       allowedLifecycleChain: [...phases],
@@ -60,6 +63,19 @@ export function createControllerRecord({ authorization, repository, checkpointPa
       steps: phases.map((id) => ({ id, status: "pending" }))
     }
   };
+}
+
+export function advanceControllerQueue(record) {
+  if (!Array.isArray(record?.queueEntries) || !Number.isInteger(record.queueIndex) || record.queueEntries[record.queueIndex] !== record.selectedEntry ||
+      record.steps?.some((step) => step.status !== "complete" || step.evidence?.current !== true)) return { valid: false, reason: "controller-queue-advance-invalid" };
+  const nextIndex = record.queueIndex + 1;
+  if (nextIndex >= record.queueEntries.length) return { valid: false, reason: "controller-queue-complete" };
+  const next = structuredClone(record);
+  next.queueIndex = nextIndex;
+  next.selectedEntry = next.queueEntries[nextIndex];
+  next.currentPhase = "propose";
+  next.steps = phases.map((id) => ({ id, status: "pending" }));
+  return { valid: true, record: next };
 }
 
 export function inspectControllerRecord(record, { authorization, repository, now = new Date().toISOString() } = {}) {

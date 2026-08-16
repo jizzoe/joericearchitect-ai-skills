@@ -176,7 +176,11 @@ export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date
       selectedEntry: target.entries[0],
       outputPath: `ai-planning/design-briefs/${target.entries[0]}.md`
     }),
-    allowedMutations: Object.freeze(["write-design-brief"]),
+    allowedMutations: Object.freeze([
+      "read-workspace", "write-design-brief", "run-test", "run-validation",
+      "issue-create-or-update", "project-update", "draft-pr-create-or-update",
+      "run-lifecycle-action", "write-result", "notify-state"
+    ]),
     targets: Object.freeze([`workspace:ai-planning/design-briefs/${target.entries[0]}.md`]),
     review: Object.freeze({
       strictFirst: true,

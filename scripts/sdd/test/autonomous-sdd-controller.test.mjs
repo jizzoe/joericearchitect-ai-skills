@@ -3,7 +3,7 @@ import test from "node:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { advanceControllerRecord, authorizationDigest, createControllerRecord, inspectControllerRecord, persistControllerRecord } from "../autonomous-sdd-controller.mjs";
+import { advanceControllerQueue, advanceControllerRecord, authorizationDigest, createControllerRecord, inspectControllerRecord, persistControllerRecord } from "../autonomous-sdd-controller.mjs";
 import { inspectCheckpoint } from "../checkpoint.mjs";
 import { checkAdapterDrift } from "../check-adapter-drift.mjs";
 import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
@@ -50,6 +50,19 @@ test("every lifecycle entry resumes only the first incomplete controller phase",
     }
     assert.equal(inspectControllerRecord(record, { authorization, repository: "owner/repository", now: started }).nextPhase, phases[index]);
   }
+});
+
+test("controller records and advances an explicit ordered-queue entry", () => {
+  const queued = resolveSddDeliveryRequest({ target: ["complete-delivery", "next-delivery"], mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-only", expiration: "12h" }, { goalStartedAt: started }).effectiveAuthorization;
+  const record = createControllerRecord({ authorization: queued, repository: "owner/repository", checkpointPath: "openspec/changes/next-delivery/evidence/run.json", selectedEntry: "next-delivery" }).record;
+  assert.equal(record.selectedEntry, "next-delivery");
+  const completed = structuredClone(record);
+  completed.queueIndex = 0; completed.selectedEntry = "complete-delivery";
+  completed.steps = completed.steps.map((step) => ({ ...step, status: "complete", evidence: { current: true } }));
+  const advanced = advanceControllerQueue(completed);
+  assert.equal(advanced.valid, true);
+  assert.equal(advanced.record.selectedEntry, "next-delivery");
+  assert.equal(advanced.record.steps[0].status, "pending");
 });
 
 test("controller persists only contained paths and advances ordered current evidence", () => {

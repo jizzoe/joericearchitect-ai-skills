@@ -110,7 +110,7 @@ test("ship-sdd accepts an explicitly ordered bracketed queue and resolves exact 
   assert.equal(result.ready, true);
   assert.deepEqual(result.effectiveAuthorization.target.entries, ["first-change", "second-change"]);
   assert.equal(result.effectiveAuthorization.deliveryPreparation.outputPath, "ai-planning/design-briefs/first-change.md");
-  assert.deepEqual(result.effectiveAuthorization.allowedMutations, ["write-design-brief"]);
+  assert.equal(result.effectiveAuthorization.allowedMutations.includes("run-lifecycle-action"), true);
 });
 
 test("ship-sdd rejects omitted targets and malformed aliases before selection", () => {
