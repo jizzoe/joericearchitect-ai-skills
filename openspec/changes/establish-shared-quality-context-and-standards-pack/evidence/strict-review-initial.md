@@ -11,3 +11,10 @@ completed under `strict-isolated` assurance. Review record
 
 The exact review archive cleanup succeeded. The findings are preserved here as
 review data; the corrected head requires a fresh strict review.
+
+The fresh strict review of corrected commit
+`f044db83257f37544e8f32f82ed1978be372ce8e`, record
+`strict-5f4857fe-3009-4e65-a5ae-c5fe05c933b7`, found URL-userinfo,
+Windows/UNC-path, and positive override/handoff-fixture gaps. Its exact review
+archive cleanup also succeeded; those findings are disposed in the next
+correction record.

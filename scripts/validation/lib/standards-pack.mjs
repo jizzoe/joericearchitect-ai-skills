@@ -3,9 +3,17 @@ import path from "node:path";
 const classifications = new Set(["required", "recommended", "repository-selected", "not-applicable"]);
 const secret = /(password|secret|token|api[_-]?key|authorization|bearer|oauth|otp|mfa|private[_-]?key)/i;
 const id = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const workspace = (value) => typeof value === "string" && value.length > 0 && !path.isAbsolute(value) && !value.split(/[\\/]/).includes("..");
+const workspace = (value) => typeof value === "string" && value.length > 0 && !path.posix.isAbsolute(value) && !path.win32.isAbsolute(value) && !value.split(/[\\/]/).includes("..");
 const text = (value) => typeof value === "string" && value.trim().length > 0 && !secret.test(value);
 const only = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.has(key));
+const source = (value) => {
+  if (typeof value !== "string" || !value || secret.test(value)) return false;
+  if (!/^https?:\/\//.test(value)) return workspace(value);
+  try {
+    const url = new URL(value);
+    return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+  } catch { return false; }
+};
 
 export function validateStandardsPack(value) {
   const issues = [];
@@ -20,8 +28,7 @@ export function validateStandardsPack(value) {
     if (!only(rule, new Set(["id", "classification", "source", "scope", "reason"]))) issues.push({ code: "invalid-rule", subject: "rules" });
     if (!id.test(rule?.id ?? "")) issues.push({ code: "invalid-rule-id", subject: "rules" });
     if (!classifications.has(rule?.classification)) issues.push({ code: "invalid-classification", subject: rule?.id ?? "rules" });
-    if (typeof rule?.source !== "string" || !rule.source || secret.test(rule.source)) issues.push({ code: "unsafe-source", subject: rule?.id ?? "rules" });
-    if (!/^https?:\/\//.test(rule?.source ?? "") && !workspace(rule?.source)) issues.push({ code: "unsafe-source", subject: rule?.id ?? "rules" });
+    if (!source(rule?.source)) issues.push({ code: "unsafe-source", subject: rule?.id ?? "rules" });
     if (!workspace(rule?.scope)) issues.push({ code: "unsafe-rule-scope", subject: rule?.id ?? "rules" });
     if (rule?.classification === "not-applicable" && !text(rule.reason)) issues.push({ code: "missing-not-applicable-reason", subject: rule?.id ?? "rules" });
     if (rule?.reason !== undefined && !text(rule.reason)) issues.push({ code: "unsafe-rule-reason", subject: rule?.id ?? "rules" });
