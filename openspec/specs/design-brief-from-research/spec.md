@@ -4,9 +4,7 @@
 
 Defines how durable research and project context become one reviewable
 Markdown decision brief before OpenSpec Explore or Propose.
-
 ## Requirements
-
 ### Requirement: The brief synthesizes evidence into one reviewable decision record
 The system SHALL use `design-brief-from-research` to write one Markdown brief
 containing: problem and desired outcome; evidence and key findings with
@@ -102,3 +100,17 @@ behavior.
   fixtures are run
 - **THEN** each of the eight required scenario types has a deterministic,
   synthetic-data-only test
+
+### Requirement: Delivery-scoped brief preparation preserves path bounds
+The design-brief workflow SHALL recognize valid `sdd-delivery` authorization
+only for one explicitly authorized selected-entry output path. It MUST validate
+the path and authorization before writing, preserve local-implementation, and
+reject other delivery writes.
+
+#### Scenario: Valid delivery preparation is received
+- **WHEN** selected-entry authorization names the requested brief path
+- **THEN** workflow may write the brief within that path boundary
+
+#### Scenario: Delivery context lacks a path grant
+- **WHEN** delivery context does not authorize requested output path
+- **THEN** workflow returns rejection without writing a brief

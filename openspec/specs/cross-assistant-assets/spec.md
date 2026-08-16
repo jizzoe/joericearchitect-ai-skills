@@ -4,9 +4,7 @@
 
 Defines portable ownership and discovery behavior for canonical AI assets that
 must operate through both Claude and Codex without silently diverging.
-
 ## Requirements
-
 ### Requirement: Claude and Codex expose equivalent lifecycle behavior
 Claude and Codex SHALL expose the same selected OpenSpec lifecycle actions even
 when platform naming and generated file locations differ.
@@ -146,3 +144,17 @@ second repository without this product's constants.
 - **WHEN** delivery claims cross-assistant or second-product portability but
   evals, fixture output, or drift checks are absent
 - **THEN** verification reports the claim as unevidenced
+
+### Requirement: Controller and cleanup exposure remain thin and equivalent
+Claude and Codex SHALL expose equivalent continuation and cleanup behavior
+through thin adapters that reference canonical assistant-neutral assets.
+Adapters MUST NOT duplicate policy or alter authorization, continuation,
+cleanup, or pause behavior.
+
+#### Scenario: Both assistant exposures are inspected
+- **WHEN** continuation and cleanup adapters are compared
+- **THEN** each resolves to canonical policy and equivalent behavior
+
+#### Scenario: One adapter is stale
+- **WHEN** an adapter no longer references canonical controller or cleanup asset
+- **THEN** verification reports stale exposure and recovery path
