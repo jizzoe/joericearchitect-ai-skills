@@ -18,3 +18,9 @@ The fresh strict review of corrected commit
 Windows/UNC-path, and positive override/handoff-fixture gaps. Its exact review
 archive cleanup also succeeded; those findings are disposed in the next
 correction record.
+
+The strict review of corrected commit
+`ae2f3ed946329677eb952cf6ee7bff6633b15831`, record
+`strict-0da4604b-91a5-4cce-8978-34c99ce79904`, found malformed collection,
+referential-integrity, and private-host validation gaps. Its archive cleanup
+succeeded; those findings are disposed in the next correction record.
