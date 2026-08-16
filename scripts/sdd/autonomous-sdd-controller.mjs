@@ -18,6 +18,25 @@ const canonical = (value) => {
 const selectedByAuthorization = (selectedEntry, authorization) =>
   text(selectedEntry) && Array.isArray(authorization?.target?.entries) && authorization.target.entries.includes(selectedEntry);
 
+function safeContainedDestination(repositoryPath, checkpointPath) {
+  const root = fs.realpathSync(repositoryPath);
+  const destination = path.resolve(root, checkpointPath);
+  if (destination === root || !destination.startsWith(`${root}${path.sep}`)) return null;
+  const inspectComponents = () => {
+    const relative = path.relative(root, destination);
+    const components = relative.split(path.sep);
+    let current = root;
+    for (const component of components.slice(0, -1)) {
+      current = path.join(current, component);
+      if (!fs.existsSync(current)) break;
+      if (fs.lstatSync(current).isSymbolicLink()) return false;
+    }
+    if (fs.existsSync(destination) && fs.lstatSync(destination).isSymbolicLink()) return false;
+    return true;
+  };
+  return { root, destination, inspectComponents };
+}
+
 export function authorizationDigest(authorization) {
   const source = {
     schemaVersion: authorization?.schemaVersion,
@@ -89,13 +108,19 @@ export function persistControllerRecord({ repositoryPath, record }) {
   if (!text(repositoryPath) || !text(record?.checkpointPath) || path.isAbsolute(record.checkpointPath)) {
     return { valid: false, reason: "controller-record-path-invalid" };
   }
-  const root = path.resolve(repositoryPath);
-  const destination = path.resolve(root, record.checkpointPath);
-  if (destination !== root && !destination.startsWith(`${root}${path.sep}`)) return { valid: false, reason: "controller-record-path-escape" };
+  let containment;
+  try {
+    containment = safeContainedDestination(repositoryPath, record.checkpointPath);
+  } catch {
+    return { valid: false, reason: "controller-record-path-invalid" };
+  }
+  if (!containment) return { valid: false, reason: "controller-record-path-escape" };
+  const { root, destination, inspectComponents } = containment;
   const directory = path.dirname(destination);
   const temporary = path.join(directory, `.${path.basename(destination)}.${process.pid}.${crypto.randomUUID()}.tmp`);
   try {
     fs.mkdirSync(directory, { recursive: true });
+    if (!inspectComponents() || fs.realpathSync(directory) === root || !fs.realpathSync(directory).startsWith(`${root}${path.sep}`)) return { valid: false, reason: "controller-record-path-symlink" };
     const descriptor = fs.openSync(temporary, "wx", 0o600);
     try {
       fs.writeFileSync(descriptor, `${JSON.stringify(record, null, 2)}\n`);

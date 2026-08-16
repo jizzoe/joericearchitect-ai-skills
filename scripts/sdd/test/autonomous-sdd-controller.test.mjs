@@ -54,6 +54,11 @@ test("controller persists only contained paths and advances ordered current evid
     assert.deepEqual(JSON.parse(fs.readFileSync(persisted.path, "utf8")).steps, created.record.steps);
     assert.equal(fs.readdirSync(path.dirname(persisted.path)).some((entry) => entry.endsWith(".tmp")), false);
     assert.equal(persistControllerRecord({ repositoryPath: root, record: { ...created.record, checkpointPath: "../escape.json" } }).reason, "controller-record-path-escape");
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "controller-outside-"));
+    fs.symlinkSync(outside, path.join(root, "linked"));
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: { ...created.record, checkpointPath: "linked/record.json" } }).reason, "controller-record-path-symlink");
+    assert.equal(fs.existsSync(path.join(outside, "record.json")), false);
+    fs.rmSync(outside, { recursive: true, force: true });
     assert.equal(advanceControllerRecord(created.record, "planning-review", { current: true }).reason, "controller-phase-advance-out-of-order");
     const advanced = advanceControllerRecord(created.record, "propose", { current: true, reference: "proposal" });
     assert.equal(advanced.valid, true);

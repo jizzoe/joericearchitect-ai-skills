@@ -29,7 +29,7 @@ test("cleanup requires final delivery evidence and permits forced local deletion
   assert.equal(planWorkspaceCleanup({ ...evidence, archiveVisible: false }).classification, "paused");
   const plan = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", id: "squash", squashOrRebaseEvidence: { merged: true, pullRequest: "42", finalHeadCommit: head } })] });
   assert.equal(plan.resources[0].actions[0].force, true);
-  const result = executeWorkspaceCleanup(plan, { deleteLocalBranch: (id, { force }) => ({ committed: id === "squash" && force }), persistOutcome: () => ({ persisted: true }) });
+  const result = executeWorkspaceCleanup(plan, { deleteLocalBranch: (id, { force }) => ({ committed: id === "squash" && force }), inspectResource: (item) => ({ ...item, exists: true }), persistOutcome: () => ({ persisted: true }) });
   assert.equal(result.classification, "completed");
 });
 
@@ -47,7 +47,7 @@ test("cleanup executes worktrees first and resumes from reread resource state", 
   ] });
   const calls = [];
   const result = executeWorkspaceCleanup(plan, {
-    inspectResource: (item) => ({ exists: item.id !== "wt" }),
+    inspectResource: (item) => item.id === "wt" ? { exists: false } : { ...item, exists: true },
     removeWorktree: (id) => { calls.push(`worktree:${id}`); return { committed: true }; },
     deleteLocalBranch: (id) => { calls.push(`branch:${id}`); return { committed: true }; },
     persistOutcome: () => ({ persisted: true })
@@ -59,11 +59,25 @@ test("cleanup executes worktrees first and resumes from reread resource state", 
 
 test("cleanup will not mutate unless each action outcome can be persisted", () => {
   const plan = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", ancestryMerged: true })] });
-  assert.equal(executeWorkspaceCleanup(plan, { deleteLocalBranch: () => ({ committed: true }) }).reason, "cleanup-outcome-persistence-missing");
+  assert.equal(executeWorkspaceCleanup(plan, { deleteLocalBranch: () => ({ committed: true }) }).reason, "cleanup-fresh-inspection-or-persistence-missing");
   const result = executeWorkspaceCleanup(plan, {
     deleteLocalBranch: () => ({ committed: true }),
+    inspectResource: (item) => ({ ...item, exists: true }),
     persistOutcome: () => ({ persisted: false })
   });
   assert.equal(result.classification, "partial");
   assert.equal(result.outcomes[0].receipt, "outcome-persist-failed");
+});
+
+test("cleanup rejects stale resources and delivery evidence that no longer matches final delivery", () => {
+  const staleEvidence = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", ancestryMerged: true, deliveryEvidence: { current: true, reference: "other-archive", headCommit: head } })] });
+  assert.equal(staleEvidence.resources[0].reason, "cleanup-resource-record-invalid");
+  const plan = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", ancestryMerged: true })] });
+  const result = executeWorkspaceCleanup(plan, {
+    inspectResource: (item) => ({ ...item, exists: true, clean: false }),
+    deleteLocalBranch: () => ({ committed: true }),
+    persistOutcome: () => ({ persisted: true })
+  });
+  assert.equal(result.classification, "partial");
+  assert.equal(result.outcomes[0].receipt, "fresh-resource-mismatch");
 });
