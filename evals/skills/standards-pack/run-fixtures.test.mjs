@@ -57,6 +57,8 @@ test("unsafe and incomplete records fail closed", () => {
     [{ ...valid, target: { path: "\\\\server\\share" } }, "unsafe-target-path"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "api_token=value" }] }, "unsafe-source"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://alice:hunter2@example.invalid/standard" }] }, "unsafe-source"],
+    [{ ...valid, rules: [{ ...valid.rules[0], source: "HTTPS://127.0.0.1/standard" }] }, "unsafe-source"],
+    [{ ...valid, rules: [{ ...valid.rules[0], source: "ftp://example.com/standard" }] }, "unsafe-source"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://127.0.0.1/standard" }] }, "unsafe-source"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://100.64.0.1/standard" }] }, "unsafe-source"],
     [{ ...valid, rules: [{ ...valid.rules[0], source: "https://192.168.1.5/standard" }] }, "unsafe-source"],

@@ -58,7 +58,7 @@ const publicHost = (host) => {
 };
 const source = (value) => {
   if (typeof value !== "string" || !value || secret.test(value)) return false;
-  if (!/^https?:\/\//.test(value)) return workspace(value);
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(value)) return workspace(value);
   try {
     const url = new URL(value);
     return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password && publicHost(url.hostname);
