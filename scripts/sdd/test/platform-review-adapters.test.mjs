@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexParentStrictReviewToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, consumeCodexParentStrictReviewToolResult, createClaudeReviewSettings, degradedCapabilityLedger, diagnoseClaudeExecutionFailure, diagnoseCodexExecutionFailure, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, prepareCodexReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, resolveTrustedReviewerExecutable, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
+import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexParentStrictReviewToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, consumeCodexParentStrictReviewToolResult, createClaudeReviewSettings, degradedCapabilityLedger, diagnoseClaudeExecutionFailure, diagnoseCodexExecutionFailure, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, pinnedExecutableUnchanged, prepareCodexReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, resolveTrustedReviewerExecutable, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 
@@ -459,6 +459,26 @@ test("Codex executable resolution continues past an invalid fixed candidate", ()
     assert.equal(resolved.candidatePath, validCandidate);
     assert.equal(resolved.realPath, fs.realpathSync(validCandidate));
     assert.equal(resolved.platformTrust.mechanism, "fixture-platform-trust-v1");
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test("sealed executable receipt verification does not re-resolve executable trust", () => {
+  const temporary = fs.realpathSync(fs.mkdtempSync("/tmp/codex-sealed-identity-"));
+  const candidate = `${temporary}/codex`;
+  fs.copyFileSync("/bin/echo", candidate);
+  fs.chmodSync(candidate, 0o755);
+  try {
+    const identity = resolveTrustedReviewerExecutable("codex", "codex", {
+      locations: [{ candidatePath: candidate, trustedRoot: temporary }],
+      mutationCheck: () => true,
+      platformTrustCheck: () => ({ mechanism: "fixture-platform-trust-v1" })
+    });
+    assert.equal(pinnedExecutableUnchanged(identity), true);
+    assert.doesNotMatch(pinnedExecutableUnchanged.toString(), /resolveTrustedReviewerExecutable/);
+    fs.writeFileSync(candidate, "changed");
+    assert.equal(pinnedExecutableUnchanged(identity), false);
   } finally {
     fs.rmSync(temporary, { recursive: true, force: true });
   }

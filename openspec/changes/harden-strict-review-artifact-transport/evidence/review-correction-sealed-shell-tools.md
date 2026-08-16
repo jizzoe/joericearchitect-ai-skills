@@ -84,3 +84,19 @@ diagnostic while recording whether the artifact was valid, missing, or another
 artifact-invalid state. Regression coverage verifies both absent and valid
 artifacts accompanying a nonzero exit. A fresh exact-head strict review is
 required after this objective correction.
+
+## Follow-up strict review finding: receipt-phase executable resolution
+
+- Review record: `strict-6bc70915-a1e4-48b0-b174-a410bf723261`
+- Reviewed head: `482d55efadedada24ac23fb4a77a5d6b827450b3`
+- Assurance: `strict-isolated`; the parent-owned final artifact was present,
+  schema-valid, and the owned view was removed.
+- Finding: high severity. Receipt consumption re-ran executable resolution,
+  potentially repeating managed mutation-denial proof after the launch phase.
+
+Receipt validation now compares only the preflight-sealed candidate path,
+identity metadata, path chain, and content digest. It does not select, resolve,
+or newly trust an executable, and it never re-runs the mutation-denial or
+platform-trust proofs. Regression coverage confirms both unchanged and changed
+sealed files and prohibits resolver use from this receipt verifier. A fresh
+exact-head strict review is required after this objective correction.

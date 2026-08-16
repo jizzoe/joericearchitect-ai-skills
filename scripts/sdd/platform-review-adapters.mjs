@@ -302,10 +302,29 @@ export function resolveTrustedReviewerExecutable(executable = "codex", expectedN
   return resolveTrustedReviewerExecutableDetailed(executable, expectedName, options);
 }
 
-function pinnedExecutableUnchanged(identity) {
-  if (!identity || identity.managedMutationDenied !== true || !identity.platformTrust || !safeIdentity(identity.expectedName)) return false;
-  const current = resolveTrustedReviewerExecutable(identity.expectedName, identity.expectedName);
-  return current !== null && canonicalJson(current) === canonicalJson(identity);
+export function pinnedExecutableUnchanged(identity) {
+  // Receipt validation verifies only that the already sealed file and its path
+  // chain have not changed. It must not resolve, select, or newly trust an
+  // executable, because those are managed-preflight responsibilities.
+  if (!identity || identity.managedMutationDenied !== true || !identity.platformTrust || !safeIdentity(identity.expectedName) ||
+      !runtimePath(identity.candidatePath) || !runtimePath(identity.realPath) || !Array.isArray(identity.pathIdentities) ||
+      !Array.isArray(identity.candidateParentIdentities)) return false;
+  try {
+    if (fs.realpathSync(identity.candidatePath) !== identity.realPath) return false;
+    const entry = fs.statSync(identity.realPath);
+    if (!entry.isFile() || entry.dev !== identity.device || entry.ino !== identity.inode || entry.size !== identity.size || entry.mtimeMs !== identity.modifiedMs) return false;
+    const currentPathIdentities = identity.pathIdentities.map((entryPath) => stablePathIdentity(entryPath?.path));
+    const currentCandidateParentIdentities = identity.candidateParentIdentities.map((entryPath) => stablePathIdentity(entryPath?.path));
+    const currentCandidateIdentity = stablePathIdentity(identity.candidatePath, { allowSymlink: true });
+    const currentContentSha256 = executableFileSha256(identity.realPath, entry);
+    return currentPathIdentities.every(Boolean) && currentCandidateParentIdentities.every(Boolean) && currentCandidateIdentity !== null &&
+      canonicalJson(currentPathIdentities) === canonicalJson(identity.pathIdentities) &&
+      canonicalJson(currentCandidateParentIdentities) === canonicalJson(identity.candidateParentIdentities) &&
+      canonicalJson(currentCandidateIdentity) === canonicalJson(identity.candidateIdentity) &&
+      currentContentSha256 === identity.contentSha256;
+  } catch {
+    return false;
+  }
 }
 
 function strictToolRequestDigest(evidence) {
