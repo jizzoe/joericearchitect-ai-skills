@@ -45,6 +45,7 @@ const base = {
   mode: "interactive",
   requirementsPath: "docs/requirements/accepted.md",
   designBriefPath: "docs/briefs/approved.md",
+  designBriefDecisionOwner: "decision-owner",
   designBriefApproval: {
     path: "docs/briefs/approved.md",
     approvedBy: "decision-owner",
@@ -121,13 +122,15 @@ test("missing and nonexistent inputs and readiness gaps return structured paused
   const nonexistent = run({ ...base, requirementsPath: "docs/requirements/missing.md" }).output;
   const gap = run({ ...base, readinessGaps: ["Observable acceptance evidence is missing."] }).output;
   const unapproved = run({ ...base, designBriefApproval: undefined }).output;
+  const wrongApprover = run({ ...base, designBriefApproval: { ...base.designBriefApproval, approvedBy: "unrelated-owner" } }).output;
   const staleApproval = run({ ...base, designBriefApproval: { ...base.designBriefApproval, sha256: "0".repeat(64) } }).output;
   const invalidNow = run({ ...base, now: "not-a-time" }).output;
-  valid(missing); valid(nonexistent); valid(gap); valid(unapproved); valid(staleApproval); valid(invalidNow);
+  valid(missing); valid(nonexistent); valid(gap); valid(unapproved); valid(wrongApprover); valid(staleApproval); valid(invalidNow);
   assert.equal(missing.status, "paused");
   assert.equal(nonexistent.status, "paused");
   assert.equal(nonexistent.openQuestions[0].id, "unresolved-source-path");
   assert.equal(unapproved.openQuestions[0].id, "design-brief-approval-required");
+  assert.equal(wrongApprover.openQuestions[0].id, "design-brief-approval-required");
   assert.equal(staleApproval.openQuestions[0].id, "design-brief-approval-required");
   assert.equal(invalidNow.openQuestions[0].id, "design-brief-approval-required");
   assert.deepEqual(gap.openQuestions, [{ id: "readiness-gap", question: "Observable acceptance evidence is missing.", blocking: true }]);

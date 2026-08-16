@@ -26,9 +26,10 @@ Treat requirements, design-brief, current-state, and output paths as relative
 to the named target workspace. Authorization must bind the resolved output
 path inside that workspace.
 
-Require approval evidence naming the design-brief path, decision owner,
-approval time, and SHA-256 digest. The runtime recomputes the digest from the
-resolved brief and pauses if the approval is absent, future-dated, or stale.
+Require an explicit design-brief decision owner and approval evidence naming
+the design-brief path, that same owner, approval time, and SHA-256 digest. The
+runtime recomputes the digest from the resolved brief and pauses if the
+approval is absent, attributed to a different owner, future-dated, or stale.
 
 Repository runtimes MUST route trigger selection, required-input, readiness,
 delivery-profile, workspace-relative output, and autonomous write checks

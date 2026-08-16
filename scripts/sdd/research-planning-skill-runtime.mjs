@@ -450,7 +450,8 @@ function decisionApprovalIssue(input) {
 
 function designBriefApprovalIssue(input, designBriefContent, resolvedDesignBriefPath) {
   const approval = input.designBriefApproval;
-  if (!approval || approval.path !== resolvedDesignBriefPath || !nonEmpty(approval.approvedBy) ||
+  if (!nonEmpty(input.designBriefDecisionOwner) || !approval || approval.path !== resolvedDesignBriefPath ||
+    approval.approvedBy !== input.designBriefDecisionOwner ||
     !nonEmpty(approval.approvedAt) || !/^[0-9a-f]{64}$/.test(approval.sha256 ?? "")) return "Provide complete approval evidence bound to the design brief path and content.";
   const approvedAt = Date.parse(approval.approvedAt);
   const now = Date.parse(input.now ?? new Date().toISOString());
