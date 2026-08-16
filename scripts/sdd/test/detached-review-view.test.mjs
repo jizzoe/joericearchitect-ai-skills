@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createArchivedReviewView, createDetachedReviewView, removeArchivedReviewView, removeDetachedReviewView } from "../detached-review-view.mjs";
+import { createArchivedReviewView, createDetachedReviewView, removeArchivedReviewView, removeDetachedReviewView, withDetachedReviewView } from "../detached-review-view.mjs";
 import { probeIndependentReviewAdapter } from "../execute-independent-review.mjs";
 
 const git = (root, args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
@@ -78,6 +78,46 @@ test("partial worktree cleanup failure is reported and preserves the owned root"
     assert.equal(result.diagnostic.category, "cleanup-failed");
     assert.equal(result.diagnostic.exitCode, 128);
     assert.equal(fs.existsSync(temporaryRoot), true, "failed Git cleanup preserves the owned root for recovery");
+  } finally {
+    fs.rmSync(source, { recursive: true, force: true });
+    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test("withDetachedReviewView never masks a failed owned cleanup", () => {
+  const source = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ai-skills-review-wrapper-source-")));
+  const temporaryRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "ai-skills-review-wrapper-")));
+  const head = "c".repeat(40);
+  const requestDigest = "d".repeat(64);
+  const reviewPath = path.join(temporaryRoot, "review-session", "repository");
+  try {
+    const result = withDetachedReviewView({
+      repositoryPath: source,
+      headCommit: head,
+      lifecycleRequestDigest: requestDigest,
+      expiresAt: "2026-08-14T00:00:00.000Z"
+    }, () => ({ status: "passed" }), {
+      now: "2026-08-13T12:00:00.000Z",
+      createTemporaryRoot: () => temporaryRoot,
+      runGit: (args) => {
+        if (args.includes("rev-parse")) return head;
+        if (args.includes("symbolic-ref")) throw new Error("detached");
+        if (args.includes("add")) {
+          fs.mkdirSync(reviewPath, { recursive: true });
+          return "";
+        }
+        if (args.includes("remove")) {
+          const error = new Error("synthetic cleanup failure");
+          error.status = 128;
+          throw error;
+        }
+        throw new Error("unexpected git operation");
+      }
+    });
+    assert.equal(result.status, "unavailable");
+    assert.equal(result.removed, false);
+    assert.equal(result.code, "review-worktree-cleanup-failed");
+    assert.equal(fs.existsSync(temporaryRoot), true, "cleanup failure preserves the owned root for recovery");
   } finally {
     fs.rmSync(source, { recursive: true, force: true });
     fs.rmSync(temporaryRoot, { recursive: true, force: true });

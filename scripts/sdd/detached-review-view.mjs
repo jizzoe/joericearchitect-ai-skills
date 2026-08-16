@@ -302,9 +302,15 @@ export function removeDetachedReviewView(view, { now = new Date().toISOString(),
 export function withDetachedReviewView(request, callback, options) {
   const created = createDetachedReviewView(request, options);
   if (!created.available) return created;
+  let callbackResult;
+  let callbackError;
   try {
-    return callback(created.view);
-  } finally {
-    removeDetachedReviewView(created.view, options);
+    callbackResult = callback(created.view);
+  } catch (error) {
+    callbackError = error;
   }
+  const cleanup = removeDetachedReviewView(created.view, options);
+  if (cleanup?.removed !== true) return cleanup;
+  if (callbackError) throw callbackError;
+  return callbackResult;
 }
