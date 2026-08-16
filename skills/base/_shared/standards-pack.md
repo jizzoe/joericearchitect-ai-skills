@@ -15,10 +15,13 @@ recorded. An unresolved required conflict is a gap, not a guessed policy.
 
 ## Selection record
 
-A version-1 record has bounded target scope, selected rules, classifications,
-expected evidence, scoped overrides, and gaps. Paths are workspace-relative;
-public references are URLs. Records never contain commands, credentials,
-absolute paths, product constants, or source-catalog copies.
+A version-1 record has a `target.path`; selected rules with `id`,
+`classification`, `source`, and workspace-relative `scope`; nonempty
+identifier-only `expectedEvidence`; scoped resolved overrides; and a `gaps`
+array. A not-applicable rule includes a reason. Paths are workspace-relative;
+public references are URLs. Each nested record is closed to unrecognized
+fields. Records never contain commands, credentials, absolute paths, product
+constants, or source-catalog copies.
 
 Preparation, review, and verification reuse one valid record for one bounded
 change. They report selected rule identifiers, not-applicable classifications,
