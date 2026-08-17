@@ -119,12 +119,15 @@ test("legacy migration requires exact owner authorization and fresh matching ins
   const legacy = resource({ kind: "branch", id: "stranded", registeredAt: undefined });
   const rejected = migrateLegacyWorkspaceResource({ selectedEntry: "complete-delivery", repository: "owner/repository", legacyResource: legacy, inspectedResource: legacy, now: "2026-08-13T13:00:00.000Z" });
   assert.equal(rejected.reason, "cleanup-legacy-migration-authorization-invalid");
-  const ownerAuthorization = { approved: true, owner: "repository-owner", entry: "complete-delivery", repository: "owner/repository", kind: "branch", id: "stranded", reviewedAt: "2026-08-13T12:30:00.000Z", reference: "owner-record-1" };
+  const ownerAuthorization = { approved: true, owner: "repository-owner", entry: "complete-delivery", repository: "owner/repository", kind: "branch", id: "stranded", reviewedAt: "2026-08-13T12:30:00.000Z", reference: "owner-record-1", resourceBinding: { kind: legacy.kind, id: legacy.id, headCommit: legacy.headCommit, recoveryReference: legacy.recoveryReference, ownershipToken: legacy.ownershipToken, deliveryEvidence: legacy.deliveryEvidence } };
   const keyPair = crypto.generateKeyPairSync("ed25519");
   ownerAuthorization.signatureAlgorithm = "ed25519";
   ownerAuthorization.signature = crypto.sign(null, Buffer.from(JSON.stringify(legacyMigrationAuthorizationPayload(ownerAuthorization))), keyPair.privateKey).toString("base64");
   const trusted = { trustedOwner: "repository-owner", trustedOwnerPublicKey: keyPair.publicKey.export({ type: "spki", format: "pem" }) };
   assert.equal(migrateLegacyWorkspaceResource({ selectedEntry: "complete-delivery", repository: "owner/repository", legacyResource: legacy, inspectedResource: structuredClone(legacy), now: "2026-08-13T13:00:00.000Z", ownerAuthorization: { ...ownerAuthorization, id: "other" }, ...trusted }).reason, "cleanup-legacy-migration-authorization-invalid");
+  const differentlyBoundAuthorization = { ...ownerAuthorization, resourceBinding: { ...ownerAuthorization.resourceBinding, headCommit: "b".repeat(40) } };
+  differentlyBoundAuthorization.signature = crypto.sign(null, Buffer.from(JSON.stringify(legacyMigrationAuthorizationPayload(differentlyBoundAuthorization))), keyPair.privateKey).toString("base64");
+  assert.equal(migrateLegacyWorkspaceResource({ selectedEntry: "complete-delivery", repository: "owner/repository", legacyResource: legacy, inspectedResource: structuredClone(legacy), now: "2026-08-13T13:00:00.000Z", ownerAuthorization: differentlyBoundAuthorization, ...trusted }).reason, "cleanup-legacy-migration-authorization-invalid");
   assert.equal(migrateLegacyWorkspaceResource({ selectedEntry: "complete-delivery", repository: "owner/repository", legacyResource: legacy, inspectedResource: structuredClone(legacy), now: "2026-08-13T13:00:00.000Z", ownerAuthorization, trustedOwner: "other-owner", trustedOwnerPublicKey: trusted.trustedOwnerPublicKey }).reason, "cleanup-legacy-migration-authorization-invalid");
   const migrated = migrateLegacyWorkspaceResource({
     selectedEntry: "complete-delivery", repository: "owner/repository", legacyResource: legacy, inspectedResource: structuredClone(legacy), now: "2026-08-13T13:00:00.000Z",

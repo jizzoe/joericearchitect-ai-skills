@@ -44,7 +44,7 @@ function defaultRunGit(repositoryPath) {
   return execFileSync("git", ["-C", repositoryPath, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).trim();
 }
 
-function validResource(resource, { selectedEntry, repository, allowPending = true } = {}) {
+function validResource(resource, { selectedEntry, repository } = {}, { allowPending = true } = {}) {
   if (!resource || resource.entry !== selectedEntry || resource.repository !== repository ||
       !["worktree", "branch"].includes(resource.kind) || !text(resource.id) || !text(resource.role) ||
       !fullCommit(resource.headCommit) || !text(resource.ownershipToken) || !text(resource.recoveryReference) ||
@@ -59,7 +59,7 @@ function validResource(resource, { selectedEntry, repository, allowPending = tru
 
 function validCompletedEntry(entry, repository) {
   return entry && text(entry.selectedEntry) && Array.isArray(entry.resourceRecords) && Array.isArray(entry.cleanupReceipts) &&
-    entry.resourceRecords.every((resource) => validResource(resource, { selectedEntry: entry.selectedEntry, repository })) &&
+    entry.resourceRecords.every((resource) => validResource(resource, { selectedEntry: entry.selectedEntry, repository }, { allowPending: false })) &&
     entry.cleanupReceipts.every((receipt) => receipt && ["started", "completed", "already-completed", "blocked"].includes(receipt.status) &&
       ["worktree", "branch"].includes(receipt.kind) && text(receipt.id) && timestamp(receipt.at) && text(receipt.recoveryReference) &&
       entry.resourceRecords.some((resource) => resource.kind === receipt.kind && resource.id === receipt.id && resource.recoveryReference === receipt.recoveryReference));
@@ -174,7 +174,7 @@ export function advanceControllerQueue(record, { now = new Date().toISOString() 
   if (nextIndex >= record.queueEntries.length) return { valid: false, reason: "controller-queue-complete" };
   const next = structuredClone(record);
   if (!Array.isArray(next.resourceRecords) || !Array.isArray(next.cleanupReceipts) || !Array.isArray(next.completedEntries) ||
-      !next.resourceRecords.every((resource) => validResource(resource, next))) return { valid: false, reason: "controller-queue-advance-invalid" };
+      !next.resourceRecords.every((resource) => validResource(resource, next, { allowPending: false }))) return { valid: false, reason: "controller-queue-advance-invalid" };
   next.completedEntries.push({
     selectedEntry: next.selectedEntry,
     completedAt: now,

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "reviewRecordId": "strict-dd878f74-69e4-455f-a286-33d367711cd6",
+  "executionId": "dd878f74-69e4-455f-a286-33d367711cd6",
+  "reviewer": {
+    "type": "codex",
+    "identity": "codex-strict-reviewer-v1",
+    "adapter": "codex"
+  },
+  "attestation": {
+    "ref": "skills/base/independent-review/references/protocol.md",
+    "nonInteractive": true,
+    "isolatedContext": true,
+    "freshContext": true,
+    "readOnly": true
+  },
+  "assuranceLevel": "strict-isolated",
+  "baseCommit": "7b878f1137814063943e39c846e30db489b9a324",
+  "headCommit": "d6535a40b4d5476f0eb9d1992303f1eb087b2995",
+  "manifestDigest": "e198c6b13a8ba3f6accec56e3366260e842f31414f7bbeff0e69fcbb47245894",
+  "startedAt": "2026-08-17T11:56:07.868Z",
+  "completedAt": "2026-08-17T11:57:26.543Z",
+  "status": "failed",
+  "findings": [
+    {
+      "id": "legacy-authorization-does-not-bind-resource-evidence",
+      "severity": "high",
+      "evidence": "scripts/sdd/sdd-workspace-cleanup.mjs",
+      "recommendation": "Bind exact resource evidence in the signed authorization and require fresh inspection to match it."
+    },
+    {
+      "id": "queue-advance-accepts-undelivered-resource-records",
+      "severity": "high",
+      "evidence": "scripts/sdd/autonomous-sdd-controller.mjs",
+      "recommendation": "Require valid delivery evidence before queue advancement and in completed-entry history."
+    }
+  ]
+}

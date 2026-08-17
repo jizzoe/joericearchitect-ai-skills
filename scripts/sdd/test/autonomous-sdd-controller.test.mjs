@@ -88,6 +88,11 @@ test("controller records and advances an explicit ordered-queue entry", () => {
   assert.deepEqual(advanced.record.cleanupReceipts, []);
   assert.equal(advanced.record.completedEntries[0].selectedEntry, "complete-delivery");
   assert.equal(inspectControllerRecord(advanced.record, { authorization: queued, repository: "owner/repository", now: started }).nextPhase, "propose");
+
+  const pending = registerControllerResource(completed, {
+    kind: "branch", id: "undelivered-entry-branch", role: "implementation", headCommit: "c".repeat(40), recoveryReference: "undelivered-entry-recovery", ownershipToken: "undelivered-entry-token"
+  }, { now: started });
+  assert.equal(advanceControllerQueue(pending.record, { now: "2026-08-13T12:30:00.000Z" }).reason, "controller-queue-advance-invalid");
 });
 
 test("controller persists only in the git common-directory state root and advances ordered current evidence", () => {

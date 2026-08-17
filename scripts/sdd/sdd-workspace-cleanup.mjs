@@ -20,8 +20,20 @@ export function legacyMigrationAuthorizationPayload(authorization) {
     id: authorization.id,
     reviewedAt: authorization.reviewedAt,
     reference: authorization.reference,
-    signatureAlgorithm: authorization.signatureAlgorithm
+    signatureAlgorithm: authorization.signatureAlgorithm,
+    resourceBinding: authorization.resourceBinding
   });
+}
+
+function migrationResourceBinding(resource) {
+  return resource && {
+    kind: resource.kind,
+    id: resource.id,
+    headCommit: resource.headCommit,
+    recoveryReference: resource.recoveryReference,
+    ownershipToken: resource.ownershipToken,
+    deliveryEvidence: resource.deliveryEvidence
+  };
 }
 
 function validSignedOwnerAuthorization(authorization, { trustedOwner, trustedOwnerPublicKey } = {}) {
@@ -95,6 +107,9 @@ export function migrateLegacyWorkspaceResource({ selectedEntry, repository, lega
       !text(legacyResource.role) || !text(legacyResource.recoveryReference) || !text(legacyResource.ownershipToken) ||
       !legacyResource.deliveryEvidence || JSON.stringify(canonical(legacyResource.deliveryEvidence)) !== JSON.stringify(canonical(inspectedResource.deliveryEvidence))) {
     return { valid: false, reason: "cleanup-legacy-migration-inspection-mismatch" };
+  }
+  if (JSON.stringify(canonical(ownerAuthorization.resourceBinding)) !== JSON.stringify(canonical(migrationResourceBinding(inspectedResource)))) {
+    return { valid: false, reason: "cleanup-legacy-migration-authorization-invalid" };
   }
   const migrated = {
     ...structuredClone(legacyResource), entry: selectedEntry, repository, owned: true,
