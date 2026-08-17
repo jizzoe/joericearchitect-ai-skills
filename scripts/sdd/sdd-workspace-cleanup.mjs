@@ -10,8 +10,8 @@ const canonical = (value) => Array.isArray(value)
     ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]))
     : value;
 
-export function legacyMigrationAuthorizationDigest(authorization) {
-  const subject = authorization && {
+export function legacyMigrationAuthorizationPayload(authorization) {
+  return canonical({
     approved: authorization.approved,
     owner: authorization.owner,
     entry: authorization.entry,
@@ -19,9 +19,20 @@ export function legacyMigrationAuthorizationDigest(authorization) {
     kind: authorization.kind,
     id: authorization.id,
     reviewedAt: authorization.reviewedAt,
-    reference: authorization.reference
-  };
-  return crypto.createHash("sha256").update(JSON.stringify(canonical(subject))).digest("hex");
+    reference: authorization.reference,
+    signatureAlgorithm: authorization.signatureAlgorithm
+  });
+}
+
+function validSignedOwnerAuthorization(authorization, { trustedOwner, trustedOwnerPublicKey } = {}) {
+  if (authorization?.approved !== true || !text(trustedOwner) || authorization.owner !== trustedOwner || !text(authorization.reference) ||
+      authorization.signatureAlgorithm !== "ed25519" || !text(authorization.signature) || !trustedOwnerPublicKey) return false;
+  try {
+    return crypto.verify(null, Buffer.from(JSON.stringify(legacyMigrationAuthorizationPayload(authorization))), trustedOwnerPublicKey,
+      Buffer.from(authorization.signature, "base64"));
+  } catch {
+    return false;
+  }
 }
 
 function exactResource(resource, { selectedEntry, repository }) {
@@ -71,12 +82,12 @@ export function planWorkspaceCleanup({ selectedEntry, repository, archiveVisible
   return { classification: "planned", reason: "cleanup-audit-complete", resources: planned };
 }
 
-export function migrateLegacyWorkspaceResource({ selectedEntry, repository, legacyResource, ownerAuthorization, inspectedResource, now = new Date().toISOString() } = {}) {
+export function migrateLegacyWorkspaceResource({ selectedEntry, repository, legacyResource, ownerAuthorization, trustedOwner, trustedOwnerPublicKey, inspectedResource, now = new Date().toISOString() } = {}) {
   if (!text(selectedEntry) || !text(repository) || !legacyResource || !inspectedResource || !timestamp(now) ||
       ownerAuthorization?.approved !== true || ownerAuthorization.entry !== selectedEntry || ownerAuthorization.repository !== repository ||
       ownerAuthorization.kind !== legacyResource.kind || ownerAuthorization.id !== legacyResource.id ||
       !text(ownerAuthorization.owner) || !timestamp(ownerAuthorization.reviewedAt) || Date.parse(ownerAuthorization.reviewedAt) > Date.parse(now) ||
-      ownerAuthorization.approvalDigest !== legacyMigrationAuthorizationDigest(ownerAuthorization)) {
+      !validSignedOwnerAuthorization(ownerAuthorization, { trustedOwner, trustedOwnerPublicKey })) {
     return { valid: false, reason: "cleanup-legacy-migration-authorization-invalid" };
   }
   if (legacyResource.kind !== inspectedResource.kind || legacyResource.id !== inspectedResource.id ||

@@ -72,10 +72,22 @@ test("controller records and advances an explicit ordered-queue entry", () => {
   const completed = structuredClone(record);
   completed.queueIndex = 0; completed.selectedEntry = "complete-delivery";
   completed.steps = completed.steps.map((step) => ({ ...step, status: "complete", evidence: { current: true } }));
-  const advanced = advanceControllerQueue(completed);
+  const registered = registerControllerResource(completed, {
+    kind: "branch", id: "completed-entry-branch", role: "implementation", headCommit: "a".repeat(40), recoveryReference: "completed-entry-recovery", ownershipToken: "completed-entry-token"
+  }, { now: started });
+  const delivered = bindControllerResourceDelivery(registered.record, {
+    kind: "branch", id: "completed-entry-branch",
+    deliveryEvidence: { current: true, reference: "pr-1", headCommit: "a".repeat(40), deliveredHeadCommit: "b".repeat(40), mergedPullRequest: { merged: true, pullRequest: "1", topicHeadCommit: "a".repeat(40), finalHeadCommit: "b".repeat(40) } }
+  });
+  const receipt = appendControllerCleanupReceipt(delivered.record, { kind: "branch", id: "completed-entry-branch", status: "completed" }, { now: started });
+  const advanced = advanceControllerQueue(receipt.record, { now: "2026-08-13T12:30:00.000Z" });
   assert.equal(advanced.valid, true);
   assert.equal(advanced.record.selectedEntry, "next-delivery");
   assert.equal(advanced.record.steps[0].status, "pending");
+  assert.deepEqual(advanced.record.resourceRecords, []);
+  assert.deepEqual(advanced.record.cleanupReceipts, []);
+  assert.equal(advanced.record.completedEntries[0].selectedEntry, "complete-delivery");
+  assert.equal(inspectControllerRecord(advanced.record, { authorization: queued, repository: "owner/repository", now: started }).nextPhase, "propose");
 });
 
 test("controller persists only in the git common-directory state root and advances ordered current evidence", () => {

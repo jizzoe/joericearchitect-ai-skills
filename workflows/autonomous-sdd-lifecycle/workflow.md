@@ -78,7 +78,9 @@ published choices, and perform no selection or mutation.
     resource against its own evidence, persist a terminal receipt outside target
     worktrees before removal, and record ineligible resources with their
     recovery state. Never infer or backfill ownership; a stranded legacy
-    resource requires a separately owner-authorized migration before audit.
+    resource requires a separately owner-authorized migration before audit. The
+    migration must verify an exact signed owner record against the configured
+    trusted owner key; a caller-computed digest is not sufficient.
 
 ## Required References
 

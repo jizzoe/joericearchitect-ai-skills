@@ -63,10 +63,11 @@ reference are already available outside it.
 
 ### Explicit migration for prior stranded resources
 
-Provide a separate migration input that requires explicit owner authorization
-and fresh local/GitHub inspection of an exact legacy resource. The migration
-creates one bounded record only; discovery, branch names, and conversation
-history never create records automatically.
+Provide a separate migration input that requires an explicit, exact signed
+owner authorization verified against a controlled trusted-owner key and fresh
+local/GitHub inspection of an exact legacy resource. The migration creates one
+bounded record only; discovery, branch names, conversation history, approval
+flags, and caller-computed digests never create records automatically.
 
 ## Risks / Trade-offs
 

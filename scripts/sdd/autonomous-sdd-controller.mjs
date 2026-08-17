@@ -57,6 +57,14 @@ function validResource(resource, { selectedEntry, repository, allowPending = tru
     evidence.mergedPullRequest.finalHeadCommit === evidence.deliveredHeadCommit;
 }
 
+function validCompletedEntry(entry, repository) {
+  return entry && text(entry.selectedEntry) && Array.isArray(entry.resourceRecords) && Array.isArray(entry.cleanupReceipts) &&
+    entry.resourceRecords.every((resource) => validResource(resource, { selectedEntry: entry.selectedEntry, repository })) &&
+    entry.cleanupReceipts.every((receipt) => receipt && ["started", "completed", "already-completed", "blocked"].includes(receipt.status) &&
+      ["worktree", "branch"].includes(receipt.kind) && text(receipt.id) && timestamp(receipt.at) && text(receipt.recoveryReference) &&
+      entry.resourceRecords.some((resource) => resource.kind === receipt.kind && resource.id === receipt.id && resource.recoveryReference === receipt.recoveryReference));
+}
+
 export function resolveControllerStateRoot({ repositoryPath, runGit = defaultRunGit } = {}) {
   if (!text(repositoryPath) || typeof runGit !== "function") return { valid: false, reason: "controller-state-root-input-invalid" };
   try {
@@ -86,7 +94,7 @@ export function createControllerRecord({ authorization, repository, checkpointPa
   return {
     valid: true,
     record: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       authorizationDigest: authorizationDigest(authorization),
       selectedEntry: entry,
       queueEntries: [...entries],
@@ -97,6 +105,7 @@ export function createControllerRecord({ authorization, repository, checkpointPa
       checkpointPath,
       resourceRecords: [],
       cleanupReceipts: [],
+      completedEntries: [],
       currentPhase: "propose",
       steps: phases.map((id) => ({ id, status: "pending" }))
     }
@@ -104,7 +113,7 @@ export function createControllerRecord({ authorization, repository, checkpointPa
 }
 
 export function registerControllerResource(record, resource, { now = new Date().toISOString() } = {}) {
-  if (record?.schemaVersion !== 2 || !timestamp(now) || !resource || !["worktree", "branch"].includes(resource.kind) ||
+  if (record?.schemaVersion !== 3 || !timestamp(now) || !resource || !["worktree", "branch"].includes(resource.kind) ||
       !text(resource.id) || !text(resource.role) || !fullCommit(resource.headCommit) || !text(resource.recoveryReference) ||
       resource.deliveryEvidence !== undefined) return { valid: false, reason: "controller-resource-registration-invalid" };
   const next = structuredClone(record);
@@ -129,7 +138,7 @@ export function registerControllerResource(record, resource, { now = new Date().
 }
 
 export function bindControllerResourceDelivery(record, { kind, id, deliveryEvidence } = {}) {
-  if (record?.schemaVersion !== 2 || !["worktree", "branch"].includes(kind) || !text(id)) return { valid: false, reason: "controller-resource-delivery-invalid" };
+  if (record?.schemaVersion !== 3 || !["worktree", "branch"].includes(kind) || !text(id)) return { valid: false, reason: "controller-resource-delivery-invalid" };
   const next = structuredClone(record);
   const resource = next.resourceRecords?.find((item) => item.kind === kind && item.id === id);
   if (!resource || resource.deliveryEvidence !== undefined) return { valid: false, reason: "controller-resource-delivery-invalid" };
@@ -139,7 +148,7 @@ export function bindControllerResourceDelivery(record, { kind, id, deliveryEvide
 }
 
 export function appendControllerCleanupReceipt(record, receipt, { now = new Date().toISOString() } = {}) {
-  if (record?.schemaVersion !== 2 || !timestamp(now) || !receipt || !["started", "completed", "already-completed", "blocked"].includes(receipt.status) ||
+  if (record?.schemaVersion !== 3 || !timestamp(now) || !receipt || !["started", "completed", "already-completed", "blocked"].includes(receipt.status) ||
       !["worktree", "branch"].includes(receipt.kind) || !text(receipt.id)) return { valid: false, reason: "controller-cleanup-receipt-invalid" };
   const next = structuredClone(record);
   const resource = next.resourceRecords?.find((item) => item.kind === receipt.kind && item.id === receipt.id);
@@ -158,24 +167,35 @@ export function persistControllerCleanupReceipt({ repositoryPath, record, receip
     : persisted;
 }
 
-export function advanceControllerQueue(record) {
+export function advanceControllerQueue(record, { now = new Date().toISOString() } = {}) {
   if (!Array.isArray(record?.queueEntries) || !Number.isInteger(record.queueIndex) || record.queueEntries[record.queueIndex] !== record.selectedEntry ||
-      record.steps?.some((step) => step.status !== "complete" || step.evidence?.current !== true)) return { valid: false, reason: "controller-queue-advance-invalid" };
+      record.steps?.some((step) => step.status !== "complete" || step.evidence?.current !== true) || !timestamp(now)) return { valid: false, reason: "controller-queue-advance-invalid" };
   const nextIndex = record.queueIndex + 1;
   if (nextIndex >= record.queueEntries.length) return { valid: false, reason: "controller-queue-complete" };
   const next = structuredClone(record);
+  if (!Array.isArray(next.resourceRecords) || !Array.isArray(next.cleanupReceipts) || !Array.isArray(next.completedEntries) ||
+      !next.resourceRecords.every((resource) => validResource(resource, next))) return { valid: false, reason: "controller-queue-advance-invalid" };
+  next.completedEntries.push({
+    selectedEntry: next.selectedEntry,
+    completedAt: now,
+    resourceRecords: next.resourceRecords,
+    cleanupReceipts: next.cleanupReceipts
+  });
   next.queueIndex = nextIndex;
   next.selectedEntry = next.queueEntries[nextIndex];
+  next.resourceRecords = [];
+  next.cleanupReceipts = [];
   next.currentPhase = "propose";
   next.steps = phases.map((id) => ({ id, status: "pending" }));
   return { valid: true, record: next };
 }
 
 export function inspectControllerRecord(record, { authorization, repository, now = new Date().toISOString() } = {}) {
-  if (!record || record.schemaVersion === 1) return { classification: "paused", reason: "controller-record-legacy", nextPhase: null };
-  if (record.schemaVersion !== 2 || !text(record.selectedEntry) || !text(record.repository) || !text(record.checkpointPath) || !Array.isArray(record.steps) ||
-      !Array.isArray(record.resourceRecords) || !Array.isArray(record.cleanupReceipts) ||
-      record.resourceRecords.some((resource) => !validResource(resource, record))) {
+  if (!record || record.schemaVersion === 1 || record.schemaVersion === 2) return { classification: "paused", reason: "controller-record-legacy", nextPhase: null };
+  if (record.schemaVersion !== 3 || !text(record.selectedEntry) || !text(record.repository) || !text(record.checkpointPath) || !Array.isArray(record.steps) ||
+      !Array.isArray(record.resourceRecords) || !Array.isArray(record.cleanupReceipts) || !Array.isArray(record.completedEntries) ||
+      record.resourceRecords.some((resource) => !validResource(resource, record)) ||
+      record.completedEntries.some((entry) => !validCompletedEntry(entry, record.repository))) {
     return { classification: "paused", reason: "controller-record-invalid", nextPhase: null };
   }
   if (!selectedByAuthorization(record.selectedEntry, authorization) || record.repository !== repository || record.authorizationDigest !== authorizationDigest(authorization) || record.expiresAt !== authorization?.expiresAt) {

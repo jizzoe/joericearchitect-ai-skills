@@ -15,8 +15,10 @@ destructive local action.
 Never infer ownership, touch legacy or dirty resources, remove a primary or
 locked worktree, delete remote branches, reset content, or widen the selected
 entry. A legacy resource may be considered only after a separate exact
-owner-authorized migration and fresh inspection. Resume from recorded outcomes
-after partial execution.
+owner-authorized migration and fresh inspection. A migration authorization must
+be an exact signed owner record verified against a controlled trusted-owner key;
+an approval flag, digest, or chat reference alone is not authorization. Resume
+from recorded outcomes after partial execution.
 
 ## Guardrails
 
