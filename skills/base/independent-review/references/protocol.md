@@ -64,8 +64,11 @@ alone is never trusted.
 If the managed implementation sandbox denies owned worktree creation, the
 direct parent strict transport, or Claude's strict sandbox, record the
 applicable stable unavailable code. A package-only same-session retry is not
-an acceptable substitute. Only after strict unavailability is durable may the
-runner invoke the configured
+an acceptable substitute. The typed Codex parent result-artifact outcome
+`review-launcher-codex-result-artifact-missing` is also eligible for the
+Codex launcher only when the active `strict-first-degraded` authorization and
+every exact package, identity, expiration, runtime, and lifecycle binding
+validate. Only after such strict unavailability is durable may the runner invoke the configured
 `codex-detached-read-only-v1` or `claude-detached-restricted-v1` launcher when
 the current change, transition, base, head, manifest, expiration, degraded
 authorization, launcher ID, runtime permission, and non-empty distinct
@@ -153,6 +156,11 @@ conclusion, and reports enforced, unavailable, and instruction-constrained
 controls. It is never called strict-isolated; missing freshness, sealed input,
 detached view, non-mutation boundary, authorization, or expiration returns
 `unavailable`.
+
+For the Codex launcher, the named owned-result-artifact failure above remains a
+strict unavailable precursor, not review evidence. A successful fallback
+retains it and is labelled `authorized-degraded`; it cannot satisfy a
+`strict-only` delivery or be relabelled as strict isolation.
 
 ## Feedback and Recovery
 

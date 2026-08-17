@@ -27,7 +27,11 @@ const launcherDefinitions = Object.freeze({
   "codex-detached-read-only-v1": Object.freeze({
     executableNames: Object.freeze(["codex", "codex.exe"]),
     boundary: "detached-exact-head-inner-read-only",
-    recoverableFailures: Object.freeze(["independent-review-view-create-failed", "independent-reviewer-nested-app-server-denied"]),
+    recoverableFailures: Object.freeze([
+      "independent-review-view-create-failed",
+      "independent-reviewer-nested-app-server-denied",
+      "review-launcher-codex-result-artifact-missing"
+    ]),
     requiredCapability: "innerReadOnlySandbox",
     innerBoundary: "read-only-sandbox"
   }),

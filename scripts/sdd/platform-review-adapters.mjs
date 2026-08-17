@@ -545,36 +545,44 @@ export function consumeCodexParentStrictReviewToolResult({ toolRequest, toolResu
   // The structural seal fixes resultPath, so every subsequent completed
   // receipt can record its owned-artifact state even when a later acceptance
   // condition (such as expiry or identity change) fails.
+  const unavailableForState = (diagnostic) => unavailable(diagnostic.code, {
+    reviewPackage: state.reviewPackage,
+    adapter: "codex",
+    reviewer: state.configuredReviewer,
+    attestationRef: state.configuredReviewer?.attestation?.ref,
+    startedAt: state.startedAt,
+    executionId: state.executionId
+  });
   const inspected = inspectResult(state.resultPath);
   if (Date.parse(state.expiresAt) <= Date.parse(clock())) {
     const cleanup = cleanupView();
     const diagnostic = createReviewDiagnostic({ stage: "parent-transport", operation: "consume-codex-strict-review-tool", code: "independent-reviewer-parent-strict-request-expired", category: "request-expired", subject: "strict-review-tool-request", safeMessage: "The strict Codex parent-tool request expired before its result was accepted." });
-    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: strictArtifactReceiptDiagnostics(inspected) });
+    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: strictArtifactReceiptDiagnostics(inspected), result: unavailableForState(diagnostic) });
   }
   if (!verifyExecutable(state.executableIdentity)) {
     const cleanup = cleanupView();
     const diagnostic = createReviewDiagnostic({ stage: "parent-transport", operation: "verify-codex-reviewer-executable", code: "independent-reviewer-codex-executable-identity-changed", category: "verification-failed", subject: "codex-reviewer-executable", safeMessage: "The configured Codex executable changed after the strict request was prepared." });
-    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: strictArtifactReceiptDiagnostics(inspected) });
+    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: strictArtifactReceiptDiagnostics(inspected), result: unavailableForState(diagnostic) });
   }
   if (toolResult?.exit_code !== 0) {
     const diagnostic = diagnoseCodexExecutionFailure({ status: toolResult?.exit_code, stderr: toolResult?.output ?? "" }, { resultMissing: true });
     const cleanup = cleanupView();
-    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: strictArtifactReceiptDiagnostics(inspected) });
+    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: strictArtifactReceiptDiagnostics(inspected), result: unavailableForState(diagnostic) });
   }
   if (!inspected?.available) {
     const cleanup = cleanupView();
-    return strictParentUnavailable(inspected.diagnostic, cleanup, { diagnostics: inspected.diagnostics });
+    return strictParentUnavailable(inspected.diagnostic, cleanup, { diagnostics: inspected.diagnostics, result: unavailableForState(inspected.diagnostic) });
   }
   const sealed = sealPayload({ payload: inspected.payload, reviewPackage: state.reviewPackage, reviewer: state.configuredReviewer, reviewPath: state.view.reviewPath, executionId: state.executionId, startedAt: state.startedAt, completedAt: clock() });
   const validation = validateResult(sealed?.result, { expectedPackage: state.reviewPackage, configuredReviewer: state.configuredReviewer, implementerSession: state.implementerSession });
   const cleanup = cleanupView();
   if (!sealed || !validation.valid) {
     const diagnostic = diagnosticFromCode({ stage: "result-validation", operation: "validate-codex-parent-strict-result", code: validation?.issues?.[0]?.code ?? "independent-reviewer-parent-strict-result-invalid", subject: "strict-review-result", safeMessage: "The strict Codex result failed canonical validation." });
-    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: inspected.diagnostics });
+    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: inspected.diagnostics, result: unavailableForState(diagnostic) });
   }
   if (cleanup?.removed !== true) {
     const diagnostic = cleanup?.diagnostic ?? diagnosticFromCode({ stage: "view-cleanup", operation: "remove-codex-parent-strict-view", code: "independent-reviewer-parent-strict-cleanup-failed", subject: "strict-review-view", safeMessage: "The strict Codex review completed but its owned view could not be removed." });
-    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: inspected.diagnostics });
+    return strictParentUnavailable(diagnostic, cleanup, { diagnostics: inspected.diagnostics, result: unavailableForState(diagnostic) });
   }
   return {
     status: sealed.result.status,
