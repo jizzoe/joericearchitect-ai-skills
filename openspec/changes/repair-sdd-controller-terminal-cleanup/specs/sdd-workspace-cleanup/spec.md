@@ -54,7 +54,11 @@ Cleanup SHALL require visible archive, recorded delivery proof, a closed issue,
 and configured Project Done evidence. It MUST accept squash or rebase delivery
 only through exact pull-request and final-head evidence. Cleanup MUST evaluate
 each registered resource against its own current delivery binding and retain a
-terminal outcome receipt outside removable worktrees.
+terminal outcome receipt outside removable worktrees. If a fresh inspection
+finds an exactly registered resource already absent, cleanup MUST persist an
+`already-completed` receipt rather than treating it as ineligible. If a second
+fresh inspection mismatches the planned resource, cleanup MUST persist a
+blocked recovery receipt and perform no destructive action.
 
 #### Scenario: Squash-delivered branch is reconciled
 - **WHEN** exact merged pull-request evidence proves recorded final-head squash or rebase delivery
@@ -63,6 +67,18 @@ terminal outcome receipt outside removable worktrees.
 #### Scenario: Delivery evidence is stale
 - **WHEN** archive, issue, Project, or pull-request evidence is absent, stale, or mismatched
 - **THEN** cleanup pauses mutation and records the first unmet evidence boundary
+
+#### Scenario: Resource disappeared after an interrupted cleanup
+- **WHEN** fresh inspection finds an exact registered resource absent before
+  cleanup action execution
+- **THEN** cleanup persists an `already-completed` receipt and resumes without
+  attempting removal
+
+#### Scenario: Resource changes after cleanup planning
+- **WHEN** the second fresh inspection no longer matches the exact planned
+  resource
+- **THEN** cleanup persists a blocked recovery receipt and leaves the resource
+  unchanged
 
 #### Scenario: Multiple lifecycle branches have distinct delivery heads
 - **WHEN** registered implementation, Sync, and Archive branches each have a

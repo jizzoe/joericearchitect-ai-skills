@@ -81,6 +81,14 @@ test("cleanup rejects malformed resource delivery evidence and stale fresh inspe
   });
   assert.equal(result.classification, "partial");
   assert.equal(result.outcomes[0].receipt, "fresh-resource-mismatch");
+  const persisted = [];
+  const durable = executeWorkspaceCleanup(plan, {
+    inspectResource: (item) => ({ ...item, exists: true, clean: false }),
+    deleteLocalBranch: () => ({ committed: true }),
+    persistOutcome: (outcome) => { persisted.push(outcome.status); return { persisted: true }; }
+  });
+  assert.equal(durable.outcomes[0].status, "blocked");
+  assert.deepEqual(persisted, ["blocked"]);
 });
 
 test("squash cleanup binds the topic head and distinct delivered head to one merged pull request", () => {

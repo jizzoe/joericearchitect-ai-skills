@@ -313,6 +313,7 @@ export function executeControllerLifecycleCleanup({ repositoryPath, record, clea
     inspectedResources = (record?.resourceRecords ?? []).map((resource) => {
       const inspected = operations.inspectResource(resource);
       if (!inspected || typeof inspected !== "object") return inspected;
+      if (inspected.exists === false) return inspected;
       const { exists, ...eligibility } = inspected;
       return eligibility;
     });

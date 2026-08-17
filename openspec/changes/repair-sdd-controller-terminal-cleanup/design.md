@@ -89,6 +89,12 @@ The generic phase-advance and ordered-queue paths enforce the same invariant,
 so a caller cannot bypass receipt-coupled cleanup by marking lifecycle steps
 complete in memory.
 
+If a resource is absent at fresh inspection, its immutable registry and
+delivery binding still permit an `already-completed` receipt; no mutable
+eligibility inference or destructive action is needed. If the second inspection
+no longer matches the plan, the controller records a blocked receipt before
+pausing, leaving a durable recovery point for every terminal outcome.
+
 ### Explicit migration for prior stranded resources
 
 Provide a separate migration input that requires an explicit, exact signed

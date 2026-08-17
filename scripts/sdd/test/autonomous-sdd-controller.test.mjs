@@ -221,6 +221,9 @@ test("controller cleanup plans from fresh worktree eligibility and refuses an in
     assert.equal(cleanup.record.cleanupReceipts.at(-1).status, "completed");
     const refused = executeControllerLifecycleCleanup({ repositoryPath: root, record: delivered.record, cleanupContext, operations: { inspectResource: (resource) => ({ ...resource, exists: true }) }, runGit });
     assert.equal(refused.reason, "controller-cleanup-resource-ineligible");
+    const absent = executeControllerLifecycleCleanup({ repositoryPath: root, record: delivered.record, cleanupContext, operations: { inspectResource: (resource) => ({ ...resource, exists: false }), removeWorktree: () => ({ committed: true }) }, runGit });
+    assert.equal(absent.classification, "completed");
+    assert.equal(absent.record.cleanupReceipts.at(-1).status, "already-completed");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

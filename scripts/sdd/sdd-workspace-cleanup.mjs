@@ -76,6 +76,12 @@ export function planWorkspaceCleanup({ selectedEntry, repository, archiveVisible
   if (!archiveVisible || !issueClosed || !projectDone || !fullCommit(deliveryEvidence?.headCommit) || !exactEvidence(deliveryEvidence, deliveryEvidence.headCommit)) return { classification: "paused", reason: "cleanup-delivery-evidence-incomplete", resources: [] };
   const planned = resources.map((resource) => {
     if (!exactResource(resource, { selectedEntry, repository })) return ineligible(resource, "cleanup-resource-record-invalid");
+    if (resource.exists === false) {
+      const action = resource.kind === "worktree"
+        ? { kind: "remove-worktree", id: resource.id, resource, deliveryEvidence: resource.deliveryEvidence, finalizationEvidence: deliveryEvidence }
+        : { kind: "delete-local-branch", id: resource.id, force: exactMergedPullRequest(resource.squashOrRebaseEvidence, resource.headCommit, resource.deliveryEvidence.deliveredHeadCommit), resource, deliveryEvidence: resource.deliveryEvidence, finalizationEvidence: deliveryEvidence };
+      return { id: resource.id, classification: "eligible", actions: [action] };
+    }
     if (resource.kind === "worktree") {
       if (resource.controllerCheckpointPresent === true && resource.terminalReceiptReady !== true) return ineligible(resource, "cleanup-controller-checkpoint-retention-incomplete");
       if (resource.primary || resource.locked || resource.registered !== true || resource.clean !== true || !text(resource.ownershipToken)) return ineligible(resource, "cleanup-worktree-ineligible");
@@ -129,7 +135,8 @@ export function executeWorkspaceCleanup(plan, { removeWorktree, deleteLocalBranc
       continue;
     }
     if (!freshResourceMatches(action, current)) {
-      outcomes.push({ ...action, status: "blocked", receipt: "fresh-resource-mismatch" });
+      const outcome = { ...action, status: "blocked", receipt: "fresh-resource-mismatch" };
+      outcomes.push(persistOutcome(outcome)?.persisted === true ? outcome : { ...outcome, receipt: "outcome-persist-failed" });
       continue;
     }
     if (persistOutcome({ ...action, status: "started" })?.persisted !== true) {
