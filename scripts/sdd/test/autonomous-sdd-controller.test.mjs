@@ -73,7 +73,7 @@ test("controller records and advances an explicit ordered-queue entry", () => {
   completed.queueIndex = 0; completed.selectedEntry = "complete-delivery";
   completed.steps = completed.steps.map((step) => ({ ...step, status: "complete", evidence: { current: true } }));
   const registered = registerControllerResource(completed, {
-    kind: "branch", id: "completed-entry-branch", role: "implementation", headCommit: "a".repeat(40), recoveryReference: "completed-entry-recovery", ownershipToken: "completed-entry-token"
+    kind: "branch", id: "completed-entry-branch", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "completed-entry-recovery", ownershipToken: "completed-entry-token"
   }, { now: started });
   const delivered = bindControllerResourceDelivery(registered.record, {
     kind: "branch", id: "completed-entry-branch",
@@ -90,7 +90,7 @@ test("controller records and advances an explicit ordered-queue entry", () => {
   assert.equal(inspectControllerRecord(advanced.record, { authorization: queued, repository: "owner/repository", now: started }).nextPhase, "propose");
 
   const pending = registerControllerResource(completed, {
-    kind: "branch", id: "undelivered-entry-branch", role: "implementation", headCommit: "c".repeat(40), recoveryReference: "undelivered-entry-recovery", ownershipToken: "undelivered-entry-token"
+    kind: "branch", id: "undelivered-entry-branch", role: "implementation", registeredHeadCommit: "c".repeat(40), recoveryReference: "undelivered-entry-recovery", ownershipToken: "undelivered-entry-token"
   }, { now: started });
   assert.equal(advanceControllerQueue(pending.record, { now: "2026-08-13T12:30:00.000Z" }).reason, "controller-queue-advance-invalid");
 });
@@ -122,11 +122,11 @@ test("controller persists only in the git common-directory state root and advanc
 
 test("controller registers independently delivered lifecycle resources and durable cleanup receipts", () => {
   const implementation = registerControllerResource(created.record, {
-    kind: "worktree", id: "implementation-worktree", role: "implementation", headCommit: "a".repeat(40), recoveryReference: "recovery-1", ownershipToken: "token-1"
+    kind: "worktree", id: "implementation-worktree", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "recovery-1", ownershipToken: "token-1"
   }, { now: started });
   assert.equal(implementation.valid, true);
   assert.equal(registerControllerResource(implementation.record, {
-    kind: "worktree", id: "implementation-worktree", role: "implementation", headCommit: "a".repeat(40), recoveryReference: "recovery-1"
+    kind: "worktree", id: "implementation-worktree", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "recovery-1"
   }, { now: started }).reason, "controller-resource-registration-duplicate");
   const delivered = bindControllerResourceDelivery(implementation.record, {
     kind: "worktree", id: "implementation-worktree",
@@ -146,7 +146,7 @@ test("cleanup receipts persist outside the registered target worktree", () => {
   try {
     fs.mkdirSync(path.join(root, ".git"));
     const registered = registerControllerResource(created.record, {
-      kind: "worktree", id: "target-worktree", role: "archive", headCommit: "a".repeat(40), recoveryReference: "recovery-2", ownershipToken: "token-2"
+      kind: "worktree", id: "target-worktree", role: "archive", registeredHeadCommit: "a".repeat(40), recoveryReference: "recovery-2", ownershipToken: "token-2"
     }, { now: started });
     const delivered = bindControllerResourceDelivery(registered.record, {
       kind: "worktree", id: "target-worktree",

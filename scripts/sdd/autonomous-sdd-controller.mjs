@@ -47,22 +47,26 @@ function defaultRunGit(repositoryPath) {
 function validResource(resource, { selectedEntry, repository } = {}, { allowPending = true } = {}) {
   if (!resource || resource.entry !== selectedEntry || resource.repository !== repository ||
       !["worktree", "branch"].includes(resource.kind) || !text(resource.id) || !text(resource.role) ||
-      !fullCommit(resource.headCommit) || !text(resource.ownershipToken) || !text(resource.recoveryReference) ||
+      !fullCommit(resource.registeredHeadCommit) || !text(resource.ownershipToken) || !text(resource.recoveryReference) ||
       resource.owned !== true || !timestamp(resource.registeredAt)) return false;
-  if (resource.deliveryEvidence === undefined) return allowPending;
+  if (resource.deliveryEvidence === undefined) return allowPending && resource.headCommit === undefined;
   const evidence = resource.deliveryEvidence;
-  return evidence?.current === true && text(evidence.reference) && evidence.headCommit === resource.headCommit &&
+  return fullCommit(resource.headCommit) && evidence?.current === true && text(evidence.reference) && evidence.headCommit === resource.headCommit &&
     fullCommit(evidence.deliveredHeadCommit) && evidence.mergedPullRequest?.merged === true &&
     text(evidence.mergedPullRequest.pullRequest) && evidence.mergedPullRequest.topicHeadCommit === resource.headCommit &&
     evidence.mergedPullRequest.finalHeadCommit === evidence.deliveredHeadCommit;
 }
 
 function validCompletedEntry(entry, repository) {
+  const receiptValid = (receipt) => receipt && ["started", "completed", "already-completed", "blocked"].includes(receipt.status) &&
+      ["worktree", "branch"].includes(receipt.kind) && text(receipt.id) && timestamp(receipt.at) && text(receipt.recoveryReference) &&
+      entry.resourceRecords.some((resource) => resource.kind === receipt.kind && resource.id === receipt.id && resource.recoveryReference === receipt.recoveryReference);
   return entry && text(entry.selectedEntry) && Array.isArray(entry.resourceRecords) && Array.isArray(entry.cleanupReceipts) &&
     entry.resourceRecords.every((resource) => validResource(resource, { selectedEntry: entry.selectedEntry, repository }, { allowPending: false })) &&
-    entry.cleanupReceipts.every((receipt) => receipt && ["started", "completed", "already-completed", "blocked"].includes(receipt.status) &&
-      ["worktree", "branch"].includes(receipt.kind) && text(receipt.id) && timestamp(receipt.at) && text(receipt.recoveryReference) &&
-      entry.resourceRecords.some((resource) => resource.kind === receipt.kind && resource.id === receipt.id && resource.recoveryReference === receipt.recoveryReference));
+    entry.cleanupReceipts.every(receiptValid) && entry.resourceRecords.every((resource) => {
+      const receipts = entry.cleanupReceipts.filter((receipt) => receipt.kind === resource.kind && receipt.id === resource.id);
+      return receipts.length > 0 && ["completed", "already-completed"].includes(receipts.at(-1).status);
+    });
 }
 
 export function resolveControllerStateRoot({ repositoryPath, runGit = defaultRunGit } = {}) {
@@ -114,7 +118,7 @@ export function createControllerRecord({ authorization, repository, checkpointPa
 
 export function registerControllerResource(record, resource, { now = new Date().toISOString() } = {}) {
   if (record?.schemaVersion !== 3 || !timestamp(now) || !resource || !["worktree", "branch"].includes(resource.kind) ||
-      !text(resource.id) || !text(resource.role) || !fullCommit(resource.headCommit) || !text(resource.recoveryReference) ||
+      !text(resource.id) || !text(resource.role) || !fullCommit(resource.registeredHeadCommit) || !text(resource.recoveryReference) ||
       resource.deliveryEvidence !== undefined) return { valid: false, reason: "controller-resource-registration-invalid" };
   const next = structuredClone(record);
   if (!Array.isArray(next.resourceRecords) || next.resourceRecords.some((item) => item.kind === resource.kind && item.id === resource.id)) {
@@ -126,7 +130,7 @@ export function registerControllerResource(record, resource, { now = new Date().
     kind: resource.kind,
     id: resource.id,
     role: resource.role,
-    headCommit: resource.headCommit,
+    registeredHeadCommit: resource.registeredHeadCommit,
     ownershipToken: resource.ownershipToken ?? crypto.randomUUID(),
     recoveryReference: resource.recoveryReference,
     owned: true,
@@ -142,6 +146,7 @@ export function bindControllerResourceDelivery(record, { kind, id, deliveryEvide
   const next = structuredClone(record);
   const resource = next.resourceRecords?.find((item) => item.kind === kind && item.id === id);
   if (!resource || resource.deliveryEvidence !== undefined) return { valid: false, reason: "controller-resource-delivery-invalid" };
+  resource.headCommit = deliveryEvidence?.headCommit;
   resource.deliveryEvidence = structuredClone(deliveryEvidence);
   if (!validResource(resource, next, { allowPending: false })) return { valid: false, reason: "controller-resource-delivery-invalid" };
   return { valid: true, record: next };
@@ -174,7 +179,7 @@ export function advanceControllerQueue(record, { now = new Date().toISOString() 
   if (nextIndex >= record.queueEntries.length) return { valid: false, reason: "controller-queue-complete" };
   const next = structuredClone(record);
   if (!Array.isArray(next.resourceRecords) || !Array.isArray(next.cleanupReceipts) || !Array.isArray(next.completedEntries) ||
-      !next.resourceRecords.every((resource) => validResource(resource, next, { allowPending: false }))) return { valid: false, reason: "controller-queue-advance-invalid" };
+      !validCompletedEntry({ selectedEntry: next.selectedEntry, resourceRecords: next.resourceRecords, cleanupReceipts: next.cleanupReceipts }, next.repository)) return { valid: false, reason: "controller-queue-advance-invalid" };
   next.completedEntries.push({
     selectedEntry: next.selectedEntry,
     completedAt: now,

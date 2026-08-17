@@ -17,10 +17,10 @@ locked worktree, delete remote branches, reset content, or widen the selected
 entry. A legacy resource may be considered only after a separate exact
 owner-authorized migration and fresh inspection. A migration authorization must
 be an exact signed owner record verified against a controlled trusted-owner key
-and bind the inspected resource's kind, identity, head, ownership/recovery
-tokens, and delivery evidence; an approval flag, digest, or chat reference
-alone is not authorization. Resume from recorded outcomes after partial
-execution.
+and bind every cleanup-relevant freshly inspected resource field; construct the
+migrated record from that inspection rather than legacy values. An approval
+flag, digest, or chat reference alone is not authorization. Resume from
+recorded outcomes after partial execution.
 
 ## Guardrails
 

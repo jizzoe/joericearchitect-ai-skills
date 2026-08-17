@@ -119,7 +119,8 @@ test("legacy migration requires exact owner authorization and fresh matching ins
   const legacy = resource({ kind: "branch", id: "stranded", registeredAt: undefined });
   const rejected = migrateLegacyWorkspaceResource({ selectedEntry: "complete-delivery", repository: "owner/repository", legacyResource: legacy, inspectedResource: legacy, now: "2026-08-13T13:00:00.000Z" });
   assert.equal(rejected.reason, "cleanup-legacy-migration-authorization-invalid");
-  const ownerAuthorization = { approved: true, owner: "repository-owner", entry: "complete-delivery", repository: "owner/repository", kind: "branch", id: "stranded", reviewedAt: "2026-08-13T12:30:00.000Z", reference: "owner-record-1", resourceBinding: { kind: legacy.kind, id: legacy.id, headCommit: legacy.headCommit, recoveryReference: legacy.recoveryReference, ownershipToken: legacy.ownershipToken, deliveryEvidence: legacy.deliveryEvidence } };
+  const { entry, repository, registeredAt, migration, ...resourceBinding } = legacy;
+  const ownerAuthorization = { approved: true, owner: "repository-owner", entry: "complete-delivery", repository: "owner/repository", kind: "branch", id: "stranded", reviewedAt: "2026-08-13T12:30:00.000Z", reference: "owner-record-1", resourceBinding };
   const keyPair = crypto.generateKeyPairSync("ed25519");
   ownerAuthorization.signatureAlgorithm = "ed25519";
   ownerAuthorization.signature = crypto.sign(null, Buffer.from(JSON.stringify(legacyMigrationAuthorizationPayload(ownerAuthorization))), keyPair.privateKey).toString("base64");

@@ -26,14 +26,9 @@ export function legacyMigrationAuthorizationPayload(authorization) {
 }
 
 function migrationResourceBinding(resource) {
-  return resource && {
-    kind: resource.kind,
-    id: resource.id,
-    headCommit: resource.headCommit,
-    recoveryReference: resource.recoveryReference,
-    ownershipToken: resource.ownershipToken,
-    deliveryEvidence: resource.deliveryEvidence
-  };
+  if (!resource || typeof resource !== "object") return null;
+  const { entry, repository, registeredAt, migration, ...binding } = resource;
+  return canonical(binding);
 }
 
 function validSignedOwnerAuthorization(authorization, { trustedOwner, trustedOwnerPublicKey } = {}) {
@@ -102,17 +97,15 @@ export function migrateLegacyWorkspaceResource({ selectedEntry, repository, lega
       !validSignedOwnerAuthorization(ownerAuthorization, { trustedOwner, trustedOwnerPublicKey })) {
     return { valid: false, reason: "cleanup-legacy-migration-authorization-invalid" };
   }
-  if (legacyResource.kind !== inspectedResource.kind || legacyResource.id !== inspectedResource.id ||
-      legacyResource.headCommit !== inspectedResource.headCommit || !fullCommit(legacyResource.headCommit) ||
-      !text(legacyResource.role) || !text(legacyResource.recoveryReference) || !text(legacyResource.ownershipToken) ||
-      !legacyResource.deliveryEvidence || JSON.stringify(canonical(legacyResource.deliveryEvidence)) !== JSON.stringify(canonical(inspectedResource.deliveryEvidence))) {
+  if (!fullCommit(legacyResource.headCommit) ||
+      JSON.stringify(migrationResourceBinding(legacyResource)) !== JSON.stringify(migrationResourceBinding(inspectedResource))) {
     return { valid: false, reason: "cleanup-legacy-migration-inspection-mismatch" };
   }
   if (JSON.stringify(canonical(ownerAuthorization.resourceBinding)) !== JSON.stringify(canonical(migrationResourceBinding(inspectedResource)))) {
     return { valid: false, reason: "cleanup-legacy-migration-authorization-invalid" };
   }
   const migrated = {
-    ...structuredClone(legacyResource), entry: selectedEntry, repository, owned: true,
+    ...structuredClone(inspectedResource), entry: selectedEntry, repository, owned: true,
     registeredAt: now,
     migration: { reviewedAt: ownerAuthorization.reviewedAt, authorizationReference: ownerAuthorization.reference ?? "owner-authorized" }
   };

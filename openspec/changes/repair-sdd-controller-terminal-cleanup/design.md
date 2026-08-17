@@ -44,9 +44,10 @@ rejected because it cannot provide durable local recovery.
 
 Extend the controller record with an append-only resource registry. Before an
 implementation, Sync, or Archive worktree/branch is created or selected, write
-its immutable ownership fields and a generated ownership token. When its PR
-merges, update only that resource's delivery binding with its exact topic head,
-merged PR, and delivered default-branch head.
+its immutable ownership fields, pre-creation registered head, and a generated
+ownership token. When its PR merges, bind the resource's final topic head with
+its exact merged PR and delivered default-branch head; the evolving topic head
+is not required to equal the head recorded before implementation.
 
 The cleanup planner consumes this registry and evaluates resources separately.
 This is preferred to one global final delivery head, which fails valid earlier
@@ -65,9 +66,9 @@ reference are already available outside it.
 
 Provide a separate migration input that requires an explicit, exact signed
 owner authorization verified against a controlled trusted-owner key and bound
-to the inspected resource's exact identity, head, ownership/recovery tokens,
-and delivery evidence. It also requires fresh local/GitHub inspection of that
-exact legacy resource. The migration creates one bounded record only;
+to every cleanup-relevant inspected field. It also requires fresh local/GitHub
+inspection of that exact legacy resource and creates the migrated record from
+the inspected values, not stale legacy data. The migration creates one bounded record only;
 discovery, branch names, conversation history, approval flags, and
 caller-computed digests never create records automatically.
 
