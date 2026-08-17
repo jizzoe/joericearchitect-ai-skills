@@ -79,6 +79,18 @@
       "expect": "Archive proceeds only after content-preserving move evidence"
     },
     {
+      "id": "per-resource-terminal-cleanup",
+      "kind": "complete",
+      "gate": "cleanup",
+      "expect": "Registered implementation, Sync, and Archive resources retain independent merged delivery bindings and external cleanup receipts"
+    },
+    {
+      "id": "legacy-cleanup-migration-required",
+      "kind": "stop",
+      "gate": "cleanup",
+      "expect": "An unregistered historical resource remains intact until one exact owner-authorized migration passes fresh inspection"
+    },
+    {
       "id": "stale-evidence",
       "kind": "stop",
       "gate": "any",

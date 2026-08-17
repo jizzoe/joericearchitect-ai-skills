@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "skill": "base-code-review",
+  "status": "completed",
+  "mode": "interactive",
+  "summary": "Bounded local review found no remaining findings in the controller-state, resource-evidence, cleanup, documentation, and fixture changes.",
+  "artifacts": [
+    { "kind": "file", "operation": "read", "subject": "scripts/sdd/autonomous-sdd-controller.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/sdd/sdd-workspace-cleanup.mjs" }
+  ],
+  "evidence": [
+    { "id": "full-tests", "type": "test", "subject": "repository Node test suite", "result": "passed", "reference": "node --test scripts/sdd/test/*.test.mjs scripts/validation/test/*.test.mjs evals/skills/implementation-quality/run-fixtures.test.mjs evals/skills/autonomous-goal-runner/*.test.mjs evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs" },
+    { "id": "strict-openspec", "type": "validation", "subject": "OpenSpec strict validation", "result": "passed", "reference": "openspec validate --all --strict" },
+    { "id": "reviewed-diff", "type": "review", "subject": "bounded controller terminal-cleanup diff", "result": "passed", "reference": "git diff -- scripts/sdd/autonomous-sdd-controller.mjs scripts/sdd/sdd-workspace-cleanup.mjs" }
+  ],
+  "assumptions": [
+    "Lifecycle resource creation is performed through the documented controller interface until a dedicated executor is introduced."
+  ],
+  "openQuestions": [],
+  "nextAction": { "kind": "continue", "description": "Run formal OpenSpec Verify before any delivery action." },
+  "details": {
+    "reviewedScope": {
+      "targets": [
+        "scripts/sdd/autonomous-sdd-controller.mjs",
+        "scripts/sdd/sdd-workspace-cleanup.mjs",
+        "scripts/sdd/test/autonomous-sdd-controller.test.mjs",
+        "scripts/sdd/test/sdd-workspace-cleanup.test.mjs",
+        "workflows/autonomous-sdd-lifecycle/workflow.md",
+        "workflows/autonomous-sdd-lifecycle/references/delivery.md",
+        "skills/base/autonomous-sdd-delivery/SKILL.md",
+        "skills/base/sdd-workspace-cleanup/SKILL.md",
+        "evals/workflows/autonomous-sdd-lifecycle/scenarios.json",
+        "evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs"
+      ],
+      "contextPaths": [
+        "openspec/changes/repair-sdd-controller-terminal-cleanup/proposal.md",
+        "openspec/changes/repair-sdd-controller-terminal-cleanup/specs/autonomous-sdd-continuation/spec.md",
+        "openspec/changes/repair-sdd-controller-terminal-cleanup/specs/sdd-workspace-cleanup/spec.md",
+        "openspec/changes/repair-sdd-controller-terminal-cleanup/design.md",
+        "openspec/changes/repair-sdd-controller-terminal-cleanup/tasks.md"
+      ],
+      "evidenceIds": ["full-tests", "strict-openspec", "reviewed-diff"]
+    },
+    "findings": [],
+    "coverage": [
+      { "area": "requirements and behavior", "status": "reviewed", "evidenceIds": ["reviewed-diff", "strict-openspec"] },
+      { "area": "tests and eval quality", "status": "reviewed", "evidenceIds": ["full-tests"] },
+      { "area": "input, authorization, recovery, and destructive-action safety", "status": "reviewed", "evidenceIds": ["reviewed-diff", "full-tests"] },
+      { "area": "secrets, dependencies, portability, generated artifacts, and accessibility", "status": "reviewed", "evidenceIds": ["reviewed-diff", "full-tests"] }
+    ],
+    "evidenceGaps": [],
+    "scopeSummary": "Reviewed the bounded terminal-cleanup repair against its OpenSpec proposal, two modified capability specifications, design, tasks, focused tests, full test suite, and strict OpenSpec validation."
+  }
+}

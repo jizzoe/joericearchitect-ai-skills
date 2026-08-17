@@ -21,9 +21,13 @@ published choices, and perform no selection or mutation.
    Projects, pull requests, living specs, archive paths, and current evidence.
 2. Select one change through the authorized queue or dependency-aware policy.
 3. Create or resume the versioned selected-entry controller record before a
-   lifecycle action. It binds normalized authorization, selected entry,
-   repository, expiry, checkpoint reference, and current phase; it contains no
-   credentials or standing approval.
+   lifecycle action. Persist it in the repository's Git common-directory state
+   root, not in a removable worktree. It binds normalized authorization,
+   selected entry, repository, expiry, checkpoint reference, and current phase;
+   it contains no credentials or standing approval. Before selecting or creating
+   each non-primary implementation, Sync, or Archive worktree or branch,
+   durably register its exact identity, role, head, ownership token, and
+   recovery reference.
 4. Run OpenSpec Explore or Propose only when required by the first incomplete
    evidenced controller checkpoint. Generated phases retain their ordinary
    boundary without a valid controller context; a valid context returns control
@@ -60,14 +64,21 @@ published choices, and perform no selection or mutation.
    executable identity as best-effort rather than security-verifiable.
 8. Run formal Verify after every task has current evidence.
 9. Deliver through a pull request only when the delivery gate passes and the
-   active authorization permits the mutation.
+   active authorization permits the mutation. Bind that resource's exact topic
+   head, merged pull request, and delivered default-branch head before moving
+   to a later checkpoint.
 10. Sync living specs only after implementation delivery is merged and delta
-   operations are proven reflected.
+   operations are proven reflected. Register Sync resources before creation and
+   bind their delivery evidence independently of implementation delivery.
 11. Archive only after implementation and Sync are delivered and the archive
-    move is content-preserving.
+   move is content-preserving. Register Archive resources before creation and
+   bind their delivery evidence independently of earlier checkpoints.
 12. Run exact owned-resource finalization only after Archive, issue, Project,
-    default-branch, and delivery evidence are current. Ineligible resources are
-    recorded with their recovery state and never inferred or removed.
+    default-branch, and delivery evidence are current. Evaluate each registered
+    resource against its own evidence, persist a terminal receipt outside target
+    worktrees before removal, and record ineligible resources with their
+    recovery state. Never infer or backfill ownership; a stranded legacy
+    resource requires a separately owner-authorized migration before audit.
 
 ## Required References
 
