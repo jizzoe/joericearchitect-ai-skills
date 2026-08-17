@@ -77,6 +77,21 @@ identity, or reviewer self-attestation alone MUST NOT establish isolation.
 - **THEN** the system may invoke only a fresh separate restricted fallback and
   records `authorized-degraded` assurance and its capability ledger
 
+#### Scenario: Authorized strict-first fallback follows a missing strict result artifact
+- **WHEN** the durable strict result for the same exact package is
+  `review-launcher-codex-result-artifact-missing` and an active exact degraded
+  authorization permits the transition
+- **THEN** the system may invoke only the existing fresh separate restricted
+  fallback, retains the immutable strict unavailable precursor, and records the
+  accepted result as `authorized-degraded`, never `strict-isolated`
+
+#### Scenario: Unsupported strict unavailable code remains ineligible
+- **WHEN** a strict result is unavailable for a code other than a configured
+  recoverable launcher failure or
+  `review-launcher-codex-result-artifact-missing`
+- **THEN** the system does not create a degraded view or launch request and
+  pauses with the stable ineligible-failure diagnostic
+
 #### Scenario: Reviewer shares context or mutation authority
 - **WHEN** the proposed reviewer inherits implementation history, can write the
   target or Git state, can mutate GitHub, or cannot establish its declared
