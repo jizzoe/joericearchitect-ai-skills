@@ -19,7 +19,10 @@ Each controller record MUST have an immutable generated run identity and a
 checkpoint location derived from that identity; persistence MUST reject
 replacement by a different recorded run. The controller MUST expose executable
 registration, delivery-binding, and receipt-coupled cleanup transitions so
-required resource evidence is produced by lifecycle work rather than tests.
+required resource evidence is produced by lifecycle work rather than tests. It
+MUST NOT report a controller or ordered queue entry complete unless at least one
+resource was registered and every registered resource has a current delivery
+binding plus a terminal completed or already-completed cleanup receipt.
 
 #### Scenario: Complete target-explicit delivery starts
 - **WHEN** a valid autonomous `sdd-delivery` request names one change or queue
@@ -55,3 +58,9 @@ required resource evidence is produced by lifecycle work rather than tests.
 - **WHEN** registered resources pass exact post-Archive cleanup gates
 - **THEN** the controller persists each receipt outside the target worktree and
   returns the updated record
+
+#### Scenario: Cleanup evidence is incomplete
+- **WHEN** a caller tries to complete cleanup or advance an ordered queue with
+  no registered resource or without a terminal receipt for every resource
+- **THEN** the controller pauses or rejects the transition and retains the
+  recoverable records

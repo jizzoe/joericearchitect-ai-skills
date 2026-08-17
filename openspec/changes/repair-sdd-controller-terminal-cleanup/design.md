@@ -83,6 +83,12 @@ inspection and combines it only with the same exact durable identity. A missing,
 failed, or ineligible inspection pauses the controller; an empty action list is
 not terminal completion when a registered resource remains ineligible.
 
+Cleanup completion itself also requires at least one registered resource and a
+terminal completed or already-completed receipt for every registered resource.
+The generic phase-advance and ordered-queue paths enforce the same invariant,
+so a caller cannot bypass receipt-coupled cleanup by marking lifecycle steps
+complete in memory.
+
 ### Explicit migration for prior stranded resources
 
 Provide a separate migration input that requires an explicit, exact signed

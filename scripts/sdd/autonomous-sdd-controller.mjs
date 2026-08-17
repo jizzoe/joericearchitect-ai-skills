@@ -64,7 +64,7 @@ function validCompletedEntry(entry, repository) {
   const receiptValid = (receipt) => receipt && ["started", "completed", "already-completed", "blocked"].includes(receipt.status) &&
       ["worktree", "branch"].includes(receipt.kind) && text(receipt.id) && timestamp(receipt.at) && text(receipt.recoveryReference) &&
       entry.resourceRecords.some((resource) => resource.kind === receipt.kind && resource.id === receipt.id && resource.recoveryReference === receipt.recoveryReference);
-  return entry && text(entry.selectedEntry) && Array.isArray(entry.resourceRecords) && Array.isArray(entry.cleanupReceipts) &&
+  return entry && text(entry.selectedEntry) && Array.isArray(entry.resourceRecords) && entry.resourceRecords.length > 0 && Array.isArray(entry.cleanupReceipts) &&
     entry.resourceRecords.every((resource) => validResource(resource, { selectedEntry: entry.selectedEntry, repository }, { allowPending: false })) &&
     entry.cleanupReceipts.every(receiptValid) && entry.resourceRecords.every((resource) => {
       const receipts = entry.cleanupReceipts.filter((receipt) => receipt.kind === resource.kind && receipt.id === resource.id);
@@ -219,6 +219,9 @@ export function inspectControllerRecord(record, { authorization, repository, now
   const stale = record.steps.find((step) => step.status === "complete" && step.evidence?.current !== true);
   if (stale) return { classification: "continue", reason: "controller-phase-stale", nextPhase: stale.id };
   const next = record.steps.find((step) => step.status !== "complete");
+  if (!next && !validCompletedEntry({ selectedEntry: record.selectedEntry, resourceRecords: record.resourceRecords, cleanupReceipts: record.cleanupReceipts }, record.repository)) {
+    return { classification: "paused", reason: "controller-cleanup-incomplete", nextPhase: "cleanup" };
+  }
   return next
     ? { classification: "continue", reason: "controller-first-incomplete-phase", nextPhase: next.id }
     : { classification: "complete", reason: "controller-all-phases-complete", nextPhase: null };
@@ -232,6 +235,9 @@ export function advanceControllerRecord(record, phase, evidence) {
   }
   if (record.steps.slice(0, index).some((step) => step.status !== "complete" || step.evidence?.current !== true)) {
     return { valid: false, reason: "controller-phase-advance-out-of-order" };
+  }
+  if (phase === "cleanup" && !validCompletedEntry({ selectedEntry: record.selectedEntry, resourceRecords: record.resourceRecords, cleanupReceipts: record.cleanupReceipts }, record.repository)) {
+    return { valid: false, reason: "controller-cleanup-incomplete" };
   }
   const next = structuredClone(record);
   next.steps[index] = { id: phase, status: "complete", evidence };

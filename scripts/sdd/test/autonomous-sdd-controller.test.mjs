@@ -92,10 +92,31 @@ test("controller records and advances an explicit ordered-queue entry", () => {
   assert.equal(advanced.record.completedEntries[0].selectedEntry, "complete-delivery");
   assert.equal(inspectControllerRecord(advanced.record, { authorization: queued, repository: "owner/repository", now: started }).nextPhase, "propose");
 
+  const emptyCompleted = structuredClone(record);
+  emptyCompleted.queueIndex = 0; emptyCompleted.selectedEntry = "complete-delivery";
+  emptyCompleted.steps = emptyCompleted.steps.map((step) => ({ ...step, status: "complete", evidence: { current: true } }));
+  assert.equal(advanceControllerQueue(emptyCompleted, { now: "2026-08-13T12:30:00.000Z" }).reason, "controller-queue-advance-invalid");
+
   const pending = registerControllerResource(completed, {
     kind: "branch", id: "undelivered-entry-branch", role: "implementation", registeredHeadCommit: "c".repeat(40), recoveryReference: "undelivered-entry-recovery", ownershipToken: "undelivered-entry-token"
   }, { now: started });
   assert.equal(advanceControllerQueue(pending.record, { now: "2026-08-13T12:30:00.000Z" }).reason, "controller-queue-advance-invalid");
+});
+
+test("controller cannot complete cleanup without a registered terminal receipt", () => {
+  const incomplete = structuredClone(created.record);
+  incomplete.steps = incomplete.steps.map((step, index) => index < 7 ? { ...step, status: "complete", evidence: { current: true } } : step);
+  assert.equal(advanceControllerRecord(incomplete, "cleanup", { current: true, reference: "cleanup" }).reason, "controller-cleanup-incomplete");
+  incomplete.steps[7] = { ...incomplete.steps[7], status: "complete", evidence: { current: true } };
+  assert.equal(inspectControllerRecord(incomplete, { authorization, repository: "owner/repository", now: started }).reason, "controller-cleanup-incomplete");
+
+  const registered = registerControllerResource(created.record, { kind: "branch", id: "receipt-branch", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "receipt-recovery", ownershipToken: "receipt-token" }, { now: started });
+  const delivered = bindControllerResourceDelivery(registered.record, { kind: "branch", id: "receipt-branch", deliveryEvidence: { current: true, reference: "pr-receipt", headCommit: "a".repeat(40), deliveredHeadCommit: "b".repeat(40), mergedPullRequest: { merged: true, pullRequest: "5", topicHeadCommit: "a".repeat(40), finalHeadCommit: "b".repeat(40) } } });
+  const receipted = appendControllerCleanupReceipt(delivered.record, { kind: "branch", id: "receipt-branch", status: "completed" }, { now: "2026-08-13T12:30:00.000Z" }).record;
+  receipted.steps = receipted.steps.map((step, index) => index < 7 ? { ...step, status: "complete", evidence: { current: true } } : step);
+  const completed = advanceControllerRecord(receipted, "cleanup", { current: true, reference: "cleanup" });
+  assert.equal(completed.valid, true);
+  assert.equal(inspectControllerRecord(completed.record, { authorization, repository: "owner/repository", now: started }).classification, "complete");
 });
 
 test("controller persists only in the git common-directory state root and advances ordered current evidence", () => {
