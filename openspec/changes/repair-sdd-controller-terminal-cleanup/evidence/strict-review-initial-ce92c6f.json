@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "reviewRecordId": "strict-61ceb493-e5d0-4905-a3f7-24f76dcaa35b",
+  "executionId": "61ceb493-e5d0-4905-a3f7-24f76dcaa35b",
+  "reviewer": { "type": "codex", "identity": "codex-strict-reviewer-v1", "adapter": "codex" },
+  "attestation": { "ref": "skills/base/independent-review/references/protocol.md", "nonInteractive": true, "isolatedContext": true, "freshContext": true, "readOnly": true },
+  "assuranceLevel": "strict-isolated",
+  "baseCommit": "7b878f1137814063943e39c846e30db489b9a324",
+  "headCommit": "ce92c6f832df96a5e5b2195c39e76f77b9a7e8b7",
+  "manifestDigest": "f71bea7245593c38153855d9332a4901205229806bb08a63d709b106ac9494f4",
+  "status": "failed",
+  "findings": [
+    { "id": "cleanup-completion-bypasses-resource-receipts", "severity": "high", "evidence": "scripts/sdd/autonomous-sdd-controller.mjs", "recommendation": "Require terminal receipt evidence before cleanup phase completion or controller completion." },
+    { "id": "empty-resource-queue-advance", "severity": "high", "evidence": "scripts/sdd/autonomous-sdd-controller.mjs", "recommendation": "Reject queue advancement when no lifecycle resource was registered." }
+  ]
+}

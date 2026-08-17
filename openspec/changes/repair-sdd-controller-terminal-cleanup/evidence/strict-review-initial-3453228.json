@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "reviewRecordId": "strict-c568e6af-2e88-4643-842c-c1d0b69f8c54",
+  "executionId": "c568e6af-2e88-4643-842c-c1d0b69f8c54",
+  "reviewer": { "type": "codex", "identity": "codex-strict-reviewer-v1", "adapter": "codex" },
+  "assuranceLevel": "strict-isolated",
+  "baseCommit": "7b878f1137814063943e39c846e30db489b9a324",
+  "headCommit": "3453228bb66fdd25f90b9ce2f7112b5a854b7d52",
+  "status": "failed",
+  "findings": [{ "id": "F1", "severity": "objective-fix", "evidence": "scripts/sdd/autonomous-sdd-controller.mjs", "recommendation": "Pause direct cleanup execution when no resource was registered." }]
+}

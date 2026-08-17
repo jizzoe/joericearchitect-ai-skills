@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "reviewRecordId": "strict-92194f29-3b32-48b5-a0e9-5adf782a0296",
+  "executionId": "92194f29-3b32-48b5-a0e9-5adf782a0296",
+  "reviewer": { "type": "codex", "identity": "codex-strict-reviewer-v1", "adapter": "codex" },
+  "attestation": { "ref": "skills/base/independent-review/references/protocol.md", "nonInteractive": true, "isolatedContext": true, "freshContext": true, "readOnly": true },
+  "assuranceLevel": "strict-isolated",
+  "baseCommit": "7b878f1137814063943e39c846e30db489b9a324",
+  "headCommit": "770527feaac885a7be98068a2a8ff506ef0964bf",
+  "manifestDigest": "38100bd4f239dbfa2b990d11b3c8ecaebcdce4887aa79079918895013ba5b1ae",
+  "status": "failed",
+  "findings": [
+    { "id": "F1", "severity": "high", "evidence": "scripts/sdd/autonomous-sdd-controller.mjs", "recommendation": "Persist already-completed receipts when exact registered resources are absent." },
+    { "id": "F2", "severity": "objective-fix", "evidence": "scripts/sdd/sdd-workspace-cleanup.mjs", "recommendation": "Persist blocked receipts when second fresh inspection mismatches the plan." }
+  ]
+}

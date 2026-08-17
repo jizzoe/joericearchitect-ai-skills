@@ -1,0 +1,23 @@
+schema_version: 1
+openspec:
+  change: repair-sdd-controller-terminal-cleanup
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 115
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/115
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - ai-planning/design-briefs/sdd-controller-terminal-cleanup.md
+      - evals/workflows/autonomous-sdd-lifecycle/
+      - openspec/changes/repair-sdd-controller-terminal-cleanup/
+      - scripts/sdd/autonomous-sdd-controller.mjs
+      - scripts/sdd/sdd-workspace-cleanup.mjs
+      - scripts/sdd/test/autonomous-sdd-controller.test.mjs
+      - scripts/sdd/test/sdd-workspace-cleanup.test.mjs
+      - skills/base/autonomous-sdd-delivery/
+      - skills/base/sdd-workspace-cleanup/
+      - workflows/autonomous-sdd-lifecycle/

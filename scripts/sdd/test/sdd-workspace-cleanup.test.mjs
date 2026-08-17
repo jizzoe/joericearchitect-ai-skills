@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import test from "node:test";
-import { executeWorkspaceCleanup, planWorkspaceCleanup } from "../sdd-workspace-cleanup.mjs";
+import { executeWorkspaceCleanup, legacyMigrationAuthorizationPayload, migrateLegacyWorkspaceResource, planWorkspaceCleanup } from "../sdd-workspace-cleanup.mjs";
 
 const head = "a".repeat(40);
 const evidence = {
@@ -9,8 +10,8 @@ const evidence = {
 };
 const resource = (values = {}) => ({
   entry: "complete-delivery", repository: "owner/repository", role: "change-workspace", id: "resource", owned: true,
-  deliveryCurrent: true, headCommit: head, ownershipToken: "owned-token", recoveryReference: "cleanup-recovery-1",
-  deliveryEvidence: { current: true, reference: "archive-pr-1", headCommit: head, deliveredHeadCommit: head }, ...values
+  deliveryCurrent: true, headCommit: head, ownershipToken: "owned-token", recoveryReference: "cleanup-recovery-1", registeredAt: "2026-08-13T12:00:00.000Z",
+  deliveryEvidence: { current: true, reference: "archive-pr-1", headCommit: head, deliveredHeadCommit: head, mergedPullRequest: { merged: true, pullRequest: "1", topicHeadCommit: head, finalHeadCommit: head } }, ...values
 });
 
 test("cleanup plans only exact clean owned delivered resources", () => {
@@ -69,7 +70,7 @@ test("cleanup will not mutate unless each action outcome can be persisted", () =
   assert.equal(result.outcomes[0].receipt, "outcome-persist-failed");
 });
 
-test("cleanup rejects stale resources and delivery evidence that no longer matches final delivery", () => {
+test("cleanup rejects malformed resource delivery evidence and stale fresh inspection", () => {
   const staleEvidence = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", ancestryMerged: true, deliveryEvidence: { current: true, reference: "other-archive", headCommit: head, deliveredHeadCommit: head } })] });
   assert.equal(staleEvidence.resources[0].reason, "cleanup-resource-record-invalid");
   const plan = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", ancestryMerged: true })] });
@@ -80,6 +81,14 @@ test("cleanup rejects stale resources and delivery evidence that no longer match
   });
   assert.equal(result.classification, "partial");
   assert.equal(result.outcomes[0].receipt, "fresh-resource-mismatch");
+  const persisted = [];
+  const durable = executeWorkspaceCleanup(plan, {
+    inspectResource: (item) => ({ ...item, exists: true, clean: false }),
+    deleteLocalBranch: () => ({ committed: true }),
+    persistOutcome: (outcome) => { persisted.push(outcome.status); return { persisted: true }; }
+  });
+  assert.equal(durable.outcomes[0].status, "blocked");
+  assert.deepEqual(persisted, ["blocked"]);
 });
 
 test("squash cleanup binds the topic head and distinct delivered head to one merged pull request", () => {
@@ -88,7 +97,51 @@ test("squash cleanup binds the topic head and distinct delivered head to one mer
   const plan = planWorkspaceCleanup({
     ...evidence,
     deliveryEvidence: { current: true, reference: "archive-pr-99", headCommit: deliveredHead },
-    resources: [resource({ kind: "branch", headCommit: topicHead, deliveryEvidence: { current: true, reference: "archive-pr-99", headCommit: topicHead, deliveredHeadCommit: deliveredHead }, squashOrRebaseEvidence: { merged: true, pullRequest: "99", topicHeadCommit: topicHead, finalHeadCommit: deliveredHead } })]
+    resources: [resource({ kind: "branch", headCommit: topicHead, deliveryEvidence: { current: true, reference: "archive-pr-99", headCommit: topicHead, deliveredHeadCommit: deliveredHead, mergedPullRequest: { merged: true, pullRequest: "99", topicHeadCommit: topicHead, finalHeadCommit: deliveredHead } }, squashOrRebaseEvidence: { merged: true, pullRequest: "99", topicHeadCommit: topicHead, finalHeadCommit: deliveredHead } })]
   });
   assert.equal(plan.resources[0].actions[0].force, true);
+});
+
+test("cleanup evaluates separately squash-delivered lifecycle resources independently", () => {
+  const implementationHead = "b".repeat(40);
+  const syncHead = "c".repeat(40);
+  const implementationDelivered = "d".repeat(40);
+  const syncDelivered = "e".repeat(40);
+  const plan = planWorkspaceCleanup({
+    ...evidence,
+    deliveryEvidence: { current: true, reference: "archive-pr", headCommit: "f".repeat(40) },
+    resources: [
+      resource({ kind: "branch", id: "implementation", headCommit: implementationHead, deliveryEvidence: { current: true, reference: "implementation-pr", headCommit: implementationHead, deliveredHeadCommit: implementationDelivered, mergedPullRequest: { merged: true, pullRequest: "11", topicHeadCommit: implementationHead, finalHeadCommit: implementationDelivered } }, squashOrRebaseEvidence: { merged: true, pullRequest: "11", topicHeadCommit: implementationHead, finalHeadCommit: implementationDelivered } }),
+      resource({ kind: "branch", id: "sync", headCommit: syncHead, deliveryEvidence: { current: true, reference: "sync-pr", headCommit: syncHead, deliveredHeadCommit: syncDelivered, mergedPullRequest: { merged: true, pullRequest: "12", topicHeadCommit: syncHead, finalHeadCommit: syncDelivered } }, squashOrRebaseEvidence: { merged: true, pullRequest: "12", topicHeadCommit: syncHead, finalHeadCommit: syncDelivered } })
+    ]
+  });
+  assert.deepEqual(plan.resources.map((item) => item.classification), ["eligible", "eligible"]);
+});
+
+test("cleanup retains a worktree whose controller checkpoint has no external terminal receipt", () => {
+  const plan = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "worktree", id: "checkpointed", registered: true, clean: true, controllerCheckpointPresent: true })] });
+  assert.equal(plan.resources[0].reason, "cleanup-controller-checkpoint-retention-incomplete");
+});
+
+test("legacy migration requires exact owner authorization and fresh matching inspection", () => {
+  const legacy = resource({ kind: "branch", id: "stranded", registeredAt: undefined });
+  const rejected = migrateLegacyWorkspaceResource({ selectedEntry: "complete-delivery", repository: "owner/repository", legacyResource: legacy, inspectedResource: legacy, now: "2026-08-13T13:00:00.000Z" });
+  assert.equal(rejected.reason, "cleanup-legacy-migration-authorization-invalid");
+  const { entry, repository, registeredAt, migration, ...resourceBinding } = legacy;
+  const ownerAuthorization = { approved: true, owner: "repository-owner", entry: "complete-delivery", repository: "owner/repository", kind: "branch", id: "stranded", reviewedAt: "2026-08-13T12:30:00.000Z", reference: "owner-record-1", resourceBinding };
+  const keyPair = crypto.generateKeyPairSync("ed25519");
+  ownerAuthorization.signatureAlgorithm = "ed25519";
+  ownerAuthorization.signature = crypto.sign(null, Buffer.from(JSON.stringify(legacyMigrationAuthorizationPayload(ownerAuthorization))), keyPair.privateKey).toString("base64");
+  const trusted = { trustedOwner: "repository-owner", trustedOwnerPublicKey: keyPair.publicKey.export({ type: "spki", format: "pem" }) };
+  assert.equal(migrateLegacyWorkspaceResource({ selectedEntry: "complete-delivery", repository: "owner/repository", legacyResource: legacy, inspectedResource: structuredClone(legacy), now: "2026-08-13T13:00:00.000Z", ownerAuthorization: { ...ownerAuthorization, id: "other" }, ...trusted }).reason, "cleanup-legacy-migration-authorization-invalid");
+  const differentlyBoundAuthorization = { ...ownerAuthorization, resourceBinding: { ...ownerAuthorization.resourceBinding, headCommit: "b".repeat(40) } };
+  differentlyBoundAuthorization.signature = crypto.sign(null, Buffer.from(JSON.stringify(legacyMigrationAuthorizationPayload(differentlyBoundAuthorization))), keyPair.privateKey).toString("base64");
+  assert.equal(migrateLegacyWorkspaceResource({ selectedEntry: "complete-delivery", repository: "owner/repository", legacyResource: legacy, inspectedResource: structuredClone(legacy), now: "2026-08-13T13:00:00.000Z", ownerAuthorization: differentlyBoundAuthorization, ...trusted }).reason, "cleanup-legacy-migration-authorization-invalid");
+  assert.equal(migrateLegacyWorkspaceResource({ selectedEntry: "complete-delivery", repository: "owner/repository", legacyResource: legacy, inspectedResource: structuredClone(legacy), now: "2026-08-13T13:00:00.000Z", ownerAuthorization, trustedOwner: "other-owner", trustedOwnerPublicKey: trusted.trustedOwnerPublicKey }).reason, "cleanup-legacy-migration-authorization-invalid");
+  const migrated = migrateLegacyWorkspaceResource({
+    selectedEntry: "complete-delivery", repository: "owner/repository", legacyResource: legacy, inspectedResource: structuredClone(legacy), now: "2026-08-13T13:00:00.000Z",
+    ownerAuthorization, ...trusted
+  });
+  assert.equal(migrated.valid, true);
+  assert.equal(migrated.resource.migration.authorizationReference, "owner-record-1");
 });

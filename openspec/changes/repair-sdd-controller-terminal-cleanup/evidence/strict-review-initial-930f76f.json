@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "reviewRecordId": "strict-23100fe5-9121-4e7a-82fb-b8e3cb45b3da",
+  "executionId": "23100fe5-9121-4e7a-82fb-b8e3cb45b3da",
+  "reviewer": {
+    "type": "codex",
+    "identity": "codex-strict-reviewer-v1",
+    "adapter": "codex"
+  },
+  "attestation": {
+    "ref": "skills/base/independent-review/references/protocol.md",
+    "nonInteractive": true,
+    "isolatedContext": true,
+    "freshContext": true,
+    "readOnly": true
+  },
+  "assuranceLevel": "strict-isolated",
+  "baseCommit": "7b878f1137814063943e39c846e30db489b9a324",
+  "headCommit": "930f76f82950b4244913d93a1e280d5bd7a2d68a",
+  "manifestDigest": "9d0d735dc6afc8628770a8ba74303ced42f876c2180a95031cac04f02f3a0df0",
+  "startedAt": "2026-08-17T11:50:42.771Z",
+  "completedAt": "2026-08-17T11:52:20.919Z",
+  "status": "failed",
+  "findings": [
+    {
+      "id": "queue-advance-retains-prior-entry-resources",
+      "severity": "high",
+      "evidence": "scripts/sdd/autonomous-sdd-controller.mjs",
+      "recommendation": "Partition completed-entry resource records and cleanup receipts before advancing the selected queue entry."
+    },
+    {
+      "id": "legacy-migration-authorization-is-self-attestable",
+      "severity": "high",
+      "evidence": "scripts/sdd/sdd-workspace-cleanup.mjs",
+      "recommendation": "Verify migration approval against a controlled trusted-owner signing key rather than a caller-computed digest."
+    }
+  ]
+}

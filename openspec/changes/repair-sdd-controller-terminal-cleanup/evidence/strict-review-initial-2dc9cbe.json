@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "reviewRecordId": "strict-c85dcf1d-c3f5-420f-aa0a-c9bf6960c82f",
+  "executionId": "c85dcf1d-c3f5-420f-aa0a-c9bf6960c82f",
+  "reviewer": { "type": "codex", "identity": "codex-strict-reviewer-v1", "adapter": "codex" },
+  "attestation": { "ref": "skills/base/independent-review/references/protocol.md", "nonInteractive": true, "isolatedContext": true, "freshContext": true, "readOnly": true },
+  "assuranceLevel": "strict-isolated",
+  "baseCommit": "7b878f1137814063943e39c846e30db489b9a324",
+  "headCommit": "2dc9cbec2dcd488071fa7bddef0a52d6e420d80e",
+  "manifestDigest": "7bc1ae8d7b29e71e6b7a3aeb0c60677336f3cf3599adea8ad5feeb7659a57fc2",
+  "startedAt": "2026-08-17T11:59:18.071Z",
+  "completedAt": "2026-08-17T12:01:03.204Z",
+  "status": "failed",
+  "findings": [
+    { "id": "resource-registration-head-cannot-remain-immutable", "severity": "high", "evidence": "scripts/sdd/autonomous-sdd-controller.mjs", "recommendation": "Separate pre-creation and final delivered topic-head bindings." },
+    { "id": "legacy-migration-trusts-stale-safety-fields", "severity": "high", "evidence": "scripts/sdd/sdd-workspace-cleanup.mjs", "recommendation": "Bind and construct from every cleanup-relevant fresh-inspection field." },
+    { "id": "queue-advance-does-not-require-terminal-resource-receipts", "severity": "objective-fix", "evidence": "scripts/sdd/autonomous-sdd-controller.mjs", "recommendation": "Require a final completed receipt for every resource before queue advancement." }
+  ]
+}

@@ -16,6 +16,9 @@ Before marking a pull request ready or merging, verify:
 - the PR body uses a closing keyword only when merge means completion
 - no unrelated or destructive changes are included
 - branch cleanup is authorized and targets the merged topic branch only
+- every target worktree or branch was registered before selection or creation
+  and has its own exact merged pull-request and delivered-head evidence; a
+  later Sync or Archive merge does not replace an earlier resource's binding
 - for `production-rapid`, `independent-review-result-v1` binds a distinct
   non-interactive isolated read-only reviewer to a sealed current package and
   exact base/head; package, result, and dispositions are retained in the named
@@ -43,3 +46,7 @@ If delivery is rerun after interruption, inspect the existing pull request,
 merge state, issue state, Project state, and branch state. Converge to the
 intended state without duplicate pull requests, duplicate comments, or loss of
 human-authored content. Pause if target identity or precedence is ambiguous.
+
+Persist delivery binding updates in repository-scoped controller state, outside
+the lifecycle worktree. Do not move controller state into the PR, issue, or
+archive as a substitute for a terminal cleanup receipt.

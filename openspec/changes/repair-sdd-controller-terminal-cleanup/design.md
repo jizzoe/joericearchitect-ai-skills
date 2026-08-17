@@ -1,0 +1,174 @@
+## Context
+
+See `proposal.md` for motivation. The current controller persists under the
+change worktree and its cleanup model accepts only one delivered head across a
+resource collection. That cannot clean a run with separately squash-merged
+implementation, Sync, and Archive branches, and its own checkpoint makes the
+implementation worktree dirty.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- preserve a portable, local, durable controller after a temporary worktree is
+  removed;
+- capture ownership before resource creation and delivery evidence per resource;
+- keep cleanup fail-closed, resumable, and capable of exact partial recovery;
+- supply a narrow, owner-authorized migration path for resources stranded by
+  older controller versions.
+
+**Non-Goals:**
+
+- delete remote branches, reset or force-remove worktrees, infer ownership, or
+  weaken review, issue, Project, or Archive gates;
+- store credentials, account identifiers, repository-specific paths, or
+  standing authorization in reusable assets;
+- alter ordinary standalone OpenSpec action boundaries.
+
+## Decisions
+
+### Repository-scoped controller state outside lifecycle worktrees
+
+Store controller records and cleanup receipts in a repository-scoped state root
+resolved from the Git common directory, under a generated run identity. The
+state-root resolver validates the canonical repository and containment, creates
+only request-owned paths, uses atomic writes, and records no credentials or
+untrusted input.
+
+This is preferred to a primary-worktree runtime directory because it does not
+dirty user work, and to a versioned archive record because final cleanup must
+not require a post-Archive content change. A generic temporary directory is
+rejected because it cannot provide durable local recovery.
+
+Each record receives a generated immutable run identity. Its checkpoint path is
+derived beneath that identity; persistence rejects replacement by a different
+run identity, preventing conflicting callers from overwriting controller state.
+
+### Register resources before creation and bind them independently
+
+Extend the controller record with an append-only resource registry. Before an
+implementation, Sync, or Archive worktree/branch is created or selected, write
+its immutable ownership fields, pre-creation registered head, and a generated
+ownership token. When its PR merges, bind the resource's final topic head with
+its exact merged PR and delivered default-branch head; the evolving topic head
+is not required to equal the head recorded before implementation.
+
+The cleanup planner consumes this registry and evaluates resources separately.
+This is preferred to one global final delivery head, which fails valid earlier
+squash merges, and to reusing one worktree, which conflicts with separate PR
+checkpoints.
+
+### Executable transition integration
+
+The controller exposes bounded transitions that persist registration, delivery
+binding, and cleanup receipts. Cleanup delegates to the existing exact cleanup
+planner/executor and carries the returned record forward after every persisted
+outcome. The interface accepts structured resource and evidence data, never
+infers ownership, and does not issue arbitrary Git commands.
+
+### Terminal receipt before destructive cleanup
+
+Before each remove-worktree or delete-branch operation, atomically persist a
+started receipt in repository-scoped state; persist the outcome immediately
+afterward. Cleanup rereads the registry and receipts on resume. A controller
+cannot be removed from a worktree unless its terminal receipt and recovery
+reference are already available outside it.
+
+### Fresh eligibility inspection at cleanup time
+
+The durable registry carries immutable ownership and delivery evidence, but it
+cannot safely assert mutable worktree state captured at registration. Before
+the controller asks the cleanup planner for actions, it obtains fresh resource
+inspection and combines it only with the same exact durable identity. A missing,
+failed, or ineligible inspection pauses the controller; an empty action list is
+not terminal completion when a registered resource remains ineligible.
+
+Cleanup completion itself also requires at least one registered resource and a
+terminal completed or already-completed receipt for every registered resource.
+The generic phase-advance and ordered-queue paths enforce the same invariant,
+so a caller cannot bypass receipt-coupled cleanup by marking lifecycle steps
+complete in memory.
+
+If a resource is absent at fresh inspection, its immutable registry and
+delivery binding still permit an `already-completed` receipt; no mutable
+eligibility inference or destructive action is needed. If the second inspection
+no longer matches the plan, the controller records a blocked receipt before
+pausing, leaving a durable recovery point for every terminal outcome.
+
+### Explicit migration for prior stranded resources
+
+Provide a separate migration input that requires an explicit, exact signed
+owner authorization verified against a controlled trusted-owner key and bound
+to every cleanup-relevant inspected field. It also requires fresh local/GitHub
+inspection of that exact legacy resource and creates the migrated record from
+the inspected values, not stale legacy data. The migration creates one bounded record only;
+discovery, branch names, conversation history, approval flags, and
+caller-computed digests never create records automatically.
+
+## Risks / Trade-offs
+
+- [Git common-directory state is unavailable or not writable] → fail closed
+  before resource creation or cleanup and retain the existing resources.
+- [Receipt write fails around a destructive action] → do not perform the action;
+  if a process interruption occurs after a recorded start, resume with fresh
+  inspection and preserve the recovery record.
+- [A legacy migration wrongly expands scope] → validate one exact resource,
+  selected entry, owner authorization, and delivery binding per record.
+- [Platform worktree layouts differ] → use Git-derived common-directory
+  resolution and portable fixtures rather than absolute paths.
+- [Two controller runs collide] → derive a unique run-scoped checkpoint and
+  reject a replacement by a different recorded run identity.
+
+## Migration Plan
+
+1. Add versioned controller resource and terminal-receipt fields while treating
+   records from earlier versions as legacy/ineligible.
+2. Route all new lifecycle resource creation through registration and all
+   cleanup through resource-specific evidence evaluation.
+3. Add a separately invoked, owner-authorized migration operation for stranded
+   resources; it performs no deletion itself.
+4. Exercise a complete fresh lifecycle and cleanup resume path in fixtures.
+5. Roll back by retaining the state records and resources; no cleanup action is
+   reversible once a local worktree or branch has been deleted, so mutation is
+   gated on persisted receipts and fresh inspection.
+
+## Verification Strategy
+
+- Add deterministic unit and workflow fixtures for state-root containment,
+  atomic receipt persistence, resource registration, multiple squash-delivery
+  bindings, dirty checkpoint refusal, migration scope, partial removal, and
+  idempotent resume.
+- Add transition fixtures for run-identity collision refusal, persisted resource
+  registration/delivery, receipt-coupled cleanup, and record resumption.
+- Run the focused controller and cleanup tests, lifecycle evaluator fixtures,
+  adapter-drift checks, and `openspec validate --all --strict`.
+- Keep canonical behavior in `scripts/sdd/` and `skills/base/`; retain thin
+  Claude/Codex adapters. Test a fixture whose repository and worktree paths
+  differ from this repository to demonstrate no product-specific constants.
+- No third-party dependency or external service is required; licensing and
+  attribution impact is therefore unchanged.
+
+## Attribution and Licensing
+
+The implementation uses repository-owned code and built-in Git and Node.js
+capabilities. No external code, dependency, or service is introduced. Any
+future migration integration that needs an external source must record its
+attribution, compatible license, integrity evidence, and security impact
+before adoption.
+
+## Recovery
+
+Controller state and cleanup receipts remain in the repository Git common
+directory after a temporary worktree is removed. If state-root resolution,
+receipt persistence, ownership inspection, or delivery evidence fails, cleanup
+stops before mutation and retains the resource for exact recovery. Legacy
+resources require a new, one-resource owner authorization and fresh inspection;
+the migration operation itself cannot delete a resource.
+
+## Reuse Plan
+
+The controller contract, receipt persistence, resource binding, cleanup policy,
+and migration validation are portable canonical assets. Repository paths,
+issue/Project values, credentials, and owner approvals remain caller-owned
+inputs. Portability is verified using a distinct disposable repository layout;
+security and recovery behavior is shared by all thin assistant adapters.

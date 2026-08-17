@@ -27,9 +27,14 @@ For one complete authorized autonomous delivery, normalize a target-explicit
 `ship-sdd` request and persist the selected-entry controller record before the
 first lifecycle action. Reruns must reread that record and advance only the
 first incomplete evidenced checkpoint. Generated standalone lifecycle actions
-do not inherit this authority. After Archive convergence, use the exact-owned
-cleanup finalizer in audit, apply, or resume mode; never infer ownership or
-delete a dirty, legacy, primary, locked, or remote resource.
+do not inherit this authority. Each run has an immutable unique identity and a
+derived checkpoint path, and persistence rejects a stored mismatched identity.
+Use the controller's persisted registration, delivery-binding, and cleanup
+transition entries instead of changing a record only in memory. After Archive
+convergence, use the exact-owned cleanup finalizer in audit, apply, or resume
+mode with fresh mutable-resource inspection; never infer ownership, call an
+ineligible cleanup audit complete, or delete a dirty, legacy, primary, locked,
+or remote resource.
 
 ## Recovery
 

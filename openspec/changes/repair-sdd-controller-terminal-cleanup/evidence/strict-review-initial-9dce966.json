@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "reviewRecordId": "strict-99ff7710-646a-4f7a-97a1-4b06258f1140",
+  "executionId": "99ff7710-646a-4f7a-97a1-4b06258f1140",
+  "reviewer": { "type": "codex", "identity": "codex-strict-reviewer-v1", "adapter": "codex" },
+  "attestation": { "ref": "skills/base/independent-review/references/protocol.md", "nonInteractive": true, "isolatedContext": true, "freshContext": true, "readOnly": true },
+  "assuranceLevel": "strict-isolated",
+  "baseCommit": "7b878f1137814063943e39c846e30db489b9a324",
+  "headCommit": "9dce966eb1145c18295301b55783f06a35cc3408",
+  "manifestDigest": "1b343453c5e635d9dca5d25192fddc0213e04d5728601dd8adcf6712f821cb46",
+  "status": "failed",
+  "findings": [
+    { "id": "F1", "severity": "high", "evidence": "scripts/sdd/autonomous-sdd-controller.mjs", "recommendation": "Obtain and validate fresh mutable worktree eligibility state before planning; do not classify an all-ineligible cleanup audit as complete." }
+  ]
+}
