@@ -305,6 +305,9 @@ export function bindControllerLifecycleDelivery({ repositoryPath, record, kind, 
 }
 
 export function executeControllerLifecycleCleanup({ repositoryPath, record, cleanupContext, operations = {}, now = new Date().toISOString(), runGit } = {}) {
+  if (!Array.isArray(record?.resourceRecords) || record.resourceRecords.length === 0) {
+    return { classification: "paused", reason: "controller-cleanup-resources-missing", outcomes: [], record, plan: null };
+  }
   if (typeof operations.inspectResource !== "function") {
     return { classification: "paused", reason: "controller-cleanup-fresh-inspection-missing", outcomes: [], record, plan: null };
   }

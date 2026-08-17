@@ -104,6 +104,7 @@ test("controller records and advances an explicit ordered-queue entry", () => {
 });
 
 test("controller cannot complete cleanup without a registered terminal receipt", () => {
+  assert.equal(executeControllerLifecycleCleanup({ record: created.record }).reason, "controller-cleanup-resources-missing");
   const incomplete = structuredClone(created.record);
   incomplete.steps = incomplete.steps.map((step, index) => index < 7 ? { ...step, status: "complete", evidence: { current: true } } : step);
   assert.equal(advanceControllerRecord(incomplete, "cleanup", { current: true, reference: "cleanup" }).reason, "controller-cleanup-incomplete");
