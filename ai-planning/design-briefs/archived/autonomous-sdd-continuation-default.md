@@ -25,30 +25,30 @@ boundary.
 
 ## 2. Evidence And Key Findings
 
-- The generated [`openspec-propose` skill](../../.agents/skills/openspec-propose/SKILL.md)
+- The generated [`openspec-propose` skill](../../../.agents/skills/openspec-propose/SKILL.md)
   unconditionally treats its triggering request as planning-only and says to
   stop after artifacts. That is correct for a standalone proposal but loses the
   enclosing autonomous-run context.
 - The canonical
-  [`autonomous-sdd-lifecycle` workflow](../../workflows/autonomous-sdd-lifecycle/workflow.md)
+  [`autonomous-sdd-lifecycle` workflow](../../../workflows/autonomous-sdd-lifecycle/workflow.md)
   already says to stop after Propose *unless* a delivered bounded runner and
   active authorization permit Apply. It does not define a durable handoff that
   prevents a standalone phase instruction from winning at Propose or any later
   resume point.
-- The living [`sdd-lifecycle` specification](../../openspec/specs/sdd-lifecycle/spec.md)
+- The living [`sdd-lifecycle` specification](../../../openspec/specs/sdd-lifecycle/spec.md)
   permits one explicit bounded authorization to span the lifecycle, including
   a derived delivery chain through cleanup. Its current prose does not make the
   autonomous entry-point routing and context propagation observable enough to
   prevent this failure.
 - The concise request resolver
-  [`resolve-sdd-delivery-request.mjs`](../../scripts/sdd/resolve-sdd-delivery-request.mjs)
+  [`resolve-sdd-delivery-request.mjs`](../../../scripts/sdd/resolve-sdd-delivery-request.mjs)
   already normalizes a named target, mode, quality profile, authorization
   profile, independent-review policy, expiration, ordinary lifecycle actions,
   and a three-attempt objective-correction budget. The original run had the
   profile values but did not preserve an effective authorization record for the
   selected proposal.
 - The operation checker
-  [`check-operation-authorization.mjs`](../../scripts/sdd/check-operation-authorization.mjs)
+  [`check-operation-authorization.mjs`](../../../scripts/sdd/check-operation-authorization.mjs)
   admits high-impact delivery only from exact durable targets. That conservative
   rule must remain; new issue, branch, PR, Sync, Archive, and cleanup targets
   need to be deterministically derived and recorded before each transition,

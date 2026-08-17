@@ -21,11 +21,11 @@ until the corresponding explicit authorization is received.
 
 ## Read First
 
-1. [Base skill contracts and guardrails](../design-briefs/base-skill-contracts-and-guardrails.md)
+1. [Base skill contracts and guardrails](../design-briefs/archived/base-skill-contracts-and-guardrails.md)
 2. [First-pass base skills design](../research/first-pass-base-skills-design.md)
-3. [Base skill authoring and guardrails](../design-briefs/base-skill-authoring-and-guardrails.md)
-4. [Base skills research and planning](../design-briefs/base-skills-research-and-planning.md)
-5. [Base implementation quality](../design-briefs/base-implementation-quality.md)
+3. [Base skill authoring and guardrails](../design-briefs/archived/base-skill-authoring-and-guardrails.md)
+4. [Base skills research and planning](../design-briefs/archived/base-skills-research-and-planning.md)
+5. [Base implementation quality](../design-briefs/archived/base-implementation-quality.md)
 6. [SDD workflow](../../docs/sdd-workflow.md)
 7. [SDD foundation operations](../../docs/sdd-foundation-operations.md)
 8. `AGENTS.md`

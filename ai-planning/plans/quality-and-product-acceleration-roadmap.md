@@ -18,7 +18,7 @@ job-search path. Technology-specific backend, web, or infrastructure overlays
 are conditional: the mobile application's selected stack, not this global
 roadmap, determines whether Java/Spring, React web, or Terraform work is next.
 
-The plan follows the repository's [SDD implementation planning rules](openspec-sdd-foundation-implementation-plan.md): one independently deliverable
+The plan follows the repository's [SDD implementation planning rules](archive/openspec-sdd-foundation-implementation-plan.md): one independently deliverable
 slice becomes one primary issue and one semantic OpenSpec change; milestones
 group outcomes rather than task lists; every slice has objective exit evidence;
 and only a reviewed proposal owns its delta specs, design, and tasks. Names
@@ -42,19 +42,19 @@ capability merely because files currently exist in the worktree.
 
 | Design brief | Completed OpenSpec change(s) | Durable evidence |
 | --- | --- | --- |
-| [Base Skill Contracts And Guardrails](../design-briefs/base-skill-contracts-and-guardrails.md) | `establish-base-skill-contracts-and-guardrails` | [Archived change](../../openspec/changes/archive/2026-08-12-establish-base-skill-contracts-and-guardrails/) has zero unchecked tasks; living contracts, shared guardrails, and validators exist. |
-| [Base Skills: Authoring And Guardrails](../design-briefs/base-skill-authoring-and-guardrails.md) | `add-base-skill-authoring`, using the completed contracts/guardrails prerequisite | [Archived change](../../openspec/changes/archive/2026-08-12-add-base-skill-authoring/) has zero unchecked tasks; the canonical authoring skill and thin adapters exist. |
-| [Global Skill Installation](../design-briefs/global-skill-installation.md) | `document-global-skill-installation-planning` and `normalize-skill-metadata-and-document-global-installation` | [Implementation archive](../../openspec/changes/archive/2026-08-12-normalize-skill-metadata-and-document-global-installation/) has zero unchecked tasks; its planning checkpoint is separately archived. |
-| [Isolated Autonomous Independent Review](../design-briefs/isolated-autonomous-independent-review.md) | `add-isolated-independent-review` | [Archived change](../../openspec/changes/archive/2026-08-13-add-isolated-independent-review/) has zero unchecked tasks and supplies the strict review capability used by `production-rapid`. |
+| [Base Skill Contracts And Guardrails](../design-briefs/archived/base-skill-contracts-and-guardrails.md) | `establish-base-skill-contracts-and-guardrails` | [Archived change](../../openspec/changes/archive/2026-08-12-establish-base-skill-contracts-and-guardrails/) has zero unchecked tasks; living contracts, shared guardrails, and validators exist. |
+| [Base Skills: Authoring And Guardrails](../design-briefs/archived/base-skill-authoring-and-guardrails.md) | `add-base-skill-authoring`, using the completed contracts/guardrails prerequisite | [Archived change](../../openspec/changes/archive/2026-08-12-add-base-skill-authoring/) has zero unchecked tasks; the canonical authoring skill and thin adapters exist. |
+| [Global Skill Installation](../design-briefs/archived/global-skill-installation.md) | `document-global-skill-installation-planning` and `normalize-skill-metadata-and-document-global-installation` | [Implementation archive](../../openspec/changes/archive/2026-08-12-normalize-skill-metadata-and-document-global-installation/) has zero unchecked tasks; its planning checkpoint is separately archived. |
+| [Isolated Autonomous Independent Review](../design-briefs/archived/isolated-autonomous-independent-review.md) | `add-isolated-independent-review` | [Archived change](../../openspec/changes/archive/2026-08-13-add-isolated-independent-review/) has zero unchecked tasks and supplies the strict review capability used by `production-rapid`. |
 
 ### Briefs without completed changes
 
 | Design brief | Current classification | Why it remains on the roadmap |
 | --- | --- | --- |
-| [Base Skills: Research And Planning](../design-briefs/base-skills-research-and-planning.md) | Unarchived/incomplete | Canonical-looking files are present locally, but no archived, complete OpenSpec implementation change proves delivery of the three-skill planning path. |
-| [Base Skills: Implementation Quality](../design-briefs/base-implementation-quality.md) | Unarchived/incomplete | `base-code-review` and `base-verification-loop` files are present locally, but no completed lifecycle change proves the brief's acceptance and evaluation commitments. |
+| [Base Skills: Research And Planning](../design-briefs/archived/base-skills-research-and-planning.md) | Unarchived/incomplete | Canonical-looking files are present locally, but no archived, complete OpenSpec implementation change proves delivery of the three-skill planning path. |
+| [Base Skills: Implementation Quality](../design-briefs/archived/base-implementation-quality.md) | Unarchived/incomplete | `base-code-review` and `base-verification-loop` files are present locally, but no completed lifecycle change proves the brief's acceptance and evaluation commitments. |
 | [Standards-Driven Quality Skills Program](../design-briefs/standards-driven-quality-skills.md) | Partially enabled, program incomplete | Contracts, authoring, and independent review prerequisites are complete, but the standards-pack convention, shared quality base, and stack overlays are not delivered as the program requires. |
-| [Authorized Degraded Independent Review](../design-briefs/authorized-degraded-independent-review.md) | Design only | The current strict protocol remains fail-closed; no authorized fallback change has been accepted or completed. |
+| [Authorized Degraded Independent Review](../design-briefs/archived/authorized-degraded-independent-review.md) | Design only | The current strict protocol remains fail-closed; no authorized fallback change has been accepted or completed. |
 | [Claude Cross-Tool Repo Gap Inventory](../design-briefs/claude-cross-tool-repo-gap-inventory.md) | Design only | It explicitly records that none of its proposed fixes has been implemented; several scope decisions remain. |
 | [React Native and Expo Quality Skills](../design-briefs/react-native-expo-quality-skills.md) | Owner-approved, not implemented | The owner accepted the asset shape, repository-selected compatibility/commands, evidence ladder, security model, and shared context policy. It is ready for Explore, not implementation. |
 

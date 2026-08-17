@@ -85,8 +85,8 @@ Work in these checkpoints:
 5. Invoke `$openspec-propose` for `bootstrap-openspec-foundation`.
    The proposal must reference:
    - `ai-planning/requirements/openspec-sdd-foundation.md`
-   - `ai-planning/plans/openspec-sdd-foundation-implementation-plan.md`
-   - `ai-planning/plans/openspec-sdd-foundation-dependency-plan.md`
+   - `ai-planning/plans/archive/openspec-sdd-foundation-implementation-plan.md`
+   - `ai-planning/plans/archive/openspec-sdd-foundation-dependency-plan.md`
 
    It must include the GitHub issue reference, a Reuse Plan, stable task IDs,
    dependency annotations, verification evidence, recovery considerations,

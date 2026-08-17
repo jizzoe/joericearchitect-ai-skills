@@ -45,7 +45,7 @@ mistake an unavailable setup for a reviewer result or a passing review.
   sandboxed retry in the same historical workflow failed on a `.git` lock; the
   explicitly escalated operation succeeded.
 - The result-transport brief at
-  `ai-planning/design-briefs/independent-review-result-transport-reliability.md`
+  `ai-planning/design-briefs/archived/independent-review-result-transport-reliability.md`
   already establishes that review acceptance must consume only the owned final
   artifact and that durable diagnostics must retain safe metadata rather than
   raw reviewer content.

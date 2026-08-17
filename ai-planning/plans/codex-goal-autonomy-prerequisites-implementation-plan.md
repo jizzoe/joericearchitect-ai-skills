@@ -2,7 +2,7 @@
 
 Date: 2026-08-09
 Status: In Progress
-Related plan: [OpenSpec SDD Foundation Implementation Plan](openspec-sdd-foundation-implementation-plan.md)
+Related plan: [OpenSpec SDD Foundation Implementation Plan](archive/openspec-sdd-foundation-implementation-plan.md)
 
 ## 1. Outcome
 

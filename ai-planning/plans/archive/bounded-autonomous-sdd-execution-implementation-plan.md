@@ -10,7 +10,7 @@ Related plans:
 
 - [OpenSpec SDD Foundation Implementation Plan](openspec-sdd-foundation-implementation-plan.md)
 - [OpenSpec SDD Foundation Dependency Plan](openspec-sdd-foundation-dependency-plan.md)
-- [Codex Goal Autonomy Prerequisites](codex-goal-autonomy-prerequisites-implementation-plan.md)
+- [Codex Goal Autonomy Prerequisites](../codex-goal-autonomy-prerequisites-implementation-plan.md)
 
 ## 1. Outcome
 

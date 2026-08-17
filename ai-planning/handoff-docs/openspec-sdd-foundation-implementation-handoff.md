@@ -22,8 +22,8 @@ Each future product will own its specifications and GitHub work state. The globa
 Read these in order before changing files or GitHub state:
 
 1. [Foundation requirements](../requirements/openspec-sdd-foundation.md)
-2. [Implementation plan](../plans/openspec-sdd-foundation-implementation-plan.md)
-3. [Dependency plan](../plans/openspec-sdd-foundation-dependency-plan.md)
+2. [Implementation plan](../plans/archive/openspec-sdd-foundation-implementation-plan.md)
+3. [Dependency plan](../plans/archive/openspec-sdd-foundation-dependency-plan.md)
 4. [GitHub Issues and OpenSpec research](../research/github-issues.md)
 5. [Cross-assistant asset practices](../research/cross-assistant-ai-assets-best-practices.md)
 
@@ -341,8 +341,8 @@ Read these files before taking action:
 
 - ai-planning/handoff-docs/openspec-sdd-foundation-implementation-handoff.md
 - ai-planning/requirements/openspec-sdd-foundation.md
-- ai-planning/plans/openspec-sdd-foundation-implementation-plan.md
-- ai-planning/plans/openspec-sdd-foundation-dependency-plan.md
+- ai-planning/plans/archive/openspec-sdd-foundation-implementation-plan.md
+- ai-planning/plans/archive/openspec-sdd-foundation-dependency-plan.md
 
 We are starting M1/C1, OpenSpec change `bootstrap-openspec-foundation`.
 

@@ -2,8 +2,8 @@
 
 Date: 2026-08-08
 Status: Proposed
-Requirements baseline: [OpenSpec SDD Foundation Requirements](../requirements/openspec-sdd-foundation.md)
-Accepted GitHub workflow standard: [GitHub Flow Standards and Best Practices](../standards-and-best-practices/github-flow-standards.md)
+Requirements baseline: [OpenSpec SDD Foundation Requirements](../../requirements/openspec-sdd-foundation.md)
+Accepted GitHub workflow standard: [GitHub Flow Standards and Best Practices](../../standards-and-best-practices/github-flow-standards.md)
 
 ## 1. Outcome
 
@@ -321,7 +321,7 @@ This first implementation SHALL build reusable interfaces and configuration boun
 
 ### DEC-017: GitHub Flow on `main`
 
-Use the accepted [GitHub Flow standard](../standards-and-best-practices/github-flow-standards.md):
+Use the accepted [GitHub Flow standard](../../standards-and-best-practices/github-flow-standards.md):
 
 - `main` is the default and sole permanent development branch.
 - Normal pull requests target `main`.

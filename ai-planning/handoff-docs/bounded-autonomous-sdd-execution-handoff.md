@@ -54,9 +54,9 @@ Read these files in order before changing anything:
 1. This handoff.
 2. [OpenSpec SDD foundation requirements](../requirements/openspec-sdd-foundation.md).
 3. [Codex Goal autonomy prerequisites plan](../plans/codex-goal-autonomy-prerequisites-implementation-plan.md).
-4. [Bounded autonomous SDD execution plan](../plans/bounded-autonomous-sdd-execution-implementation-plan.md).
-5. [Foundation implementation plan](../plans/openspec-sdd-foundation-implementation-plan.md).
-6. [Foundation dependency plan](../plans/openspec-sdd-foundation-dependency-plan.md).
+4. [Bounded autonomous SDD execution plan](../plans/archive/bounded-autonomous-sdd-execution-implementation-plan.md).
+5. [Foundation implementation plan](../plans/archive/openspec-sdd-foundation-implementation-plan.md).
+6. [Foundation dependency plan](../plans/archive/openspec-sdd-foundation-dependency-plan.md).
 7. [Cross-assistant assets living spec](../../openspec/specs/cross-assistant-assets/spec.md).
 8. [SDD lifecycle living spec](../../openspec/specs/sdd-lifecycle/spec.md).
 9. [SDD action prompt reference](../references/sdd-action-prompts.md).
@@ -459,7 +459,7 @@ mutation.
 
 Use the `openspec-propose` skill to create OpenSpec change
 `enable-bounded-autonomous-sdd-execution` for M1-C2. Base it on issue #8 and
-`ai-planning/plans/bounded-autonomous-sdd-execution-implementation-plan.md`,
+`ai-planning/plans/archive/bounded-autonomous-sdd-execution-implementation-plan.md`,
 with the foundation requirements, implementation plan, dependency plan, and
 living specs as context.
 

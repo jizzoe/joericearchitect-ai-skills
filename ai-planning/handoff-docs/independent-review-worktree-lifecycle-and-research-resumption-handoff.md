@@ -8,7 +8,7 @@
   `/Users/joerice/git/joericearchitect/joericearchitect-ai-skills`
 - Research worktree: `/private/tmp/ai-skills-research-planning-86`
 - Primary design brief:
-  `ai-planning/design-briefs/independent-review-worktree-lifecycle-and-diagnostics.md`
+  `ai-planning/design-briefs/archived/independent-review-worktree-lifecycle-and-diagnostics.md`
 
 ## 1. Purpose and Required Sequence
 
@@ -179,7 +179,7 @@ gate remains fail-closed: unavailable setup is never accepted as a review.
 narrow, repair-only human-review bootstrap exception. That exception is not a
 standing waiver. Its design brief is:
 
-`ai-planning/design-briefs/independent-review-result-transport-reliability.md`.
+`ai-planning/design-briefs/archived/independent-review-result-transport-reliability.md`.
 
 It established the final-artifact-only gate and safe result diagnostics after a
 review transcript displayed JSON `passed` while the owned final artifact was
@@ -298,7 +298,7 @@ ai-planning/handoff-docs/independent-review-worktree-lifecycle-and-research-resu
 Re-derive Git, OpenSpec, worktree, and relevant GitHub state without mutating
 anything. Preserve all unrelated dirty work and registered worktrees.
 
-Use ai-planning/design-briefs/independent-review-worktree-lifecycle-and-diagnostics.md
+Use ai-planning/design-briefs/archived/independent-review-worktree-lifecycle-and-diagnostics.md
 to Explore and Propose a focused change named
 harden-independent-review-worktree-lifecycle, then stop for the required Apply
 authorization. The repair must implement the owner-decided bounded outer

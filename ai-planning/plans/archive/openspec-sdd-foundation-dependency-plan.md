@@ -3,7 +3,7 @@
 Date: 2026-08-08
 Status: Proposed
 Parent plan: [OpenSpec SDD Foundation Implementation Plan](openspec-sdd-foundation-implementation-plan.md)
-Accepted GitHub workflow standard: [GitHub Flow Standards and Best Practices](../standards-and-best-practices/github-flow-standards.md)
+Accepted GitHub workflow standard: [GitHub Flow Standards and Best Practices](../../standards-and-best-practices/github-flow-standards.md)
 
 ## 1. Purpose
 

@@ -62,8 +62,8 @@ Read these sources in order in a new session:
 
 1. This checkpoint.
 2. [Foundation requirements](../requirements/openspec-sdd-foundation.md)
-3. [Implementation plan](../plans/openspec-sdd-foundation-implementation-plan.md)
-4. [Dependency plan](../plans/openspec-sdd-foundation-dependency-plan.md)
+3. [Implementation plan](../plans/archive/openspec-sdd-foundation-implementation-plan.md)
+4. [Dependency plan](../plans/archive/openspec-sdd-foundation-dependency-plan.md)
 5. [Proposal](../../openspec/changes/bootstrap-openspec-foundation/proposal.md)
 6. [Cross-assistant delta spec](../../openspec/changes/bootstrap-openspec-foundation/specs/cross-assistant-assets/spec.md)
 7. [SDD lifecycle delta spec](../../openspec/changes/bootstrap-openspec-foundation/specs/sdd-lifecycle/spec.md)

@@ -484,15 +484,15 @@ unresolved decisions across multiple documents.
 The following implementation-ready design briefs now carry the next planning
 step. Accept their contracts before any OpenSpec proposal:
 
-1. [Shared contracts and guardrails](../design-briefs/base-skill-contracts-and-guardrails.md):
+1. [Shared contracts and guardrails](../design-briefs/archived/base-skill-contracts-and-guardrails.md):
    shared schemas, guardrail migration/enforcement, and autonomous operation
    authorization.
-2. [Skill authoring and guardrails](../design-briefs/base-skill-authoring-and-guardrails.md):
+2. [Skill authoring and guardrails](../design-briefs/archived/base-skill-authoring-and-guardrails.md):
    `base-skill-authoring` consuming the shared contract.
-3. [Research and planning](../design-briefs/base-skills-research-and-planning.md):
+3. [Research and planning](../design-briefs/archived/base-skills-research-and-planning.md):
    `research-topic-workflow`, `design-brief-from-research`, and
    `sdd-requirements-to-plan`.
-4. [Implementation quality](../design-briefs/base-implementation-quality.md):
+4. [Implementation quality](../design-briefs/archived/base-implementation-quality.md):
    `base-code-review` and `base-verification-loop`.
 
 This grouping has cohesive inputs and outputs, limits cross-document
@@ -551,8 +551,8 @@ domain skills start only after the relevant base changes are complete.
 - `docs/research-topic-workflow-notes.md`
 - `ai-planning/research/builtin-ai-assets-claude-vs-codex.md`
 - `ai-planning/requirements/openspec-sdd-foundation.md`
-- `ai-planning/plans/openspec-sdd-foundation-implementation-plan.md`
-- `ai-planning/plans/bounded-autonomous-sdd-execution-implementation-plan.md`
+- `ai-planning/plans/archive/openspec-sdd-foundation-implementation-plan.md`
+- `ai-planning/plans/archive/bounded-autonomous-sdd-execution-implementation-plan.md`
 - `ai-planning/handoff-docs/openspec-sdd-foundation-implementation-handoff.md`
 - Existing canonical SDD/GitHub skills under `skills/base/`
 - `/Users/joerice/Library/CloudStorage/GoogleDrive-jizzoerice@gmail.com/My Drive/2026/job-search/application-assistance-workflow.md`

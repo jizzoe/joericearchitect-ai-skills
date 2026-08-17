@@ -28,8 +28,8 @@ they deserve a separate trigger.
 | S3 | `ai-planning/handoff-docs/openspec-sdd-foundation-implementation-handoff.md` |
 | S4 | `ai-planning/requirements/openspec-sdd-foundation.md` |
 | S5 | `ai-planning/research/builtin-ai-assets-claude-vs-codex.md` |
-| S6 | `ai-planning/plans/openspec-sdd-foundation-implementation-plan.md` |
-| S7 | `ai-planning/plans/bounded-autonomous-sdd-execution-implementation-plan.md` |
+| S6 | `ai-planning/plans/archive/openspec-sdd-foundation-implementation-plan.md` |
+| S7 | `ai-planning/plans/archive/bounded-autonomous-sdd-execution-implementation-plan.md` |
 | S8 | `ai-planning/research/google-apps-connectivity/handoff-job-search-automation.md` |
 | H1 | `/Users/joerice/git/joericearchitect/home-roots-reinvest-in-growth/ai-planning/ai-planning/handoff-docs/mobile-bookkeeping-new-repository-handoff.md` |
 | H2 | `/Users/joerice/git/joericearchitect/home-roots-reinvest-in-growth/ai-planning/research/tech-research/openspec-adoption-decision-and-structure.md` |

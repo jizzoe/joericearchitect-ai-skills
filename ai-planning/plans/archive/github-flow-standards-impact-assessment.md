@@ -2,7 +2,7 @@
 
 Date: 2026-08-09
 Status: Accepted decision reconciliation
-Standard: [GitHub Flow Standards and Best Practices](../standards-and-best-practices/github-flow-standards.md)
+Standard: [GitHub Flow Standards and Best Practices](../../standards-and-best-practices/github-flow-standards.md)
 
 ## Purpose
 
@@ -136,8 +136,8 @@ The accepted workflow standard establishes these directions:
 
 The first SDD foundation pass still SHALL NOT implement release automation. Detailed versioning, release assets, Environment topology, store mapping, and deployment protection decisions remain follow-up work after owner review of:
 
-- [GitHub Releases research](../research/git-workflows/github-releases-for-assets-and-mobile-apps.md)
-- [GitHub Environments research](../research/git-workflows/github-environments-for-assets-and-mobile-apps.md)
+- [GitHub Releases research](../../research/git-workflows/github-releases-for-assets-and-mobile-apps.md)
+- [GitHub Environments research](../../research/git-workflows/github-environments-for-assets-and-mobile-apps.md)
 
 ## Dependency Plan Impact
 

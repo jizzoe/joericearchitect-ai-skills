@@ -3,7 +3,7 @@
 Date: 2026-08-10
 Status: Research complete; decision pending
 Related plan: [Global Skill Installation Implementation
-Plan](../../plans/global-skill-installation-implementation-plan.md)
+Plan](../../plans/archive/global-skill-installation-implementation-plan.md)
 
 ## Executive Summary
 
