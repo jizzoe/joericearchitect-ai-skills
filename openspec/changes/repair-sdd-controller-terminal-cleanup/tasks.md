@@ -51,6 +51,6 @@
 - [x] 5.2 Add executable controller transitions for durable resource registration, delivery binding, fresh eligibility inspection, and receipt-coupled cleanup execution.
   - Depends on: 2.1, 2.2, 3.1, and 5.1.
   - Evidence: transition integration tests prove persisted registration, delivery binding, and cleanup receipt outcomes.
-- [ ] 5.3 Rerun complete validation and strict isolated review after the correction head is committed.
+- [x] 5.3 Rerun complete validation and strict isolated review after the correction head is committed.
   - Depends on: 5.1 and 5.2.
   - Evidence: complete validation and a passed strict-review record.
