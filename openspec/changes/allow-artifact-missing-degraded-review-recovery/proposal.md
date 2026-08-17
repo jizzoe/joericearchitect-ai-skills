@@ -34,5 +34,5 @@ None.
 
 Affected assets are the independent-review recovery adapter, its deterministic
 tests, the reusable isolated-review specification, and user-facing recovery
-guidance. No external API, credential, Project, deployment, or release
-behavior changes.
+guidance. Primary tracking issue: #111. No external API, credential, Project,
+deployment, or release behavior changes.
