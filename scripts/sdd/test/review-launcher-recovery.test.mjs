@@ -87,6 +87,30 @@ test("recovery preflight requires exact authorization, fixed host, and runtime p
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, failureCode: "independent-reviewer-codex-execution-unavailable" }).code, "review-launcher-failure-not-recoverable");
 });
 
+test("Codex recovery accepts only the durable strict artifact-missing precursor", () => {
+  const artifactMissing = {
+    ...strictResult,
+    reviewRecordId: "strict-artifact-missing-record",
+    executionId: "strict-artifact-missing-execution",
+    unavailableCode: "review-launcher-codex-result-artifact-missing"
+  };
+  const allowed = validateReviewLauncherRecovery({
+    ...baseInput,
+    failureCode: artifactMissing.unavailableCode,
+    strictResult: artifactMissing
+  });
+  assert.equal(allowed.allowed, true, JSON.stringify(allowed));
+  assert.equal(allowed.recovery.launcherKind, "codex-detached-read-only-v1");
+
+  const rejected = validateReviewLauncherRecovery({
+    ...baseInput,
+    failureCode: "review-launcher-codex-result-artifact-malformed",
+    strictResult: { ...artifactMissing, unavailableCode: "review-launcher-codex-result-artifact-malformed" }
+  });
+  assert.equal(rejected.allowed, false);
+  assert.equal(rejected.code, "review-launcher-failure-not-recoverable");
+});
+
 test("host and acceptance reject missing or self-review identity bindings before trust", () => {
   for (const [label, changedRequest, expectedCode] of [
     ["missing implementer", { authorization: { ...authorization, implementerSession: undefined } }, "review-launcher-identity-binding-missing"],

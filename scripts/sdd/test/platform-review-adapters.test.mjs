@@ -400,6 +400,17 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       clock: () => "2026-08-15T04:01:00.000Z"
     });
     assert.equal(tamperedExpiration.code, "independent-reviewer-parent-strict-tool-receipt-invalid");
+    const artifactMissing = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
+      removeView: () => ({ removed: true }),
+      verifyExecutable: () => true,
+      clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(artifactMissing.code, "review-launcher-codex-result-artifact-missing");
+    assert.equal(artifactMissing.result.status, "unavailable");
+    assert.equal(artifactMissing.result.unavailableCode, "review-launcher-codex-result-artifact-missing");
+    assert.equal(artifactMissing.result.baseCommit, reviewPackage.baseCommit);
+    assert.equal(artifactMissing.result.headCommit, reviewPackage.headCommit);
+    assert.equal(artifactMissing.result.manifestDigest, reviewPackage.manifestDigest);
     const authenticationFailure = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 1, output: "authentication token expired at /private/secret" } }, {
       removeView: () => ({ removed: true }),
       verifyExecutable: () => true,
