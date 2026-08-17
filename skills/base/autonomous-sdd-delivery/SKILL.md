@@ -19,6 +19,9 @@ controller transition entry points, rather than mutating records in memory:
 `bindControllerLifecycleDelivery` after that resource's merge, and
 `executeControllerLifecycleCleanup` after Archive convergence. Those entries
 persist each transition and carry the updated record through cleanup receipts.
+The cleanup entry requires a fresh resource inspection for mutable eligibility;
+if any registered resource is not exactly eligible, it pauses rather than
+claiming an empty cleanup plan is complete.
 
 Without valid controller context, generated OpenSpec actions retain their
 ordinary bounded behavior. Do not infer targets, persist credentials, bypass

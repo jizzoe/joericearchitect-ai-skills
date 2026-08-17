@@ -83,8 +83,10 @@ published choices, and perform no selection or mutation.
    resource against its own evidence through
    `executeControllerLifecycleCleanup`, which persists every started, terminal,
    or already-completed receipt outside target worktrees and returns the updated
-   controller record before removal. Record ineligible resources with their
-   recovery state. Never infer or backfill ownership; a stranded legacy
+   controller record before removal. Supply a fresh inspection for each
+   resource's mutable eligibility state; if any resource remains ineligible,
+   pause rather than treating an empty action list as complete. Record
+   ineligible resources with their recovery state. Never infer or backfill ownership; a stranded legacy
     resource requires a separately owner-authorized migration before audit. The
     migration must verify an exact signed owner record against the configured
     trusted owner key; a caller-computed digest is not sufficient.

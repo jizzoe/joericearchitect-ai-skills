@@ -48,7 +48,7 @@
 - [x] 5.1 Generate immutable run identities, derive controller checkpoint destinations from them, and reject cross-run checkpoint replacement.
   - Depends on: 1.1 and 1.2.
   - Evidence: controller collision and resume tests in `scripts/sdd/test/autonomous-sdd-controller.test.mjs`.
-- [x] 5.2 Add executable controller transitions for durable resource registration, delivery binding, and receipt-coupled cleanup execution.
+- [x] 5.2 Add executable controller transitions for durable resource registration, delivery binding, fresh eligibility inspection, and receipt-coupled cleanup execution.
   - Depends on: 2.1, 2.2, 3.1, and 5.1.
   - Evidence: transition integration tests prove persisted registration, delivery binding, and cleanup receipt outcomes.
 - [ ] 5.3 Rerun complete validation and strict isolated review after the correction head is committed.

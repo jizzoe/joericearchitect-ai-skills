@@ -32,8 +32,9 @@ derived checkpoint path, and persistence rejects a stored mismatched identity.
 Use the controller's persisted registration, delivery-binding, and cleanup
 transition entries instead of changing a record only in memory. After Archive
 convergence, use the exact-owned cleanup finalizer in audit, apply, or resume
-mode; never infer ownership or delete a dirty, legacy, primary, locked, or
-remote resource.
+mode with fresh mutable-resource inspection; never infer ownership, call an
+ineligible cleanup audit complete, or delete a dirty, legacy, primary, locked,
+or remote resource.
 
 ## Recovery
 

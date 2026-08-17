@@ -185,6 +185,26 @@ test("executable controller transitions persist lifecycle resources and cleanup 
   }
 });
 
+test("controller cleanup plans from fresh worktree eligibility and refuses an ineligible audit", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "controller-worktree-cleanup-"));
+  try {
+    fs.mkdirSync(path.join(root, ".git"));
+    const runGit = () => ".git";
+    const initial = createControllerRecord({ authorization, repository: "owner/repository", runId: "controller-run-0004" }).record;
+    const registered = registerControllerLifecycleResource({ repositoryPath: root, record: initial, resource: { kind: "worktree", id: "transition-worktree", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "worktree-recovery", ownershipToken: "worktree-token" }, now: started, runGit });
+    const delivered = bindControllerLifecycleDelivery({ repositoryPath: root, record: registered.record, kind: "worktree", id: "transition-worktree", deliveryEvidence: { current: true, reference: "pr-worktree", headCommit: "b".repeat(40), deliveredHeadCommit: "c".repeat(40), mergedPullRequest: { merged: true, pullRequest: "4", topicHeadCommit: "b".repeat(40), finalHeadCommit: "c".repeat(40) } }, runGit });
+    const cleanupContext = { archiveVisible: true, issueClosed: true, projectDone: true, deliveryEvidence: { current: true, reference: "archive", headCommit: "c".repeat(40) } };
+    const eligible = (resource) => ({ ...resource, exists: true, primary: false, locked: false, registered: true, clean: true, controllerCheckpointPresent: false });
+    const cleanup = executeControllerLifecycleCleanup({ repositoryPath: root, record: delivered.record, cleanupContext, operations: { inspectResource: eligible, removeWorktree: () => ({ committed: true }) }, now: "2026-08-13T12:30:00.000Z", runGit });
+    assert.equal(cleanup.classification, "completed");
+    assert.equal(cleanup.record.cleanupReceipts.at(-1).status, "completed");
+    const refused = executeControllerLifecycleCleanup({ repositoryPath: root, record: delivered.record, cleanupContext, operations: { inspectResource: (resource) => ({ ...resource, exists: true }) }, runGit });
+    assert.equal(refused.reason, "controller-cleanup-resource-ineligible");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("controller state root rejects an unavailable common Git directory", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "controller-state-"));
   try {

@@ -74,6 +74,15 @@ afterward. Cleanup rereads the registry and receipts on resume. A controller
 cannot be removed from a worktree unless its terminal receipt and recovery
 reference are already available outside it.
 
+### Fresh eligibility inspection at cleanup time
+
+The durable registry carries immutable ownership and delivery evidence, but it
+cannot safely assert mutable worktree state captured at registration. Before
+the controller asks the cleanup planner for actions, it obtains fresh resource
+inspection and combines it only with the same exact durable identity. A missing,
+failed, or ineligible inspection pauses the controller; an empty action list is
+not terminal completion when a registered resource remains ineligible.
+
 ### Explicit migration for prior stranded resources
 
 Provide a separate migration input that requires an explicit, exact signed

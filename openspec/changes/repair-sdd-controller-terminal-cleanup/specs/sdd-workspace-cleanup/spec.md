@@ -10,6 +10,12 @@ when that resource is created or selected; cleanup MUST NOT infer or
 post-Archive-backfill ownership. A legacy resource may become eligible only
 through a distinct owner-authorized migration record that captures a fresh,
 human-reviewed identity and delivery proof before cleanup is planned.
+Before each controller-coupled cleanup plan, it MUST obtain a fresh inspection
+of every recorded resource for mutable eligibility state, including existence,
+worktree primary/lock/registration/cleanliness/checkpoint state, or branch
+reachability state. A controller MUST pause rather than classify cleanup as
+complete if that inspection is missing, fails, or leaves any resource
+ineligible.
 
 #### Scenario: Recorded clean worktree is eligible
 - **WHEN** a non-primary registered worktree matches its ownership record and has no changes
@@ -18,6 +24,18 @@ human-reviewed identity and delivery proof before cleanup is planned.
 #### Scenario: Legacy or dirty resource is discovered
 - **WHEN** inventory finds unrecorded or staged, unstaged, untracked, conflicted, or submodule changes
 - **THEN** it reports the resource as ineligible and leaves it intact
+
+#### Scenario: Fresh worktree inspection permits exact cleanup
+- **WHEN** a controller-held worktree record has current delivery evidence and
+  fresh inspection proves it is non-primary, unlocked, registered, clean, and
+  has no unresolved checkpoint-retention boundary
+- **THEN** the controller may create its receipt-coupled cleanup plan and remove
+  only that exact worktree
+
+#### Scenario: Fresh inspection is incomplete
+- **WHEN** controller cleanup lacks fresh inspection or any registered resource
+  remains ineligible after that inspection
+- **THEN** it pauses without removal and does not report cleanup complete
 
 #### Scenario: Unregistered historical resource is discovered
 - **WHEN** a branch or worktree lacks a contemporaneous lifecycle ownership

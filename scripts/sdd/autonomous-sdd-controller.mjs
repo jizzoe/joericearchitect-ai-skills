@@ -299,7 +299,24 @@ export function bindControllerLifecycleDelivery({ repositoryPath, record, kind, 
 }
 
 export function executeControllerLifecycleCleanup({ repositoryPath, record, cleanupContext, operations = {}, now = new Date().toISOString(), runGit } = {}) {
-  const plan = planWorkspaceCleanup({ ...cleanupContext, selectedEntry: record?.selectedEntry, repository: record?.repository, resources: record?.resourceRecords });
+  if (typeof operations.inspectResource !== "function") {
+    return { classification: "paused", reason: "controller-cleanup-fresh-inspection-missing", outcomes: [], record, plan: null };
+  }
+  let inspectedResources;
+  try {
+    inspectedResources = (record?.resourceRecords ?? []).map((resource) => {
+      const inspected = operations.inspectResource(resource);
+      if (!inspected || typeof inspected !== "object") return inspected;
+      const { exists, ...eligibility } = inspected;
+      return eligibility;
+    });
+  } catch {
+    return { classification: "paused", reason: "controller-cleanup-fresh-inspection-failed", outcomes: [], record, plan: null };
+  }
+  const plan = planWorkspaceCleanup({ ...cleanupContext, selectedEntry: record?.selectedEntry, repository: record?.repository, resources: inspectedResources });
+  if (plan.classification !== "planned" || plan.resources.some((resource) => resource.classification !== "eligible")) {
+    return { classification: "paused", reason: "controller-cleanup-resource-ineligible", outcomes: [], record, plan };
+  }
   let currentRecord = record;
   const result = executeWorkspaceCleanup(plan, {
     ...operations,
