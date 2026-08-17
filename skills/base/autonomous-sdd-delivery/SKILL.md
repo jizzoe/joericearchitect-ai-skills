@@ -11,7 +11,14 @@ with `scripts/sdd/autonomous-sdd-controller.mjs` in repository-common Git state,
 then reread durable state and run only its first incomplete phase. Register
 every non-primary implementation, Sync, and Archive resource before it is
 created or selected, and bind each merged checkpoint to that resource rather
-than to one global delivery head.
+than to one global delivery head. Each controller run receives an immutable
+unique run ID and uses only its derived `runs/<run-id>/controller.json`
+checkpoint; never choose or reuse another run's checkpoint path. Use the
+controller transition entry points, rather than mutating records in memory:
+`registerControllerLifecycleResource` before resource creation or selection,
+`bindControllerLifecycleDelivery` after that resource's merge, and
+`executeControllerLifecycleCleanup` after Archive convergence. Those entries
+persist each transition and carry the updated record through cleanup receipts.
 
 Without valid controller context, generated OpenSpec actions retain their
 ordinary bounded behavior. Do not infer targets, persist credentials, bypass

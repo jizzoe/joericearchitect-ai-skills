@@ -8,12 +8,15 @@ import {
   advanceControllerRecord,
   appendControllerCleanupReceipt,
   authorizationDigest,
+  bindControllerLifecycleDelivery,
   bindControllerResourceDelivery,
   createControllerRecord,
+  executeControllerLifecycleCleanup,
   inspectControllerRecord,
   persistControllerRecord,
   persistControllerCleanupReceipt,
   registerControllerResource,
+  registerControllerLifecycleResource,
   resolveControllerStateRoot
 } from "../autonomous-sdd-controller.mjs";
 import { inspectCheckpoint } from "../checkpoint.mjs";
@@ -22,7 +25,7 @@ import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
 
 const started = "2026-08-13T12:00:00.000Z";
 const authorization = resolveSddDeliveryRequest({ target: "complete-delivery", mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-only", expiration: "12h" }, { goalStartedAt: started }).effectiveAuthorization;
-const created = createControllerRecord({ authorization, repository: "owner/repository", checkpointPath: "openspec/changes/complete-delivery/evidence/run.json" });
+const created = createControllerRecord({ authorization, repository: "owner/repository", runId: "controller-run-0001" });
 
 test("controller record starts at planning and resumes first incomplete phase", () => {
   assert.equal(created.valid, true);
@@ -67,7 +70,7 @@ test("every lifecycle entry resumes only the first incomplete controller phase",
 
 test("controller records and advances an explicit ordered-queue entry", () => {
   const queued = resolveSddDeliveryRequest({ target: ["complete-delivery", "next-delivery"], mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-only", expiration: "12h" }, { goalStartedAt: started }).effectiveAuthorization;
-  const record = createControllerRecord({ authorization: queued, repository: "owner/repository", checkpointPath: "openspec/changes/next-delivery/evidence/run.json", selectedEntry: "next-delivery" }).record;
+  const record = createControllerRecord({ authorization: queued, repository: "owner/repository", runId: "controller-run-0002", selectedEntry: "next-delivery" }).record;
   assert.equal(record.selectedEntry, "next-delivery");
   const completed = structuredClone(record);
   completed.queueIndex = 0; completed.selectedEntry = "complete-delivery";
@@ -105,11 +108,14 @@ test("controller persists only in the git common-directory state root and advanc
     assert.deepEqual(JSON.parse(fs.readFileSync(persisted.path, "utf8")).steps, created.record.steps);
     assert.equal(fs.readdirSync(path.dirname(persisted.path)).some((entry) => entry.endsWith(".tmp")), false);
     assert.equal(persisted.path.startsWith(path.join(fs.realpathSync(root), ".git", "sdd-delivery-runs")), true);
-    assert.equal(persistControllerRecord({ repositoryPath: root, record: { ...created.record, checkpointPath: "../escape.json" }, runGit }).reason, "controller-record-path-escape");
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: { ...created.record, checkpointPath: "../escape.json" }, runGit }).reason, "controller-record-path-invalid");
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), "controller-outside-"));
     fs.symlinkSync(outside, path.join(root, ".git", "sdd-delivery-runs", "linked"));
-    assert.equal(persistControllerRecord({ repositoryPath: root, record: { ...created.record, checkpointPath: "linked/record.json" }, runGit }).reason, "controller-record-path-symlink");
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: { ...created.record, checkpointPath: "linked/record.json" }, runGit }).reason, "controller-record-path-invalid");
     assert.equal(fs.existsSync(path.join(outside, "record.json")), false);
+    const conflictingOnDisk = { ...created.record, runId: "controller-run-9999" };
+    fs.writeFileSync(persisted.path, `${JSON.stringify(conflictingOnDisk)}\n`);
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: created.record, runGit }).reason, "controller-record-run-conflict");
     fs.rmSync(outside, { recursive: true, force: true });
     assert.equal(advanceControllerRecord(created.record, "planning-review", { current: true }).reason, "controller-phase-advance-out-of-order");
     const advanced = advanceControllerRecord(created.record, "propose", { current: true, reference: "proposal" });
@@ -156,6 +162,24 @@ test("cleanup receipts persist outside the registered target worktree", () => {
     assert.equal(persisted.valid, true);
     assert.equal(persisted.path.includes("target-worktree"), false);
     assert.equal(JSON.parse(fs.readFileSync(persisted.path, "utf8")).cleanupReceipts[0].status, "started");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("executable controller transitions persist lifecycle resources and cleanup receipts", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "controller-transition-"));
+  try {
+    fs.mkdirSync(path.join(root, ".git"));
+    const runGit = () => ".git";
+    const initial = createControllerRecord({ authorization, repository: "owner/repository", runId: "controller-run-0003" }).record;
+    const registered = registerControllerLifecycleResource({ repositoryPath: root, record: initial, resource: { kind: "branch", id: "transition-branch", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "transition-recovery", ownershipToken: "transition-token" }, now: started, runGit });
+    assert.equal(registered.valid, true);
+    const delivered = bindControllerLifecycleDelivery({ repositoryPath: root, record: registered.record, kind: "branch", id: "transition-branch", deliveryEvidence: { current: true, reference: "pr-transition", headCommit: "b".repeat(40), deliveredHeadCommit: "c".repeat(40), mergedPullRequest: { merged: true, pullRequest: "3", topicHeadCommit: "b".repeat(40), finalHeadCommit: "c".repeat(40) } }, runGit });
+    assert.equal(delivered.valid, true);
+    const cleanup = executeControllerLifecycleCleanup({ repositoryPath: root, record: delivered.record, cleanupContext: { archiveVisible: true, issueClosed: true, projectDone: true, deliveryEvidence: { current: true, reference: "archive", headCommit: "c".repeat(40) } }, operations: { inspectResource: (resource) => ({ ...resource, exists: true }), deleteLocalBranch: () => ({ committed: true }) }, now: "2026-08-13T12:30:00.000Z", runGit });
+    assert.equal(cleanup.classification, "completed");
+    assert.equal(cleanup.record.cleanupReceipts.at(-1).status, "completed");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

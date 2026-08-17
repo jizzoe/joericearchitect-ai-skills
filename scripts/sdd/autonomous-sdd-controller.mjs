@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { executeWorkspaceCleanup, planWorkspaceCleanup } from "./sdd-workspace-cleanup.mjs";
 
 const phases = Object.freeze([
   "propose", "planning-review", "apply", "verify", "delivery", "sync", "archive", "cleanup"
@@ -20,6 +21,8 @@ const canonical = (value) => {
 };
 const selectedByAuthorization = (selectedEntry, authorization) =>
   text(selectedEntry) && Array.isArray(authorization?.target?.entries) && authorization.target.entries.includes(selectedEntry);
+const validRunId = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9-]{7,127}$/i.test(value);
+const checkpointForRun = (runId) => `runs/${runId}/controller.json`;
 
 function safeContainedDestination(repositoryPath, checkpointPath) {
   const root = fs.realpathSync(repositoryPath);
@@ -89,16 +92,17 @@ export function authorizationDigest(authorization) {
   return crypto.createHash("sha256").update(JSON.stringify(canonical(authorization))).digest("hex");
 }
 
-export function createControllerRecord({ authorization, repository, checkpointPath, selectedEntry } = {}) {
+export function createControllerRecord({ authorization, repository, selectedEntry, runId = crypto.randomUUID() } = {}) {
   const entries = authorization?.target?.entries;
   const entry = selectedEntry ?? entries?.[0];
-  if (!selectedByAuthorization(entry, authorization) || !text(repository) || !text(checkpointPath) || authorization?.mode !== "autonomous" || authorization?.authorizationProfile !== "sdd-delivery") {
+  if (!selectedByAuthorization(entry, authorization) || !text(repository) || !validRunId(runId) || authorization?.mode !== "autonomous" || authorization?.authorizationProfile !== "sdd-delivery") {
     return { valid: false, reason: "controller-record-input-invalid" };
   }
   return {
     valid: true,
     record: {
-      schemaVersion: 3,
+      schemaVersion: 4,
+      runId,
       authorizationDigest: authorizationDigest(authorization),
       selectedEntry: entry,
       queueEntries: [...entries],
@@ -106,7 +110,7 @@ export function createControllerRecord({ authorization, repository, checkpointPa
       repository,
       expiresAt: authorization.expiresAt,
       allowedLifecycleChain: [...phases],
-      checkpointPath,
+      checkpointPath: checkpointForRun(runId),
       resourceRecords: [],
       cleanupReceipts: [],
       completedEntries: [],
@@ -117,7 +121,7 @@ export function createControllerRecord({ authorization, repository, checkpointPa
 }
 
 export function registerControllerResource(record, resource, { now = new Date().toISOString() } = {}) {
-  if (record?.schemaVersion !== 3 || !timestamp(now) || !resource || !["worktree", "branch"].includes(resource.kind) ||
+  if (record?.schemaVersion !== 4 || !timestamp(now) || !resource || !["worktree", "branch"].includes(resource.kind) ||
       !text(resource.id) || !text(resource.role) || !fullCommit(resource.registeredHeadCommit) || !text(resource.recoveryReference) ||
       resource.deliveryEvidence !== undefined) return { valid: false, reason: "controller-resource-registration-invalid" };
   const next = structuredClone(record);
@@ -142,18 +146,20 @@ export function registerControllerResource(record, resource, { now = new Date().
 }
 
 export function bindControllerResourceDelivery(record, { kind, id, deliveryEvidence } = {}) {
-  if (record?.schemaVersion !== 3 || !["worktree", "branch"].includes(kind) || !text(id)) return { valid: false, reason: "controller-resource-delivery-invalid" };
+  if (record?.schemaVersion !== 4 || !["worktree", "branch"].includes(kind) || !text(id)) return { valid: false, reason: "controller-resource-delivery-invalid" };
   const next = structuredClone(record);
   const resource = next.resourceRecords?.find((item) => item.kind === kind && item.id === id);
   if (!resource || resource.deliveryEvidence !== undefined) return { valid: false, reason: "controller-resource-delivery-invalid" };
   resource.headCommit = deliveryEvidence?.headCommit;
+  resource.deliveryCurrent = true;
   resource.deliveryEvidence = structuredClone(deliveryEvidence);
+  if (resource.kind === "branch") resource.squashOrRebaseEvidence = structuredClone(deliveryEvidence?.mergedPullRequest);
   if (!validResource(resource, next, { allowPending: false })) return { valid: false, reason: "controller-resource-delivery-invalid" };
   return { valid: true, record: next };
 }
 
 export function appendControllerCleanupReceipt(record, receipt, { now = new Date().toISOString() } = {}) {
-  if (record?.schemaVersion !== 3 || !timestamp(now) || !receipt || !["started", "completed", "already-completed", "blocked"].includes(receipt.status) ||
+  if (record?.schemaVersion !== 4 || !timestamp(now) || !receipt || !["started", "completed", "already-completed", "blocked"].includes(receipt.status) ||
       !["worktree", "branch"].includes(receipt.kind) || !text(receipt.id)) return { valid: false, reason: "controller-cleanup-receipt-invalid" };
   const next = structuredClone(record);
   const resource = next.resourceRecords?.find((item) => item.kind === receipt.kind && item.id === receipt.id);
@@ -196,8 +202,8 @@ export function advanceControllerQueue(record, { now = new Date().toISOString() 
 }
 
 export function inspectControllerRecord(record, { authorization, repository, now = new Date().toISOString() } = {}) {
-  if (!record || record.schemaVersion === 1 || record.schemaVersion === 2) return { classification: "paused", reason: "controller-record-legacy", nextPhase: null };
-  if (record.schemaVersion !== 3 || !text(record.selectedEntry) || !text(record.repository) || !text(record.checkpointPath) || !Array.isArray(record.steps) ||
+  if (!record || record.schemaVersion === 1 || record.schemaVersion === 2 || record.schemaVersion === 3) return { classification: "paused", reason: "controller-record-legacy", nextPhase: null };
+  if (record.schemaVersion !== 4 || !validRunId(record.runId) || record.checkpointPath !== checkpointForRun(record.runId) || !text(record.selectedEntry) || !text(record.repository) || !text(record.checkpointPath) || !Array.isArray(record.steps) ||
       !Array.isArray(record.resourceRecords) || !Array.isArray(record.cleanupReceipts) || !Array.isArray(record.completedEntries) ||
       record.resourceRecords.some((resource) => !validResource(resource, record)) ||
       record.completedEntries.some((entry) => !validCompletedEntry(entry, record.repository))) {
@@ -234,7 +240,7 @@ export function advanceControllerRecord(record, phase, evidence) {
 }
 
 export function persistControllerRecord({ repositoryPath, record, runGit } = {}) {
-  if (!text(repositoryPath) || !text(record?.checkpointPath) || path.isAbsolute(record.checkpointPath)) {
+  if (!text(repositoryPath) || !validRunId(record?.runId) || record?.checkpointPath !== checkpointForRun(record.runId) || path.isAbsolute(record.checkpointPath)) {
     return { valid: false, reason: "controller-record-path-invalid" };
   }
   const state = resolveControllerStateRoot({ repositoryPath, runGit });
@@ -253,6 +259,10 @@ export function persistControllerRecord({ repositoryPath, record, runGit } = {})
   try {
     fs.mkdirSync(directory, { recursive: true });
     if (!inspectComponents() || fs.realpathSync(directory) === root || !fs.realpathSync(directory).startsWith(`${root}${path.sep}`)) return { valid: false, reason: "controller-record-path-symlink" };
+    if (fs.existsSync(destination)) {
+      const existing = JSON.parse(fs.readFileSync(destination, "utf8"));
+      if (existing?.runId !== record.runId) return { valid: false, reason: "controller-record-run-conflict" };
+    }
     const descriptor = fs.openSync(temporary, "wx", 0o600);
     try {
       fs.writeFileSync(descriptor, `${JSON.stringify(record, null, 2)}\n`);
@@ -272,4 +282,33 @@ export function persistControllerRecord({ repositoryPath, record, runGit } = {})
     try { fs.unlinkSync(temporary); } catch {}
     return { valid: false, reason: "controller-record-persist-failed" };
   }
+}
+
+export function registerControllerLifecycleResource({ repositoryPath, record, resource, now, runGit } = {}) {
+  const registered = registerControllerResource(record, resource, { now });
+  if (!registered.valid) return registered;
+  const persisted = persistControllerRecord({ repositoryPath, record: registered.record, runGit });
+  return persisted.valid ? { valid: true, record: registered.record, resource: registered.resource, path: persisted.path } : persisted;
+}
+
+export function bindControllerLifecycleDelivery({ repositoryPath, record, kind, id, deliveryEvidence, runGit } = {}) {
+  const bound = bindControllerResourceDelivery(record, { kind, id, deliveryEvidence });
+  if (!bound.valid) return bound;
+  const persisted = persistControllerRecord({ repositoryPath, record: bound.record, runGit });
+  return persisted.valid ? { valid: true, record: bound.record, path: persisted.path } : persisted;
+}
+
+export function executeControllerLifecycleCleanup({ repositoryPath, record, cleanupContext, operations = {}, now = new Date().toISOString(), runGit } = {}) {
+  const plan = planWorkspaceCleanup({ ...cleanupContext, selectedEntry: record?.selectedEntry, repository: record?.repository, resources: record?.resourceRecords });
+  let currentRecord = record;
+  const result = executeWorkspaceCleanup(plan, {
+    ...operations,
+    persistOutcome: (outcome) => {
+      const persisted = persistControllerCleanupReceipt({ repositoryPath, record: currentRecord, receipt: { kind: outcome.resource?.kind, id: outcome.resource?.id, status: outcome.status }, now, runGit });
+      if (!persisted.valid) return { persisted: false };
+      currentRecord = persisted.record;
+      return { persisted: true, path: persisted.path };
+    }
+  });
+  return { ...result, record: currentRecord, plan };
 }

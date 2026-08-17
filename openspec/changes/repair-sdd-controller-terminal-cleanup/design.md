@@ -40,6 +40,10 @@ dirty user work, and to a versioned archive record because final cleanup must
 not require a post-Archive content change. A generic temporary directory is
 rejected because it cannot provide durable local recovery.
 
+Each record receives a generated immutable run identity. Its checkpoint path is
+derived beneath that identity; persistence rejects replacement by a different
+run identity, preventing conflicting callers from overwriting controller state.
+
 ### Register resources before creation and bind them independently
 
 Extend the controller record with an append-only resource registry. Before an
@@ -53,6 +57,14 @@ The cleanup planner consumes this registry and evaluates resources separately.
 This is preferred to one global final delivery head, which fails valid earlier
 squash merges, and to reusing one worktree, which conflicts with separate PR
 checkpoints.
+
+### Executable transition integration
+
+The controller exposes bounded transitions that persist registration, delivery
+binding, and cleanup receipts. Cleanup delegates to the existing exact cleanup
+planner/executor and carries the returned record forward after every persisted
+outcome. The interface accepts structured resource and evidence data, never
+infers ownership, and does not issue arbitrary Git commands.
 
 ### Terminal receipt before destructive cleanup
 
@@ -83,6 +95,8 @@ caller-computed digests never create records automatically.
   selected entry, owner authorization, and delivery binding per record.
 - [Platform worktree layouts differ] → use Git-derived common-directory
   resolution and portable fixtures rather than absolute paths.
+- [Two controller runs collide] → derive a unique run-scoped checkpoint and
+  reject a replacement by a different recorded run identity.
 
 ## Migration Plan
 
@@ -103,6 +117,8 @@ caller-computed digests never create records automatically.
   atomic receipt persistence, resource registration, multiple squash-delivery
   bindings, dirty checkpoint refusal, migration scope, partial removal, and
   idempotent resume.
+- Add transition fixtures for run-identity collision refusal, persisted resource
+  registration/delivery, receipt-coupled cleanup, and record resumption.
 - Run the focused controller and cleanup tests, lifecycle evaluator fixtures,
   adapter-drift checks, and `openspec validate --all --strict`.
 - Keep canonical behavior in `scripts/sdd/` and `skills/base/`; retain thin

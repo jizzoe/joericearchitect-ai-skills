@@ -27,6 +27,10 @@ or ambiguously owned local resources.
 - Add deterministic fixtures for terminal controller retention, multi-PR
   resource delivery, dirty controller worktrees, partial cleanup, and migration
   refusal or acceptance.
+- Generate an immutable run identity and checkpoint location so concurrent or
+  mistaken controller runs cannot overwrite one another's state.
+- Provide an executable controller transition interface that persists resource
+  registration, delivery binding, and cleanup receipts as real lifecycle work.
 
 ## Non-Goals
 

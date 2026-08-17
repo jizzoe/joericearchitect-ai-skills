@@ -15,6 +15,11 @@ ownership token, recovery reference, and pending delivery binding. A registered
 resource MUST retain its own delivery evidence as the corresponding lifecycle
 pull request is merged; the controller MUST NOT substitute one global final
 head for distinct resource deliveries.
+Each controller record MUST have an immutable generated run identity and a
+checkpoint location derived from that identity; persistence MUST reject
+replacement by a different recorded run. The controller MUST expose executable
+registration, delivery-binding, and receipt-coupled cleanup transitions so
+required resource evidence is produced by lifecycle work rather than tests.
 
 #### Scenario: Complete target-explicit delivery starts
 - **WHEN** a valid autonomous `sdd-delivery` request names one change or queue
@@ -41,3 +46,12 @@ head for distinct resource deliveries.
 - **WHEN** a registered worktree passes the exact post-Archive cleanup gate
 - **THEN** its controller and terminal cleanup receipt remain recoverable from
   repository-scoped state outside that worktree
+
+#### Scenario: Controller checkpoint collides with another run
+- **WHEN** persistence targets a checkpoint owned by a different run identity
+- **THEN** it rejects the replacement and preserves the existing record
+
+#### Scenario: Executable cleanup transition completes
+- **WHEN** registered resources pass exact post-Archive cleanup gates
+- **THEN** the controller persists each receipt outside the target worktree and
+  returns the updated record
