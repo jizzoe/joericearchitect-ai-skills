@@ -3,9 +3,14 @@
 Date: 2026-08-15 (revised 2026-08-15 to add cross-repository slices)
 Status: Implementation-ready design brief draft. Create an OpenSpec proposal only after the owner accepts this scope. This brief is expected to change as the workflow is tuned in practice; edit it in place rather than forking a new file.
 
+Portfolio role: this is the canonical milestone and cross-repository
+coordination brief in the [design-brief portfolio](README.md). It consumes the
+[single-repository runtime](autonomous-sdd-runtime-kernel.md) and lifecycle
+evidence; it does not define a second runner or broaden repository authority.
+
 ## Decision
 
-Create `sdd-milestone-slice-delivery`, a reusable, assistant-neutral skill that runs OpenSpec/SDD work one slice at a time inside a milestone-based delivery plan, with a fixed conversational cadence: milestone briefing, slice briefing, confirmed lifecycle execution, slice summary, next-step approval, milestone summary. It also answers on-demand, read-only status queries about the plan (current milestone, last slice/milestone worked on, plan-wide progress, an arbitrary milestone's summary or slice list) at any time, without requiring the cadence's approval gates — see Status Queries below.
+Create `sdd-milestone-slice-delivery`, a reusable, assistant-neutral skill that runs OpenSpec/SDD work one slice at a time inside a milestone-based delivery plan, with a fixed conversational cadence: milestone briefing, slice briefing, confirmed lifecycle execution, slice summary, next-step approval, milestone summary. It resolves an explicit collaboration profile before a cross-repository slice begins. It also answers on-demand, read-only status queries about the plan (current milestone, last slice/milestone worked on, plan-wide progress, an arbitrary milestone's summary or slice list) at any time, without requiring the cadence's approval gates — see Status Queries below.
 
 The skill is a conversational orchestration layer. It does not reimplement:
 
@@ -231,9 +236,49 @@ If the slice's own delivery profile or the participating repositories genuinely 
 
 ## Users And Modes
 
+### Collaboration profiles and observed gap
+
+The original two-role model correctly protects repository ownership and durable
+handoffs, but it has no way to distinguish a multi-owner delivery from a
+single owner deliberately operating both roles. The absence of that choice can
+make a cross-repository transition appear as an unexpected notification, or
+tempt an assistant to treat a central bounded run as implicit component
+authority. Neither outcome is acceptable.
+
+The skill therefore SHALL resolve one collaboration profile for every
+cross-repository milestone and slice:
+
+- **`team` (default):** separate central-coordinator and component-implementer
+  role sessions, with each participating component owned by its named
+  repository owner. Gate 1 emits the durable handoff, the central session ends
+  while component returns are outstanding, and no central session acts in a
+  component repository.
+- **`solo` (explicit):** one named owner is intentionally operating the
+  central and named component roles. The same person may perform both roles,
+  but the assistant still announces a role transition, reads the durable
+  inbound handoff, maintains separate central and component controller state,
+  and writes the same linkage-ledger dispatch and return records. `solo` does
+  not collapse the central and component changes, remove either Gate 1 or Gate
+  2, substitute component evidence for end-to-end evidence, or grant a
+  component mutation from a central authorization.
+
+When a required collaboration profile is absent, the assistant SHALL present
+`team` as the default, explain the effect of `team` and `solo`, and ask the
+user to either accept `team` or explicitly select `solo`. It SHALL not select
+or start a slice, dispatch a component, or enter a component repository until
+that response is recorded in the milestone/slice source and, for an in-flight
+slice, its linkage ledger. Default is a safe recommendation, not silent
+consent.
+
+This profile is independent of the delivery profile (`prototype-rapid` or
+`production-rapid`) and execution mode (checkpointed or a separately granted
+autonomous scope). A `solo` choice permits one owner to operate both roles; it
+does not make a cross-repository central change milestone-autonomous or
+slice-autonomous.
+
 ### Interactive, one slice at a time (default)
 
-The user is walked through each milestone and each slice with explicit narration and approval gates as described in Workflow below. This is the default whenever the user has not granted a bounded autonomous scope.
+The user is walked through each milestone and each slice with explicit narration and approval gates as described in Workflow below. For a cross-repository milestone or slice whose collaboration profile is absent, profile resolution occurs before this cadence begins. This is the default whenever the user has not granted a bounded autonomous scope.
 
 ### Milestone-autonomous
 
@@ -274,6 +319,10 @@ Do not use this skill:
 - Completion state: the target repository's OpenSpec `changes/archive/` (or linked GitHub Project/issue status) to compute done vs. remaining slices per milestone.
 - Delivery profile: `prototype-rapid` or `production-rapid`, applied at Apply/Verify/Archive time via `base-verification-loop` (and `independent-review` for `production-rapid`); this skill does not choose or downgrade the profile.
 - Role: whether this session is running as central-coordinator or component-implementer. Resolve it from the repository being operated in, not from what the user's request sounds like.
+- Collaboration profile: `team` or `solo` for every cross-repository milestone
+  and slice. If absent, present the `team` default and wait for the user's
+  explicit acceptance or `solo` selection before any work selection or
+  mutation.
 - Repository set and integration paths: for a single-repository slice, the one target repository and its configured path for "merge to main" (direct commit, or PR-and-merge under branch protection). For a cross-repository slice, the central repository *and* each participating component repository, each with its own integration path — close-out spans one branch per participating repository, not one branch overall.
 - Component declaration: for each milestone, an explicit statement of which component repositories its slices involve, or an explicit declaration of none. Absence of this field is "unknown," not "none."
 - For a cross-repository slice: the end-to-end verification assignment — executor, environment, and evidence location — resolved before Gate 1. An unassigned end-to-end owner is a missing input, not a detail to settle later.
@@ -305,14 +354,15 @@ Every session begins here, including a fresh session with no conversational memo
 
 1. Resolve the current milestone: the first milestone (in documented order) that still has remaining candidate slices, unless the user names a different one explicitly.
 2. Resolve the milestone's component declaration. If it is absent, say so and treat component involvement as unknown for the rest of this milestone.
-3. Emit a milestone summary: goal, outcome, the full ordered candidate-slice list annotated done/next/remaining, dependencies, acceptance criteria, open blocking questions, and the component declaration (the repositories involved, or an explicit "none").
-4. Offer the autonomous path **only** if the milestone is explicitly declared to have no component repositories. Otherwise offer one-slice-at-a-time only, and state plainly why the autonomous option is unavailable — cross-repository milestones and undeclared milestones both fail closed.
-5. Pause for approval before starting the first slice, or before starting the milestone if autonomous was chosen and available.
+3. Resolve the collaboration profile. For a milestone containing component repositories, show the `team` default and pause for the owner to accept it or select `solo` when the source has no explicit profile. Record the selection durably before starting a slice.
+4. Emit a milestone summary: goal, outcome, the full ordered candidate-slice list annotated done/next/remaining, dependencies, acceptance criteria, open blocking questions, the component declaration (the repositories involved, or an explicit "none"), and the collaboration profile.
+5. Offer the autonomous path **only** if the milestone is explicitly declared to have no component repositories. Otherwise offer one-slice-at-a-time only, and state plainly why the autonomous option is unavailable — cross-repository milestones and undeclared milestones both fail closed.
+6. Pause for approval before starting the first slice, or before starting the milestone if autonomous was chosen and available.
 
 ### 2. Slice entry — after milestone/slice approval
 
 1. Emit a slice briefing: what the slice does, the files it plans to add/modify/delete, and the expected end-of-slice outcome.
-2. State whether the slice is single-repository or cross-repository. If cross-repository, name the responsible repositories and how the requirements divide between them, and say explicitly that approving the plan gate will produce handoff records those repositories' owners must act on.
+2. State whether the slice is single-repository or cross-repository. If cross-repository, name the responsible repositories, collaboration profile, and how the requirements divide between them. For `team`, say that named repository owners must act on the handoff records. For `solo`, say that the named owner may enter each component role only after the corresponding durable handoff and role-transition acknowledgement.
 3. If the milestone scope is interactive, offer the per-slice execution choice: checkpointed (the two gates below) or slice-autonomous (Propose through close-out without pausing, if granted). Skip this offer when the milestone itself is already running autonomously, and do not offer it at all for a cross-repository slice — that slice's central change cannot run continuously, so checkpointed is its only coherent mode.
 4. Ask for explicit confirmation to start the slice.
 
@@ -428,6 +478,10 @@ The skill must:
 - preserve the milestone/slice source document as the authoritative plan — if a slice's real scope diverges from what was briefed (split, grown, or dropped), surface that as a visible plan revision before continuing, not a silent substitution;
 - never offer or accept a milestone-autonomous grant for a milestone containing a cross-repository slice, and never treat an undeclared milestone as component-free — component declaration fails closed;
 - never offer or accept slice-autonomy for a cross-repository slice's central change, which cannot run continuously; component-level slice-autonomy is granted locally, in the component's own repository, and is never implied by a central grant;
+- never infer `solo` from a shared user identity, a common workspace, an agent's
+  ability to access both repositories, or a generic approval. Missing profile
+  means present `team` and wait; `solo` changes role-operation convenience only
+  after explicit selection and durable recording;
 - never operate outside the repository the current role owns. The central role does not implement in component repositories; a component role does not edit the central contract. Cross-repository influence travels only through handoff records and contract amendments;
 - treat the Gate 1 commit-and-push of the central change package as authorized by Gate 1 approval itself, and treat everything it enables downstream as still requiring the component repositories' own approvals;
 - never let the central change archive before its component changes, and never let a component change archive against a pin it knows to be superseded without that being recorded as an explicit gap; and
@@ -449,6 +503,14 @@ Use synthetic milestone/slice plans to test:
 
 - correct next-milestone and next-slice resolution from a documented plan plus archive/completion state;
 - milestone and slice briefings contain every required field (goal/outcome/slice list/status for milestones; changes/files/outcome for slices);
+- a cross-repository milestone or slice with no collaboration profile presents
+  `team` as the default and pauses before work selection, dispatch, or a role
+  transition; it never treats the default as silent consent;
+- explicit `team` preserves separate central and component role sessions, while
+  explicit `solo` permits one named owner to enter both roles only through
+  visible role-transition acknowledgement and durable handoff/return records;
+  neither profile weakens the two approval gates, component mutation boundary,
+  linkage ledger, or end-to-end verification requirement;
 - the two autonomy grants stay independent and are never inferred from each other or from vague approval language;
 - checkpointed slices pause at exactly two gates — before Apply (Gate 1) and before Sync (Gate 2) — and that Gate 2 approval alone authorizes Sync, Archive, merge to main, and feature-branch/worktree cleanup as one close-out with no third prompt;
 - autonomous slices still invoke `base-verification-loop` (and `independent-review` for `production-rapid`) and still pause on a named-mutation boundary not covered by the grant, and that an unassisted-merge blocker (e.g., a protected branch requiring a human-clicked merge) is reported as a completion blocker rather than a fabricated third gate;

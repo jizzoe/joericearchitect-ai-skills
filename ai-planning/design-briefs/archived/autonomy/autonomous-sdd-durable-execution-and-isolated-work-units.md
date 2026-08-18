@@ -1,5 +1,9 @@
 # Autonomous SDD durable execution and isolated work units
 
+> Historical source. Superseded by the canonical
+> [runtime](../../autonomous-sdd-runtime-kernel.md) and
+> [scoped work-unit](../../scoped-work-unit-context-orchestration.md) briefs.
+
 Date: 2026-08-17
 
 Status: Evidence-derived recommendation pending owner confirmation. This brief
@@ -67,7 +71,7 @@ while retaining its reproduced reliability gaps and its SDD-specific rules.
 | One transition engine directly owns the entire lifecycle. | Split the design into an SDD workflow kernel and a `RunStore`/runtime port. SDD semantics remain stable if the local store is later replaced by Restate, Temporal, or DBOS. |
 | Isolation is concentrated in the review dispatcher. | Generalize isolation into typed execution capsules for test authoring, implementation, verification, research, planning, review, and other bounded work. Independent review adds stronger actor-separation and read-only requirements. |
 | Apply is one broad lifecycle phase. | Permit an Apply phase to contain an evidence-gated subgraph of smaller work units, such as tests-first, implementation, verification, and correction. |
-| The controller lacked a run ID and stored state only in a removable worktree. | This diagnosis is now stale. The current [controller](../../scripts/sdd/autonomous-sdd-controller.mjs) uses schema version 4, a unique `runId`, a Git-common-directory checkpoint, resource registration, delivery bindings, and cleanup receipts. The remaining gaps are orchestration, unified schemas, configuration snapshots, locking, context dispatch, and composed recovery. |
+| The controller lacked a run ID and stored state only in a removable worktree. | This diagnosis is now stale. The current [controller](../../../../scripts/sdd/autonomous-sdd-controller.mjs) uses schema version 4, a unique `runId`, a Git-common-directory checkpoint, resource registration, delivery bindings, and cleanup receipts. The remaining gaps are orchestration, unified schemas, configuration snapshots, locking, context dispatch, and composed recovery. |
 | Temporal-like durability was treated as a future external-service option. | Existing durable engines are explicit adapters or escalation options. None is allowed to define SDD lifecycle, evidence, authorization, review, or cleanup semantics. |
 
 ### The SDD domain model already exists, but is fragmented
@@ -78,12 +82,12 @@ consolidated rather than reinvented.
 
 | Domain concern | OpenSpec definition | Current executable coverage | Remaining composition gap |
 |---|---|---|---|
-| Typed lifecycle and operation graph | [SDD lifecycle](../../openspec/specs/sdd-lifecycle/spec.md), [bounded autonomous execution](../../openspec/specs/bounded-autonomous-execution/spec.md), and [derived target authorization](../../openspec/specs/derived-sdd-target-authorization/spec.md) define ordering, prerequisites, and authorized target derivation. | [Operation authorization](../../scripts/sdd/check-operation-authorization.mjs), the [controller](../../scripts/sdd/autonomous-sdd-controller.mjs), and the delivery resolver contain hard-coded phase and operation vocabularies. | One validated graph must generate or validate every vocabulary and permit subgraphs of typed work units. |
+| Typed lifecycle and operation graph | [SDD lifecycle](../../../../openspec/specs/sdd-lifecycle/spec.md), [bounded autonomous execution](../../../../openspec/specs/bounded-autonomous-execution/spec.md), and [derived target authorization](../../../../openspec/specs/derived-sdd-target-authorization/spec.md) define ordering, prerequisites, and authorized target derivation. | [Operation authorization](../../../../scripts/sdd/check-operation-authorization.mjs), the [controller](../../../../scripts/sdd/autonomous-sdd-controller.mjs), and the delivery resolver contain hard-coded phase and operation vocabularies. | One validated graph must generate or validate every vocabulary and permit subgraphs of typed work units. |
 | Authorization and configuration snapshots | Bounded execution and lifecycle specs require exact, expiring authorization and selected-entry continuity. | The request resolver normalizes authorization and the controller records an authorization digest. Repository config and reviewer consumers still use incompatible projections. | Resolve one safe configuration and authorization snapshot at admission, retain provenance and digests, and make every work unit derive narrower authority from it. |
-| Evidence bindings and freshness | Lifecycle specs, derived authorization, independent review, and cleanup define current evidence and exact-head invalidation. | [Checkpoint inspection](../../scripts/sdd/checkpoint.mjs), operation authorization, and review-contract validators enforce many individual bindings. | Use one evidence schema, dependency graph, and invalidation function instead of caller-supplied or subsystem-specific notions of `current`. |
-| Review dispatcher and exact-head lineage | [Isolated independent review](../../openspec/specs/isolated-independent-review/spec.md) defines sealed packages, fresh reviewers, immutable results, correction, and changed-head rereview. | [Independent-review execution](../../scripts/sdd/execute-independent-review.mjs) implements strict-first dispatch and authorized degraded recovery. | Invoke it from the workflow kernel and bind its result into the same work-unit lineage and outcome registry. |
+| Evidence bindings and freshness | Lifecycle specs, derived authorization, independent review, and cleanup define current evidence and exact-head invalidation. | [Checkpoint inspection](../../../../scripts/sdd/checkpoint.mjs), operation authorization, and review-contract validators enforce many individual bindings. | Use one evidence schema, dependency graph, and invalidation function instead of caller-supplied or subsystem-specific notions of `current`. |
+| Review dispatcher and exact-head lineage | [Isolated independent review](../../../../openspec/specs/isolated-independent-review/spec.md) defines sealed packages, fresh reviewers, immutable results, correction, and changed-head rereview. | [Independent-review execution](../../../../scripts/sdd/execute-independent-review.mjs) implements strict-first dispatch and authorized degraded recovery. | Invoke it from the workflow kernel and bind its result into the same work-unit lineage and outcome registry. |
 | Git/GitHub/OpenSpec reconciliation | The lifecycle and GitHub sync specifications define resume and convergence behavior. | Focused GitHub, lifecycle audit, Project status, and OpenSpec helpers exist. | Each external transition needs a typed adapter with `inspect`, `apply`, and `reconcile` behavior consumed by the kernel. |
-| Cleanup ownership and human-pause classification | [Workspace cleanup](../../openspec/specs/sdd-workspace-cleanup/spec.md) strongly defines exact ownership, fresh inspection, terminal receipts, and safe refusal. Bounded execution defines when judgment is human-only. | Controller schema v4 and cleanup scripts now register resources and persist cleanup receipts; a deterministic result classifier exists. | All emitted outcomes need one exhaustive retry, correction, pause, or terminal disposition used by every work unit. |
+| Cleanup ownership and human-pause classification | [Workspace cleanup](../../../../openspec/specs/sdd-workspace-cleanup/spec.md) strongly defines exact ownership, fresh inspection, terminal receipts, and safe refusal. Bounded execution defines when judgment is human-only. | Controller schema v4 and cleanup scripts now register resources and persist cleanup receipts; a deterministic result classifier exists. | All emitted outcomes need one exhaustive retry, correction, pause, or terminal disposition used by every work unit. |
 | Domain-level run/status projection | Lifecycle, continuation, review, and cleanup specs define individual state classifications. | Controller, checkpoint, review, GitHub, and cleanup commands each expose partial status. | A single projection must aggregate the run, current unit, evidence, external state, owned resources, stop reason, and next safe action. |
 
 OpenSpec therefore owns the normative observable behavior; canonical skills own
@@ -93,7 +97,7 @@ store and invoke this model, but cannot define it.
 
 ### Durable-execution build-versus-adopt evidence
 
-The checked-in [landscape findings](../research/autonomous-agent-harness-landscape-2026/findings.md)
+The checked-in [landscape findings](../../../research/autonomous-agent-harness-landscape-2026/findings.md)
 support predefined code paths, evidence gates, narrow model roles, and durable
 handoffs. They also warn that hand-building distributed leases, CAS, and replay
 is a known risk. The later vendor comparison supplied with this decision was

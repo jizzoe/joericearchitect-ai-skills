@@ -1,5 +1,8 @@
 # Strict Review Multi-Step Artifact Delivery
 
+> Historical open-gap evidence. Current review architecture and remaining work
+> are consolidated in [Independent-review assurance and profiles](../../independent-review-assurance-and-profiles.md).
+
 Date: 2026-08-16
 
 Status: Propose-ready design brief. This brief does not authorize an Apply,
@@ -52,16 +55,16 @@ has now failed twice with exit status `0`.
 
 Relevant durable sources:
 
-- [result-transport reliability brief](archived/independent-review-result-transport-reliability.md)
+- [result-transport reliability brief](../independent-review-result-transport-reliability.md)
   already recommends a fixed host-owned event-capture adapter if the CLI cannot
   guarantee final-file handoff.
-- [archived strict transport design](../../openspec/changes/archive/2026-08-15-harden-strict-review-artifact-transport/design.md)
+- [archived strict transport design](../../../../openspec/changes/archive/2026-08-15-harden-strict-review-artifact-transport/design.md)
   added artifact-only acceptance and safe unavailable diagnostics, but its
   live acceptance evidence did not prove a multi-step tool-driven review.
-- [platform adapter](../../scripts/sdd/platform-review-adapters.mjs) writes the
+- [platform adapter](../../../../scripts/sdd/platform-review-adapters.mjs) writes the
   review package as one `JSON.stringify` line and invokes the free-form review
   prompt with `--output-last-message`.
-- [transport adapter tests](../../scripts/sdd/test/platform-review-adapters.test.mjs)
+- [transport adapter tests](../../../../scripts/sdd/test/platform-review-adapters.test.mjs)
   manually write the success artifact in the parent-consumer fixture, so they
   do not exercise the actual CLI path after multiple tool calls.
 - [inspection-environment fallback brief](independent-review-inspection-environment-fallback.md)

@@ -1,16 +1,19 @@
 # independent-review-configuration-provenance design brief
 
+> Superseded design input. Current review architecture and remaining work are
+> consolidated in [Independent-review assurance and profiles](../../independent-review-assurance-and-profiles.md).
+
 ## 1. Problem and desired outcome
 Problem: A delivery run incorrectly inferred that config/ai-skills.json was the source of strict independent-review configuration, then declared the reviewer absent despite the established sealed parent strict-review request carrying a configured Codex reviewer, distinct identity, and attestation.
 Desired outcome: Review availability conclusions are provenance-based, deterministic, and fail closed: the runner identifies the authoritative strict-review source, records why it is usable or unavailable, and invokes the established parent transport before any unavailability conclusion.
 
 ## 2. Evidence and key findings
-- [ai-planning/design-briefs/archived/independent-review-worktree-lifecycle-and-diagnostics.md](archived/independent-review-worktree-lifecycle-and-diagnostics.md): Existing decision record for bounded review-view construction and safe failure reporting.
-- [ai-planning/design-briefs/archived/independent-review-result-transport-reliability.md](archived/independent-review-result-transport-reliability.md): Existing transport reliability decision record, including exact final-artifact and cleanup requirements.
+- [ai-planning/design-briefs/archived/independent-review-worktree-lifecycle-and-diagnostics.md](../independent-review-worktree-lifecycle-and-diagnostics.md): Existing decision record for bounded review-view construction and safe failure reporting.
+- [ai-planning/design-briefs/archived/independent-review-result-transport-reliability.md](../independent-review-result-transport-reliability.md): Existing transport reliability decision record, including exact final-artifact and cleanup requirements.
 - [ai-planning/design-briefs/independent-review-inspection-environment-fallback.md](independent-review-inspection-environment-fallback.md): Existing strict-first, fail-closed fallback analysis.
-- [config/ai-skills.json](../../config/ai-skills.json): Contains only research, design-brief, and plan roots; it defines no strict-review loader or reviewer identity.
-- [skills/base/independent-review/SKILL.md](../../skills/base/independent-review/SKILL.md) and [protocol](../../skills/base/independent-review/references/protocol.md): Require a configured distinct reviewer, attestation, and a direct parent strict request before durable strict unavailability.
-- [scripts/sdd/check-operation-authorization.mjs](../../scripts/sdd/check-operation-authorization.mjs) and [scripts/sdd/platform-review-adapters.mjs](../../scripts/sdd/platform-review-adapters.mjs): Accept a reviewer as supplied runtime data and build the sealed parent transport; neither establishes `config/ai-skills.json` as an authoritative source.
+- [config/ai-skills.json](../../../../config/ai-skills.json): Contains only research, design-brief, and plan roots; it defines no strict-review loader or reviewer identity.
+- [skills/base/independent-review/SKILL.md](../../../../skills/base/independent-review/SKILL.md) and [protocol](../../../../skills/base/independent-review/references/protocol.md): Require a configured distinct reviewer, attestation, and a direct parent strict request before durable strict unavailability.
+- [scripts/sdd/check-operation-authorization.mjs](../../../../scripts/sdd/check-operation-authorization.mjs) and [scripts/sdd/platform-review-adapters.mjs](../../../../scripts/sdd/platform-review-adapters.mjs): Accept a reviewer as supplied runtime data and build the sealed parent transport; neither establishes `config/ai-skills.json` as an authoritative source.
 
 ## 3. Options considered and tradeoffs
 - Keep the current implicit convention — no implementation cost, but recurring source-confusion risk and weak diagnosis.

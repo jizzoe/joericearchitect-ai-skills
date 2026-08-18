@@ -1,5 +1,9 @@
 # Independent Review Inspection-Environment Fallback
 
+> Conditional historical design input. Use
+> [Independent-review assurance and profiles](../../independent-review-assurance-and-profiles.md)
+> for the current sequencing and decision boundary.
+
 Date: 2026-08-14
 
 Status: Propose-ready design brief with recommendations awaiting owner

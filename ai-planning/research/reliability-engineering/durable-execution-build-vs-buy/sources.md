@@ -227,7 +227,7 @@
 
 ## Autonomous SDD Reliability Control Plane \(design brief\)
 - Publisher: This repository \(internal\)
-- URL or path: ai-planning/design-briefs/autonomous-sdd-reliability-control-plane.md
+- URL or path: ai-planning/design-briefs/archived/autonomy/autonomous-sdd-reliability-control-plane.md
 - Access date: 2026-08-17
 - Source type: primary
 - Relevance: The exact proposal under evaluation: the specific reliability primitives \(run ID, monotonic revision, lease, compare-and-swap, append-only event ledger, one executable transition engine\) this build-vs-buy spike is assessing against the surveyed market options.

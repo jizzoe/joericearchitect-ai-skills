@@ -1,5 +1,9 @@
 # Design Brief: SDD Lifecycle Hygiene and Design-Brief Provenance
 
+> Historical source. Superseded by the canonical
+> [lifecycle](../../sdd-lifecycle-integration-and-safe-recovery.md) and
+> [design-brief provenance](../../sdd-design-brief-provenance.md) briefs.
+
 Date: 2026-08-16
 Status: Owner decisions recorded. Ready for one OpenSpec proposal.
 

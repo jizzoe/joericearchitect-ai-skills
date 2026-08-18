@@ -187,7 +187,7 @@ missing or malformed. Do not regress that distinction.
 
 ### Inspection-environment fallback
 
-`ai-planning/design-briefs/independent-review-inspection-environment-fallback.md`
+`ai-planning/design-briefs/archived/autonomy/independent-review-inspection-environment-fallback.md`
 addresses a different problem: after an authorized degraded reviewer starts,
 its restricted environment lacked `sed`/expected command discovery and
 macOS Git invoked `xcrun` without usable developer-tool state. Its intended

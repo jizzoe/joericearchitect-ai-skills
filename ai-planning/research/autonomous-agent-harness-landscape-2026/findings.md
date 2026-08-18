@@ -3,7 +3,7 @@
 Date: 2026-08-16
 
 Purpose: independent public-source check on whether
-[autonomous-sdd-reliability-control-plane.md](../../design-briefs/autonomous-sdd-reliability-control-plane.md)
+[autonomous-sdd-reliability-control-plane.md](../../design-briefs/archived/autonomy/autonomous-sdd-reliability-control-plane.md)
 (the proposal to build a deterministic "control plane" — canonical run
 schema, lease + compare-and-swap, event ledger, typed operation graph,
 review dispatcher — for this repo's autonomous SDD lifecycle) is pointed in

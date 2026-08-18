@@ -1,5 +1,10 @@
 # Autonomous SDD Reliability Control Plane
 
+> Historical source. Superseded by the canonical
+> [runtime](../../autonomous-sdd-runtime-kernel.md),
+> [review](../../independent-review-assurance-and-profiles.md), and
+> [lifecycle](../../sdd-lifecycle-integration-and-safe-recovery.md) briefs.
+
 Date: 2026-08-16
 
 Status: Evidence-derived recommendation pending owner confirmation. This brief
@@ -34,19 +39,19 @@ and independent review within those fixed transitions.
 
 ### Intended behavior is coherent
 
-- [Autonomous SDD lifecycle](../../workflows/autonomous-sdd-lifecycle/workflow.md)
+- [Autonomous SDD lifecycle](../../../../workflows/autonomous-sdd-lifecycle/workflow.md)
   defines the intended Issue-to-cleanup sequence, current-evidence gates,
   objective correction, exact-head rereview, and routine autonomous
   continuation.
-- [Autonomous goal runner](../../skills/base/autonomous-goal-runner/SKILL.md)
+- [Autonomous goal runner](../../../../skills/base/autonomous-goal-runner/SKILL.md)
   separates authorization, runtime permission, evidence, and human decisions,
   and directs objective failures into bounded correction instead of routine
   owner prompts.
-- [Authorization policy](../../skills/base/autonomous-goal-runner/references/authorization-policy.md)
+- [Authorization policy](../../../../skills/base/autonomous-goal-runner/references/authorization-policy.md)
   requires exact targets, derived durable records, idempotent recovery, and
   strict independent review before production delivery.
-- [Independent review](../../skills/base/independent-review/SKILL.md) and its
-  [protocol](../../skills/base/independent-review/references/protocol.md) define
+- [Independent review](../../../../skills/base/independent-review/SKILL.md) and its
+  [protocol](../../../../skills/base/independent-review/references/protocol.md) define
   a sealed immutable package, a fresh distinct reviewer, a read-only inner
   boundary, a fixed parent transport, owned final-result evidence, and
   fail-closed acceptance.
@@ -58,11 +63,11 @@ components exchange state.
 ### Initial sweep: structural reliability gaps
 
 1. **There is no executable orchestration loop.**
-   [autonomous-sdd-controller.mjs](../../scripts/sdd/autonomous-sdd-controller.mjs)
+   [autonomous-sdd-controller.mjs](../../../../scripts/sdd/autonomous-sdd-controller.mjs)
    creates, inspects, advances, and persists records, but it does not select and
    invoke phases, derive targets, launch review, reconcile GitHub state, loop to
    the next checkpoint, or run to a terminal state. The thin
-   [autonomous-sdd-delivery skill](../../skills/base/autonomous-sdd-delivery/SKILL.md)
+   [autonomous-sdd-delivery skill](../../../../skills/base/autonomous-sdd-delivery/SKILL.md)
    tells the model to run the first incomplete phase, while workflow prose says
    control should return for continuation. No deterministic engine enforces
    that re-entry.
@@ -70,7 +75,7 @@ components exchange state.
 2. **Multiple incompatible records are treated as authoritative.** The
    controller uses eight broad phases and accepts a selected-entry string with
    `{current: true}` evidence. The
-   [delivery checkpoint](../../scripts/sdd/checkpoint.mjs) uses seven external
+   [delivery checkpoint](../../../../scripts/sdd/checkpoint.mjs) uses seven external
    lifecycle steps, a structured selected entry, typed durable records, and
    `{present: true, current: true}` evidence. There is no canonical run record,
    validated projection, or linkage between them.
@@ -79,8 +84,8 @@ components exchange state.
    direct resolver-to-validator probe reports `missing-objective`,
    `missing-work-selection`, `missing-forbidden-actions`,
    `missing-stopping-conditions`, and `missing-evidence`. The
-   [delivery resolver](../../scripts/sdd/resolve-sdd-delivery-request.mjs) and
-   [run-policy validator](../../scripts/sdd/validate-run-policy.mjs) therefore
+   [delivery resolver](../../../../scripts/sdd/resolve-sdd-delivery-request.mjs) and
+   [run-policy validator](../../../../scripts/sdd/validate-run-policy.mjs) therefore
    implement different authoritative authorization schemas.
 
 4. **An ordered queue authorizes only its first entry's brief.** The resolver
@@ -119,20 +124,20 @@ components exchange state.
    enforced permission boundary.
 
 9. **Configuration has two mutually incompatible schemas.** The validated
-   [repository configuration](../../config/ai-skills.json) supports a nested
+   [repository configuration](../../../../config/ai-skills.json) supports a nested
    `independentReview` object, while the operation checker reads undeclared
    top-level `independentReviewer`, `degradedIndependentReviewer`,
    `requiredOpenSpecArtifacts`, and `reviewRepositoryPath` fields. A checker-
    compatible object is rejected by
-   [the config validator](../../scripts/validation/validate-base-skill-contracts.mjs),
+   [the config validator](../../../../scripts/validation/validate-base-skill-contracts.mjs),
    and no canonical loader maps the validated shape into the checker shape.
    The configured `designBriefRoot` is also `docs/design-briefs`, while current
    repository practice and the resolver use `ai-planning/design-briefs`.
 
 10. **Review transport is a prepared contract, not an integrated runtime.**
-    [platform-review-adapters.mjs](../../scripts/sdd/platform-review-adapters.mjs)
+    [platform-review-adapters.mjs](../../../../scripts/sdd/platform-review-adapters.mjs)
     can build and consume the fixed strict parent request, and
-    [review-launcher-recovery.mjs](../../scripts/sdd/review-launcher-recovery.mjs)
+    [review-launcher-recovery.mjs](../../../../scripts/sdd/review-launcher-recovery.mjs)
     can validate callback-driven recovery. Production code does not provide a
     host dispatcher that calls those helpers from the controller. The model is
     still responsible for choosing the helper, making the exact escalated tool
@@ -209,17 +214,17 @@ components exchange state.
 
 | Existing brief | Coverage | Recommended disposition in this design |
 |---|---|---|
-| [Isolated autonomous independent review](archived/isolated-autonomous-independent-review.md) | Sealed package, distinct reviewer, immutable exact-head evidence | Retain as the assurance foundation. |
-| [Authorized degraded independent review](archived/authorized-degraded-independent-review.md) | Explicit reduced-assurance fallback after strict unavailability | Retain, but route through one dispatcher and failure registry. |
-| [Independent-review result transport reliability](archived/independent-review-result-transport-reliability.md) | Owned final artifact and transcript rejection | Retain; its contract is necessary but not proven for real multi-step review. |
-| [Independent-review worktree lifecycle and diagnostics](archived/independent-review-worktree-lifecycle-and-diagnostics.md) | Exact detached-view ownership and safe diagnostics | Retain and integrate with admission readiness and the canonical run record. |
-| [Autonomous SDD continuation default](archived/autonomous-sdd-continuation-default.md) | Request resolver and controller primitives | Treat as the v1 foundation to consolidate, not as a complete runner. |
-| [SDD post-Archive workspace cleanup](archived/sdd-post-archive-workspace-cleanup.md) | Exact-owned clean resource cleanup | Retain its safety policy and make it a terminal control-plane transition. |
+| [Isolated autonomous independent review](../isolated-autonomous-independent-review.md) | Sealed package, distinct reviewer, immutable exact-head evidence | Retain as the assurance foundation. |
+| [Authorized degraded independent review](../authorized-degraded-independent-review.md) | Explicit reduced-assurance fallback after strict unavailability | Retain, but route through one dispatcher and failure registry. |
+| [Independent-review result transport reliability](../independent-review-result-transport-reliability.md) | Owned final artifact and transcript rejection | Retain; its contract is necessary but not proven for real multi-step review. |
+| [Independent-review worktree lifecycle and diagnostics](../independent-review-worktree-lifecycle-and-diagnostics.md) | Exact detached-view ownership and safe diagnostics | Retain and integrate with admission readiness and the canonical run record. |
+| [Autonomous SDD continuation default](../autonomous-sdd-continuation-default.md) | Request resolver and controller primitives | Treat as the v1 foundation to consolidate, not as a complete runner. |
+| [SDD post-Archive workspace cleanup](../sdd-post-archive-workspace-cleanup.md) | Exact-owned clean resource cleanup | Retain its safety policy and make it a terminal control-plane transition. |
 | [Strict review multi-step artifact delivery](strict-review-multistep-artifact-delivery.md) | Reproduced missing terminal artifact on real multi-step reviews | Required review-transport workstream and live acceptance gate. |
 | [Independent-review configuration provenance](independent-review-configuration-provenance.md) | Wrong-source reviewer discovery and false absence | Expand into the canonical runtime-config loader and immutable run snapshot. |
 | [Independent-review inspection-environment fallback](independent-review-inspection-environment-fallback.md) | Missing inspection tools in restricted review environments | Keep conditional; prefer host-owned semantic inspection before adding shell-environment tiers. |
 | [Prototype-rapid same-session review](prototype-rapid-same-session-review.md) | Prototype profile disagreement | Resolve inside one generated profile-and-gate matrix. |
-| [SDD milestone/slice delivery skill](sdd-milestone-slice-delivery-skill.md) | Milestone cadence and slice planning | Make it a downstream client of the stable runner, not another orchestrator. |
+| [SDD milestone/slice delivery skill](../../sdd-milestone-slice-delivery-skill.md) | Milestone cadence and slice planning | Make it a downstream client of the stable runner, not another orchestrator. |
 | [SDD lifecycle hygiene and brief provenance](sdd-lifecycle-hygiene-and-brief-provenance.md) | Cross-worktree inventory and durable brief provenance | Reuse its inventory/provenance decisions in the run registry; avoid a parallel status model. |
 
 The existing briefs cover most observed symptoms. What is missing is the
@@ -294,7 +299,7 @@ Implement the state machine outside the assistant runtime.
 
 ### Recommended architecture
 
-![Autonomous SDD reliability control-plane architecture showing inputs, the deterministic orchestration core, lifecycle adapters, evidence return, and evidence-driven outcomes](assets/autonomous-sdd-reliability-control-plane.png)
+![Autonomous SDD reliability control-plane architecture showing inputs, the deterministic orchestration core, lifecycle adapters, evidence return, and evidence-driven outcomes](../../assets/autonomous-sdd-reliability-control-plane.png)
 
 The diagram is explanatory; the written contracts and their validated schemas
 remain normative. The transition engine selects exactly one next action, every
