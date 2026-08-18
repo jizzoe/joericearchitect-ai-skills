@@ -44,6 +44,12 @@ publication; reuse it without another skill prompt only while its payload,
 target, operation, expiry, and host runtime permission remain current. This
 does not confer GitHub authentication or bypass a host denial.
 
+For optional design-brief provenance and post-Archive explanation, use the
+canonical `sdd-lifecycle-hygiene` skill. It records only an explicitly selected
+workspace-relative brief as an immutable change-local copy and produces a
+read-only reconciliation/cleanup recommendation report. A report does not
+authorize cleanup; exact-owned finalization remains the sole deletion path.
+
 ## Recovery
 
 - Re-read Git, GitHub issue/PR, Project, and OpenSpec state before resuming.

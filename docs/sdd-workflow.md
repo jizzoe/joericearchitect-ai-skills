@@ -231,6 +231,32 @@ Treat exit status, artifact paths, test/eval output, reviewed diffs, GitHub URLs
 and explicit gaps as evidence. An attempted command is not evidence that the
 operation completed correctly.
 
+## Lifecycle Hygiene and Brief Provenance
+
+An OpenSpec proposal may retain an explicitly selected source design brief in
+its supplemental change-local context directory:
+
+```text
+openspec/changes/<change-name>/context/
+  design-brief.md
+  design-brief-provenance.yaml
+```
+
+The copy is immutable proposal provenance, not a live mirror. Capture accepts
+only an in-workspace Markdown source, records its relative path and SHA-256
+digest, and writes both files atomically. If no brief is explicitly supplied,
+interactive work may display up to three deterministic candidates and must
+accept no selection; autonomous delivery never infers a brief.
+
+Use `sdd-lifecycle-hygiene` for an idempotent read-only reconciliation report
+after delivery or Archive. It combines local branches, worktrees, active
+changes, archives, and living specifications with GitHub PR evidence when
+available. If GitHub lookup is unavailable, it reports a local-only evidence
+gap rather than guessing. The report may recommend an exact clean delivered
+resource, but removal still requires `sdd-workspace-cleanup` and separate
+exact-owned authorization. It never deletes, resets, rewrites history, or
+backfills ownership.
+
 ## Refresh Generated Integrations
 
 Record the current state before updating OpenSpec or changing the workflow
