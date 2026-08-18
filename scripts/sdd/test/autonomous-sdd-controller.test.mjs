@@ -8,6 +8,7 @@ import {
   advanceControllerRecord,
   appendControllerCleanupReceipt,
   authorizationDigest,
+  bindControllerIssueIntake,
   bindControllerLifecycleDelivery,
   bindControllerResourceDelivery,
   createControllerRecord,
@@ -15,6 +16,7 @@ import {
   inspectControllerRecord,
   persistControllerRecord,
   persistControllerCleanupReceipt,
+  registerControllerIssueIntake,
   registerControllerResource,
   registerControllerLifecycleResource,
   resolveControllerStateRoot
@@ -22,10 +24,20 @@ import {
 import { inspectCheckpoint } from "../checkpoint.mjs";
 import { checkAdapterDrift } from "../check-adapter-drift.mjs";
 import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
+import { createIssueIntakeBinding } from "../issue-intake-binding.mjs";
 
 const started = "2026-08-13T12:00:00.000Z";
 const authorization = resolveSddDeliveryRequest({ target: "complete-delivery", mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-only", expiration: "12h" }, { goalStartedAt: started }).effectiveAuthorization;
 const created = createControllerRecord({ authorization, repository: "owner/repository", runId: "controller-run-0001" });
+
+const intakePayload = {
+  repository: "owner/repository",
+  title: "Complete delivery",
+  body: "Human context\n\n<!-- sdd-managed:start -->\nOpenSpec change: `complete-delivery`\n<!-- sdd-managed:end -->",
+  labels: ["sdd", "type:feature"],
+  managedBlock: "<!-- sdd-managed:start -->\nOpenSpec change: `complete-delivery`\n<!-- sdd-managed:end -->"
+};
+const intakeBinding = createIssueIntakeBinding({ selectedEntry: "complete-delivery", payload: intakePayload, expiresAt: authorization.expiresAt }).binding;
 
 test("controller record starts at planning and resumes first incomplete phase", () => {
   assert.equal(created.valid, true);
@@ -55,6 +67,36 @@ test("controller rejects expired, stale, and conflicting context", () => {
   narrowedScope.allowedMutations = ["different-operation"];
   assert.notEqual(authorizationDigest(authorization), authorizationDigest(narrowedScope));
   assert.equal(inspectControllerRecord({ ...created.record, schemaVersion: 1 }, { authorization, repository: "owner/repository", now: started }).reason, "controller-record-legacy");
+});
+
+test("controller persists pending reviewed intake then binds exact issue evidence", () => {
+  const registered = registerControllerIssueIntake(created.record, intakeBinding, { now: started });
+  assert.equal(registered.valid, true);
+  assert.equal(registered.intake.status, "pending");
+  assert.equal(registered.intake.binding.payloadDigest, intakeBinding.payloadDigest);
+  assert.equal(registerControllerIssueIntake(registered.record, intakeBinding, { now: started }).reason, "controller-issue-intake-registration-duplicate");
+  assert.equal(registerControllerIssueIntake({ ...registered.record, issueIntakeRecords: [null] }, intakeBinding, { now: started }).reason, "controller-issue-intake-registration-invalid");
+  assert.equal(bindControllerIssueIntake({ ...registered.record, issueIntakeRecords: [null] }, {
+    payloadDigest: intakeBinding.payloadDigest,
+    issue: { number: 126, url: "https://github.com/owner/repository/issues/126", state: "OPEN", labels: ["sdd"] },
+    observedAt: started,
+    reference: "malformed controller regression"
+  }).reason, "controller-issue-intake-delivery-invalid");
+
+  const delivered = bindControllerIssueIntake(registered.record, {
+    payloadDigest: intakeBinding.payloadDigest,
+    issue: { number: 126, url: "https://github.com/owner/repository/issues/126", state: "OPEN", labels: ["type:feature", "sdd"] },
+    observedAt: "2026-08-13T12:05:00.000Z",
+    reference: "issue #126 exact-title reconciliation"
+  });
+  assert.equal(delivered.valid, true);
+  assert.equal(delivered.intake.status, "delivered");
+  assert.equal(delivered.intake.evidence.payloadDigest, intakeBinding.payloadDigest);
+  assert.equal(inspectControllerRecord(delivered.record, { authorization, repository: "owner/repository", now: started }).nextPhase, "propose");
+
+  const conflicted = structuredClone(delivered.record);
+  conflicted.issueIntakeRecords[0].binding.title = "changed";
+  assert.equal(inspectControllerRecord(conflicted, { authorization, repository: "owner/repository", now: started }).reason, "controller-record-invalid");
 });
 
 test("every lifecycle entry resumes only the first incomplete controller phase", () => {

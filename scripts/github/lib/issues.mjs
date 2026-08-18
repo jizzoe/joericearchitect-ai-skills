@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { ghCommand } from "./gh.mjs";
 import { stringifyTracking } from "../../validation/lib/tracking.mjs";
+import { authorizeBoundIssueIntake } from "../../sdd/issue-intake-binding.mjs";
 
 export function renderManagedIssueBlock({ markers, changeName, changeDir }) {
   const start = markers.start;
@@ -50,19 +51,38 @@ export function findIssueByExactTitle({ repo, title, existingIssues, dryRun = fa
   return { ok: true, issue: (result.json ?? []).find((candidate) => candidate.title === title) ?? null };
 }
 
-export function createOrFindIssue({ repo, title, body, labels = [], existingIssues, dryRun = false }) {
+export function createOrFindIssue({ repo, title, body, labels = [], managedBlock, existingIssues, dryRun = false,
+  intakeBinding, selectedEntry, runtime, now }) {
+  if (intakeBinding) {
+    const authorization = authorizeBoundIssueIntake({
+      binding: intakeBinding,
+      selectedEntry,
+      payload: { repository: repo, title, body, labels, managedBlock },
+      runtime,
+      now
+    });
+    if (!authorization.allowed) {
+      return {
+        ok: false,
+        classification: authorization.classification,
+        error: authorization.issues[0].code,
+        promptRequired: authorization.promptRequired,
+        recoveryReference: authorization.recoveryReference
+      };
+    }
+  }
   const found = findIssueByExactTitle({ repo, title, existingIssues, dryRun: Boolean(existingIssues) && dryRun });
   if (!found.ok) return found;
   if (found.issue) {
-    return { ok: true, action: "found", issue: found.issue };
+    return { ok: true, action: "found", issue: found.issue, ...(intakeBinding ? { payloadDigest: intakeBinding.payloadDigest, promptRequired: false } : {}) };
   }
   const args = ["issue", "create", "--repo", repo, "--title", title, "--body", body];
   for (const label of labels) args.push("--label", label);
   if (dryRun) {
-    return { ok: true, dryRun: true, action: "create", command: ["gh", ...args] };
+    return { ok: true, dryRun: true, action: "create", command: ["gh", ...args], ...(intakeBinding ? { payloadDigest: intakeBinding.payloadDigest, promptRequired: false } : {}) };
   }
   const result = ghCommand(args);
-  return result.ok ? { ok: true, action: "created", url: result.stdout.trim() } : result;
+  return result.ok ? { ok: true, action: "created", url: result.stdout.trim(), ...(intakeBinding ? { payloadDigest: intakeBinding.payloadDigest, promptRequired: false } : {}) } : result;
 }
 
 export function buildIssueToOpenSpecIntake({ config, issue, changeName, title, outputRoot = "openspec/changes" }) {

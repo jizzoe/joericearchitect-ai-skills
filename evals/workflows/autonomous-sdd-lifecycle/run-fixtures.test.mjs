@@ -103,3 +103,24 @@ test("zero-touch review fixtures cover objective correction, changed-head rerevi
     manualFallback: false
   });
 });
+
+test("frictionless prototype fixtures continue objective work and preserve every material stop", () => {
+  const cases = JSON.parse(
+    fs.readFileSync(new URL("./fixtures/frictionless-prototype-loop.json", import.meta.url), "utf8")
+  ).cases;
+  const converged = cases.find((item) => item.id === "objective-correction-converges");
+  assert.deepEqual(converged.ownerActions, []);
+  assert.equal(converged.reviewPolicy, "same-session-local");
+  assert.equal(converged.steps.find((step) => step.kind === "local-review").assurance, "local-review");
+  assert.equal(converged.steps.at(-1).status, "passed");
+  for (const id of ["material-decision-stops", "runtime-permission-denial-stops", "unsafe-action-stops", "expired-authorization-stops", "stale-final-evidence-stops"]) {
+    const stopped = cases.find((item) => item.id === id);
+    assert.equal(stopped.preservesRecovery, true, id);
+    assert.ok(stopped.stop, id);
+  }
+
+  const lifecycle = read("skills/base/autonomous-sdd-lifecycle/SKILL.md");
+  assert.match(lifecycle, /without a\s+routine Plan-to-Apply or Verified-to-Close prompt/s);
+  assert.match(lifecycle, /does not override the host/);
+  assert.match(lifecycle, /Never pass local-review evidence to the\s+production independent-review gate/s);
+});

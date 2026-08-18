@@ -37,6 +37,18 @@
       "expect": "Dependency-valid batch completes after validations and reviews pass"
     },
     {
+      "id": "prototype-objective-correction-converges",
+      "kind": "complete",
+      "gate": "apply",
+      "expect": "An autonomous prototype diagnoses an objective failure, corrects it within its canonical signature budget, reruns affected checks, and receives fresh local-review evidence without owner retrigger"
+    },
+    {
+      "id": "prototype-material-or-permission-stop",
+      "kind": "stop",
+      "gate": "apply",
+      "expect": "A material decision, unavailable authority, permission denial, unsafe action, expiry, exhausted signature, or stale final binding stops with durable recovery evidence"
+    },
+    {
       "id": "verify-missing-evidence",
       "kind": "incomplete",
       "gate": "verify",

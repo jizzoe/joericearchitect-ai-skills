@@ -5,10 +5,11 @@ const changeName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const modes = ["autonomous", "interactive"];
 const qualityProfiles = ["production-rapid", "prototype-rapid"];
 const authorizationProfiles = ["sdd-delivery"];
-const reviewPolicies = ["strict-only", "strict-first-degraded"];
+const reviewPolicies = ["strict-only", "strict-first-degraded", "same-session-local"];
+const independentReviewPolicies = new Set(["strict-only", "strict-first-degraded"]);
 const shorthandProfiles = Object.freeze({
-  prod: Object.freeze({ mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-only", expiration: "4h" }),
-  prototype: Object.freeze({ mode: "autonomous", qualityProfile: "prototype-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-first-degraded", expiration: "4h" })
+  prod: Object.freeze({ mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", reviewPolicy: "strict-only", expiration: "4h" }),
+  prototype: Object.freeze({ mode: "autonomous", qualityProfile: "prototype-rapid", authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h" })
 });
 
 export const sddDeliveryRequestInputs = Object.freeze([
@@ -33,8 +34,8 @@ export const sddDeliveryRequestInputs = Object.freeze([
     values: authorizationProfiles
   }),
   Object.freeze({
-    field: "independentReviewPolicy",
-    summary: "Strict review behavior when OS-isolated review is unavailable.",
+    field: "reviewPolicy",
+    summary: "Assurance policy selected by the execution-mode and quality-profile matrix.",
     values: reviewPolicies
   }),
   Object.freeze({
@@ -90,21 +91,42 @@ function parseExpiration(value, goalStartedAt) {
 function clarification(items) {
   const lines = ["I need these delivery inputs before I can select work or make changes:"];
   for (const item of items) {
-    const definition = byField.get(item.field);
+    const definition = byField.get(item.field === "independentReviewPolicy" ? "reviewPolicy" : item.field);
     lines.push(`- ${item.field}: ${definition.summary} Values: ${definition.values.join(" | ")}.`);
   }
   return lines.join("\n");
 }
 
 function requestedFields(input) {
+  const legacyReviewPolicy = input?.independentReviewPolicy ?? input?.independentReview;
   return {
     target: input?.target,
     mode: input?.mode,
     qualityProfile: input?.qualityProfile ?? input?.profile,
     authorizationProfile: input?.authorizationProfile ?? input?.authorization,
-    independentReviewPolicy: input?.independentReviewPolicy ?? input?.independentReview,
+    reviewPolicy: input?.reviewPolicy ?? legacyReviewPolicy,
+    legacyReviewPolicy,
+    reviewPolicyExplicit: input?.reviewPolicy !== undefined,
     expiration: input?.expiration
   };
+}
+
+function reviewPolicyIssue(values) {
+  if (!reviewPolicies.includes(values.reviewPolicy)) return issue("invalid-delivery-request-input", "reviewPolicy", values.reviewPolicy);
+  if (values.reviewPolicyExplicit && values.legacyReviewPolicy !== undefined && values.reviewPolicy !== values.legacyReviewPolicy) {
+    return issue("conflicting-delivery-request-input", "reviewPolicy", "independentReviewPolicy");
+  }
+  if (values.legacyReviewPolicy !== undefined && !independentReviewPolicies.has(values.legacyReviewPolicy)) {
+    return issue("invalid-delivery-request-input", "independentReviewPolicy", values.legacyReviewPolicy);
+  }
+  const localPrototype = values.mode === "autonomous" && values.qualityProfile === "prototype-rapid";
+  if (localPrototype && values.reviewPolicy !== "same-session-local") {
+    return issue("delivery-request-matrix-conflict", "reviewPolicy", "autonomous prototype-rapid requires same-session-local");
+  }
+  if (!localPrototype && values.reviewPolicy === "same-session-local") {
+    return issue("delivery-request-matrix-conflict", "reviewPolicy", "same-session-local is limited to autonomous prototype-rapid");
+  }
+  return null;
 }
 
 export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date().toISOString() } = {}) {
@@ -126,7 +148,10 @@ export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date
   if (values.mode !== undefined && !modes.includes(values.mode)) gaps.push(issue("invalid-delivery-request-input", "mode", values.mode));
   if (values.qualityProfile !== undefined && !qualityProfiles.includes(values.qualityProfile)) gaps.push(issue("invalid-delivery-request-input", "qualityProfile", values.qualityProfile));
   if (values.authorizationProfile !== undefined && !authorizationProfiles.includes(values.authorizationProfile)) gaps.push(issue("invalid-delivery-request-input", "authorizationProfile", values.authorizationProfile));
-  if (values.independentReviewPolicy !== undefined && !reviewPolicies.includes(values.independentReviewPolicy)) gaps.push(issue("invalid-delivery-request-input", "independentReviewPolicy", values.independentReviewPolicy));
+  if (values.reviewPolicy !== undefined) {
+    const policyIssue = reviewPolicyIssue(values);
+    if (policyIssue) gaps.push(policyIssue);
+  }
   if (values.expiration !== undefined && !expiration) gaps.push(issue("invalid-delivery-request-input", "expiration"));
 
   const requestedBudget = input.correctionBudgetPerFailureSignature;
@@ -145,22 +170,43 @@ export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date
   }
 
   const correctionBudget = requestedBudget ?? 3;
-  const degraded = values.independentReviewPolicy === "strict-first-degraded";
+  const degraded = values.reviewPolicy === "strict-first-degraded";
+  const localReview = values.reviewPolicy === "same-session-local";
+  const requiredQualityActions = Object.freeze([
+    "focused-tests", "critical-flow", "requirements-mapping", "local-code-security-review",
+    ...(values.qualityProfile === "production-rapid"
+      ? ["regression-coverage", "repeatability", "operational-checks", "exact-head-ci", "independent-review"]
+      : []),
+    "openspec-verify", "openspec-validate-all-strict", "lifecycle-reconciliation"
+  ]);
+  const completionEvidencePredicates = Object.freeze([
+    "all-applicable-quality-actions-current-and-passing",
+    "final-target-package-workspace-and-head-bound",
+    "no-unresolved-objective-findings",
+    "delivery-sync-archive-current",
+    "issue-project-and-cleanup-reconciled",
+    "no-residual-owned-state"
+  ]);
+  const blockingApprovalGates = Object.freeze(values.mode === "interactive"
+    ? ["plan-to-apply-confirmation", "verified-to-close-confirmation"]
+    : []);
   const effectiveAuthorization = Object.freeze({
-    schemaVersion: 1,
+    schemaVersion: 2,
     target,
     mode: values.mode,
     qualityProfile: values.qualityProfile,
     authorizationProfile: values.authorizationProfile,
-    independentReviewPolicy: values.independentReviewPolicy,
+    reviewPolicy: values.reviewPolicy,
+    ...(independentReviewPolicies.has(values.reviewPolicy)
+      ? { independentReviewPolicy: values.reviewPolicy, independentReviewPolicyDeprecated: true }
+      : {}),
     goalStartedAt: new Date(Date.parse(goalStartedAt)).toISOString(),
     expiresAt: expiration.expiresAt,
     correctionBudgetPerFailureSignature: correctionBudget,
-    qualityGates: Object.freeze([
-      "task-tests", "security-and-secret-review", "portability", "attribution",
-      "requirements-mapping", "recovery-review", "openspec-verify", "independent-review",
-      "openspec-validate-all-strict"
-    ]),
+    blockingApprovalGates,
+    requiredQualityActions,
+    completionEvidencePredicates,
+    qualityGates: requiredQualityActions,
     lifecycle: Object.freeze({
       allowed: Object.freeze([
         "issue-create-or-reuse", "project-item-create-or-reuse", "openspec-plan", "apply",
@@ -183,13 +229,17 @@ export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date
     ]),
     targets: Object.freeze([`workspace:ai-planning/design-briefs/${target.entries[0]}.md`]),
     review: Object.freeze({
-      strictFirst: true,
+      assurance: localReview ? "local-review" : "independent-review",
+      strictFirst: !localReview,
+      sameSessionLocal: localReview,
       degradedFallbackAuthorized: degraded,
       launcherRecoveryAuthorized: degraded,
       authorizationDerivation: "exact-change-transition-package",
       riskAcceptanceReason: degraded
         ? "Owner selected strict-first-degraded to preserve fresh independent review after strict unavailability while accepting explicitly reduced OS-isolation assurance."
-        : null
+        : localReview
+          ? "Owner selected bounded autonomous prototype delivery with explicitly labeled same-session local review; this evidence cannot satisfy a production independent-review gate."
+          : null
     })
   });
 

@@ -10,6 +10,8 @@
   "openQuestions": [],
   "nextAction": { "kind": "none", "description": "Fixture only." },
   "details": {
+    "assurance": "local-review",
+    "worker": { "executionIdentity": "same-session-review-worker-invalid-order", "sameSession": true, "readOnly": true, "canMutate": false, "canApprove": false },
     "reviewedScope": { "targets": ["src/service.mjs"], "contextPaths": [], "evidenceIds": ["review-source"] },
     "findings": [
       { "id": "low", "severity": "low", "disposition": "warning", "subject": "src/service.mjs", "evidenceIds": ["review-source"], "impact": "Limited issue.", "recommendation": "Review later." },

@@ -32,10 +32,21 @@ request for a named change.
 Use `ship-sdd <change-or-ordered-queue> prod|prototype [duration]` only for a
 complete bounded delivery. The target is always explicit; `prod` resolves to a
 four-hour autonomous production-rapid strict-only `sdd-delivery` run, while
-`prototype` selects strict-first-degraded review. The controller records the
-normalized authorization and selected entry before lifecycle work, then resumes
-only the first incomplete evidenced phase. A bare generated Propose, Apply,
-Verify, Sync, or Archive action remains at its ordinary phase boundary.
+`prototype` resolves to autonomous prototype-rapid with
+`reviewPolicy: same-session-local`. The controller records the normalized
+authorization and selected entry before lifecycle work, then resumes only the
+first incomplete evidenced phase. A bare generated Propose, Apply, Verify,
+Sync, or Archive action remains at its ordinary phase boundary.
+
+The prototype preset keeps focused checks, critical-flow evidence,
+requirements mapping, bounded read-only local review, Verify, strict
+validation, lifecycle reconciliation, and final-state evidence. It does not
+pause for routine Plan-to-Apply, objective-correction/rereview, or
+Verified-to-Close confirmation inside the current exact grant. Before issue
+publication, it persists the exact reviewed create-or-reuse payload binding;
+an exact current binding avoids a second skill-level prompt only when the host
+runtime already permits the write. Host authentication, permission, or sandbox
+denial remains a fail-closed recovery stop.
 
 After Archive, exact owned-resource cleanup audits first and changes only clean,
 recorded, confirmed-delivered local worktrees and branches. Legacy, primary,

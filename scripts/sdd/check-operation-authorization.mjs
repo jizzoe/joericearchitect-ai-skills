@@ -3,6 +3,7 @@ import { operationVocabulary } from "../validation/validate-base-skill-contracts
 import { inspectCheckpoint } from "./checkpoint.mjs";
 import { canonicalFailureSignature } from "./correction-chain.mjs";
 import { canonicalGitCommit, immutableReviewManifest, reviewInputMatchesGitDiff, validateIndependentReviewEvidence, validateIndependentReviewV1 } from "./independent-review.mjs";
+import { authorizeBoundIssueIntake } from "./issue-intake-binding.mjs";
 
 export const profileOperations = {
   "research-read-only": new Set(["read-source", "write-findings", "write-sources", "write-result", "notify-state"]),
@@ -210,10 +211,11 @@ function durableCorrectionState(authorization, request) {
     sourceDurable = sourceRecords.length === 1 && sourceFindings.length === 1;
   } else if (request.failureSource.kind === "verification") {
     const verificationRecords = request.checkpoint?.selectedEntry?.verificationRecords ?? [];
+    const expectedFailureSignature = canonicalFailureSignature(request.failureSource);
     const matches = verificationRecords.filter((record) =>
       record?.id === request.failureSource.verificationRecordId && record.entry === request.selectedEntry &&
       record.transition === request.failureSource.transition && record.current === true &&
-      record.failureSignature === request.failureSource.failureSignature &&
+      record.failureSignature === expectedFailureSignature &&
       record.evidence === request.failureSource.evidence);
     sourceDurable = matches.length === 1;
   }
@@ -257,6 +259,16 @@ export function checkOperationAuthorization(input) {
   if (runtime.permissionGaps?.length || (Array.isArray(runtime.permittedOperations) && !runtime.permittedOperations.includes(operation))) return fail("runtime-permission-gap", operation);
   if (request.adapter && !authorization.targets?.includes(`adapter:${request.adapter}`)) return fail("unauthorized-adapter", request.adapter);
   if (request.adapter && !adapterAllows(config, runtime, request.adapter, operation)) return fail("adapter-capability-mismatch", request.adapter);
+  if (operation === "issue-create-or-update" && request.issueIntakeBinding) {
+    const intake = authorizeBoundIssueIntake({
+      binding: request.issueIntakeBinding,
+      selectedEntry: request.selectedEntry,
+      payload: request.issuePayload,
+      runtime,
+      now: input.now
+    });
+    if (!intake.allowed) return fail(intake.issues[0].code, intake.recoveryReference);
+  }
   if (operation === "objective-correction") {
     const correctionIssue = durableCorrectionState(authorization, request);
     if (correctionIssue) return correctionIssue;

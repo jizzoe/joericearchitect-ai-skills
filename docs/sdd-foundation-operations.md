@@ -36,6 +36,14 @@ mode with fresh mutable-resource inspection; never infer ownership, call an
 ineligible cleanup audit complete, or delete a dirty, legacy, primary, locked,
 or remote resource.
 
+For a newly resolved `prototype` request, the v2 contract selects
+`reviewPolicy: same-session-local`, separates blocking approval gates from
+required quality actions and completion predicates, and uses a read-only
+`local-review` worker. Persist the exact reviewed issue-intake binding before
+publication; reuse it without another skill prompt only while its payload,
+target, operation, expiry, and host runtime permission remain current. This
+does not confer GitHub authentication or bypass a host denial.
+
 ## Recovery
 
 - Re-read Git, GitHub issue/PR, Project, and OpenSpec state before resuming.
@@ -44,6 +52,14 @@ or remote resource.
   validation before delivery.
 - If a correction budget is exhausted or a dependency conflict is unresolved,
   record the blocked reason and pause.
+- Canonicalize a correction from its gate or command, normalized error class,
+  repository-relative artifact or exact target, lifecycle transition, and task
+  batch. Repeated strategy without new diagnostic evidence is stagnation; the
+  three-attempt limit applies per stable signature, not to aggregate distinct
+  failures.
+- Rebuild affected evidence and fresh local review after a prototype
+  correction. Do not report completion until every required action and final
+  target/package/workspace/head predicate converges.
 
 ## Token Rotation
 

@@ -12,8 +12,10 @@ authorization.
 - `mode`: `autonomous` or `interactive`.
 - `qualityProfile`: `production-rapid` or `prototype-rapid`.
 - `authorizationProfile`: `sdd-delivery`.
-- `independentReviewPolicy`: `strict-only` or
-  `strict-first-degraded`.
+- `reviewPolicy`: `strict-only`, `strict-first-degraded`, or
+  `same-session-local`. The legacy `independentReviewPolicy` input remains
+  compatible only for an independent policy and only when it does not conflict
+  with `reviewPolicy`.
 - `expiration`: a positive duration such as `12h` or a future ISO-8601 UTC
   timestamp.
 
@@ -62,6 +64,13 @@ request-bound lifecycle record for the canonical repository, package commits,
 manifest, transition, parent digest, and expiry. The runtime chooses its
 temporary root and cleanup removes only the marker-proven lifecycle-owned view;
 failures use safe structured diagnostics and never turn into a manual command.
+
+`same-session-local` is valid only for exact `autonomous` plus
+`prototype-rapid`. It requires a bounded read-only `local-review` worker and
+continuous objective correction and rereview, but cannot satisfy or replace a
+production independent-review gate. The `prototype` shorthand selects this
+matrix for newly resolved requests; already admitted runs retain their durable
+authorization digest and policy.
 
 The preset is authorization, not runtime permission. If the configured launcher
 cannot run under the platform's active permission policy, record terminal

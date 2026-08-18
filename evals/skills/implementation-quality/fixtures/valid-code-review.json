@@ -15,6 +15,8 @@
   "openQuestions": [],
   "nextAction": { "kind": "continue", "description": "Authorize bounded objective corrections separately and rerun focused evidence." },
   "details": {
+    "assurance": "local-review",
+    "worker": { "executionIdentity": "same-session-review-worker-1", "sameSession": true, "readOnly": true, "canMutate": false, "canApprove": false },
     "reviewedScope": {
       "targets": ["src/service.mjs"],
       "contextPaths": ["specs/service.md"],
