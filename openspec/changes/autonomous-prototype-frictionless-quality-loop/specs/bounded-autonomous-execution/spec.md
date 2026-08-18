@@ -161,3 +161,42 @@ relabeled as passed.
   earlier head, or leaves an unresolved objective finding
 - **THEN** the runner creates correction work when safely eligible or stops with
   preserved state and MUST NOT report success
+
+### Requirement: Autonomous prototype issue intake is preauthorized and payload-bound
+An autonomous `prototype-rapid` `sdd-delivery` authorization SHALL bind the
+reviewed issue-intake payload before lifecycle mutation. The binding MUST name
+the selected entry, configured repository, title, managed labels, managed
+OpenSpec block, content digest, issue-create-or-reuse operation, expiry, and
+idempotent recovery behavior. When the binding, active authorization, exact
+target, runtime permission, and planning prerequisites all match, the runner
+MUST create or reuse the issue without a separate skill-level human approval
+prompt. The binding MUST NOT create host permission, broaden credentials, or
+authorize payload drift; a runtime denial or digest mismatch MUST fail closed
+with durable recovery evidence.
+
+#### Scenario: Bound issue payload is authorized
+- **WHEN** an unexpired autonomous prototype run reaches issue intake with a
+  reviewed payload whose digest and configured target match durable
+  authorization and the runtime permits the mutation
+- **THEN** the runner creates or reuses the exact issue and records its number,
+  URL, title, state, labels, and recovery linkage without a routine
+  conversational pause
+
+#### Scenario: Existing exact issue is found
+- **WHEN** issue intake finds an issue with the exact bound title in the exact
+  configured repository
+- **THEN** the runner reuses it, preserves human-authored content outside the
+  managed block, and creates no duplicate
+
+#### Scenario: Reviewed payload changes after authorization
+- **WHEN** the repository, title, labels, managed block, content, digest,
+  selected entry, or expiry differs from the durable binding
+- **THEN** the runner refuses publication and requires a newly reviewed exact
+  binding instead of treating the prior grant as standing approval
+
+#### Scenario: Host runtime denies issue publication
+- **WHEN** the exact payload is authorized but active host policy, credential,
+  connector, network, or runtime permission denies the mutation
+- **THEN** the runner records the permission boundary and safe resume condition
+  without bypassing the host, weakening controls, or claiming the skill can
+  guarantee publication

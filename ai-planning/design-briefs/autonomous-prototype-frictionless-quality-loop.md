@@ -120,6 +120,13 @@ Approval evidence:
 - Digest input: the ordered decisions above and the recommendation in section
   7, bound to the decision owner.
 
+Follow-up owner confirmation on 2026-08-18: the approved frictionless profile
+must also prevent a second skill-level publication approval from blocking
+future exact authorized issue intake. The selected design SHALL bind the
+reviewed issue payload and create-or-reuse operation durably while preserving
+host runtime permission as a separate fail-closed boundary; it SHALL NOT claim
+that a skill can override host policy.
+
 ### Completion-evidence model
 
 Human approval, quality execution, and successful completion are separate:
@@ -203,6 +210,9 @@ Implement one profile-specific interim contract:
   the overall authorized deadline or cost budget.
 - Preserve current exact-target authorization, operation checking, evidence
   binding, lifecycle reconciliation, durable status, and stop reporting.
+- Pre-bind reviewed issue-intake payloads so an exact authorized autonomous
+  prototype run does not add a separate skill-level publication prompt, while
+  rejecting payload drift and preserving host permission denial.
 - Update the resolver, operation checker, correction-chain behavior,
   verification validation, lifecycle controller, canonical base skills, living
   specifications, thin adapters, guidance, and deterministic fixtures needed
@@ -230,6 +240,9 @@ Acceptance evidence must prove:
 10. `production-rapid` and `owner-checkpointed` behavior remain unchanged.
 11. Milestone/project entry and exit reports remain visible but non-blocking
     when the encompassing planning scope is autonomous.
+12. Exact bound issue intake creates or reuses the configured issue without a
+    second skill-level approval prompt when runtime permission is present, and
+    payload drift or host denial fails closed with durable recovery evidence.
 
 ### Non-goals
 

@@ -60,3 +60,31 @@ external dependency.
   attempted-only, or leaves an unresolved objective finding
 - **THEN** the lifecycle corrects it when safely eligible or preserves an
   incomplete checkpoint and MUST NOT report completion
+
+### Requirement: Autonomous prototype intake does not add a routine publication gate
+Before planning review, the SDD lifecycle SHALL use the durable reviewed
+issue-payload binding from the exact autonomous prototype authorization to run
+configured create-or-reuse intake idempotently. It MUST record the returned
+issue identity, write valid tracking metadata, preserve issue content outside
+the configured managed block, and reconcile the configured Project item. It
+MUST NOT ask for a second skill-level approval when the exact binding and host
+runtime permission remain current. Host denial, payload drift, missing
+credentials, or target mismatch remains a stopping condition and MUST NOT be
+hidden by the frictionless profile.
+
+#### Scenario: Planning intake binding is current
+- **WHEN** the selected change has a current reviewed issue binding and the
+  configured host permits create-or-reuse and Project reconciliation
+- **THEN** the lifecycle records exact issue and tracking evidence and proceeds
+  to planning review without a routine publication prompt
+
+#### Scenario: Managed issue content already exists
+- **WHEN** the exact issue exists with human-authored content and a configured
+  managed OpenSpec block
+- **THEN** lifecycle reconciliation changes only the managed block as needed
+  and preserves all other content
+
+#### Scenario: Runtime permission is absent
+- **WHEN** the issue binding is valid but the host denies the external mutation
+- **THEN** the lifecycle stops at intake with durable recovery evidence and
+  does not claim that skill policy overrides host authority

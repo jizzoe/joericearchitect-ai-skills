@@ -67,15 +67,36 @@ Product-neutral behavior remains under `skills/base/{autonomous-goal-runner,auto
 
 Repository, Project, branch, issue, credential, path, deadline, and runtime data continue to come from validated configuration and authorization. No product constant is added to a reusable global asset.
 
+### Decision 7: Bind reviewed issue intake before autonomous lifecycle execution
+
+Extend effective authorization and the selected-entry controller context with a
+canonical issue-intake binding containing the selected entry, configured
+repository, title, managed labels, managed OpenSpec block, canonical payload
+digest, operation, expiry, and idempotent create-or-reuse recovery rule. The
+payload builder continues to use repository configuration and existing issue
+helpers; canonical policy stores no product constants. Planning intake compares
+the exact current payload with the durable binding, invokes configured intake
+without a second skill-level approval when runtime permission is already
+present, records the issue identity, and writes validated tracking metadata.
+
+The skill does not claim authority over the host. A host approval-policy,
+credential, connector, network, or sandbox denial remains a fail-closed stop
+with durable recovery evidence. Treating an initial broad instruction as
+standing approval was rejected; so was retrying through a different command
+after host denial. This design prevents the avoidable skill-level prompt while
+preserving the platform's higher-level boundary.
+
 ## Affected Boundaries and Data Flow
 
 1. `resolve-sdd-delivery-request.mjs` validates the request and emits the versioned effective profile matrix.
-2. `check-operation-authorization.mjs` confirms the exact operation, target, runtime permission, profile, and non-expired authorization before every action or correction.
-3. The autonomous controller persists the immutable authorization digest and routes only the first incomplete phase.
-4. `base-verification-loop` runs required deterministic evidence and invokes bounded `base-code-review` for local-review evidence.
-5. Objective findings enter the existing correction-chain owner, which canonicalizes and budgets the signature; material findings become intervention results.
-6. Implementation-quality and lifecycle validation accept success only after final-state evidence converges.
-7. Delivery, Sync, Archive, issue/Project convergence, and exact-owned cleanup retain their existing independently bound resource and receipt records.
+2. The resolver and configured issue helper produce a canonical reviewed intake payload and digest bound to the selected entry and expiry.
+3. `check-operation-authorization.mjs` confirms the exact operation, target, payload digest, runtime permission, profile, and non-expired authorization before every action or correction.
+4. The autonomous controller persists the immutable authorization digest and routes only the first incomplete phase.
+5. Planning intake creates or reuses the exact issue, records its identity, writes tracking metadata, and reconciles the configured Project item without a second skill-level prompt when runtime permission is present.
+6. `base-verification-loop` runs required deterministic evidence and invokes bounded `base-code-review` for local-review evidence.
+7. Objective findings enter the existing correction-chain owner, which canonicalizes and budgets the signature; material findings become intervention results.
+8. Implementation-quality and lifecycle validation accept success only after final-state evidence converges.
+9. Delivery, Sync, Archive, issue/Project convergence, and exact-owned cleanup retain their existing independently bound resource and receipt records.
 
 Likely implementation paths include `scripts/sdd/resolve-sdd-delivery-request.mjs`, `scripts/sdd/check-operation-authorization.mjs`, `scripts/sdd/correction-chain.mjs`, implementation-quality/result validators, controller and lifecycle fixtures, canonical skill instructions, living specs, repository guidance, and thin-adapter drift fixtures. No credential format, external API, or dependency changes are required.
 
@@ -84,6 +105,7 @@ Likely implementation paths include `scripts/sdd/resolve-sdd-delivery-request.mj
 - Resolver matrix fixtures prove the prototype alias and explicit autonomous prototype resolve to `same-session-local`, separated approvals/actions/predicates, four-hour default, exact target, and no production drift.
 - Compatibility fixtures prove legacy explicit independent-review input remains accepted only when consistent and conflicting fields fail before mutation.
 - Operation-check fixtures prove authorization and runtime permission remain mandatory and production delivery still requires current independent-review evidence.
+- Issue-intake fixtures prove exact payload canonicalization and digest binding, no skill-level prompt on a current authorized match, duplicate-safe reuse, managed-block preservation, Project reconciliation, payload-drift refusal, expiry refusal, and honest host-denial recovery.
 - Correction fixtures prove more than three aggregate corrections across distinct signatures pass, a fourth attempt for one stable signature fails, superficial changes do not reset the budget, and stagnation is durable.
 - Review fixtures prove the worker is read-only, returns `local-review`, preserves findings, and cannot satisfy independent-review validation.
 - Verification/lifecycle fixtures exercise objective failure → correction → focused retest → rereview → Verify/strict validation convergence without routine prompts, plus material, permission, unsafe, expiry, stale-evidence, and cleanup stop paths.
@@ -111,15 +133,17 @@ No new dependency or third-party code is planned. Changes extend repository-owne
 - [Signature variation could evade the budget] → exclude superficial and generated values and test restatement/stagnation behavior.
 - [No routine prompt could be misread as no gate] → model approvals, quality actions, and completion predicates separately and reject empty/attempted-only evidence.
 - [External denial interrupts an otherwise local plan] → preserve the controller checkpoint and exact dry-run evidence; require runtime permission rather than bypassing GitHub controls.
+- [A broad autonomous grant could be mistaken for standing publication approval] → bind the exact reviewed payload, digest, target, operation, and expiry and reject every mismatch.
 
 ## Migration Plan
 
 1. Add failing matrix, correction, review-label, convergence, and non-regression fixtures.
-2. Implement request schema v2 and compatibility parsing without changing existing admitted controller records.
-3. Extend the canonical correction and evidence validators, then the verification and lifecycle skills.
-4. Refresh thin exposure only from canonical source and verify adapter drift and packaging.
-5. Run focused suites, strict OpenSpec validation, formal Verify, local review, and delivery checks.
-6. Deliver implementation, Sync exact delta changes to living specs, Archive content-preservingly, converge issue/Project state, and run exact-owned cleanup.
+2. Implement request schema v2, exact issue-payload binding, and compatibility parsing without changing existing admitted controller records.
+3. Extend configured issue intake and controller reconciliation to consume the binding without a skill-level prompt while preserving host permission.
+4. Extend the canonical correction and evidence validators, then the verification and lifecycle skills.
+5. Refresh thin exposure only from canonical source and verify adapter drift and packaging.
+6. Run focused suites, strict OpenSpec validation, formal Verify, local review, and delivery checks.
+7. Deliver implementation, Sync exact delta changes to living specs, Archive content-preservingly, converge issue/Project state, and run exact-owned cleanup.
 
 Rollback is a normal revert of the delivered implementation and living-spec commits before another run is admitted under the new schema. Existing schema-v1 controller records continue using their stored policy and remain readable. Do not rewrite a durable authorization digest to simulate rollback.
 

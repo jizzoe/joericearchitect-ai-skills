@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: "autonomous-prototype-frictionless-quality-loop"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 126
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/126"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/autonomous-prototype-frictionless-quality-loop/"
