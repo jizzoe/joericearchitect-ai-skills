@@ -6,8 +6,8 @@
 
 ## 2. Make correction and readiness evidence converge
 
-- [ ] 2.1 Extend the existing correction-chain owner with deterministic canonical signatures, per-signature attempt and stagnation evidence, aggregate-distinct progress, and durable exhausted-signature intervention output. Depends on: 1.2, 1.3. Evidence: correction fixtures prove more than three aggregate distinct corrections pass, superficial variation does not reset a signature, repetition is stagnation, and a fourth stable-signature attempt is refused.
-- [ ] 2.2 Extend implementation-quality and shared result validation so autonomous prototype completion requires every applicable current passing action and final target/package/workspace/head predicate, with failed, missing, stale, mismatched, skipped-required, attempted-only, and unresolved-objective states rejected. Depends on: 1.2, 2.1. Evidence: focused validator fixtures cover passing convergence and every required negative or stop state.
+- [x] 2.1 Extend the existing correction-chain owner with deterministic canonical signatures, per-signature attempt and stagnation evidence, aggregate-distinct progress, and durable exhausted-signature intervention output. Depends on: 1.2, 1.3. Evidence: correction fixtures prove more than three aggregate distinct corrections pass, superficial variation does not reset a signature, repetition is stagnation, and a fourth stable-signature attempt is refused.
+- [x] 2.2 Extend implementation-quality and shared result validation so autonomous prototype completion requires every applicable current passing action and final target/package/workspace/head predicate, with failed, missing, stale, mismatched, skipped-required, attempted-only, and unresolved-objective states rejected. Depends on: 1.2, 2.1. Evidence: focused validator fixtures cover passing convergence and every required negative or stop state.
 
 ## 3. Deliver the continuous local-review loop
 

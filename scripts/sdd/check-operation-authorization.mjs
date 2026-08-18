@@ -211,10 +211,11 @@ function durableCorrectionState(authorization, request) {
     sourceDurable = sourceRecords.length === 1 && sourceFindings.length === 1;
   } else if (request.failureSource.kind === "verification") {
     const verificationRecords = request.checkpoint?.selectedEntry?.verificationRecords ?? [];
+    const expectedFailureSignature = canonicalFailureSignature(request.failureSource);
     const matches = verificationRecords.filter((record) =>
       record?.id === request.failureSource.verificationRecordId && record.entry === request.selectedEntry &&
       record.transition === request.failureSource.transition && record.current === true &&
-      record.failureSignature === request.failureSource.failureSignature &&
+      record.failureSignature === expectedFailureSignature &&
       record.evidence === request.failureSource.evidence);
     sourceDurable = matches.length === 1;
   }

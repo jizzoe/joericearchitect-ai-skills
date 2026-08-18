@@ -45,6 +45,7 @@ const checkCategories = new Set([
 const secretKey = /^(?:password|secret|token|credential|api[_-]?key|authorization|otp|mfa|private[_-]?key|pii|personal[_-]?data)$/i;
 const secretValue = /(?:gh[pousr]_[A-Za-z0-9]{20,}|Bearer\s+\S+|AKIA[A-Z0-9]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/;
 const standardsRuleId = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const completionFailureStates = new Set(["failed", "missing", "stale", "mismatched", "skipped-required", "attempted-only"]);
 
 function issue(code, subject, detail) {
   return { code, subject, ...(detail === undefined ? {} : { detail }) };
@@ -843,6 +844,56 @@ export function evaluateVerificationLoop({ completedStages = [], currentBinding,
   }
   const nextStage = verificationStages[completedStages.length] ?? null;
   return nextStage ? { state: "in-progress", nextStage } : { state: "complete", nextStage: null };
+}
+
+function canonicalCompletionBinding(value) {
+  if (!isObject(value) || !nonEmpty(value.target) || !nonEmpty(value.workspace) ||
+      !/^[0-9a-f]{64}$/.test(value.packageDigest ?? "") ||
+      !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(value.head ?? "") ||
+      Object.keys(value).some((key) => !new Set(["target", "packageDigest", "workspace", "head"]).has(key))) return null;
+  return { target: value.target, packageDigest: value.packageDigest, workspace: value.workspace, head: value.head };
+}
+
+export function evaluateCompletionConvergence({ requiredQualityActions, completionEvidencePredicates,
+  expectedQualityActionIds = [], expectedPredicateIds = [], finalBinding, unresolvedObjectiveFindings = [] } = {}) {
+  const binding = canonicalCompletionBinding(finalBinding);
+  if (!binding) return { converged: false, classification: "paused", reason: "final-binding-invalid" };
+  if (!Array.isArray(requiredQualityActions) || !Array.isArray(completionEvidencePredicates) ||
+      !Array.isArray(expectedQualityActionIds) || !Array.isArray(expectedPredicateIds) ||
+      !Array.isArray(unresolvedObjectiveFindings)) {
+    return { converged: false, classification: "paused", reason: "completion-evidence-invalid" };
+  }
+  if (unresolvedObjectiveFindings.length > 0) {
+    return { converged: false, classification: "needs-implementation", reason: "unresolved-objective-finding", ids: [...unresolvedObjectiveFindings] };
+  }
+  const inspect = (records, expectedIds, kind) => {
+    const ids = new Set();
+    for (const record of records) {
+      if (!isObject(record) || !nonEmpty(record.id) || ids.has(record.id) || !nonEmpty(record.status) ||
+          !Array.isArray(record.evidenceIds) || record.evidenceIds.length === 0 || record.evidenceIds.some((id) => !nonEmpty(id))) {
+        return { reason: `${kind}-record-invalid` };
+      }
+      ids.add(record.id);
+      if (completionFailureStates.has(record.status)) return { reason: record.status, id: record.id };
+      if (record.status !== "passed") return { reason: `${kind}-status-invalid`, id: record.id };
+      const recordBinding = canonicalCompletionBinding(record.binding);
+      if (!recordBinding || JSON.stringify(recordBinding) !== JSON.stringify(binding)) return { reason: "mismatched", id: record.id };
+    }
+    const missing = expectedIds.find((id) => !ids.has(id));
+    return missing ? { reason: "missing", id: missing } : null;
+  };
+  const qualityIssue = inspect(requiredQualityActions, expectedQualityActionIds, "quality-action");
+  if (qualityIssue) return { converged: false, classification: "needs-implementation", ...qualityIssue, kind: "required-quality-action" };
+  const predicateIssue = inspect(completionEvidencePredicates, expectedPredicateIds, "completion-predicate");
+  if (predicateIssue) return { converged: false, classification: "paused", ...predicateIssue, kind: "completion-evidence-predicate" };
+  return {
+    converged: true,
+    classification: "complete",
+    reason: "current-final-evidence-converged",
+    finalBinding: binding,
+    qualityActionIds: requiredQualityActions.map((record) => record.id),
+    predicateIds: completionEvidencePredicates.map((record) => record.id)
+  };
 }
 
 export function authorizeVerificationOperation({ authorization, runtime, config, operation, target, now, correctionAttemptsForFailureSignature, correctionAttempts, selectedEntry, failureSignature, failureSource, checkpoint } = {}) {

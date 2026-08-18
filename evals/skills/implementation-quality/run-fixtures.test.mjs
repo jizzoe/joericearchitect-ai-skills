@@ -9,6 +9,7 @@ import { packageDigest } from "../../../scripts/sdd/independent-review-contract.
 import { checkAdapterDrift } from "../../../scripts/sdd/check-adapter-drift.mjs";
 import {
   authorizeVerificationOperation,
+  evaluateCompletionConvergence,
   evaluateProductionReadiness,
   evaluateVerificationLoop,
   renderImplementationQualityMarkdown,
@@ -266,6 +267,46 @@ test("verification state machine is ordered, idempotent, current, and correction
   assert.deepEqual(evaluateVerificationLoop({ currentBinding: "state-1", correctionBudget: 1, correctionStateByFailureSignature: { validation: { attempts: 1, latestResult: "failed" } } }), { state: "blocked", reason: "correction-limit-exhausted" });
   assert.deepEqual(evaluateVerificationLoop({ currentBinding: "state-1", correctionStateByFailureSignature: { validation: { attempts: 3, latestResult: "passed" } } }), initial);
   assert.deepEqual(evaluateVerificationLoop({ currentBinding: "state-1", correctionStateByFailureSignature: { validation: { attempts: 3 } } }), { state: "paused", reason: "invalid-correction-state" });
+});
+
+test("autonomous prototype completion converges only on current final-bound passing evidence", () => {
+  const finalBinding = { target: "change:quality-change", packageDigest: "a".repeat(64), workspace: "workspace-state-final", head: "b".repeat(40) };
+  const expectedQualityActionIds = ["focused-tests", "critical-flow", "requirements-mapping", "local-review", "openspec-verify", "openspec-validate-all-strict", "lifecycle-reconciliation"];
+  const expectedPredicateIds = ["final-target-bound", "no-unresolved-objective-findings", "delivery-sync-archive-current", "issue-project-cleanup-reconciled", "no-residual-owned-state"];
+  const record = (id) => ({ id, status: "passed", evidenceIds: [`evidence-${id}`], binding: { ...finalBinding } });
+  const baseline = {
+    finalBinding,
+    expectedQualityActionIds,
+    expectedPredicateIds,
+    requiredQualityActions: expectedQualityActionIds.map(record),
+    completionEvidencePredicates: expectedPredicateIds.map(record),
+    unresolvedObjectiveFindings: []
+  };
+  assert.equal(evaluateCompletionConvergence(baseline).converged, true);
+
+  const cases = [
+    ["failed", (value) => { value.requiredQualityActions[0].status = "failed"; }],
+    ["missing", (value) => { value.requiredQualityActions.pop(); }],
+    ["stale", (value) => { value.requiredQualityActions[0].status = "stale"; }],
+    ["mismatched", (value) => { value.requiredQualityActions[0].binding.head = "c".repeat(40); }],
+    ["skipped-required", (value) => { value.requiredQualityActions[0].status = "skipped-required"; }],
+    ["attempted-only", (value) => { value.requiredQualityActions[0].status = "attempted-only"; }],
+    ["unresolved-objective-finding", (value) => { value.unresolvedObjectiveFindings = ["finding-1"]; }]
+  ];
+  for (const [reason, mutate] of cases) {
+    const value = clone(baseline);
+    mutate(value);
+    const result = evaluateCompletionConvergence(value);
+    assert.equal(result.converged, false, reason);
+    assert.equal(result.reason, reason);
+  }
+
+  const predicateMismatch = clone(baseline);
+  predicateMismatch.completionEvidencePredicates[0].binding.workspace = "workspace-state-old";
+  assert.deepEqual(
+    evaluateCompletionConvergence(predicateMismatch),
+    { converged: false, classification: "paused", reason: "mismatched", id: "final-target-bound", kind: "completion-evidence-predicate" }
+  );
 });
 
 test("verification operations reuse exact local-implementation authorization", () => {
