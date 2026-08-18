@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { executeWorkspaceCleanup, planWorkspaceCleanup } from "./sdd-workspace-cleanup.mjs";
+import { bindIssueIntakeEvidence, validateIssueIntakeBinding } from "./issue-intake-binding.mjs";
 
 const phases = Object.freeze([
   "propose", "planning-review", "apply", "verify", "delivery", "sync", "archive", "cleanup"
@@ -60,6 +61,18 @@ function validResource(resource, { selectedEntry, repository } = {}, { allowPend
     evidence.mergedPullRequest.finalHeadCommit === evidence.deliveredHeadCommit;
 }
 
+function validIssueIntakeRecord(record, selectedEntry) {
+  if (!record || record.selectedEntry !== selectedEntry || !validateIssueIntakeBinding(record.binding) ||
+      record.binding.selectedEntry !== selectedEntry || record.bindingDigest !== authorizationDigest(record.binding) || !timestamp(record.registeredAt) ||
+      !["pending", "delivered"].includes(record.status)) return false;
+  if (record.status === "pending") return record.evidence === undefined;
+  const evidence = record.evidence;
+  return evidence?.current === true && evidence.payloadDigest === record.binding.payloadDigest &&
+    Number.isInteger(evidence.number) && evidence.number > 0 && text(evidence.url) &&
+    ["OPEN", "CLOSED"].includes(evidence.state) && Array.isArray(evidence.labels) &&
+    timestamp(evidence.observedAt) && text(evidence.reference);
+}
+
 function validCompletedEntry(entry, repository) {
   const receiptValid = (receipt) => receipt && ["started", "completed", "already-completed", "blocked"].includes(receipt.status) &&
       ["worktree", "branch"].includes(receipt.kind) && text(receipt.id) && timestamp(receipt.at) && text(receipt.recoveryReference) &&
@@ -112,12 +125,46 @@ export function createControllerRecord({ authorization, repository, selectedEntr
       allowedLifecycleChain: [...phases],
       checkpointPath: checkpointForRun(runId),
       resourceRecords: [],
+      issueIntakeRecords: [],
       cleanupReceipts: [],
       completedEntries: [],
       currentPhase: "propose",
       steps: phases.map((id) => ({ id, status: "pending" }))
     }
   };
+}
+
+export function registerControllerIssueIntake(record, binding, { now = new Date().toISOString() } = {}) {
+  if (record?.schemaVersion !== 4 || !timestamp(now) || !validateIssueIntakeBinding(binding) ||
+      binding.selectedEntry !== record.selectedEntry) return { valid: false, reason: "controller-issue-intake-registration-invalid" };
+  const next = structuredClone(record);
+  next.issueIntakeRecords ??= [];
+  if (!Array.isArray(next.issueIntakeRecords) || next.issueIntakeRecords.some((item) => item.binding.payloadDigest === binding.payloadDigest)) {
+    return { valid: false, reason: "controller-issue-intake-registration-duplicate" };
+  }
+  const intake = {
+    selectedEntry: next.selectedEntry,
+    status: "pending",
+    binding: structuredClone(binding),
+    bindingDigest: authorizationDigest(binding),
+    registeredAt: now
+  };
+  if (!validIssueIntakeRecord(intake, next.selectedEntry)) return { valid: false, reason: "controller-issue-intake-registration-invalid" };
+  next.issueIntakeRecords.push(intake);
+  return { valid: true, record: next, intake };
+}
+
+export function bindControllerIssueIntake(record, { payloadDigest, issue, observedAt, reference } = {}) {
+  if (record?.schemaVersion !== 4 || !text(payloadDigest)) return { valid: false, reason: "controller-issue-intake-delivery-invalid" };
+  const next = structuredClone(record);
+  const matches = next.issueIntakeRecords?.filter((item) => item.binding.payloadDigest === payloadDigest) ?? [];
+  if (matches.length !== 1 || matches[0].status !== "pending") return { valid: false, reason: "controller-issue-intake-delivery-invalid" };
+  const bound = bindIssueIntakeEvidence(matches[0].binding, issue, { observedAt, reference });
+  if (!bound.valid) return { valid: false, reason: "controller-issue-intake-delivery-invalid" };
+  matches[0].status = "delivered";
+  matches[0].evidence = bound.evidence;
+  if (!validIssueIntakeRecord(matches[0], next.selectedEntry)) return { valid: false, reason: "controller-issue-intake-delivery-invalid" };
+  return { valid: true, record: next, intake: matches[0] };
 }
 
 export function registerControllerResource(record, resource, { now = new Date().toISOString() } = {}) {
@@ -190,11 +237,13 @@ export function advanceControllerQueue(record, { now = new Date().toISOString() 
     selectedEntry: next.selectedEntry,
     completedAt: now,
     resourceRecords: next.resourceRecords,
+    issueIntakeRecords: next.issueIntakeRecords ?? [],
     cleanupReceipts: next.cleanupReceipts
   });
   next.queueIndex = nextIndex;
   next.selectedEntry = next.queueEntries[nextIndex];
   next.resourceRecords = [];
+  next.issueIntakeRecords = [];
   next.cleanupReceipts = [];
   next.currentPhase = "propose";
   next.steps = phases.map((id) => ({ id, status: "pending" }));
@@ -204,8 +253,10 @@ export function advanceControllerQueue(record, { now = new Date().toISOString() 
 export function inspectControllerRecord(record, { authorization, repository, now = new Date().toISOString() } = {}) {
   if (!record || record.schemaVersion === 1 || record.schemaVersion === 2 || record.schemaVersion === 3) return { classification: "paused", reason: "controller-record-legacy", nextPhase: null };
   if (record.schemaVersion !== 4 || !validRunId(record.runId) || record.checkpointPath !== checkpointForRun(record.runId) || !text(record.selectedEntry) || !text(record.repository) || !text(record.checkpointPath) || !Array.isArray(record.steps) ||
-      !Array.isArray(record.resourceRecords) || !Array.isArray(record.cleanupReceipts) || !Array.isArray(record.completedEntries) ||
+      !Array.isArray(record.resourceRecords) || (record.issueIntakeRecords !== undefined && !Array.isArray(record.issueIntakeRecords)) ||
+      !Array.isArray(record.cleanupReceipts) || !Array.isArray(record.completedEntries) ||
       record.resourceRecords.some((resource) => !validResource(resource, record)) ||
+      (record.issueIntakeRecords ?? []).some((intake) => !validIssueIntakeRecord(intake, record.selectedEntry)) ||
       record.completedEntries.some((entry) => !validCompletedEntry(entry, record.repository))) {
     return { classification: "paused", reason: "controller-record-invalid", nextPhase: null };
   }
@@ -295,6 +346,20 @@ export function registerControllerLifecycleResource({ repositoryPath, record, re
   if (!registered.valid) return registered;
   const persisted = persistControllerRecord({ repositoryPath, record: registered.record, runGit });
   return persisted.valid ? { valid: true, record: registered.record, resource: registered.resource, path: persisted.path } : persisted;
+}
+
+export function persistControllerIssueIntake({ repositoryPath, record, binding, now, runGit } = {}) {
+  const registered = registerControllerIssueIntake(record, binding, { now });
+  if (!registered.valid) return registered;
+  const persisted = persistControllerRecord({ repositoryPath, record: registered.record, runGit });
+  return persisted.valid ? { valid: true, record: registered.record, intake: registered.intake, path: persisted.path } : persisted;
+}
+
+export function persistControllerIssueIntakeEvidence({ repositoryPath, record, payloadDigest, issue, observedAt, reference, runGit } = {}) {
+  const bound = bindControllerIssueIntake(record, { payloadDigest, issue, observedAt, reference });
+  if (!bound.valid) return bound;
+  const persisted = persistControllerRecord({ repositoryPath, record: bound.record, runGit });
+  return persisted.valid ? { valid: true, record: bound.record, intake: bound.intake, path: persisted.path } : persisted;
 }
 
 export function bindControllerLifecycleDelivery({ repositoryPath, record, kind, id, deliveryEvidence, runGit } = {}) {
