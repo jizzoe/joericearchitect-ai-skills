@@ -98,7 +98,7 @@ preserving the platform's higher-level boundary.
 8. Implementation-quality and lifecycle validation accept success only after final-state evidence converges.
 9. Delivery, Sync, Archive, issue/Project convergence, and exact-owned cleanup retain their existing independently bound resource and receipt records.
 
-Likely implementation paths include `scripts/sdd/resolve-sdd-delivery-request.mjs`, `scripts/sdd/check-operation-authorization.mjs`, `scripts/sdd/correction-chain.mjs`, implementation-quality/result validators, controller and lifecycle fixtures, canonical skill instructions, living specs, repository guidance, and thin-adapter drift fixtures. No credential format, external API, or dependency changes are required.
+Likely implementation paths include `scripts/sdd/resolve-sdd-delivery-request.mjs`, `scripts/sdd/check-operation-authorization.mjs`, the controller transition module, a canonical issue-intake binding helper, configured GitHub issue helpers, `scripts/sdd/correction-chain.mjs`, implementation-quality/result validators, controller and lifecycle fixtures, canonical skill instructions, living specs, repository guidance, and thin-adapter drift fixtures. No credential format, external API, or dependency changes are required.
 
 ## Verification Strategy
 

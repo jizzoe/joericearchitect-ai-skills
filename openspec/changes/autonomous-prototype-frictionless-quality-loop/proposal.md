@@ -33,6 +33,8 @@ None.
 - `bounded-autonomous-execution`: Define the autonomous prototype profile matrix, continuous required quality actions, completion-evidence predicates, and per-signature correction behavior.
 - `base-code-review`: Define bounded same-session review-worker evidence and its explicit local-review assurance label.
 - `base-verification-loop`: Define continuous objective correction, affected-check rerun, rereview, and final evidence convergence for autonomous prototypes.
+- `github-openspec-intake`: Define canonical issue-payload binding, digest validation, duplicate-safe create-or-reuse, and managed-content preservation for authorized autonomous intake.
+- `autonomous-sdd-continuation`: Persist and recover the exact issue-intake binding and resulting issue evidence in the run-specific controller context.
 - `sdd-lifecycle`: Define frictionless autonomous-prototype lifecycle progression and terminal evidence reconciliation while preserving other modes and profiles.
 
 ## Impact
