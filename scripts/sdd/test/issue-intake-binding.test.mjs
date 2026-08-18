@@ -54,6 +54,7 @@ test("payload drift, expiry, and host denial fail closed without requesting a sk
   const cases = [
     [{ ...payload, title: "Changed" }, runtime, "2026-08-13T12:00:00.000Z", "issue-intake-payload-mismatch"],
     [payload, runtime, expiresAt, "issue-intake-binding-expired"],
+    [payload, runtime, "not-a-time", "issue-intake-clock-invalid"],
     [payload, { permittedOperations: [] }, "2026-08-13T12:00:00.000Z", "runtime-permission-gap"]
   ];
   for (const [candidate, host, now, code] of cases) {

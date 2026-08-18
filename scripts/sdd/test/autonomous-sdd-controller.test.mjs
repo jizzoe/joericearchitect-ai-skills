@@ -75,6 +75,13 @@ test("controller persists pending reviewed intake then binds exact issue evidenc
   assert.equal(registered.intake.status, "pending");
   assert.equal(registered.intake.binding.payloadDigest, intakeBinding.payloadDigest);
   assert.equal(registerControllerIssueIntake(registered.record, intakeBinding, { now: started }).reason, "controller-issue-intake-registration-duplicate");
+  assert.equal(registerControllerIssueIntake({ ...registered.record, issueIntakeRecords: [null] }, intakeBinding, { now: started }).reason, "controller-issue-intake-registration-invalid");
+  assert.equal(bindControllerIssueIntake({ ...registered.record, issueIntakeRecords: [null] }, {
+    payloadDigest: intakeBinding.payloadDigest,
+    issue: { number: 126, url: "https://github.com/owner/repository/issues/126", state: "OPEN", labels: ["sdd"] },
+    observedAt: started,
+    reference: "malformed controller regression"
+  }).reason, "controller-issue-intake-delivery-invalid");
 
   const delivered = bindControllerIssueIntake(registered.record, {
     payloadDigest: intakeBinding.payloadDigest,

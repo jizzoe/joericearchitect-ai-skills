@@ -79,6 +79,7 @@ export function authorizeBoundIssueIntake({ binding, selectedEntry, payload, run
   const recovery = binding?.recoveryReference ?? "rebuild and review the exact issue-intake binding";
   if (!validateIssueIntakeBinding(binding)) return fail("issue-intake-binding-invalid", recovery);
   if (binding.selectedEntry !== selectedEntry) return fail("issue-intake-selected-entry-mismatch", recovery);
+  if (!timestamp(now)) return fail("issue-intake-clock-invalid", recovery);
   if (Date.parse(binding.expiresAt) <= Date.parse(now)) return fail("issue-intake-binding-expired", recovery);
   const normalized = canonicalIssueIntakePayload(payload);
   if (!normalized || binding.repository !== normalized.repository || binding.title !== normalized.title ||

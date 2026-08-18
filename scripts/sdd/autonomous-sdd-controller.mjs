@@ -139,7 +139,11 @@ export function registerControllerIssueIntake(record, binding, { now = new Date(
       binding.selectedEntry !== record.selectedEntry) return { valid: false, reason: "controller-issue-intake-registration-invalid" };
   const next = structuredClone(record);
   next.issueIntakeRecords ??= [];
-  if (!Array.isArray(next.issueIntakeRecords) || next.issueIntakeRecords.some((item) => item.binding.payloadDigest === binding.payloadDigest)) {
+  if (!Array.isArray(next.issueIntakeRecords) ||
+      next.issueIntakeRecords.some((item) => !validIssueIntakeRecord(item, next.selectedEntry))) {
+    return { valid: false, reason: "controller-issue-intake-registration-invalid" };
+  }
+  if (next.issueIntakeRecords.some((item) => item.binding.payloadDigest === binding.payloadDigest)) {
     return { valid: false, reason: "controller-issue-intake-registration-duplicate" };
   }
   const intake = {
@@ -157,6 +161,10 @@ export function registerControllerIssueIntake(record, binding, { now = new Date(
 export function bindControllerIssueIntake(record, { payloadDigest, issue, observedAt, reference } = {}) {
   if (record?.schemaVersion !== 4 || !text(payloadDigest)) return { valid: false, reason: "controller-issue-intake-delivery-invalid" };
   const next = structuredClone(record);
+  if (!Array.isArray(next.issueIntakeRecords) ||
+      next.issueIntakeRecords.some((item) => !validIssueIntakeRecord(item, next.selectedEntry))) {
+    return { valid: false, reason: "controller-issue-intake-delivery-invalid" };
+  }
   const matches = next.issueIntakeRecords?.filter((item) => item.binding.payloadDigest === payloadDigest) ?? [];
   if (matches.length !== 1 || matches[0].status !== "pending") return { valid: false, reason: "controller-issue-intake-delivery-invalid" };
   const bound = bindIssueIntakeEvidence(matches[0].binding, issue, { observedAt, reference });
