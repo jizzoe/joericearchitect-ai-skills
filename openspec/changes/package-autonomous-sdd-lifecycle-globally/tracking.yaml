@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: "package-autonomous-sdd-lifecycle-globally"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 123
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/123"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/package-autonomous-sdd-lifecycle-globally/"

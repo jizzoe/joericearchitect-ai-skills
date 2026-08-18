@@ -6,9 +6,9 @@ link breaks after `gh skill` copies the skill into a user profile. This makes a
 supported global installation incomplete and can produce assistant-dependent
 or workspace-dependent behavior.
 
-Approved no-issue exception: the owner directly authorized this bounded repair
-in the current repository session and did not authorize a separate GitHub issue
-mutation.
+Tracking issue: [#123](https://github.com/jizzoe/joericearchitect-ai-skills/issues/123).
+It records the bounded repair required by this repository's delivery linkage
+policy.
 
 ## What Changes
 
