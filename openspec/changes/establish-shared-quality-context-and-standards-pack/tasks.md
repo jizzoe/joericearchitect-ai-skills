@@ -40,12 +40,12 @@
   - Depends on: 3.1.
   - Evidence: written evidence maps every task/spec/design decision and
     documents no third-party dependency or product constants.
-- [ ] 3.3 Complete formal OpenSpec Verify and current-head strict independent
-  review before delivery.
+- [x] 3.3 Complete formal OpenSpec Verify and owner-authorized current-head
+  non-strict review before delivery.
   - Depends on: 3.2.
   - Evidence: current validation, exact-head CI evidence where configured,
-    independently generated strict review record, and `openspec validate --all
-    --strict` pass.
+    an owner-authorized non-strict review record that preserves the missing
+    isolation as residual risk, and `openspec validate --all --strict` pass.
 - [ ] 3.4 Deliver, Sync, Archive, reconcile issue/Project state, and remove
   only exact clean change-owned branches/worktrees.
   - Depends on: 3.3.
