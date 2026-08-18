@@ -8,7 +8,7 @@ or workspace-dependent behavior.
 
 Tracking issue: [#123](https://github.com/jizzoe/joericearchitect-ai-skills/issues/123).
 It records the bounded repair required by this repository's delivery linkage
-policy.
+policy; `tracking.yaml` is the authoritative repository-to-issue binding.
 
 ## What Changes
 
