@@ -10,6 +10,10 @@ change. Read [review contract](references/review-contract.md) before producing a
 result and use [evaluation matrix](references/evaluation-matrix.md) when
 evaluating or changing the skill itself.
 
+For claimed stack-standard coverage, also read the shared
+[standards-pack selection](../_shared/standards-pack.md) and
+[context-management policy](../_shared/context-management.md).
+
 ## Required Inputs
 
 Require the target repository or workspace, bounded changed paths or diff,
@@ -36,6 +40,10 @@ data, authorization, untrusted input, dependencies and supply chain,
 portability, configuration ownership, generated artifacts, unrelated changes,
 and UI accessibility, responsive layout, or interaction risk when applicable.
 Record every unreviewed applicable area as an evidence gap.
+When stack-standard coverage is claimed, consume the supplied validated
+selection record, report selected rule IDs, scoped overrides, and
+not-applicable classifications, and report a gap rather than claim coverage
+when the record is absent or invalid.
 
 ## Findings
 
@@ -53,11 +61,16 @@ security, licensing, governance, data-ownership, or scope choices are
 ## Result
 
 Emit `skill-result-v1` with `skill: base-code-review`. Put reviewed scope,
-ordered findings, coverage, evidence gaps, and scope summary in `details` and
-reference the shared top-level evidence array by stable ID. Validate the result
+ordered findings, coverage, `standardsSelection`, evidence gaps, and scope
+summary in `details`; `standardsSelection` carries selected rule IDs, scoped
+overrides, and not-applicable rule IDs (or empty arrays when not requested).
+Reference the shared top-level evidence array by stable ID. Validate the result
 with `scripts/validation/validate-implementation-quality.mjs` before rendering
-Markdown. The report order is findings, evidence gaps, scope, summary, then
-next action.
+Markdown. When standards coverage is claimed, supply that same selection record
+as `standardsSelectionRecord` in the validation context; the validator rejects
+rule IDs, override scopes, and not-applicable classifications that do not match
+the validated record. The report order is findings, evidence gaps, scope,
+summary, then next action.
 
 On sensitive content, unexpected scope, destructive or external mutation,
 material decision, ambiguous state, or exhausted correction budget, preserve

@@ -45,6 +45,11 @@
       { "area": "tests and eval quality", "status": "gap", "evidenceIds": ["test-focused"] },
       { "area": "web accessibility", "status": "not-applicable", "evidenceIds": [] }
     ],
+    "standardsSelection": {
+      "selectedRuleIds": [],
+      "scopedOverrides": [],
+      "notApplicableRuleIds": []
+    },
     "evidenceGaps": [
       { "id": "gap-edge-test", "subject": "edge-case coverage", "reason": "No malformed-input test was supplied." }
     ],

@@ -39,6 +39,9 @@ defect but still blocks the selected profile until correction and rereview.
   evidence IDs, impact, and recommendation;
 - `coverage`: review area, `reviewed`, `gap`, or `not-applicable` status, and
   evidence IDs;
+- `standardsSelection`: selected rule IDs, scoped resolved overrides, and
+  not-applicable rule IDs from the validated selection record; use empty arrays
+  when stack-standard coverage is not requested;
 - `evidenceGaps`: stable ID, subject, and reason; and
 - `scopeSummary`: concise text.
 

@@ -23,6 +23,18 @@ const root = path.resolve(new URL("../../..", import.meta.url).pathname);
 const fixtures = path.join(root, "evals/skills/implementation-quality/fixtures");
 const readJson = (name) => JSON.parse(fs.readFileSync(path.join(fixtures, name), "utf8"));
 const clone = (value) => structuredClone(value);
+const standardsSelectionRecord = {
+  schemaVersion: 1,
+  target: { path: "fixtures/second-workspace" },
+  rules: [
+    { id: "repository-style", classification: "repository-selected", source: "config/quality.md", scope: "repository" },
+    { id: "official-rule", classification: "required", source: "https://example.com/official", scope: "src" },
+    { id: "expo-rule", classification: "not-applicable", source: "https://example.com/expo", scope: "repository", reason: "target is not Expo" }
+  ],
+  overrides: [{ ruleId: "repository-style", scope: "src", reason: "repository convention", status: "resolved" }],
+  expectedEvidence: ["lint"],
+  gaps: []
+};
 
 function productionReviewAuthorization(head) {
   const baseCommit = "0".repeat(40);
@@ -130,7 +142,7 @@ const validationOptions = (value) => ({
     ? productionReviewAuthorization(value.details.productionGate?.head ?? "")
     : undefined
 });
-const validateResult = (value) => validateImplementationQualityResultRaw(value, validationOptions(value));
+const validateResult = (value, options = {}) => validateImplementationQualityResultRaw(value, { ...validationOptions(value), ...options });
 const renderResult = (value) => renderImplementationQualityMarkdown(value, validationOptions(value));
 
 test("valid code-review result is findings-first and shared-contract compliant", () => {
@@ -143,6 +155,18 @@ test("valid code-review result is findings-first and shared-contract compliant",
   assert.ok(markdown.indexOf("## Scope") < markdown.indexOf("## Summary"));
   assert.match(markdown, /- The supplied changed path list is complete\./);
   assert.match(markdown, /HIGH finding-high-validation/);
+
+  const selectedStandards = clone(result);
+  selectedStandards.details.standardsSelection = {
+    selectedRuleIds: ["repository-style", "official-rule"],
+    scopedOverrides: [{ ruleId: "repository-style", scope: "src" }],
+    notApplicableRuleIds: ["expo-rule"]
+  };
+  assert.deepEqual(validateResult(selectedStandards, { standardsSelectionRecord }), { valid: true, issues: [] });
+
+  const unvalidatedStandards = clone(selectedStandards);
+  unvalidatedStandards.details.standardsSelection.selectedRuleIds = ["made-up-rule"];
+  assert.ok(validateResult(unvalidatedStandards, { standardsSelectionRecord }).issues.some((item) => item.code === "standards-selection-record-mismatch"));
 
   const emptyAssumptions = clone(result);
   emptyAssumptions.assumptions = [];
@@ -158,6 +182,7 @@ test("review validator rejects malformed, duplicate, unsafe, unsupported, and mi
     ["duplicate", (value) => { value.details.findings[1].id = value.details.findings[0].id; }, "duplicate-finding-id"],
     ["unsafe path", (value) => { value.details.findings[0].subject = "../outside.mjs"; }, "unsafe-workspace-path"],
     ["unsupported severity", (value) => { value.details.findings[0].severity = "critical"; }, "invalid-finding-severity"],
+    ["unsafe standards override scope", (value) => { value.details.standardsSelection.scopedOverrides = [{ ruleId: "repository-style", scope: "../outside" }]; }, "unsafe-workspace-path"],
     ["unknown details key", (value) => { value.details.extra = true; }, "unknown-key"],
     ["sensitive details", (value) => { value.details.scopeSummary = ["ghp_", "A".repeat(20)].join(""); }, "sensitive-value"],
     ["personal data field", (value) => { value.details.pii = "synthetic@example.invalid"; }, "sensitive-key"]
@@ -356,6 +381,21 @@ test("prototype and strict production results validate without lifecycle overcla
     assert.match(renderResult(value), /ready-for-openspec-verify/);
     assert.doesNotMatch(value.summary, /merge|archive|delivery complete/i);
   }
+});
+
+test("verification results report and bind a supplied standards selection record", () => {
+  const result = readJson("valid-verification-prototype.json");
+  result.details.standardsSelection = {
+    selectedRuleIds: ["repository-style", "official-rule"],
+    scopedOverrides: [{ ruleId: "repository-style", scope: "src" }],
+    notApplicableRuleIds: ["expo-rule"]
+  };
+  assert.deepEqual(validateResult(result, { standardsSelectionRecord }), { valid: true, issues: [] });
+
+  result.details.standardsSelection.notApplicableRuleIds = ["official-rule"];
+  const validation = validateResult(result, { standardsSelectionRecord });
+  assert.equal(validation.valid, false);
+  assert.ok(validation.issues.some((item) => item.code === "standards-selection-record-mismatch"));
 });
 
 test("verification result status and readiness remain consistent", () => {

@@ -29,6 +29,14 @@ caller-reported counts must match and cannot reset the budget.
 
 ## Required Loop
 
+For claimed stack-standard coverage, read the shared
+[standards-pack selection](../_shared/standards-pack.md) and
+[context-management policy](../_shared/context-management.md). Use only the
+validated selection record and repository-declared command evidence; absent
+selection or tooling is a gap, never an invented command or passing claim.
+Report selected rule IDs, scoped overrides, not-applicable classifications, and
+role-specific evidence gaps in the verification result.
+
 1. Bind the behavior, acceptance evidence, target paths, mode, profile, and
    authorization.
 2. Identify the smallest reproduction or critical path.
@@ -87,6 +95,8 @@ evidence for readiness.
 Validate with `scripts/validation/validate-implementation-quality.mjs`. Supply
 a validation-context JSON file as its second argument. The context carries the
 applicable local-implementation authorization and durable correction checkpoint;
+when standards coverage is claimed, it also carries the same validated selection
+record as `standardsSelectionRecord`, which the result must match exactly;
 a production-ready result additionally carries the canonical owner's complete
 review authorization input. Self-reported correction budgets, correction
 histories, review summaries, or top-level evidence records cannot establish

@@ -25,6 +25,7 @@
     "intendedBehavior": "The widget returns a stable normalized value under production checks.",
     "criticalPath": "Invoke the widget through the production entry point.",
     "changedPaths": ["src/widget.mjs"],
+    "standardsSelection": { "selectedRuleIds": [], "scopedOverrides": [], "notApplicableRuleIds": [] },
     "selectedChecks": [
       { "id": "focused-unit-or-integration", "category": "focused", "required": true, "result": "passed", "evidenceId": "focused" },
       { "id": "critical-flow", "category": "critical-flow", "required": true, "result": "passed", "evidenceId": "critical" },
