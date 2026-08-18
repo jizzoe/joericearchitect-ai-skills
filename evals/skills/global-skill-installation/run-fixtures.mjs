@@ -10,6 +10,8 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../..");
 const skillName = "github-pr-linkage";
+const deliverySkillName = "autonomous-sdd-delivery";
+const lifecycleSkillName = "autonomous-sdd-lifecycle";
 const args = process.argv.slice(2);
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "global-skill-installation-"));
 const home = path.join(tempRoot, "fixture home");
@@ -41,9 +43,9 @@ function list(agent) {
   return JSON.parse(result.stdout);
 }
 
-function listedSkill(agent) {
-  const installed = list(agent).find((item) => item.skillName === skillName);
-  assert.ok(installed, `${agent} should list the installed skill`);
+function listedSkill(agent, expectedSkillName = skillName) {
+  const installed = list(agent).find((item) => item.skillName === expectedSkillName);
+  assert.ok(installed, `${agent} should list ${expectedSkillName}`);
   assert.equal(installed.scope, "user");
   assert.equal(typeof installed.path, "string");
   return installed;
@@ -51,6 +53,19 @@ function listedSkill(agent) {
 
 function listedSkillPath(installed) {
   return path.resolve(installed.path, "SKILL.md");
+}
+
+function verifyDeliveryDependency(agent) {
+  const delivery = listedSkill(agent, deliverySkillName);
+  const lifecycle = listedSkill(agent, lifecycleSkillName);
+  const deliveryPath = listedSkillPath(delivery);
+  const expectedLifecyclePath = listedSkillPath(lifecycle);
+  const text = fs.readFileSync(deliveryPath, "utf8");
+  const match = text.match(/\[the canonical lifecycle\]\((\.\.\/autonomous-sdd-lifecycle\/SKILL\.md)\)/);
+  assert.ok(match, `${agent} delivery must declare its sibling lifecycle dependency`);
+  const resolved = path.resolve(path.dirname(deliveryPath), match[1]);
+  assert.equal(resolved, expectedLifecyclePath, `${agent} delivery dependency must resolve to its listed lifecycle skill`);
+  assert.equal(fs.existsSync(resolved), true, `${agent} installed lifecycle dependency must exist`);
 }
 
 function skillFilesUnder(directory) {
@@ -93,7 +108,7 @@ function authenticatedInvocation(agent, fixturePath) {
   const workspace = path.join(tempRoot, `${agent} invocation workspace`);
   fs.mkdirSync(workspace, { recursive: true });
 
-  let installedSkillPath;
+  let installedSkillPaths = [];
   let installedByFixture = false;
   try {
     const auth = spawnSync(
@@ -124,9 +139,13 @@ function authenticatedInvocation(agent, fixturePath) {
     if (listed.status !== 0) {
       return { status: "blocked", reason: `${agent} could not verify its installed skill with gh skill list` };
     }
-    const installed = JSON.parse(listed.stdout).find((item) => item.skillName === skillName);
+    const listedItems = JSON.parse(listed.stdout);
+    const installed = listedItems.find((item) => item.skillName === skillName);
     if (!installed?.path) return { status: "blocked", reason: `${agent} could not find its fixture skill in gh skill list` };
-    installedSkillPath = path.resolve(installed.path);
+    installedSkillPaths = [skillName, deliverySkillName, lifecycleSkillName]
+      .map((name) => listedItems.find((item) => item.skillName === name)?.path)
+      .filter(Boolean)
+      .map((installedPath) => path.resolve(installedPath));
 
     const invocation = agent === "claude-code"
       ? spawnSync("claude", [
@@ -152,15 +171,19 @@ function authenticatedInvocation(agent, fixturePath) {
       output: invocation.stdout.trim().replaceAll(/\s+/g, " ").slice(0, 240)
     };
   } finally {
-    if (installedByFixture && installedSkillPath) {
-      fs.rmSync(installedSkillPath, { recursive: true, force: true });
+    if (installedByFixture) {
+      for (const installedSkillPath of installedSkillPaths) {
+        fs.rmSync(installedSkillPath, { recursive: true, force: true });
+      }
     }
   }
 }
 
 try {
   fs.mkdirSync(path.join(source, "skills", "base"), { recursive: true });
-  fs.cpSync(path.join(repoRoot, "skills", "base", skillName), path.join(source, "skills", "base", skillName), { recursive: true });
+  for (const sourceSkill of [skillName, deliverySkillName, lifecycleSkillName]) {
+    fs.cpSync(path.join(repoRoot, "skills", "base", sourceSkill), path.join(source, "skills", "base", sourceSkill), { recursive: true });
+  }
 
   const discoveryOnly = expectSuccess("local-source skill discovery", "gh", ["skill", "install", source, "--from-local"]);
   assert.match(discoveryOnly.stdout, new RegExp(skillName));
@@ -171,6 +194,7 @@ try {
     const installed = listedSkill(agent);
     const installedPath = listedSkillPath(installed);
     assert.equal(fs.existsSync(installedPath), true, `${agent} destination should contain SKILL.md`);
+    verifyDeliveryDependency(agent);
 
     const rerun = run("gh", ["skill", "install", source, "--from-local", "--all", "--agent", agent, "--scope", "user"]);
     assert.notEqual(rerun.status, 0, `${agent} rerun must not silently overwrite an existing skill`);

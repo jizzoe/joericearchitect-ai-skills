@@ -100,5 +100,11 @@ node scripts/sdd/check-adapter-drift.mjs
 Canonical behavior lives in:
 
 - `skills/base/autonomous-goal-runner/`
-- `workflows/autonomous-sdd-lifecycle/`
+- `skills/base/autonomous-sdd-delivery/`
+- `skills/base/autonomous-sdd-lifecycle/`
 - `scripts/sdd/`
+
+`workflows/autonomous-sdd-lifecycle/` is a compatibility entrypoint for
+existing repository links. It contains no canonical lifecycle policy. Global
+installations must include delivery and lifecycle as sibling skills and require
+a new Claude Code or Codex session after refresh.

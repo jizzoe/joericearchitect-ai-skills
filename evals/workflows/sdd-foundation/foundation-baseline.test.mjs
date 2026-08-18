@@ -36,6 +36,8 @@ test("foundation living specs exist for all delivered capabilities", () => {
 test("foundation workflows and canonical skills are exposed to Claude and Codex", () => {
   for (const skill of [
     "autonomous-goal-runner",
+    "autonomous-sdd-delivery",
+    "autonomous-sdd-lifecycle",
     "github-issue-authoring",
     "github-issue-to-openspec",
     "github-pr-linkage",
