@@ -3,6 +3,12 @@ import fs from "node:fs";
 import test from "node:test";
 import { checkAdapterDrift } from "../../../scripts/sdd/check-adapter-drift.mjs";
 
+const root = new URL("../../..", import.meta.url).pathname;
+
+function read(relativePath) {
+  return fs.readFileSync(new URL(`../../../${relativePath}`, import.meta.url), "utf8");
+}
+
 test("lifecycle scenarios cover required gates and outcomes", () => {
   const scenarios = JSON.parse(
     fs.readFileSync(new URL("./scenarios.json", import.meta.url), "utf8")
@@ -35,8 +41,44 @@ test("external mutation fixtures cover boundary failures", () => {
 });
 
 test("Claude and Codex adapters identify canonical sources", () => {
-  const result = checkAdapterDrift(new URL("../../..", import.meta.url).pathname);
+  const result = checkAdapterDrift(root);
   assert.equal(result.valid, true, JSON.stringify(result.issues));
+});
+
+test("canonical lifecycle is distributable and compatibility paths stay thin", () => {
+  const canonicalPath = "skills/base/autonomous-sdd-lifecycle/SKILL.md";
+  const canonical = read(canonicalPath);
+  assert.match(canonical, /^name: autonomous-sdd-lifecycle$/m);
+  assert.match(canonical, /do not use for standalone phase actions or unbounded work/);
+  assert.match(canonical, /skill-result-v1/);
+  assert.match(canonical, /\.\.\/autonomous-goal-runner\/references\/sdd-delivery-request\.md/);
+  assert.match(canonical, /See \[Shared guardrails\]\(\.\.\/_shared\/guardrails\.md\)\./);
+
+  const compatibility = read("workflows/autonomous-sdd-lifecycle/workflow.md");
+  assert.match(compatibility, new RegExp(canonicalPath.replaceAll("/", "\\/")));
+  assert.match(compatibility, /must not duplicate or change lifecycle/);
+  assert.ok(compatibility.length < 700, "compatibility workflow must remain thin");
+
+  for (const reference of ["openspec-actions", "delivery", "recovery", "external-mutations"]) {
+    const text = read(`workflows/autonomous-sdd-lifecycle/references/${reference}.md`);
+    assert.match(text, new RegExp(`skills\\/base\\/autonomous-sdd-lifecycle\\/references\\/${reference}\\.md`));
+    assert.ok(text.length < 300, `${reference} compatibility reference must remain thin`);
+  }
+
+  for (const adapter of [
+    ".agents/skills/autonomous-sdd-lifecycle/SKILL.md",
+    ".claude/skills/autonomous-sdd-lifecycle/SKILL.md"
+  ]) {
+    const text = read(adapter);
+    assert.match(text, new RegExp(canonicalPath.replaceAll("/", "\\/")));
+    assert.ok(text.length < 900, `${adapter} must remain thin`);
+  }
+});
+
+test("delivery uses an installed-layout-safe sibling lifecycle reference", () => {
+  const delivery = read("skills/base/autonomous-sdd-delivery/SKILL.md");
+  assert.match(delivery, /\.\.\/autonomous-sdd-lifecycle\/SKILL\.md/);
+  assert.doesNotMatch(delivery, /\.\.\/\.\.\/\.\.\/workflows\/autonomous-sdd-lifecycle/);
 });
 
 test("zero-touch review fixtures cover objective correction, changed-head rereview, and terminal denial", () => {

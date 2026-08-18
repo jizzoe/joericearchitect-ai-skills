@@ -28,8 +28,10 @@ ordinary bounded behavior. Do not infer targets, persist credentials, bypass
 evidence or independent-review gates, or continue through unavailable runtime
 permissions.
 
-See [the canonical lifecycle](../../../workflows/autonomous-sdd-lifecycle/workflow.md)
-for phase gates and recovery.
+See [the canonical lifecycle](../autonomous-sdd-lifecycle/SKILL.md) for phase
+gates and recovery. A complete global installation must include that sibling
+skill; treat an unresolved target as an incomplete installation and do not
+substitute remembered or copied lifecycle policy.
 
 ## Guardrails
 

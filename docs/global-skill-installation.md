@@ -59,6 +59,12 @@ Run one command for Claude Code, one for Codex, or both. To install one skill,
 replace `--all` with its explicit path, for example
 `skills/base/github-pr-linkage@<release-tag-or-commit-sha>`.
 
+`autonomous-sdd-delivery` requires the sibling
+`autonomous-sdd-lifecycle` package. Use `--all` for the complete autonomous SDD
+flow. A delivery-only installation is incomplete and must pause if its
+`../autonomous-sdd-lifecycle/SKILL.md` reference does not resolve from the
+installed skill directory.
+
 Do not add `--force` as routine maintenance. It overwrites the existing skill.
 Stop and inspect a conflict or user-authored destination before choosing an
 explicit replacement strategy.
@@ -134,6 +140,11 @@ repository's disposable fixture verifies install/list behavior without using a
 real user profile; a release support claim additionally requires invocation in
 an authenticated disposable profile.
 
+For autonomous SDD, confirm both `autonomous-sdd-delivery` and
+`autonomous-sdd-lifecycle` appear in the same agent inventory. Resolve the
+delivery skill's lifecycle link relative to its installed `SKILL.md`; the target
+must be the listed lifecycle `SKILL.md`, not a source-checkout workflow path.
+
 ## Updates and Recovery
 
 For unpinned skills, inspect updates before applying them:
@@ -177,8 +188,11 @@ node evals/skills/global-skill-installation/run-install-utility-fixtures.mjs
 The install/list fixture covers user-scope local-source installation for Claude
 Code and Codex, discovery/listing, no-mutation skill discovery, rerun behavior,
 an existing destination conflict, paths with spaces, and an alternate source
-layout. The utility fixture covers local and remote dry-run rendering with a
-second checkout path. Neither uses global assistant directories or credentials.
+layout. It also proves that autonomous delivery and lifecycle are installed as
+sibling packages and that delivery's canonical dependency resolves inside the
+disposable installed root. The utility fixture covers local and remote dry-run
+rendering with a second checkout path. Neither uses global assistant directories
+or credentials.
 Run the documented per-agent invocation manually from an authenticated
 disposable profile before claiming the tested agent/version pair is supported.
 

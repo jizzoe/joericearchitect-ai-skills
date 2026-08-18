@@ -15,13 +15,18 @@ const REQUIRED_ADAPTERS = [
   },
   {
     adapter: ".claude/skills/autonomous-sdd-lifecycle/SKILL.md",
-    canonical: "workflows/autonomous-sdd-lifecycle/workflow.md",
-    phrases: ["canonical autonomous SDD lifecycle", "must not duplicate"]
+    canonical: "skills/base/autonomous-sdd-lifecycle/SKILL.md",
+    phrases: ["canonical instructions", "must not duplicate"]
   },
   {
     adapter: ".agents/skills/autonomous-sdd-lifecycle/SKILL.md",
-    canonical: "workflows/autonomous-sdd-lifecycle/workflow.md",
-    phrases: ["canonical autonomous SDD lifecycle", "must not duplicate"]
+    canonical: "skills/base/autonomous-sdd-lifecycle/SKILL.md",
+    phrases: ["canonical instructions", "must not duplicate"]
+  },
+  {
+    adapter: "workflows/autonomous-sdd-lifecycle/workflow.md",
+    canonical: "skills/base/autonomous-sdd-lifecycle/SKILL.md",
+    phrases: ["compatibility", "must not duplicate"]
   },
   {
     adapter: ".claude/skills/autonomous-sdd-delivery/SKILL.md",
