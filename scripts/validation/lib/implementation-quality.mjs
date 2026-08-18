@@ -200,10 +200,22 @@ export function sortReviewFindings(findings = []) {
 function validateReviewDetails(result, issues, { standardsSelectionRecord } = {}) {
   const details = result.details;
   const subject = "result.details";
-  const keys = new Set(["reviewedScope", "findings", "coverage", "standardsSelection", "evidenceGaps", "scopeSummary"]);
+  const keys = new Set(["assurance", "worker", "reviewedScope", "findings", "coverage", "standardsSelection", "evidenceGaps", "scopeSummary"]);
   if (!exactKeys(details, keys, subject, issues)) return;
   required(details, [...keys], subject, issues);
   const evidenceById = new Map((result.evidence ?? []).map((item) => [item.id, item]));
+
+  if (details.assurance !== "local-review") issues.push(issue("invalid-local-review-assurance", `${subject}.assurance`, details.assurance));
+  const workerSubject = `${subject}.worker`;
+  const workerKeys = new Set(["executionIdentity", "sameSession", "readOnly", "canMutate", "canApprove"]);
+  if (exactKeys(details.worker, workerKeys, workerSubject, issues)) {
+    required(details.worker, [...workerKeys], workerSubject, issues);
+    if (!nonEmpty(details.worker.executionIdentity)) issues.push(issue("invalid-review-worker-identity", `${workerSubject}.executionIdentity`));
+    if (details.worker.sameSession !== true) issues.push(issue("local-review-worker-not-same-session", `${workerSubject}.sameSession`));
+    if (details.worker.readOnly !== true || details.worker.canMutate !== false || details.worker.canApprove !== false) {
+      issues.push(issue("local-review-worker-boundary-invalid", workerSubject));
+    }
+  }
 
   if (exactKeys(details.reviewedScope, new Set(["targets", "contextPaths", "evidenceIds"]), `${subject}.reviewedScope`, issues)) {
     required(details.reviewedScope, ["targets", "contextPaths", "evidenceIds"], `${subject}.reviewedScope`, issues);

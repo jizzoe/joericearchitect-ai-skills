@@ -45,7 +45,14 @@ targets. Do not include token values or other secrets in authorization text.
 5. Run tests, OpenSpec validation, review, security, portability, attribution,
    and recovery checks before marking tasks complete.
 6. Correct objective failures within the correction budget.
-7. For `production-rapid`, obtain independent review after Apply and after
+   For autonomous prototype delivery, signatures are canonical and bounded per
+   stable failure; distinct signatures may continue within the run bound.
+7. For `prototype-rapid` with `reviewPolicy: same-session-local`, run a bounded
+   same-session worker as read-only `local-review` evidence, route objective
+   findings back to the controller, rerun affected checks, and request fresh
+   review without routine transition prompts. This evidence is not independent
+   or production assurance.
+8. For `production-rapid`, obtain independent review after Apply and after
    every objective fix from a configured, non-interactive, isolated read-only
    reviewer. Give it only immutable full base/head object IDs, the complete diff, relevant
    OpenSpec artifacts, and current validation evidence. Record reviewer
@@ -59,9 +66,15 @@ targets. Do not include token values or other secrets in authorization text.
    durable review IDs as a conflict. Require reviewer identity/type and
    isolation/read-only capability from configured adapter attestation, then
    resolve supplied lowercase full object IDs as canonical commits.
-8. Pause for material decisions, credential changes, destructive actions,
+9. Pause for material decisions, credential changes, destructive actions,
    unexpected external targets, durable-state conflicts, or persistent
    environment failures.
+
+Before autonomous issue publication, durably bind the exact reviewed
+create-or-reuse payload, digest, target, labels, managed block, expiry, and
+recovery rule. A matching binding prevents a repeat skill-level prompt when
+host permission is present; it cannot override authentication, connector,
+network, sandbox, or host-policy denial.
 
 ## Recovery
 

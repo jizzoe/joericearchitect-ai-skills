@@ -50,6 +50,23 @@ role-specific evidence gaps in the verification result.
 8. Invalidate stale evidence, rerun affected checks and local review, then emit
    readiness or recovery state.
 
+For exact `autonomous` plus `prototype-rapid` input, resolve
+`reviewPolicy: same-session-local` and keep this sequence continuous. A failed
+focused check or `local-review` `objective-fix` finding becomes correction work:
+derive its canonical signature, diagnose it from current evidence, pass the
+operation checker, apply one bounded behavior-preserving correction, rerun every
+affected check, and request a fresh read-only local-review worker result. Do not
+pause for a routine Plan-to-Apply, correction, rereview, or
+Verified-to-Close confirmation. Distinct canonical signatures may exceed three
+aggregate corrections while each signature remains inside its budget and the
+run remains current.
+
+Still pause on a material decision, unavailable authority, host runtime denial,
+unsafe or destructive operation, expired authorization, exhausted canonical
+signature, invalid durable state, or persistent external failure. Preserve the
+exact first incomplete action and recovery evidence; never convert one of these
+stops into a local-review success.
+
 Do not skip or relabel a failed required check. Pause for a behavior,
 architecture, compatibility, security, licensing, governance, data-ownership,
 or scope decision. A changed head or workspace binding invalidates prior bound
@@ -91,6 +108,13 @@ readiness; an exhausted failed signature requires blocked status and recovery.
 Historical attempts retain evidence bound to their recorded workspace or head;
 only the latest passed attempt for each signature must bind to current rerun
 evidence for readiness.
+
+For terminal autonomous-prototype assessment, use the implementation-quality
+completion-convergence evaluator. Every required quality action and completion
+predicate must be `passed`, evidence-backed, and bound to the same final target,
+package digest, workspace, and head. Failed, missing, stale, mismatched,
+skipped-required, attempted-only, or unresolved-objective state is not
+completion.
 
 Validate with `scripts/validation/validate-implementation-quality.mjs`. Supply
 a validation-context JSON file as its second argument. The context carries the

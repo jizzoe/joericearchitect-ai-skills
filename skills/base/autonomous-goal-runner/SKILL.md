@@ -46,8 +46,14 @@ not select work or mutate local or external state first.
 4. Run applicable tests, validation, review, security, attribution,
    portability, requirements mapping, and recovery checks before marking work
    complete.
-5. Correct objective, behavior-preserving failures automatically. Stop after
-   three materially different corrections for the same failure signature.
+5. Correct objective, behavior-preserving failures automatically. Derive the
+   canonical signature from the command or gate, normalized error class,
+   repository-relative artifact or exact target, lifecycle transition, and task
+   batch. Ignore timestamps, temporary identifiers, and superficial wording.
+   Stop after three materially different corrections for the same signature;
+   permit additional aggregate corrections only for distinct signatures inside
+   the overall run bound, and record repeated strategy without new diagnostic
+   evidence as stagnation.
 6. Derive resume state from durable sources such as Git, issue or Project
    state, pull requests, specifications, tasks, archives, and verification
    evidence. Do not trust transient logs over durable records.
@@ -71,6 +77,20 @@ not select work or mutate local or external state first.
    severity objective finding autonomously only when the fix is scoped,
    behavior-preserving, evidence-backed, and inside the correction budget.
    GitHub review publication is optional and cannot replace this gate.
+10. For exact `autonomous` plus `prototype-rapid`, use `reviewPolicy:
+    same-session-local`. Keep focused checks, critical-flow checks, requirements
+    mapping, bounded read-only `local-review`, OpenSpec Verify, strict validation,
+    lifecycle reconciliation, and final evidence convergence as required quality
+    work. Continue across routine Plan-to-Apply and Verified-to-Close boundaries
+    without asking again. A local review is never independent or production
+    assurance.
+11. Before autonomous issue publication, persist the exact reviewed
+    create-or-reuse binding: selected entry, configured repository, title,
+    labels, managed block, canonical payload digest, operation, expiry,
+    ownership, and recovery reference. When the current payload matches and the
+    host runtime already permits the operation, consume the binding without a
+    second skill-level prompt. Payload drift, expiry, or host denial fails closed
+    with durable recovery state; never infer runtime permission from the grant.
 
 ## Progressive References
 

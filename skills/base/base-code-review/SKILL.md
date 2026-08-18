@@ -33,6 +33,15 @@ Verify, or independent review passed. A caller may separately authorize a
 bounded local implementation correction; that is a different operation and
 requires new focused evidence and review.
 
+For an autonomous `prototype-rapid` loop, run as a bounded same-session review
+worker. Receive only the current changed paths, applicable requirements, and
+named evidence selected by the verification loop. Label the result
+`assurance: local-review`, record a non-sensitive execution identity, and keep
+`sameSession: true`, `readOnly: true`, `canMutate: false`, and
+`canApprove: false`. This worker is neither isolated nor independent and cannot
+satisfy a production independent-review gate. Return `objective-fix` findings
+to the implementing controller; the worker never applies them.
+
 Review only the supplied scope against relevant requirements and conventions.
 Cover applicable behavior, regression and edge cases, tests and eval quality,
 input and error handling, data integrity and recovery, secrets and sensitive
@@ -60,9 +69,10 @@ security, licensing, governance, data-ownership, or scope choices are
 
 ## Result
 
-Emit `skill-result-v1` with `skill: base-code-review`. Put reviewed scope,
-ordered findings, coverage, `standardsSelection`, evidence gaps, and scope
-summary in `details`; `standardsSelection` carries selected rule IDs, scoped
+Emit `skill-result-v1` with `skill: base-code-review`. Put `assurance:
+local-review`, the read-only same-session worker record, reviewed scope, ordered
+findings, coverage, `standardsSelection`, evidence gaps, and scope summary in
+`details`; `standardsSelection` carries selected rule IDs, scoped
 overrides, and not-applicable rule IDs (or empty arrays when not requested).
 Reference the shared top-level evidence array by stable ID. Validate the result
 with `scripts/validation/validate-implementation-quality.mjs` before rendering
@@ -71,6 +81,9 @@ as `standardsSelectionRecord` in the validation context; the validator rejects
 rule IDs, override scopes, and not-applicable classifications that do not match
 the validated record. The report order is findings, evidence gaps, scope,
 summary, then next action.
+
+After any affected implementation change, discard the prior worker conclusion
+and run a fresh bounded local review against the new workspace or head binding.
 
 On sensitive content, unexpected scope, destructive or external mutation,
 material decision, ambiguous state, or exhausted correction budget, preserve

@@ -98,6 +98,15 @@ heavier setup is deferred; strict review is unaffected.
 
 ## Starting a Bounded Run
 
+For `ship-sdd <change> prototype [duration]`, newly resolved requests use
+`reviewPolicy: same-session-local`. The same implementation session may invoke
+a bounded read-only review worker, but the result must be labeled
+`local-review` and never described as independent, isolated, strict, or
+production assurance. Objective findings continue through correction,
+affected-check rerun, and fresh local review without a routine owner retrigger.
+Material decisions, denied permission, unsafe operations, expiration, exhausted
+signatures, and stale or conflicting durable state still stop the run.
+
 ### Codex
 
 1. Start a Codex Goal with `/goal`.

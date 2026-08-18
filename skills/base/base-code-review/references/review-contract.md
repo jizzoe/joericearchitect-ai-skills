@@ -33,6 +33,10 @@ defect but still blocks the selected profile until correction and rereview.
 
 `details` contains only:
 
+- `assurance`: exactly `local-review`; this label is never independent,
+  isolated, strict, production, approval, CI, test, or OpenSpec Verify evidence;
+- `worker`: non-sensitive execution identity plus `sameSession: true`,
+  `readOnly: true`, `canMutate: false`, and `canApprove: false`;
 - `reviewedScope`: workspace-relative `targets`, `contextPaths`, and shared
   `evidenceIds`;
 - `findings`: stable ID, severity, disposition, workspace-relative subject,

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "objective-correction-converges",
+      "ownerActions": [],
+      "mode": "autonomous",
+      "profile": "prototype-rapid",
+      "reviewPolicy": "same-session-local",
+      "steps": [
+        { "kind": "focused-check", "status": "failed", "failureSignature": "correction-v2/focused-tests/assertion-failure/artifact:src%2Fwidget.mjs/apply/batch-3" },
+        { "kind": "objective-correction", "status": "passed", "signatureAttempt": 1 },
+        { "kind": "focused-check", "status": "passed" },
+        { "kind": "local-review", "assurance": "local-review", "readOnly": true, "status": "passed" },
+        { "kind": "completion-convergence", "status": "passed", "binding": "final-target-package-workspace-head" }
+      ]
+    },
+    { "id": "material-decision-stops", "stop": "material-decision", "preservesRecovery": true },
+    { "id": "runtime-permission-denial-stops", "stop": "runtime-permission-gap", "preservesRecovery": true },
+    { "id": "unsafe-action-stops", "stop": "unsafe-or-destructive-action", "preservesRecovery": true },
+    { "id": "expired-authorization-stops", "stop": "expired-authorization", "preservesRecovery": true },
+    { "id": "stale-final-evidence-stops", "stop": "stale-evidence", "preservesRecovery": true }
+  ]
+}

@@ -185,6 +185,10 @@ test("review validator rejects malformed, duplicate, unsafe, unsupported, and mi
     ["unsupported severity", (value) => { value.details.findings[0].severity = "critical"; }, "invalid-finding-severity"],
     ["unsafe standards override scope", (value) => { value.details.standardsSelection.scopedOverrides = [{ ruleId: "repository-style", scope: "../outside" }]; }, "unsafe-workspace-path"],
     ["unknown details key", (value) => { value.details.extra = true; }, "unknown-key"],
+    ["false independent assurance", (value) => { value.details.assurance = "strict-isolated"; }, "invalid-local-review-assurance"],
+    ["mutable worker", (value) => { value.details.worker.canMutate = true; }, "local-review-worker-boundary-invalid"],
+    ["approving worker", (value) => { value.details.worker.canApprove = true; }, "local-review-worker-boundary-invalid"],
+    ["not same session", (value) => { value.details.worker.sameSession = false; }, "local-review-worker-not-same-session"],
     ["sensitive details", (value) => { value.details.scopeSummary = ["ghp_", "A".repeat(20)].join(""); }, "sensitive-value"],
     ["personal data field", (value) => { value.details.pii = "synthetic@example.invalid"; }, "sensitive-key"]
   ];
@@ -894,6 +898,8 @@ test("canonical skills expose read-only, correction, strict-review, recovery, an
   assert.match(review, /Do not refactor, apply a\s+finding, approve delivery/s);
   assert.match(review, /blocker.*high.*medium.*low/s);
   assert.match(review, /objective-fix.*human-decision.*warning.*false-positive/s);
+  assert.match(review, /assurance: local-review/);
+  assert.match(review, /cannot\s+satisfy.*production.*independent-review/s);
 
   const verification = fs.readFileSync(path.join(root, "skills/base/base-verification-loop/SKILL.md"), "utf8");
   assert.match(verification, /local-implementation/);

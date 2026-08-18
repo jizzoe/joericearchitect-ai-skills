@@ -15,8 +15,8 @@ stopping conditions.
 
 For the concise named-delivery form, first apply
 `../autonomous-goal-runner/references/sdd-delivery-request.md`. Resolve the
-target, mode, quality profile, authorization profile, independent-review
-policy, and expiration before step 1. If any are missing, invalid, or
+target, mode, quality profile, authorization profile, review policy, and
+expiration before step 1. If any are missing, invalid, or
 conflicting, ask once for every affected value with a short meaning and the
 published choices, and perform no selection or mutation.
 
@@ -37,6 +37,12 @@ published choices, and perform no selection or mutation.
    each non-primary implementation, Sync, or Archive worktree or branch,
    durably register its exact identity, role, head, ownership token, and
    recovery reference.
+   For autonomous prototype intake, persist the exact reviewed issue binding
+   with `persistControllerIssueIntake` before publication and bind the returned
+   issue evidence with `persistControllerIssueIntakeEvidence`. If the payload,
+   selected entry, repository, digest, or expiry conflicts on resume, pause
+   before mutation. A current exact binding plus host runtime permission removes
+   the second skill-level publication prompt; it does not override the host.
 4. Run OpenSpec Explore or Propose only when required by the first incomplete
    evidenced controller checkpoint. Generated phases retain their ordinary
    boundary without a valid controller context; a valid context returns control
@@ -49,6 +55,10 @@ published choices, and perform no selection or mutation.
    OpenSpec validation where applicable, documentation review, security and
    supply-chain review, requirements mapping, portability review, attribution
    review, and recovery review.
+   Under exact `autonomous` plus `prototype-rapid`, planning review may flow
+   directly into Apply and verified evidence may flow toward closure without a
+   routine Plan-to-Apply or Verified-to-Close prompt. These are continuation
+   rules inside the active grant, not omitted quality gates.
 7. After current Apply evidence and every behavior-preserving objective fix,
    invoke `../independent-review/` for `production-rapid`. Preserve its sealed
    v1 package, normalized result, and dispositions in the exact durable
@@ -71,6 +81,14 @@ published choices, and perform no selection or mutation.
    execution receipt and the inner Codex read-only or Claude read/search-only
    boundary. Treat the degraded launch evidence and executable identity as
    best-effort rather than security-verifiable.
+   For `prototype-rapid` with `reviewPolicy: same-session-local`, use the
+   bounded `base-code-review` worker instead. Preserve `assurance:
+   local-review`, route an `objective-fix` back to the implementing controller,
+   rerun affected checks, and request a fresh local review without owner
+   retrigger. Stop on a material decision, unavailable authority, permission
+   denial, unsafe action, expiry, exhausted signature, stale conflict, or
+   unrepairable external failure. Never pass local-review evidence to the
+   production independent-review gate.
 8. Run formal Verify after every task has current evidence.
 9. Deliver through a pull request only when the delivery gate passes and the
    active authorization permits the mutation. Bind that resource's exact topic
@@ -120,7 +138,11 @@ attempted command, or one completed phase.
 ## Completion Rule
 
 Completion requires current durable evidence for the selected transition and
-all prior required gates.
+all prior required gates. For an autonomous prototype, evaluate every required
+quality action and terminal evidence predicate against one final target,
+package digest, workspace, and head. An attempted command, stale earlier head,
+skipped required action, unresolved objective finding, or unreconciled issue,
+Project, Archive, cleanup, or residual state prevents completion.
 
 ## Guardrails
 

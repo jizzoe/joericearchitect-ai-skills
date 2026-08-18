@@ -1,9 +1,10 @@
 # Autonomous Prototype Frictionless Quality Loop
 
 Date: 2026-08-18
-Status: Owner-confirmed, Propose-ready design brief. This brief is planning
-input; it does not create an OpenSpec change, authorize Apply, or change the
-currently implemented `prototype-rapid` behavior.
+Status: Owner-confirmed; active implementation is governed by OpenSpec change
+`autonomous-prototype-frictionless-quality-loop`. The approval evidence remains
+the decision source; implementation and delivery evidence live with the linked
+change.
 
 Portfolio role: this is the interim low-friction prototype profile within the
 [SDD execution-mode standard](../standards-and-best-practices/sdd-execution-modes-and-gates.md).
@@ -13,7 +14,7 @@ define another controller or weaken the future production assurance model.
 
 ## 1. Problem and desired outcome
 
-The current `prototype-rapid` shorthand resolves to strict-first-degraded
+Before this delivery, the `prototype-rapid` shorthand resolved to strict-first-degraded
 independent review, carries lifecycle approval pauses, and stops after a fixed
 correction signature exhausts its budget. The narrower
 [same-session review brief](prototype-rapid-same-session-review.md) removes the
@@ -298,38 +299,30 @@ Acceptance evidence must prove:
   run/evidence/outcome/status vocabulary and treat later migration as a
   versioned compatibility change rather than creating a parallel controller.
 
-## 6. Open questions and blocking decisions
+## 6. Resolved implementation decisions
 
-No product decision blocks Propose. The following are implementation design
-details that Propose must make explicit without changing the selected behavior:
-
-- Select final schema names for blocking human approvals, required quality
-  actions, and completion-evidence predicates. The semantic separation is
-  fixed even if the field names differ.
-- Decide whether the existing `independentReviewPolicy` field temporarily
-  accepts `same-session-agent` or a versioned request schema introduces the
-  more accurate `reviewPolicy` name immediately.
-- Define the deterministic canonical-signature and stagnation fixtures using
-  the existing correction-chain owner; do not introduce a second retry ledger.
-- Define the migration trigger from this interim profile to the completed
-  runtime kernel and fully implemented production profile. Migration must not
-  silently upgrade, downgrade, or reinterpret an already admitted run.
+- Request schema v2 uses `reviewPolicy`; the legacy
+  `independentReviewPolicy` input is accepted only for consistent independent
+  policies. Newly resolved autonomous prototypes use `same-session-local`.
+- Effective authorization uses `blockingApprovalGates`,
+  `requiredQualityActions`, and `completionEvidencePredicates`; `qualityGates`
+  remains a derived compatibility projection.
+- The existing correction-chain owner derives canonical signatures and
+  stagnation evidence; no second retry ledger was introduced.
+- Existing admitted runs retain their stored schema, policy, and authorization
+  digest. A future runtime-kernel migration must remain versioned and cannot
+  silently reinterpret them.
 
 Any proposal that removes completion evidence, expands the correction budget
 for one stable signature, changes owner-checkpointed or production behavior, or
 creates another controller must return to the owner.
 
-## 7. Recommended next step
+## 7. Delivery disposition
 
-Owner-confirmed recommendation: Propose
-simplify-autonomous-prototype-quality-loop as an interim bounded-autonomous
-prototype profile that removes routine human pauses, continuously corrects
-objective failures, requires final completion evidence, preserves the standard
-per-signature safety bound, and leaves owner-checkpointed and production-rapid
-behavior unchanged.
-
-The proposal should treat
+The owner-confirmed recommendation was accepted as the interim
+bounded-autonomous prototype profile. The linked OpenSpec change carries the
+frictionless quality loop, exact issue-intake binding, per-signature correction
+model, final convergence checks, explicit `local-review` assurance, and
+unchanged owner-checkpointed and production boundaries. The earlier
 [prototype-rapid-same-session-review.md](prototype-rapid-same-session-review.md)
-as partially superseded after acceptance and should align with the execution
-standard, Goal prerequisites, and local-first runtime direction. The next
-workflow action is OpenSpec Propose. No OpenSpec artifacts were created.
+is partially superseded for newly resolved autonomous prototype requests.
