@@ -125,6 +125,32 @@ export function rankDesignBriefCandidates(candidates, { changeName, issueNumber 
     .map(({ path: candidatePath, exact, shared }) => ({ path: candidatePath, exactMatch: exact === 1, sharedTerms: shared }));
 }
 
+export function discoverDesignBriefCandidates({ workspacePath, changeName, issueNumber, briefRoot = "ai-planning/design-briefs" } = {}) {
+  if (typeof workspacePath !== "string" || !isRelative(briefRoot) || !changeNamePattern.test(changeName ?? "")) return [];
+  try {
+    const workspace = fs.realpathSync(workspacePath);
+    const root = fs.realpathSync(path.resolve(workspace, briefRoot));
+    if (!isWithin(workspace, root) || !fs.statSync(root).isDirectory()) return [];
+    const candidates = [];
+    const visit = (directory) => {
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const candidate = path.join(directory, entry.name);
+        if (entry.isDirectory()) visit(candidate);
+        else if (entry.isFile() && entry.name.endsWith(".md")) {
+          const resolved = fs.realpathSync(candidate);
+          if (isWithin(root, resolved) && isWithin(workspace, resolved)) {
+            candidates.push({ path: path.relative(workspace, resolved).split(path.sep).join("/"), content: fs.readFileSync(resolved, "utf8"), mtimeMs: fs.statSync(resolved).mtimeMs });
+          }
+        }
+      }
+    };
+    visit(root);
+    return rankDesignBriefCandidates(candidates, { changeName, issueNumber });
+  } catch {
+    return [];
+  }
+}
+
 export function classifyLifecycleResource(resource = {}) {
   if (resource.aliasOf) return { classification: "duplicate-ref-alias", recovery: "retain the alias until a separate exact ownership decision" };
   const delivered = resource.deliveryEvidence === true && resource.archiveEvidence === true && resource.specEvidence === true;

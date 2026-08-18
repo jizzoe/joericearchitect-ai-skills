@@ -40,6 +40,11 @@ provenance conflict. The implementation now compares immutable source,
 selection, and change fields while preserving the original copy timestamp; its
 fresh focused test passes.
 
+Formal verification also found that supplied-candidate ranking did not itself
+enumerate the configured brief directory. The final implementation adds bounded
+regular-Markdown discovery below that root, and this fresh same-session review
+confirmed its path containment and focused fixture coverage.
+
 ## Coverage and limits
 
 The review covered path containment, atomic capture/retry, candidate ordering,

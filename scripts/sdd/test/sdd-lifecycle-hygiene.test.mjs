@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { buildLifecycleReconciliationReport, captureDesignBrief, classifyLifecycleResource, rankDesignBriefCandidates, validateDesignBriefSource } from "../sdd-lifecycle-hygiene.mjs";
+import { buildLifecycleReconciliationReport, captureDesignBrief, classifyLifecycleResource, discoverDesignBriefCandidates, rankDesignBriefCandidates, validateDesignBriefSource } from "../sdd-lifecycle-hygiene.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const changeName = "improve-sdd-lifecycle-hygiene-and-brief-provenance";
@@ -44,6 +44,15 @@ test("candidate discovery is deterministic and does not select a brief", () => {
   assert.equal(ranked[0].path, "ai-planning/design-briefs/exact.md");
   assert.ok(ranked.length <= 3);
 });
+
+test("candidate discovery reads only regular Markdown briefs below the configured workspace root", () => fixture((root) => {
+  const briefRoot = path.join(root, "ai-planning/design-briefs");
+  fs.mkdirSync(briefRoot, { recursive: true });
+  fs.writeFileSync(path.join(briefRoot, "matched.md"), "improve-sdd-lifecycle #130");
+  fs.writeFileSync(path.join(briefRoot, "ignored.txt"), "improve-sdd-lifecycle #130");
+  const candidates = discoverDesignBriefCandidates({ workspacePath: root, changeName: "improve-sdd-lifecycle", issueNumber: 130 });
+  assert.deepEqual(candidates.map(({ path: candidatePath }) => candidatePath), ["ai-planning/design-briefs/matched.md"]);
+}));
 
 test("reconciliation uses delivery evidence before ancestry and protects dirty resources", () => {
   assert.equal(classifyLifecycleResource({ deliveryEvidence: true, archiveEvidence: true, specEvidence: true, clean: true, registered: true, primary: false, locked: false, divergent: true }).classification, "delivered-and-safe-to-retire");
