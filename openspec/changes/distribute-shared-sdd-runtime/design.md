@@ -7,11 +7,11 @@ source tree provides Node-based SDD, validation, and GitHub helper modules with
 relative imports between them; copying a few reported files cannot work.
 
 Sixteen canonical skill packages reference seventeen shared helper modules.
-Eleven of those modules are command-line programs. Six —
-`autonomous-sdd-controller.mjs`, `independent-review-contract.mjs`,
-`platform-review-adapters.mjs`, `research-planning-skill-runtime.mjs`,
-`sdd-lifecycle-hygiene.mjs`, and `sdd-workspace-cleanup.mjs` — export
-functions with no executable entrypoint,
+Ten of those modules are command-line programs. Seven —
+`autonomous-sdd-controller.mjs`, `check-operation-authorization.mjs`,
+`independent-review-contract.mjs`, `platform-review-adapters.mjs`,
+`research-planning-skill-runtime.mjs`, `sdd-lifecycle-hygiene.mjs`, and
+`sdd-workspace-cleanup.mjs` — cannot be dispatched as programs,
 and skills currently reference them for import by assistant-authored code. Two
 modules also read repository data outside `scripts/`:
 `validate-openspec-artifacts.mjs` loads `quality/openspec-artifact-rules.json`
@@ -109,13 +109,15 @@ name (and verb) through the manifest registry, validates the explicit target,
 and starts the declared module. Skill instructions migrate from
 `scripts/sdd/<file>.mjs` to this launcher contract.
 
-The six library-only modules gain executable entrypoints so they are
-dispatchable:
+The seven non-dispatchable modules gain executable entrypoints:
 
-- `independent-review-contract`, `research-planning-skill-runtime`,
-  `sdd-lifecycle-hygiene`, and `sdd-workspace-cleanup` are pure functions over
-  a payload. Each gains a uniform `--input <file>` / `--stdin` wrapper that
-  reads a JSON payload and writes a JSON result to stdout.
+- `check-operation-authorization`, `independent-review-contract`,
+  `research-planning-skill-runtime`, `sdd-lifecycle-hygiene`, and
+  `sdd-workspace-cleanup` are pure functions over a payload. Each gains a
+  uniform `--input <file>` / `--stdin` wrapper that reads a JSON payload and
+  writes a JSON result to stdout. `check-operation-authorization.mjs` has a
+  main guard, but it only prints that the module is imported and exits 2, so it
+  is not dispatchable today.
 - `platform-review-adapters` exposes many operations and spawns a reviewer
   process, and `autonomous-sdd-controller` exposes many operations over a
   persistent record. Both gain explicit subcommands enumerated in the manifest.

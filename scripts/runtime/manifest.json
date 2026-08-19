@@ -1,0 +1,267 @@
+{
+  "schemaVersion": 1,
+  "contractVersion": 1,
+  "sourceRoots": [
+    "scripts/sdd",
+    "scripts/github",
+    "scripts/validation",
+    "scripts/skills",
+    "scripts/runtime"
+  ],
+  "assetRoots": [
+    "quality",
+    "skills/base"
+  ],
+  "excludedDirectories": [
+    "test",
+    "fixtures"
+  ],
+  "entrypoints": [
+    {
+      "name": "check-operation-authorization",
+      "module": "scripts/runtime/bin/check-operation-authorization.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": [
+          "--help"
+        ],
+        "exitCodes": [
+          0
+        ]
+      },
+      "payloadWrapper": "scripts/sdd/check-operation-authorization.mjs"
+    },
+    {
+      "name": "resolve-sdd-delivery-request",
+      "module": "scripts/sdd/resolve-sdd-delivery-request.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "review-launcher-recovery",
+      "module": "scripts/sdd/review-launcher-recovery.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "validate-implementation-quality",
+      "module": "scripts/validation/validate-implementation-quality.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "validate-pr-contract",
+      "module": "scripts/validation/validate-pr-contract.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "validate-openspec-linkage",
+      "module": "scripts/validation/validate-openspec-linkage.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "validate-openspec-artifacts",
+      "module": "scripts/validation/validate-openspec-artifacts.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      },
+      "readsAssetRoots": [
+        "quality"
+      ]
+    },
+    {
+      "name": "validate-shared-guardrails",
+      "module": "scripts/validation/validate-shared-guardrails.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      },
+      "readsAssetRoots": [
+        "skills/base"
+      ]
+    },
+    {
+      "name": "validate-skill-metadata",
+      "module": "scripts/validation/validate-skill-metadata.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      },
+      "readsAssetRoots": [
+        "skills/base"
+      ]
+    },
+    {
+      "name": "validate-tracking",
+      "module": "scripts/validation/validate-tracking.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "create-or-find-issue",
+      "module": "scripts/github/create-or-find-issue.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "dependency-report",
+      "module": "scripts/github/dependency-report.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "project-status",
+      "module": "scripts/github/project-status.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "select-next-work",
+      "module": "scripts/github/select-next-work.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "reconcile-pr-project-status",
+      "module": "scripts/github/reconcile-pr-project-status.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "install-global-skill",
+      "module": "scripts/skills/install-global-skill.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": []
+      }
+    },
+    {
+      "name": "independent-review-contract",
+      "module": "scripts/runtime/bin/independent-review-contract.mjs",
+      "invocation": "cli",
+      "payloadWrapper": "scripts/sdd/independent-review-contract.mjs",
+      "smoke": {
+        "args": [
+          "--help"
+        ],
+        "exitCodes": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "research-planning-skill-runtime",
+      "module": "scripts/runtime/bin/research-planning-skill-runtime.mjs",
+      "invocation": "cli",
+      "payloadWrapper": "scripts/sdd/research-planning-skill-runtime.mjs",
+      "smoke": {
+        "args": [
+          "--help"
+        ],
+        "exitCodes": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "sdd-lifecycle-hygiene",
+      "module": "scripts/runtime/bin/sdd-lifecycle-hygiene.mjs",
+      "invocation": "cli",
+      "payloadWrapper": "scripts/sdd/sdd-lifecycle-hygiene.mjs",
+      "smoke": {
+        "args": [
+          "--help"
+        ],
+        "exitCodes": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "sdd-workspace-cleanup",
+      "module": "scripts/runtime/bin/sdd-workspace-cleanup.mjs",
+      "invocation": "cli",
+      "payloadWrapper": "scripts/sdd/sdd-workspace-cleanup.mjs",
+      "smoke": {
+        "args": [
+          "--help"
+        ],
+        "exitCodes": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "platform-review-adapters",
+      "module": "scripts/runtime/bin/platform-review-adapters.mjs",
+      "invocation": "subcommand",
+      "verbs": [
+        "build-codex-parent-strict-review-tool-request",
+        "consume-codex-parent-strict-review-tool-result",
+        "write-prepared-review-host-request",
+        "build-codex-parent-review-host-tool-request",
+        "consume-codex-parent-review-host-tool-result",
+        "probe-codex-review-adapter",
+        "probe-claude-review-adapter",
+        "degraded-capability-ledger"
+      ],
+      "smoke": {
+        "args": [
+          "--help"
+        ],
+        "exitCodes": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "autonomous-sdd-controller",
+      "module": "scripts/runtime/bin/autonomous-sdd-controller.mjs",
+      "invocation": "subcommand",
+      "verbs": [
+        "create-controller-record",
+        "inspect-controller-record",
+        "advance-controller-record",
+        "register-controller-lifecycle-resource",
+        "persist-controller-issue-intake",
+        "persist-controller-issue-intake-evidence",
+        "bind-controller-lifecycle-delivery",
+        "persist-controller-cleanup-receipt",
+        "execute-controller-lifecycle-cleanup"
+      ],
+      "smoke": {
+        "args": [
+          "--help"
+        ],
+        "exitCodes": [
+          0
+        ]
+      }
+    }
+  ]
+}

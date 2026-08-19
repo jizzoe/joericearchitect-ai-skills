@@ -33,11 +33,11 @@ scenarios, each in WHEN/THEN form, and each maps to at least one task:
 | Version ordering and offline rollback | 3.3, 3.6 |
 | Installed-runtime completeness evidence | 5.1, 5.2 |
 
-## Objective finding: helper inventory undercounts library-only modules
+## Objective finding: helper inventory undercounts non-dispatchable modules
 
 `proposal.md`, `design.md`, and task 2.2 state that **five** helper modules
 export functions with no executable entrypoint. A direct inventory of the
-seventeen modules referenced by canonical skills finds **six**:
+seventeen modules referenced by canonical skills finds **seven**:
 
 - `scripts/sdd/independent-review-contract.mjs`
 - `scripts/sdd/platform-review-adapters.mjs`
@@ -45,19 +45,27 @@ seventeen modules referenced by canonical skills finds **six**:
 - `scripts/sdd/sdd-lifecycle-hygiene.mjs`
 - `scripts/sdd/sdd-workspace-cleanup.mjs`
 - `scripts/sdd/autonomous-sdd-controller.mjs`
+- `scripts/sdd/check-operation-authorization.mjs`
 
 `autonomous-sdd-controller.mjs` carries a `#!/usr/bin/env node` shebang, which
 is what the original count appears to have keyed on, but it never reads
-`process.argv` and exposes no command behavior. It is referenced by
-`skills/base/autonomous-sdd-delivery/SKILL.md`, so under the delta requirement
-"Every declared helper is dispatchable through one contract" it must gain an
-executable entrypoint like the other five.
+`process.argv` and exposes no command behavior.
 
-**Disposition:** implement six entrypoints and correct the counts in
-`proposal.md`, `design.md`, and `tasks.md`. The controller exposes many
-distinct operations over a persistent record, so it takes the enumerated
-`subcommand` shape rather than the single-payload wrapper, matching
-`platform-review-adapters`.
+`check-operation-authorization.mjs` was found during launcher testing. It has a
+main guard, but that guard only prints "This module is imported by
+deterministic validators and tests" and exits 2. It is the most referenced
+helper in the catalog — five canonical skills name it — and it is the
+authorization authority the launcher deliberately does not duplicate, so an
+installed skill that cannot dispatch it cannot check authorization at all.
+
+Both are referenced by canonical skills, so under the delta requirement "Every
+declared helper is dispatchable through one contract" both must gain an
+executable entrypoint.
+
+**Disposition:** implement seven entrypoints and correct the counts in
+`proposal.md`, `design.md`, and `tasks.md`. The controller and the review
+adapters expose many distinct operations, so they take the enumerated
+`subcommand` shape; the other five take the single-payload wrapper.
 
 ## Dependencies, security, recovery, portability
 

@@ -7,7 +7,7 @@ repository-level `scripts/` runtime. The result is a misleading successful
 installation that later pauses on missing executables, preventing portable
 Claude and Codex autonomous SDD work.
 
-Six of those seventeen modules export functions with no executable entrypoint,
+Seven of those seventeen modules are not dispatchable as programs,
 and two read repository data outside `scripts/`, so a complete distribution
 must package assets and add dispatchable entrypoints rather than only copying
 executable roots.
@@ -24,8 +24,8 @@ must create or reuse the configured issue record before delivery work begins.
   canonical repository `scripts/` sources and the declared asset roots the
   helpers read, verifies its full local dependency closure by static analysis
   and staged smoke invocation, and emits a version/digest receipt.
-- Add executable entrypoints for the six library-only helper modules: a
-  uniform JSON payload wrapper for four of them and declared subcommands for
+- Add executable entrypoints for the seven non-dispatchable helper modules: a
+  uniform JSON payload wrapper for five of them and declared subcommands for
   `platform-review-adapters` and `autonomous-sdd-controller`.
 - Add a portable runtime resolver/launcher that verifies the active runtime and
   its declared contract version before dispatching a named helper against an

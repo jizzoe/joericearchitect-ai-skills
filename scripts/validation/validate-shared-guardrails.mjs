@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { requireAssetRoot } from "../runtime/asset-root.mjs";
+
 const sharedRelativePath = "../_shared/guardrails.md";
 const allowedLine = /^See \[[^\]]+\]\(\.\.\/_shared\/guardrails\.md\)\.$/;
 
@@ -51,7 +53,16 @@ export function validateSharedGuardrails(skillsRoot) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const root = path.resolve(process.argv[2] ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../skills/base"));
+  // No argument keeps working for in-repo and CI invocation; an installed
+  // runtime resolves the packaged asset root through RUNTIME_HOME. Either way an
+  // unresolved root fails closed rather than validating an empty set.
+  const root = process.argv[2]
+    ? path.resolve(process.argv[2])
+    : requireAssetRoot("skills/base", import.meta.url);
+  if (!fs.existsSync(root)) {
+    console.error(`asset-root-unresolved: skills/base (resolved ${root})`);
+    process.exit(1);
+  }
   const result = validateSharedGuardrails(root);
   if (result.valid) console.log(`Shared guardrail validation passed: ${root}`);
   else for (const item of result.issues) console.error(`${item.code} ${item.path}${item.detail ? `: ${item.detail}` : ""}`);
