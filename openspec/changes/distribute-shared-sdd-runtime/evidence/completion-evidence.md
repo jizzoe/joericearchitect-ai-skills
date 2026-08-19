@@ -61,24 +61,48 @@ run against an authenticated disposable profile.
 ## Unavailable prerequisites
 
 - **PowerShell**: `pwsh` is absent on the delivery host, so the local parity
-  run asserted the Bash half only. The `Shared Runtime Matrix` workflow runs
-  the PowerShell entrypoint and PSScriptAnalyzer on `windows-latest`, and the
-  parity test asserts the receipt contract for whichever shells exist.
+  run asserted the Bash half only. The `Shared Runtime Matrix` workflow covers
+  it: `runtime (windows-latest)` passes on pull request #143, including the
+  PowerShell entrypoint receipt parity check and PSScriptAnalyzer. The
+  PowerShell path is therefore evidenced by an executed run, not by
+  construction, and is not marked experimental.
 
 ## Windows matrix findings
 
-The first matrix run caught two portability defects that no local check could
-have surfaced, both corrected at this head:
+The matrix caught five portability defects that no check on the delivery host
+could have surfaced. All are corrected at this head with regression coverage,
+and `runtime (windows-latest)` now passes.
 
-- `structurally invalid targets are refused before dispatch` asserted a
-  POSIX-shaped absolute literal. On Windows that path fails the earlier
-  canonicality check, so the test now builds an absent target from the
-  platform's own temporary root.
-- The shell parity test compared the Bash entrypoint against PowerShell on
-  Windows, where Git Bash cannot run it. Parity is now asserted per shell
-  against the Node installer that owns the receipt contract, and the Bash
-  entrypoint is documented as the POSIX path with PowerShell as the Windows
-  one.
+1. **The main-module guard never matched on Windows.** `build-runtime.mjs`,
+   `launcher.mjs`, `install-runtime.mjs`, and `validate-runtime-references.mjs`
+   compared `import.meta.url` against a literal `file://` plus
+   `process.argv[1]`. Windows argv carries a drive-letter path with
+   backslashes, so every one of those command lines exited zero without
+   running: the PowerShell entrypoint invoked node successfully and received
+   nothing back. All four now share `isMainModule`, which resolves argv through
+   `pathToFileURL`.
+2. **The PowerShell entrypoint discarded its own receipt.** Writing to the
+   success stream and then calling `exit` from inside `try`/`finally` loses the
+   output as the scope unwinds. The node output is now captured inside the
+   guarded block and written after it, and an empty capture is reported as a
+   receipt rather than as silence.
+3. **A generic list did not splat.** Arguments are collected in a plain array
+   so node receives them.
+4. **A target test asserted a POSIX-shaped absolute literal**, which Windows
+   canonicalisation rejects before the missing-target check is reached. The
+   absent target is built from the platform's own temporary root.
+5. **The completeness fixture recorded host path separators**, so Windows
+   evidence was not comparable with POSIX evidence. Discovered skill
+   identifiers are normalised to POSIX separators.
+
+The shell parity test also compared the Bash entrypoint against PowerShell on
+Windows, where Git Bash cannot run it. Parity is now asserted per shell against
+the Node installer that owns the receipt contract, and the Bash entrypoint is
+documented as the POSIX path with PowerShell as the Windows one.
+
+Finding 1 is the one that justifies the matrix outright: without it, this
+change would have shipped a runtime whose every command line was inert on
+Windows while all local evidence passed.
 - **Authenticated agent profiles**: not provisioned in this session, as above.
 
 ## Local review
