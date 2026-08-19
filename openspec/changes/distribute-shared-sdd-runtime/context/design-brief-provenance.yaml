@@ -1,0 +1,6 @@
+schema_version: 1
+source_path: "ai-planning/design-briefs/shared-sdd-runtime-distribution.md"
+source_sha256: "7f7d5883e0d80569a568eba321bbb779b38a07df7410fcf64590d8a41c540525"
+copied_at: "2026-08-19T16:14:15.331Z"
+selection_mode: "explicit"
+change: "distribute-shared-sdd-runtime"
