@@ -9,6 +9,7 @@ import {
   appendControllerCleanupReceipt,
   authorizationDigest,
   bindControllerIssueIntake,
+  bindControllerAuthContext,
   bindControllerLifecycleDelivery,
   bindControllerResourceDelivery,
   createControllerRecord,
@@ -17,6 +18,7 @@ import {
   persistControllerRecord,
   persistControllerCleanupReceipt,
   registerControllerIssueIntake,
+  registerControllerAuthContext,
   registerControllerResource,
   registerControllerLifecycleResource,
   resolveControllerStateRoot
@@ -25,6 +27,7 @@ import { inspectCheckpoint } from "../checkpoint.mjs";
 import { checkAdapterDrift } from "../check-adapter-drift.mjs";
 import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
 import { createIssueIntakeBinding } from "../issue-intake-binding.mjs";
+import { createGithubAuthContextBinding, evaluateGithubAuthContextContrast } from "../github-cli-auth-context.mjs";
 
 const started = "2026-08-13T12:00:00.000Z";
 const authorization = resolveSddDeliveryRequest({ target: "complete-delivery", mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-only", expiration: "12h" }, { goalStartedAt: started }).effectiveAuthorization;
@@ -38,6 +41,15 @@ const intakePayload = {
   managedBlock: "<!-- sdd-managed:start -->\nOpenSpec change: `complete-delivery`\n<!-- sdd-managed:end -->"
 };
 const intakeBinding = createIssueIntakeBinding({ selectedEntry: "complete-delivery", payload: intakePayload, expiresAt: authorization.expiresAt }).binding;
+const authContextBinding = createGithubAuthContextBinding({
+  selectedEntry: "complete-delivery", operation: "issue-create-or-reuse", repository: "owner/repository",
+  payloadDigest: intakeBinding.payloadDigest, expiresAt: authorization.expiresAt
+}).binding;
+const authContextEvidence = evaluateGithubAuthContextContrast({
+  binding: authContextBinding,
+  restrictedProbe: { commandKind: "github-api-user", contextType: "restricted", state: "success", account: "octocat", observedAt: started },
+  observedAt: started
+}).evidence;
 
 test("controller record starts at planning and resumes first incomplete phase", () => {
   assert.equal(created.valid, true);
@@ -97,6 +109,27 @@ test("controller persists pending reviewed intake then binds exact issue evidenc
   const conflicted = structuredClone(delivered.record);
   conflicted.issueIntakeRecords[0].binding.title = "changed";
   assert.equal(inspectControllerRecord(conflicted, { authorization, repository: "owner/repository", now: started }).reason, "controller-record-invalid");
+});
+
+test("controller persists exact non-secret auth-context evidence and rejects mismatches", () => {
+  const registered = registerControllerAuthContext(created.record, authContextBinding, { now: started });
+  assert.equal(registered.valid, true);
+  assert.equal(registered.authContext.status, "pending");
+  assert.equal(registered.authContext.binding.operation, "issue-create-or-reuse");
+  const delivered = bindControllerAuthContext(registered.record, {
+    bindingDigest: registered.authContext.bindingDigest,
+    evidence: authContextEvidence
+  });
+  assert.equal(delivered.valid, true);
+  assert.equal(delivered.authContext.status, "delivered");
+  assert.equal(delivered.authContext.evidence.classification, "authenticated");
+  assert.doesNotMatch(JSON.stringify(delivered.authContext), /stdout|stderr|token|secret/i);
+  assert.equal(bindControllerAuthContext(registered.record, {
+    bindingDigest: "b".repeat(64), evidence: authContextEvidence
+  }).reason, "controller-auth-context-evidence-invalid");
+  const forged = structuredClone(created.record);
+  forged.authContextRecords = [{ ...registered.authContext, binding: { ...registered.authContext.binding, repository: "other/repository" } }];
+  assert.equal(inspectControllerRecord(forged, { authorization, repository: "owner/repository", now: started }).reason, "controller-record-invalid");
 });
 
 test("every lifecycle entry resumes only the first incomplete controller phase", () => {

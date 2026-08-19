@@ -85,6 +85,25 @@ Some restricted execution environments cannot access the local keyring or
 network and may report a false authentication failure; verify from an allowed
 environment before replacing a valid credential.
 
+## GitHub CLI Authentication-Context Preflight
+
+Before a GitHub CLI lifecycle operation, run the canonical non-secret
+authentication-context preflight for the exact authorized operation. The probe
+is bounded and read-only; it records only command kind, normalized result,
+context type, timestamp, and returned account identity when available. Never
+persist raw CLI output, token text, environment values, credential scopes, or
+keychain/secret-store errors.
+
+If a restricted runtime has an authentication-shaped result, request the host
+permission boundary only for the identical read-only probe. A host success
+proves `credential-unavailable-in-restricted-runtime`; a second
+authentication-shaped result is `credential-invalid-or-expired`; a denied
+retry is `host-permission-denied`; other failures are `auth-state-unknown`.
+Successful host preflight neither authorizes the original write nor permits a
+different target. Bind recovery evidence to the selected entry, operation,
+repository, optional payload digest, and expiry; pause on invalid, denied,
+unknown, stale, expired, or mismatched evidence.
+
 ## Selected Actions
 
 The custom workflow selection intentionally exposes six actions:

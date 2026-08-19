@@ -43,6 +43,21 @@ published choices, and perform no selection or mutation.
    selected entry, repository, digest, or expiry conflicts on resume, pause
    before mutation. A current exact binding plus host runtime permission removes
    the second skill-level publication prompt; it does not override the host.
+   Before every GitHub CLI lifecycle operation, create or reuse an exact,
+   non-secret authentication-context binding for its selected entry, operation,
+   repository, optional payload digest, command kind, and expiry. Persist the
+   binding through `persistControllerAuthContext` before a host contrast retry,
+   and persist the terminal normalized result through
+   `persistControllerAuthContextEvidence`. Run the declared
+   `github-cli-auth-context` helper's fixed read-only probe in the current
+   context. A restricted authentication-shaped result may request the existing
+   host permission only for that same probe; host success classifies restricted
+   credential unavailability, host authentication failure classifies invalid or
+   expired credentials, and a denied retry classifies host-permission denial.
+   Do not retain raw CLI output or credential data, substitute a different host
+   command, self-escalate, or treat successful host preflight as authorization
+   for a GitHub mutation. Unknown, stale, expired, or mismatched evidence
+   pauses the affected operation.
 4. Run OpenSpec Explore or Propose only when required by the first incomplete
    evidenced controller checkpoint. Generated phases retain their ordinary
    boundary without a valid controller context; a valid context returns control
@@ -125,6 +140,19 @@ published choices, and perform no selection or mutation.
 - `../autonomous-goal-runner/references/human-decision-classification.md`
 - `../autonomous-goal-runner/references/correction-loop.md`
 - `../autonomous-goal-runner/references/review-matrix.md`
+
+## Shared Runtime
+
+Invoke the authentication-context helper through the installed runtime, never
+by importing a workspace script:
+
+```
+ai-skills-runtime run github-cli-auth-context --repository <absolute-target-repository> -- <helper args>
+```
+
+Required runtime contract version: 1. The launcher validates the declared
+helper and target shape; it does not grant operation authority or host
+permission.
 
 ## Result Contract
 

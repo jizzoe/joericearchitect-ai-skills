@@ -13,6 +13,7 @@ function parseArgs(argv) {
     else if (arg === "--managed-block-file") args.managedBlock = fs.readFileSync(argv[++index], "utf8").replace(/\n$/, "");
     else if (arg === "--label") args.labels.push(argv[++index]);
     else if (arg === "--binding-file") args.intakeBinding = JSON.parse(fs.readFileSync(argv[++index], "utf8"));
+    else if (arg === "--auth-context-evidence-file") args.authContextEvidence = JSON.parse(fs.readFileSync(argv[++index], "utf8"));
     else if (arg === "--selected-entry") args.selectedEntry = argv[++index];
     else if (arg === "--runtime-permitted") args.runtime.permittedOperations.push("issue-create-or-update");
     else if (arg === "--now") args.now = argv[++index];

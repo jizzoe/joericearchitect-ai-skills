@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "skill": "base-code-review",
+  "status": "completed",
+  "mode": "autonomous",
+  "summary": "Fresh bounded same-session local review found no unresolved findings in the GitHub CLI authentication-context diagnostic, its controller enforcement, shared-runtime exposure, or documentation.",
+  "artifacts": [
+    { "kind": "file", "operation": "read", "subject": "scripts/github/lib/auth-context.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/sdd/github-cli-auth-context.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/sdd/autonomous-sdd-controller.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/github/lib/issues.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/sdd/check-operation-authorization.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/runtime/bin/github-cli-auth-context.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/runtime/manifest.json" },
+    { "kind": "file", "operation": "read", "subject": "skills/base/autonomous-sdd-lifecycle/SKILL.md" }
+  ],
+  "evidence": [
+    { "id": "focused-auth-tests", "type": "test", "subject": "diagnostic, binding, controller, issue-intake, and runtime focused Node tests", "result": "passed", "reference": "node --test focused authentication-context suites: 65 passed" },
+    { "id": "full-node-suite", "type": "test", "subject": "repository Node test suites", "result": "passed", "reference": "node --test scripts/github/test/*.mjs scripts/runtime/test/*.mjs scripts/sdd/test/*.mjs scripts/skills/test/*.mjs scripts/validation/test/*.mjs: 320 passed" },
+    { "id": "strict-openspec", "type": "validation", "subject": "OpenSpec change and repository artifacts", "result": "passed", "reference": "openspec validate harden-github-cli-auth-context-detection --strict; openspec validate --all --strict" },
+    { "id": "runtime-and-adapter-validation", "type": "validation", "subject": "shared runtime registration, wrapper closure, and thin adapter routing", "result": "passed", "reference": "validate-runtime-references.mjs; check-adapter-drift.mjs; runtime build fixtures" },
+    { "id": "reviewed-workspace", "type": "review", "subject": "complete scoped workspace change", "result": "passed", "reference": "reviewed implementation files, OpenSpec delta specifications, design, task evidence, and final test evidence" }
+  ],
+  "assumptions": [],
+  "openQuestions": [],
+  "nextAction": { "kind": "continue", "description": "Record formal OpenSpec Verify evidence and continue the authorized delivery lifecycle." },
+  "details": {
+    "assurance": "local-review",
+    "worker": { "executionIdentity": "same-session-github-auth-context-final-review", "sameSession": true, "readOnly": true, "canMutate": false, "canApprove": false },
+    "reviewedScope": {
+      "targets": [
+        "docs/sdd-foundation-operations.md",
+        "docs/sdd-workflow.md",
+        "scripts/github/create-or-find-issue.mjs",
+        "scripts/github/lib/auth-context.mjs",
+        "scripts/github/lib/issues.mjs",
+        "scripts/github/test/auth-context.test.mjs",
+        "scripts/runtime/bin/autonomous-sdd-controller.mjs",
+        "scripts/runtime/bin/github-cli-auth-context.mjs",
+        "scripts/runtime/manifest.json",
+        "scripts/runtime/test/build-runtime.test.mjs",
+        "scripts/runtime/test/payload-wrapper.test.mjs",
+        "scripts/sdd/autonomous-sdd-controller.mjs",
+        "scripts/sdd/check-operation-authorization.mjs",
+        "scripts/sdd/github-cli-auth-context.mjs",
+        "scripts/sdd/test/autonomous-sdd-controller.test.mjs",
+        "scripts/sdd/test/github-cli-auth-context.test.mjs",
+        "scripts/sdd/test/issue-intake-binding.test.mjs",
+        "skills/base/autonomous-sdd-delivery/SKILL.md",
+        "skills/base/autonomous-sdd-lifecycle/SKILL.md"
+      ],
+      "contextPaths": [
+        "openspec/changes/harden-github-cli-auth-context-detection/proposal.md",
+        "openspec/changes/harden-github-cli-auth-context-detection/design.md",
+        "openspec/changes/harden-github-cli-auth-context-detection/tasks.md",
+        "openspec/changes/harden-github-cli-auth-context-detection/specs/github-cli-auth-context-detection/spec.md",
+        "openspec/changes/harden-github-cli-auth-context-detection/specs/autonomous-sdd-continuation/spec.md",
+        "openspec/changes/harden-github-cli-auth-context-detection/tracking.yaml"
+      ],
+      "evidenceIds": ["focused-auth-tests", "full-node-suite", "strict-openspec", "runtime-and-adapter-validation", "reviewed-workspace"]
+    },
+    "findings": [],
+    "coverage": [
+      { "area": "non-secret probe normalization and all terminal classifications", "status": "reviewed", "evidenceIds": ["focused-auth-tests", "reviewed-workspace"] },
+      { "area": "exact operation binding, expiry, host-permission separation, and fail-closed enforcement", "status": "reviewed", "evidenceIds": ["focused-auth-tests", "full-node-suite"] },
+      { "area": "controller durability, recovery, portability, runtime registration, and thin-assistant routing", "status": "reviewed", "evidenceIds": ["runtime-and-adapter-validation", "reviewed-workspace"] },
+      { "area": "OpenSpec conformance and regression coverage", "status": "reviewed", "evidenceIds": ["strict-openspec", "full-node-suite"] },
+      { "area": "user interface and accessibility", "status": "not-applicable", "evidenceIds": [] }
+    ],
+    "standardsSelection": { "selectedRuleIds": [], "scopedOverrides": [], "notApplicableRuleIds": [] },
+    "evidenceGaps": [],
+    "scopeSummary": "Reviewed every implementation, test, runtime, documentation, and OpenSpec path in this scoped change. The diagnostic retains normalized metadata only; host success remains exact-operation-bound and does not grant a GitHub write; absent, stale, invalid, denied, unknown, or mismatched evidence fails closed."
+  }
+}

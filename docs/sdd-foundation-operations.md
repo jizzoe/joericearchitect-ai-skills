@@ -10,6 +10,14 @@
 4. Run `openspec validate --all --strict`.
 5. Run the focused Node verification suite before delivery.
 
+When a GitHub lifecycle action is planned, run the declared non-secret
+authentication-context preflight first. A restricted authentication-shaped
+result requires the same read-only probe through the ordinary host permission
+boundary before it can be classified; it never permits credential bridging,
+automatic escalation, or a GitHub write. Persist only normalized,
+operation-bound recovery evidence and pause on invalid, denied, unknown, stale,
+expired, or mismatched results.
+
 ## Normal Operation
 
 Use the lifecycle order:

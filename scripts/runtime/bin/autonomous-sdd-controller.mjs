@@ -4,6 +4,7 @@ import { workspaceIoFromEnvironment } from "../workspace-io.mjs";
 import {
   advanceControllerRecord, bindControllerLifecycleDelivery, createControllerRecord,
   executeControllerLifecycleCleanup, inspectControllerRecord, persistControllerCleanupReceipt,
+  persistControllerAuthContext, persistControllerAuthContextEvidence,
   persistControllerIssueIntake, persistControllerIssueIntakeEvidence,
   registerControllerLifecycleResource
 } from "../../sdd/autonomous-sdd-controller.mjs";
@@ -32,6 +33,12 @@ runAsMain({
       ...payload, repositoryPath: repositoryPath(payload)
     }),
     "persist-controller-issue-intake-evidence": (payload) => persistControllerIssueIntakeEvidence({
+      ...payload, repositoryPath: repositoryPath(payload)
+    }),
+    "persist-controller-auth-context": (payload) => persistControllerAuthContext({
+      ...payload, repositoryPath: repositoryPath(payload)
+    }),
+    "persist-controller-auth-context-evidence": (payload) => persistControllerAuthContextEvidence({
       ...payload, repositoryPath: repositoryPath(payload)
     }),
     "bind-controller-lifecycle-delivery": (payload) => bindControllerLifecycleDelivery({
