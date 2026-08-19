@@ -55,7 +55,9 @@ export function discoverHelpers(skillRoot) {
       const [, helper, verb] = match;
       const existing = discovered.get(helper) ?? { helper, verbs: new Set(), skills: new Set() };
       if (verb) existing.verbs.add(verb);
-      existing.skills.add(path.relative(skillRoot, filePath));
+      // Recorded evidence uses POSIX separators so a Windows run and a POSIX
+      // run produce the same comparable skill identifiers.
+      existing.skills.add(path.relative(skillRoot, filePath).split(path.sep).join("/"));
       discovered.set(helper, existing);
     }
   }
