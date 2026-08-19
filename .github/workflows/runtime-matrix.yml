@@ -41,6 +41,22 @@ jobs:
         with:
           node-version: "20"
 
+      - name: PowerShell entrypoint parity
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Write-Output "pwsh $($PSVersionTable.PSVersion)"
+          $raw = & ./scripts/install-ai-skills.ps1 -Local (Get-Location).Path -Agent claude -DryRun -AllowDirtySource 2>&1
+          Write-Output "exit code: $LASTEXITCODE"
+          Write-Output "--- raw output ---"
+          $raw | ForEach-Object { Write-Output $_ }
+          Write-Output "--- end raw output ---"
+          $receipt = ($raw | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }) -join "`n" | ConvertFrom-Json
+          if (-not $receipt.dryRun) { throw "PowerShell dry run did not report itself" }
+          if ($receipt.tool -ne 'install-ai-skills') { throw "unexpected receipt tool: $($receipt.tool)" }
+          Write-Output "PowerShell receipt parity verified"
+
       - name: Runtime unit and contract tests
         run: node --test scripts/runtime/test/
 
@@ -103,15 +119,6 @@ jobs:
             if (receipt.dryRun !== true) throw new Error("dry run did not report itself");
             console.log("receipt contract verified");
           '
-
-      - name: PowerShell entrypoint parity
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $receipt = & ./scripts/install-ai-skills.ps1 -Local (Get-Location).Path -Agent claude -DryRun -AllowDirtySource | ConvertFrom-Json
-          if (-not $receipt.dryRun) { throw "PowerShell dry run did not report itself" }
-          if ($receipt.tool -ne 'install-ai-skills') { throw "unexpected receipt tool: $($receipt.tool)" }
-          Write-Output "PowerShell receipt parity verified"
 
       - name: PowerShell script analysis
         shell: pwsh

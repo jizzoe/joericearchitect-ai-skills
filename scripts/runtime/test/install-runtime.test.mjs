@@ -346,8 +346,14 @@ test("each available shell entrypoint reproduces the Node receipt contract", () 
   for (const shell of shells) {
     const result = spawnSync(shell.command, shell.args, { encoding: "utf8", env: environment });
     if (result.error?.code === "ENOENT") continue;
-    const receipt = JSON.parse(result.stdout || "null");
-    assert.ok(receipt, `${shell.name} produced no receipt: ${result.stdout}${result.stderr}`);
+    const diagnostics = `${shell.name} exited ${result.status}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`;
+    let receipt = null;
+    try {
+      receipt = JSON.parse(result.stdout || "null");
+    } catch {
+      receipt = null;
+    }
+    assert.ok(receipt, `${shell.name} produced no receipt.\n${diagnostics}`);
     assert.deepEqual(Object.keys(receipt).sort(), referenceKeys, `${shell.name} receipt keys differ`);
     assert.equal(receipt.tool, "install-ai-skills");
     assert.equal(receipt.dryRun, true);
