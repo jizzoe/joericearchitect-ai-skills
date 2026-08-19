@@ -102,7 +102,7 @@ Load only the references needed for the current decision:
   missing-input handling
 - `references/human-decision-classification.md` for pause and non-pause
   classification
-- `scripts/sdd/check-operation-authorization.mjs` for deterministic profile
+- `ai-skills-runtime run check-operation-authorization` for deterministic profile
   and delivery-boundary evaluation
 
 ## Non-Triggers
@@ -111,6 +111,21 @@ Do not use this skill for ordinary local edits, single-command answers,
 planning-only OpenSpec Propose actions, credential creation or rotation, or
 unbounded requests such as "do everything" without explicit target, queue,
 mutation, evidence, and stopping boundaries.
+
+## Shared runtime
+
+Shared helpers are invoked through the installed launcher, never through a
+path in the active workspace:
+
+```
+ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository> [-- <helper args>]
+```
+
+Required runtime contract version: 1. The launcher validates the runtime, the
+declared helper and verb, and the mechanical shape of the target repository. It
+makes no authorization decision, and a missing, incompatible, or drifted runtime
+is a classified pause rather than a workspace fallback. Run
+`ai-skills-runtime doctor` once per session to detect skill and runtime drift.
 
 ## Guardrails
 

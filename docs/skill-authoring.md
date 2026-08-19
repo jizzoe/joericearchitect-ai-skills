@@ -68,3 +68,51 @@ the optional configuration is absent. Validate synthetic inputs with:
 ```bash
 node --test evals/skills/base-skill-contracts/run-fixtures.test.mjs
 ```
+
+## Shared Runtime Helpers
+
+Canonical skills are distributed to user profiles without this repository's
+`scripts/` tree, so a skill must never instruct an agent to run a
+workspace-relative helper path. Every shared helper is reached through the
+installed launcher:
+
+```markdown
+`ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository>`
+```
+
+A runtime-dependent skill has four obligations:
+
+1. **Register the helper.** Add it to `scripts/runtime/manifest.json` with its
+   module path, `invocation` shape (`cli` or `subcommand`), the permitted verb
+   list for a subcommand helper, and any `readsAssetRoots` it loads packaged
+   data from. An unregistered helper name or verb cannot be dispatched.
+2. **Reference it through the launcher.** No `scripts/sdd/...`,
+   `scripts/github/...`, `scripts/validation/...`, or `scripts/skills/...`
+   path may appear in a canonical skill, a progressive reference, or a thin
+   platform adapter.
+3. **Declare the contract version.** Include the standard `## Shared runtime`
+   section with `Required runtime contract version: <n>` matching the
+   manifest's `contractVersion`. A mismatch is a fail-closed pause at dispatch.
+4. **Prove installed completeness.** The completeness fixture discovers every
+   helper each installed skill names and requires it to resolve through the
+   installed launcher, so a newly referenced helper needs a manifest entry and,
+   where it is harmless to run, a representative request.
+
+A helper that exports functions but has no command line gains an executable
+entrypoint under `scripts/runtime/bin/`: a uniform `--input <file>` / `--stdin`
+JSON payload wrapper, or an enumerated subcommand set when it exposes many
+operations. Never expose a command that resolves or returns an importable
+module path.
+
+Packaged data a helper reads must resolve through `RUNTIME_HOME` using
+`scripts/runtime/asset-root.mjs`, keeping the checkout-relative default for
+in-repository invocation and failing closed when the resolved root is absent.
+
+Validate the runtime contract before review:
+
+```bash
+node scripts/validation/validate-runtime-references.mjs
+node --test scripts/validation/test/validate-runtime-references.test.mjs
+node --test scripts/runtime/test/
+node --test evals/skills/global-skill-installation/run-runtime-completeness.test.mjs
+```

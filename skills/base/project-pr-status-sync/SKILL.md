@@ -12,7 +12,7 @@ lifecycle events for OpenSpec SDD work.
 
 - Repository configuration: `config/sdd-github.json`
 - Planner: `scripts/github/lib/pr-status-sync.mjs`
-- CLI: `scripts/github/reconcile-pr-project-status.mjs`
+- CLI: `ai-skills-runtime run reconcile-pr-project-status`
 - Workflow: `.github/workflows/project-status-sync.yml`
 
 ## Required Behavior
@@ -34,6 +34,21 @@ Run:
 ```bash
 node --test scripts/github/test/pr-status-sync.test.mjs evals/workflows/project-pr-status-sync/run-fixtures.test.mjs
 ```
+
+## Shared runtime
+
+Shared helpers are invoked through the installed launcher, never through a
+path in the active workspace:
+
+```
+ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository> [-- <helper args>]
+```
+
+Required runtime contract version: 1. The launcher validates the runtime, the
+declared helper and verb, and the mechanical shape of the target repository. It
+makes no authorization decision, and a missing, incompatible, or drifted runtime
+is a classified pause rather than a workspace fallback. Run
+`ai-skills-runtime doctor` once per session to detect skill and runtime drift.
 
 ## Guardrails
 

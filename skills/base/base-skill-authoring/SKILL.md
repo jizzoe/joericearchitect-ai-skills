@@ -26,7 +26,7 @@ invent a contract, target, configuration, permission, or approval.
 Build the contract package from the required sections in the reference. Require
 the shared guardrail link, workspace-relative/configured values, optional
 `ai-skills-config-v1` handling, and `skill-result-v1` output. Map autonomous
-actions through `scripts/sdd/check-operation-authorization.mjs`; expose only a
+actions through `ai-skills-runtime run check-operation-authorization`; expose only a
 subset of `research-read-only`, `local-implementation`,
 `tracker-maintenance`, and `sdd-delivery`.
 
@@ -42,6 +42,27 @@ After a reviewed contract and explicit implementation authorization, create
 platform exposures. Follow `docs/skill-authoring.md`; do not copy canonical
 policy into adapters. Validate the required synthetic eval matrix before
 delivery.
+
+A skill that needs a shared helper must register that helper in the runtime
+distribution manifest, reference it only through the launcher contract below,
+declare the required contract version, and gain installed-runtime completeness
+coverage. A workspace-relative helper path is not portable to an installed
+profile and is rejected by deterministic validation.
+
+## Shared runtime
+
+Shared helpers are invoked through the installed launcher, never through a
+path in the active workspace:
+
+```
+ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository> [-- <helper args>]
+```
+
+Required runtime contract version: 1. The launcher validates the runtime, the
+declared helper and verb, and the mechanical shape of the target repository. It
+makes no authorization decision, and a missing, incompatible, or drifted runtime
+is a classified pause rather than a workspace fallback. Run
+`ai-skills-runtime doctor` once per session to detect skill and runtime drift.
 
 ## Guardrails
 

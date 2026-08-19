@@ -118,20 +118,25 @@ export function nodeVersionSupported(version = process.versions.node) {
  * Authorization stays in scripts/sdd/check-operation-authorization.mjs and the
  * helper-level checks that call it.
  */
-export function validateTargetRepository(target, { stat = fs.statSync, realpath = fs.realpathSync } = {}) {
+export function validateTargetRepository(target, { stat = fs.statSync, lstat = fs.lstatSync, realpath = fs.realpathSync } = {}) {
   if (!text(target)) return { valid: false, reason: "target-repository-absent" };
   if (!path.isAbsolute(target)) return { valid: false, reason: "target-repository-not-absolute" };
   if (path.normalize(target) !== target.replace(/\/+$/, "") && path.normalize(target) !== target) {
     return { valid: false, reason: "target-repository-not-canonical" };
+  }
+  // The target itself must be a real directory. An ancestor may be a symbolic
+  // link — /tmp is one on macOS — because the canonical path is what gets
+  // passed to the helper, but a target that is itself a link is refused.
+  try {
+    if (lstat(target).isSymbolicLink()) return { valid: false, reason: "target-repository-symlink-escape" };
+  } catch {
+    return { valid: false, reason: "target-repository-missing" };
   }
   let resolved;
   try {
     resolved = realpath(target);
   } catch {
     return { valid: false, reason: "target-repository-missing" };
-  }
-  if (resolved !== path.normalize(target).replace(/\/+$/, "") && resolved !== target) {
-    return { valid: false, reason: "target-repository-symlink-escape" };
   }
   try {
     if (!stat(resolved).isDirectory()) return { valid: false, reason: "target-repository-not-directory" };

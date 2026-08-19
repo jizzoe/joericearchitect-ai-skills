@@ -34,7 +34,7 @@ approval is absent, attributed to a different owner, future-dated, or stale.
 Repository runtimes MUST route trigger selection, required-input, readiness,
 delivery-profile, workspace-relative output, and autonomous write checks
 through `executeSddRequirementsToPlan` in
-`scripts/sdd/research-planning-skill-runtime.mjs`, supplying bounded artifact
+`ai-skills-runtime run research-planning-skill-runtime`, supplying bounded artifact
 reader and writer functions. The runtime resolves the requirements and design
 brief paths, generates the delivery-plan Markdown from their content and the
 explicit per-candidate readiness inputs, and passes it to the writer. Each
@@ -105,8 +105,23 @@ Autonomous execution is permitted only under the `local-implementation`
 bounded-autonomous-execution profile, writing only the plan file within the
 run's authorized workspace and paths. Before every autonomous plan write,
 validate the exact profile, workspace, path, and operation through
-`scripts/sdd/check-operation-authorization.mjs`; pause without writing when
+`ai-skills-runtime run check-operation-authorization`; pause without writing when
 that deterministic check denies the operation.
+
+## Shared runtime
+
+Shared helpers are invoked through the installed launcher, never through a
+path in the active workspace:
+
+```
+ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository> [-- <helper args>]
+```
+
+Required runtime contract version: 1. The launcher validates the runtime, the
+declared helper and verb, and the mechanical shape of the target repository. It
+makes no authorization decision, and a missing, incompatible, or drifted runtime
+is a classified pause rather than a workspace fallback. Run
+`ai-skills-runtime doctor` once per session to detect skill and runtime drift.
 
 ## Guardrails
 

@@ -29,16 +29,16 @@
 
 ## 4. Canonical skill and platform migration
 
-- [ ] 4.1 Migrate canonical skill and reference instructions from workspace-relative shared helper paths to declared `ai-skills-runtime` launcher calls with explicit target-repository inputs and declared contract versions. Depends on: 2.3, 2.5.
-- [ ] 4.2 Preserve thin Claude/Codex adapters and update deterministic validation to reject unresolved legacy runtime references, relative asset defaults, duplicated platform runtime policy, an unregistered helper name, or an unregistered subcommand verb. Depends on: 4.1.
-- [ ] 4.3 Add cross-assistant and second-repository fixtures proving equivalent launcher selection, unavailable classification, shared-runtime service of two agents at differing revisions within one contract version, and no change to approval, sandbox, credential, network, review, or cleanup policy. Depends on: 4.2.
+- [x] 4.1 Migrate canonical skill and reference instructions from workspace-relative shared helper paths to declared `ai-skills-runtime` launcher calls with explicit target-repository inputs and declared contract versions. Depends on: 2.3, 2.5.
+- [x] 4.2 Preserve thin Claude/Codex adapters and update deterministic validation to reject unresolved legacy runtime references, relative asset defaults, duplicated platform runtime policy, an unregistered helper name, or an unregistered subcommand verb. Depends on: 4.1.
+- [x] 4.3 Add cross-assistant and second-repository fixtures proving equivalent launcher selection, unavailable classification, shared-runtime service of two agents at differing revisions within one contract version, and no change to approval, sandbox, credential, network, review, or cleanup policy. Depends on: 4.2.
 
 ## 5. Installed-profile evidence and documentation
 
-- [ ] 5.1 Extend disposable-profile installation fixtures to install the paired skill/runtime distribution, discover every helper named by each installed canonical skill, verify launcher resolution, and run representative harmless helper invocations for Claude Code and Codex. Depends on: 3.6, 4.3.
-- [ ] 5.2 Add a CI matrix on Ubuntu and Windows covering the network-free surface: builder determinism, launcher preflight and failure classification, `--dry-run` receipt parity, and PowerShell script analysis. If the matrix is not adopted, document the PowerShell path as experimental rather than claiming parity. Depends on: 3.6.
-- [ ] 5.3 Update `docs/global-skill-installation.md` with source review, bootstrap by `gh release download` and `gh attestation verify`, local and pinned-remote installation, selected agents, runtime activation/PATH requirements, paired update replacing the current unpaired `gh skill update` instruction, `doctor` drift detection, rollback, verification evidence, and the unchanged authorization boundary. Depends on: 3.6, 4.1.
-- [ ] 5.4 Update skill-authoring and distribution guidance to require manifest registration, launcher-based shared helper references, declared contract versions, and an installed-runtime completeness scenario for every new runtime-dependent skill. Depends on: 1.2, 4.2, 5.1.
+- [x] 5.1 Extend disposable-profile installation fixtures to install the paired skill/runtime distribution, discover every helper named by each installed canonical skill, verify launcher resolution, and run representative harmless helper invocations for Claude Code and Codex. Depends on: 3.6, 4.3.
+- [x] 5.2 Add a CI matrix on Ubuntu and Windows covering the network-free surface: builder determinism, launcher preflight and failure classification, `--dry-run` receipt parity, and PowerShell script analysis. If the matrix is not adopted, document the PowerShell path as experimental rather than claiming parity. Depends on: 3.6.
+- [x] 5.3 Update `docs/global-skill-installation.md` with source review, bootstrap by `gh release download` and `gh attestation verify`, local and pinned-remote installation, selected agents, runtime activation/PATH requirements, paired update replacing the current unpaired `gh skill update` instruction, `doctor` drift detection, rollback, verification evidence, and the unchanged authorization boundary. Depends on: 3.6, 4.1.
+- [x] 5.4 Update skill-authoring and distribution guidance to require manifest registration, launcher-based shared helper references, declared contract versions, and an installed-runtime completeness scenario for every new runtime-dependent skill. Depends on: 1.2, 4.2, 5.1.
 
 ## 6. Completion evidence
 

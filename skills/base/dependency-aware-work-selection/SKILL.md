@@ -11,12 +11,27 @@ dependency, status, priority, sequence, and shared-resource evidence.
 Canonical scripts:
 
 - `scripts/github/lib/dependencies.mjs`
-- `scripts/github/project-status.mjs`
-- `scripts/github/select-next-work.mjs`
-- `scripts/github/dependency-report.mjs`
+- `ai-skills-runtime run project-status`
+- `ai-skills-runtime run select-next-work`
+- `ai-skills-runtime run dependency-report`
 
 The skill is read-only. It reports in-flight, actionable, blocked, parallel,
 and next work and never switches changes without an explicit target.
+
+## Shared runtime
+
+Shared helpers are invoked through the installed launcher, never through a
+path in the active workspace:
+
+```
+ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository> [-- <helper args>]
+```
+
+Required runtime contract version: 1. The launcher validates the runtime, the
+declared helper and verb, and the mechanical shape of the target repository. It
+makes no authorization decision, and a missing, incompatible, or drifted runtime
+is a classified pause rather than a workspace fallback. Run
+`ai-skills-runtime doctor` once per session to detect skill and runtime drift.
 
 ## Guardrails
 
