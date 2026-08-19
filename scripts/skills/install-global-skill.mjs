@@ -16,6 +16,7 @@ Options:
   --force                    Explicitly overwrite existing installed skills.
   --pin <tag-or-commit>      Pin a remote install. Not valid with --local.
   --dry-run                  Print the argument vector without invoking gh.
+  --result                   Emit one machine-readable JSON result on stdout.
   --help                     Show this help text.
 `;
 
@@ -35,6 +36,7 @@ export function parseArguments(args) {
   const options = {
     all: false,
     dryRun: false,
+    result: false,
     force: false,
     help: false,
     local: undefined,
@@ -54,6 +56,10 @@ export function parseArguments(args) {
       case "--dry-run":
         if (options.dryRun) fail("--dry-run may be supplied only once");
         options.dryRun = true;
+        break;
+      case "--result":
+        if (options.result) fail("--result may be supplied only once");
+        options.result = true;
         break;
       case "--force":
         if (options.force) fail("--force may be supplied only once");
@@ -113,25 +119,51 @@ export function redactArguments(args) {
   return args.map((argument) => argument.replace(/(https?:\/\/)[^@\s/]+@/i, "$1<redacted>@"));
 }
 
-export function run(options, { spawn = spawnSync, stdio = "inherit" } = {}) {
+/**
+ * One machine-readable record the paired shell entrypoints consume instead of
+ * scraping output or reimplementing gh invocation. Arguments are redacted, and
+ * no credential, token, or resolved secret is ever included.
+ */
+export function installResult(options, { status, unpinnedRemote }) {
+  return {
+    schemaVersion: 1,
+    tool: "install-global-skill",
+    ok: status === 0,
+    agent: options.agent,
+    source: options.local ? "local" : "remote",
+    sourceReference: options.local ?? options.remote,
+    selection: options.all ? "all" : "skill",
+    skill: options.skill ?? null,
+    overwriteIntent: options.force === true,
+    pin: options.pin ?? null,
+    unpinnedRemote: unpinnedRemote === true,
+    dryRun: options.dryRun === true,
+    command: { executable: "gh", args: redactArguments(buildInstallArguments(options)) },
+    status
+  };
+}
+
+export function run(options, { spawn = spawnSync, stdio = "inherit", write = (line) => console.log(line), writeError = (line) => console.error(line) } = {}) {
   const args = buildInstallArguments(options);
+  const unpinnedRemote = Boolean(options.remote) && !options.pin;
+  const emit = (status) => {
+    if (options.result) write(JSON.stringify(installResult(options, { status, unpinnedRemote }), null, 2));
+    return status;
+  };
+
+  if (unpinnedRemote) writeError("Remote install is unpinned; gh will resolve its normal mutable version.");
+
   if (options.dryRun) {
-    console.log(JSON.stringify({ command: "gh", args: redactArguments(args) }, null, 2));
-    if (options.remote && !options.pin) {
-      console.error("Remote install is unpinned; gh will resolve its normal mutable version.");
-    }
-    return 0;
+    if (!options.result) write(JSON.stringify({ command: "gh", args: redactArguments(args) }, null, 2));
+    return emit(0);
   }
 
-  if (options.remote && !options.pin) {
-    console.error("Remote install is unpinned; gh will resolve its normal mutable version.");
-  }
   const result = spawn("gh", args, { stdio });
   if (result.error) {
-    console.error(`Unable to start gh: ${result.error.message}`);
-    return 1;
+    writeError(`Unable to start gh: ${result.error.message}`);
+    return emit(1);
   }
-  return result.status ?? 1;
+  return emit(result.status ?? 1);
 }
 
 export function main(args = process.argv.slice(2)) {

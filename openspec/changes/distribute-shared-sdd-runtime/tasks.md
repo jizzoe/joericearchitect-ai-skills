@@ -20,12 +20,12 @@
 
 ## 3. Paired installer/update entrypoints
 
-- [ ] 3.1 Define a machine-readable installer receipt and parity fixture covering selected agents, local versus pinned-remote source, source revision, runtime digest and contract version, overwrite intent, paths, activation state, dry-run, `mode`, prior skill pin, and recovery code. Depends on: 2.1, 2.3.
-- [ ] 3.2 Add a machine-readable result to `scripts/skills/install-global-skill.mjs` so shell entrypoints consume its output instead of reimplementing GitHub CLI invocation. Depends on: 3.1.
-- [ ] 3.3 Implement runtime version identity `{ contractVersion, sourceRevision, digest, builtAt }`, `runtime-<digest12>` directory naming, append-only `installed.json` history for ordering, active-plus-one-prior retention, and offline `ai-skills-runtime activate --previous`. Depends on: 2.1.
-- [ ] 3.4 Add the Bash install/update entrypoint under `scripts/`, delegating canonical skill installation to `scripts/skills/install-global-skill.mjs`, building or obtaining the matching runtime, and retaining the previous active runtime on failure. Depends on: 3.1, 3.2, 3.3.
-- [ ] 3.5 Add the Windows PowerShell install/update entrypoint under `scripts/` with the same supported contract, quoting safety, source verification, receipt fields, and failure behavior as Bash. Depends on: 3.1, 3.2, 3.3.
-- [ ] 3.6 Add installer tests for local reviewed checkout mode, pinned remote mode, explicit overwrite behavior, failed runtime activation, missing/incompatible Node, offline `activate --previous`, approved PATH activation behavior, and Bash/PowerShell receipt parity. Depends on: 3.4, 3.5.
+- [x] 3.1 Define a machine-readable installer receipt and parity fixture covering selected agents, local versus pinned-remote source, source revision, runtime digest and contract version, overwrite intent, paths, activation state, dry-run, `mode`, prior skill pin, and recovery code. Depends on: 2.1, 2.3.
+- [x] 3.2 Add a machine-readable result to `scripts/skills/install-global-skill.mjs` so shell entrypoints consume its output instead of reimplementing GitHub CLI invocation. Depends on: 3.1.
+- [x] 3.3 Implement runtime version identity `{ contractVersion, sourceRevision, digest, builtAt }`, `runtime-<digest12>` directory naming, append-only `installed.json` history for ordering, active-plus-one-prior retention, and offline `ai-skills-runtime activate --previous`. Depends on: 2.1.
+- [x] 3.4 Add the Bash install/update entrypoint under `scripts/`, delegating canonical skill installation to `scripts/skills/install-global-skill.mjs`, building or obtaining the matching runtime, and retaining the previous active runtime on failure. Depends on: 3.1, 3.2, 3.3.
+- [x] 3.5 Add the Windows PowerShell install/update entrypoint under `scripts/` with the same supported contract, quoting safety, source verification, receipt fields, and failure behavior as Bash. Depends on: 3.1, 3.2, 3.3.
+- [x] 3.6 Add installer tests for local reviewed checkout mode, pinned remote mode, explicit overwrite behavior, failed runtime activation, missing/incompatible Node, offline `activate --previous`, approved PATH activation behavior, and Bash/PowerShell receipt parity. Depends on: 3.4, 3.5.
 
 ## 4. Canonical skill and platform migration
 
