@@ -716,6 +716,8 @@ test("degraded Claude transport is fresh, read/search-only, and truthfully reduc
   const invocation = buildClaudeDegradedReviewInvocation({ view, schema });
   assert.ok(invocation.args.includes("--safe-mode"));
   assert.ok(invocation.args.includes("--no-session-persistence"));
+  assert.ok(invocation.args.includes("--strict-mcp-config"));
+  assert.equal(invocation.args[invocation.args.indexOf("--mcp-config") + 1], "{\"mcpServers\":{}}");
   assert.equal(invocation.args[invocation.args.indexOf("--tools") + 1], "Read,Glob,Grep");
   assert.match(invocation.args[invocation.args.indexOf("--disallowed-tools") + 1], /Bash/);
   assert.equal(invocation.environment.GH_TOKEN, "");
