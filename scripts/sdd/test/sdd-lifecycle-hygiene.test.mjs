@@ -9,7 +9,12 @@ import { fileURLToPath } from "node:url";
 import { buildLifecycleReconciliationReport, captureDesignBrief, classifyLifecycleResource, discoverDesignBriefCandidates, rankDesignBriefCandidates, validateDesignBriefSource } from "../sdd-lifecycle-hygiene.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const changeName = "improve-sdd-lifecycle-hygiene-and-brief-provenance";
+// Resolved from the active changes rather than pinned to one name: pinning made
+// this test fail as soon as the named change was archived.
+const changeName = fs.readdirSync(path.join(repoRoot, "openspec/changes"), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && entry.name !== "archive")
+  .map((entry) => entry.name)
+  .sort()[0];
 
 function fixture(callback) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "sdd-hygiene-"));
@@ -62,16 +67,18 @@ test("reconciliation uses delivery evidence before ancestry and protects dirty r
   assert.equal(report.recommendations.length, 1);
 });
 
-test("the supplemental context convention remains strict-validation compatible", () => {
+test("the supplemental context convention remains strict-validation compatible", { skip: changeName ? false : "no active OpenSpec change" }, () => {
   const context = path.join(repoRoot, "openspec/changes", changeName, "context");
-  assert.equal(fs.existsSync(context), false);
+  const preexisting = fs.existsSync(context);
+  const fixture = path.join(context, "strict-validation-fixture.md");
   try {
-    fs.mkdirSync(context);
-    fs.writeFileSync(path.join(context, "design-brief.md"), "# Fixture\n");
-    fs.writeFileSync(path.join(context, "design-brief-provenance.yaml"), "schema_version: 1\nsource_path: \"fixture.md\"\n");
+    fs.mkdirSync(context, { recursive: true });
+    fs.writeFileSync(fixture, "# Fixture\n");
     execFileSync("openspec", ["validate", changeName, "--strict"], { cwd: repoRoot, stdio: "pipe" });
   } finally {
-    fs.rmSync(context, { recursive: true, force: true });
+    // Remove only what the fixture added; a real change's context is preserved.
+    fs.rmSync(fixture, { force: true });
+    if (!preexisting) fs.rmSync(context, { recursive: true, force: true });
   }
 });
 

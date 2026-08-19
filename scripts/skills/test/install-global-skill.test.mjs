@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { buildInstallArguments, parseArguments, redactArguments } from "../install-global-skill.mjs";
+import { buildInstallArguments, installResult, parseArguments, redactArguments, run } from "../install-global-skill.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const utility = path.resolve(__dirname, "../install-global-skill.mjs");
@@ -112,4 +112,56 @@ test("prints help without requiring install arguments", () => {
   const result = spawnSync(process.execPath, [utility, "--help"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Usage:/);
+});
+
+test("the machine-readable result states the phase, redacted command, and outcome", () => {
+  const written = [];
+  const status = run(
+    { local: "/reviewed/checkout", all: true, agent: "claude", result: true, dryRun: true },
+    { write: (line) => written.push(line), writeError: () => {} }
+  );
+  const receipt = JSON.parse(written.join("\n"));
+  assert.equal(status, 0);
+  assert.equal(receipt.ok, true);
+  assert.equal(receipt.phase, "dry-run");
+  assert.equal(receipt.source, "local");
+  assert.equal(receipt.agent, "claude");
+  assert.equal(receipt.command.executable, "gh");
+  assert.equal(receipt.dryRun, true);
+});
+
+test("a failed invocation reports its phase and recovery code without scraping output", () => {
+  const written = [];
+  const status = run(
+    { remote: "owner/repo", pin: "v1.0.0", all: true, agent: "codex", result: true },
+    {
+      spawn: () => ({ status: 3 }),
+      write: (line) => written.push(line),
+      writeError: () => {}
+    }
+  );
+  const receipt = JSON.parse(written.join("\n"));
+  assert.equal(status, 3);
+  assert.equal(receipt.ok, false);
+  assert.equal(receipt.phase, "invoke");
+  assert.equal(receipt.code, "gh-skill-install-failed");
+  assert.equal(receipt.pin, "v1.0.0");
+
+  const unavailable = [];
+  run(
+    { local: "/reviewed/checkout", all: true, agent: "claude", result: true },
+    { spawn: () => ({ error: new Error("spawn gh ENOENT") }), write: (line) => unavailable.push(line), writeError: () => {} }
+  );
+  assert.equal(JSON.parse(unavailable.join("\n")).code, "gh-unavailable");
+});
+
+test("a credential embedded in a remote source is redacted in the result", () => {
+  const written = [];
+  run(
+    { remote: "https://user:secret-token@example.invalid/owner/repo", pin: "v1.0.0", all: true, agent: "claude", result: true, dryRun: true },
+    { write: (line) => written.push(line), writeError: () => {} }
+  );
+  const serialized = written.join("\n");
+  assert.doesNotMatch(serialized, /secret-token/);
+  assert.match(serialized, /<redacted>@/);
 });

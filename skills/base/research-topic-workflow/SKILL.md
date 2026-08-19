@@ -27,7 +27,7 @@ destination.
 Repository runtimes MUST route trigger selection, required-input checks,
 workspace-relative path resolution, and autonomous write authorization through
 `executeResearchTopicWorkflow` in
-`scripts/sdd/research-planning-skill-runtime.mjs`, supplying a bounded artifact
+`ai-skills-runtime run research-planning-skill-runtime`, supplying a bounded artifact
 reader, an atomic multi-artifact writer, and a bounded model-guidance display
 callback.
 The runtime displays provider-aware guidance before source resolution,
@@ -88,12 +88,27 @@ Autonomous execution is permitted only under the `research-read-only`
 bounded-autonomous-execution profile, with the run's workspace, permitted
 findings/sources paths, expiration, evidence, and pause conditions named for
 that run. Map every autonomous write through
-`scripts/sdd/check-operation-authorization.mjs`.
+`ai-skills-runtime run check-operation-authorization`.
 
 Pause when topic, category, depth, or destination is missing; a source
 requires new credentials or an unapproved connector; access to sensitive data
 is needed; source conflicts materially affect the recommendation; or the
 request expands into a decision the user has not authorized.
+
+## Shared runtime
+
+Shared helpers are invoked through the installed launcher, never through a
+path in the active workspace:
+
+```
+ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository> [-- <helper args>]
+```
+
+Required runtime contract version: 1. The launcher validates the runtime, the
+declared helper and verb, and the mechanical shape of the target repository. It
+makes no authorization decision, and a missing, incompatible, or drifted runtime
+is a classified pause rather than a workspace fallback. Run
+`ai-skills-runtime doctor` once per session to detect skill and runtime drift.
 
 ## Guardrails
 

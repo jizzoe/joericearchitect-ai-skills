@@ -18,7 +18,7 @@ work through the configured GitHub intake flow.
 
 1. Read repository configuration.
 2. Search for an existing issue with the exact title before creating one.
-3. Use `scripts/github/create-or-find-issue.mjs` for issue creation or dry-run
+3. Use `ai-skills-runtime run create-or-find-issue` for issue creation or dry-run
    planning.
 4. Preserve human-authored issue content.
 5. Record returned issue URL, number, and action.
@@ -30,6 +30,21 @@ work through the configured GitHub intake flow.
 - Use dry-run output when authorization for live mutation is absent.
 - Do not store credentials, Project item IDs, field IDs, PR state, or
   timestamps in repository files.
+
+## Shared runtime
+
+Shared helpers are invoked through the installed launcher, never through a
+path in the active workspace:
+
+```
+ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository> [-- <helper args>]
+```
+
+Required runtime contract version: 1. The launcher validates the runtime, the
+declared helper and verb, and the mechanical shape of the target repository. It
+makes no authorization decision, and a missing, incompatible, or drifted runtime
+is a classified pause rather than a workspace fallback. Run
+`ai-skills-runtime doctor` once per session to detect skill and runtime drift.
 
 ## Guardrails
 

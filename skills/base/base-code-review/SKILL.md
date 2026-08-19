@@ -75,7 +75,7 @@ findings, coverage, `standardsSelection`, evidence gaps, and scope summary in
 `details`; `standardsSelection` carries selected rule IDs, scoped
 overrides, and not-applicable rule IDs (or empty arrays when not requested).
 Reference the shared top-level evidence array by stable ID. Validate the result
-with `scripts/validation/validate-implementation-quality.mjs` before rendering
+with `ai-skills-runtime run validate-implementation-quality` before rendering
 Markdown. When standards coverage is claimed, supply that same selection record
 as `standardsSelectionRecord` in the validation context; the validator rejects
 rule IDs, override scopes, and not-applicable classifications that do not match
@@ -89,6 +89,21 @@ On sensitive content, unexpected scope, destructive or external mutation,
 material decision, ambiguous state, or exhausted correction budget, preserve
 the reviewed state and return a paused or blocked result with a safe next
 action.
+
+## Shared runtime
+
+Shared helpers are invoked through the installed launcher, never through a
+path in the active workspace:
+
+```
+ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository> [-- <helper args>]
+```
+
+Required runtime contract version: 1. The launcher validates the runtime, the
+declared helper and verb, and the mechanical shape of the target repository. It
+makes no authorization decision, and a missing, incompatible, or drifted runtime
+is a classified pause rather than a workspace fallback. Run
+`ai-skills-runtime doctor` once per session to detect skill and runtime drift.
 
 ## Guardrails
 

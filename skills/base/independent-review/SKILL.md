@@ -22,11 +22,11 @@ standing grants, noncanonical commits, or content outside the sealed package.
 
 1. Re-derive durable Git, OpenSpec, checkpoint, authorization, and Apply
    evidence. Stop if evidence is stale or the transition is not authorized.
-2. Build the package with `scripts/sdd/independent-review-contract.mjs`; do not
+2. Build the package with `ai-skills-runtime run independent-review-contract`; do not
    add conversation history, dispositions as instructions, or an intended
    conclusion.
 3. Create a disposable detached view at the exact head and capability-probe the
-   selected adapter. Invoke only `scripts/sdd/platform-review-adapters.mjs`.
+   selected adapter. Invoke only `ai-skills-runtime run platform-review-adapters`.
 4. If a managed parent denies nested Codex app-server or sandbox startup, call
    `buildCodexParentStrictReviewToolRequest` for the same exact package,
    configured reviewer, attestation, and distinct implementer identity. Issue
@@ -48,7 +48,7 @@ standing grants, noncanonical commits, or content outside the sealed package.
    reason, and `fresh-separated-reviewer-only` boundary. It MUST retain the
    strict record and capability ledger and MUST NOT be called strict-isolated.
 7. If detached-view creation or the parent strict transport remains unavailable,
-   use `scripts/sdd/review-launcher-recovery.mjs` to validate and
+   use `ai-skills-runtime run review-launcher-recovery` to validate and
    prepare a sealed host request only when the exact degraded authorization,
    configured launcher, active runtime permission, and a separately bound
    worktree-lifecycle authorization all validate. That lifecycle request binds
@@ -91,6 +91,21 @@ Return `skill-result-v1` with the selected adapter, review record/result path,
 current status, validation evidence, assumptions, and the next safe action.
 Use `paused` for unavailable or invalid isolation, a material finding, stale
 evidence, or an exhausted correction budget. Do not claim delivery approval.
+
+## Shared runtime
+
+Shared helpers are invoked through the installed launcher, never through a
+path in the active workspace:
+
+```
+ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository> [-- <helper args>]
+```
+
+Required runtime contract version: 1. The launcher validates the runtime, the
+declared helper and verb, and the mechanical shape of the target repository. It
+makes no authorization decision, and a missing, incompatible, or drifted runtime
+is a classified pause rather than a workspace fallback. Run
+`ai-skills-runtime doctor` once per session to detect skill and runtime drift.
 
 ## Guardrails
 

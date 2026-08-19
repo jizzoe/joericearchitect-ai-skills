@@ -68,6 +68,9 @@ test("assistant wrappers point to canonical PR linkage skill", () => {
   for (const wrapper of [".claude/skills/github-pr-linkage/SKILL.md", ".agents/skills/github-pr-linkage/SKILL.md"]) {
     const text = fs.readFileSync(path.join(repoRoot, wrapper), "utf8");
     assert.match(text, /Canonical skill: `skills\/base\/github-pr-linkage\/SKILL.md`/);
-    assert.match(text, /validate-pr-contract\.mjs/);
+    // Helpers are named through the installed launcher, not by a path in the
+    // workspace, so an installed adapter stays valid without this checkout.
+    assert.match(text, /ai-skills-runtime run validate-pr-contract/);
+    assert.doesNotMatch(text, /scripts\/validation\/validate-pr-contract\.mjs/);
   }
 });

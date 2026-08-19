@@ -5,8 +5,12 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { resolveAssetRoot } from "../runtime/asset-root.mjs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const defaultSkillsRoot = path.resolve(__dirname, "../../skills/base");
+// Installed runtimes resolve the packaged skills root through RUNTIME_HOME;
+// the checkout-relative path remains the in-repository default.
+const defaultSkillsRoot = resolveAssetRoot("skills/base", import.meta.url).resolved;
 const namePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const plainScalarPattern = /^(?![-?:,[\]{}#&*!|>'"%@`])(?!.*:\s)(?!.*\s#)[^\t\r\n]+$/;
 

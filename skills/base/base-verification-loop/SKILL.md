@@ -116,7 +116,7 @@ package digest, workspace, and head. Failed, missing, stale, mismatched,
 skipped-required, attempted-only, or unresolved-objective state is not
 completion.
 
-Validate with `scripts/validation/validate-implementation-quality.mjs`. Supply
+Validate with `ai-skills-runtime run validate-implementation-quality`. Supply
 a validation-context JSON file as its second argument. The context carries the
 applicable local-implementation authorization and durable correction checkpoint;
 when standards coverage is claimed, it also carries the same validated selection
@@ -131,6 +131,21 @@ merge, Sync, or Archive completed.
 Map readiness deterministically to the shared result status: `paused` to
 `paused`, `blocked` to `blocked`, `needs-implementation` to `completed`, and
 ready to `completed` or an evidence-equivalent `no-op`.
+
+## Shared runtime
+
+Shared helpers are invoked through the installed launcher, never through a
+path in the active workspace:
+
+```
+ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository> [-- <helper args>]
+```
+
+Required runtime contract version: 1. The launcher validates the runtime, the
+declared helper and verb, and the mechanical shape of the target repository. It
+makes no authorization decision, and a missing, incompatible, or drifted runtime
+is a classified pause rather than a workspace fallback. Run
+`ai-skills-runtime doctor` once per session to detect skill and runtime drift.
 
 ## Guardrails
 

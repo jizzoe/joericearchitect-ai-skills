@@ -4,9 +4,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { requireAssetRoot } from "../runtime/asset-root.mjs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../..");
-const rulesPath = path.join(repoRoot, "quality/openspec-artifact-rules.json");
+// Packaged rules resolve through RUNTIME_HOME when installed and stay
+// checkout-relative in the repository; an unresolved root fails closed.
+const rulesPath = path.join(requireAssetRoot("quality", import.meta.url), "openspec-artifact-rules.json");
 
 function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");

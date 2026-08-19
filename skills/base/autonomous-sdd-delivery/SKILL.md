@@ -5,9 +5,9 @@ description: Continue one complete, explicit autonomous SDD delivery through its
 
 # Autonomous SDD Delivery
 
-Use `scripts/sdd/resolve-sdd-delivery-request.mjs` or its `ship-sdd` parser
+Use `ai-skills-runtime run resolve-sdd-delivery-request` or its `ship-sdd` parser
 before selection. Create or resume the exact selected-entry controller record
-with `scripts/sdd/autonomous-sdd-controller.mjs` in repository-common Git state,
+with `ai-skills-runtime run autonomous-sdd-controller` in repository-common Git state,
 then reread durable state and run only its first incomplete phase. Register
 every non-primary implementation, Sync, and Archive resource before it is
 created or selected, and bind each merged checkpoint to that resource rather
@@ -32,6 +32,21 @@ See [the canonical lifecycle](../autonomous-sdd-lifecycle/SKILL.md) for phase
 gates and recovery. A complete global installation must include that sibling
 skill; treat an unresolved target as an incomplete installation and do not
 substitute remembered or copied lifecycle policy.
+
+## Shared runtime
+
+Shared helpers are invoked through the installed launcher, never through a
+path in the active workspace:
+
+```
+ai-skills-runtime run <helper> [verb] --repository <absolute-target-repository> [-- <helper args>]
+```
+
+Required runtime contract version: 1. The launcher validates the runtime, the
+declared helper and verb, and the mechanical shape of the target repository. It
+makes no authorization decision, and a missing, incompatible, or drifted runtime
+is a classified pause rather than a workspace fallback. Run
+`ai-skills-runtime doctor` once per session to detect skill and runtime drift.
 
 ## Guardrails
 

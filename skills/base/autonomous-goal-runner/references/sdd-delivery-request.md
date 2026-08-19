@@ -3,7 +3,7 @@
 Use this contract when a user asks the autonomous runner to deliver one named
 OpenSpec change or an ordered queue. Before work selection or mutation,
 normalize the request with
-`scripts/sdd/resolve-sdd-delivery-request.mjs` and report its effective
+`ai-skills-runtime run resolve-sdd-delivery-request` and report its effective
 authorization.
 
 ## Required Inputs

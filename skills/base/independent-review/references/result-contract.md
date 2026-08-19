@@ -2,7 +2,7 @@
 
 Use `independent-review-result-v1` from
 `schemas/independent-review-result-v1.schema.json`. Validate through
-`validateReviewResult` in `scripts/sdd/independent-review-contract.mjs`.
+`validateReviewResult` in `ai-skills-runtime run independent-review-contract`.
 
 The result binds one unique review record and execution ID to reviewer type,
 identity, adapter, attestation, exact base/head, package digest, timestamps,

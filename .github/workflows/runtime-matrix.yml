@@ -1,0 +1,124 @@
+name: Shared Runtime Matrix
+
+# Covers the network-free cross-platform surface of the shared SDD runtime:
+# builder determinism, launcher preflight and failure classification, dry-run
+# receipt parity, and PowerShell script analysis. The gh-authenticated
+# installed-profile fixtures stay operator-run and are recorded separately.
+#
+# No job authenticates to GitHub, installs an agent, or contacts the network
+# beyond checkout and Node setup.
+
+on:
+  pull_request:
+    paths:
+      - "scripts/runtime/**"
+      - "scripts/skills/**"
+      - "scripts/validation/**"
+      - "scripts/install-ai-skills.sh"
+      - "scripts/install-ai-skills.ps1"
+      - "scripts/dev-link-runtime.sh"
+      - "skills/**"
+      - ".claude/**"
+      - ".agents/**"
+      - "quality/**"
+      - "evals/skills/global-skill-installation/**"
+      - ".github/workflows/runtime-matrix.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    name: runtime (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: PowerShell entrypoint parity
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $receipt = & ./scripts/install-ai-skills.ps1 -Local (Get-Location).Path -Agent claude -DryRun -AllowDirtySource | ConvertFrom-Json
+          if (-not $receipt) { throw "PowerShell entrypoint produced no receipt" }
+          if (-not $receipt.dryRun) { throw "PowerShell dry run did not report itself" }
+          if ($receipt.tool -ne 'install-ai-skills') { throw "unexpected receipt tool: $($receipt.tool)" }
+          if ($receipt.runtime.contractVersion -ne 1) { throw "unexpected contract version: $($receipt.runtime.contractVersion)" }
+          Write-Output "PowerShell receipt parity verified"
+
+      - name: Runtime unit and contract tests
+        run: node --test scripts/runtime/test/
+
+      - name: Runtime reference validation
+        run: node scripts/validation/validate-runtime-references.mjs
+
+      - name: Installed-runtime completeness
+        run: node --test evals/skills/global-skill-installation/run-runtime-completeness.test.mjs
+
+      - name: Builder determinism
+        shell: bash
+        run: |
+          node scripts/runtime/build-runtime.mjs --output "${RUNNER_TEMP}/runtime-a" > "${RUNNER_TEMP}/a.json"
+          node scripts/runtime/build-runtime.mjs --output "${RUNNER_TEMP}/runtime-b" > "${RUNNER_TEMP}/b.json"
+          node -e '
+            const fs = require("node:fs");
+            const first = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/a.json", "utf8"));
+            const second = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/b.json", "utf8"));
+            if (!first.ok || !second.ok) throw new Error("build failed");
+            if (first.manifest.digest !== second.manifest.digest) {
+              throw new Error(`nondeterministic build: ${first.manifest.digest} !== ${second.manifest.digest}`);
+            }
+            console.log("deterministic digest", first.manifest.digest);
+          '
+
+      - name: Launcher preflight and failure classification
+        shell: bash
+        run: |
+          node --input-type=module -e '
+            const { prepareDispatch, resolveRuntime } = await import("./scripts/runtime/launcher.mjs");
+            const runtime = process.env.RUNNER_TEMP + "/runtime-a";
+            const environment = { ...process.env, AI_SKILLS_RUNTIME_ROOT: runtime };
+            const expectations = [
+              [{ helper: "not-declared", target: process.cwd(), environment }, "helper-not-declared"],
+              [{ helper: "platform-review-adapters", verb: "nope", target: process.cwd(), environment }, "verb-not-declared"],
+              [{ helper: "check-operation-authorization", target: "relative", environment }, "target-repository-not-absolute"],
+              [{ helper: "check-operation-authorization", target: process.cwd(), requiredContractVersion: 99, environment }, "runtime-contract-version-mismatch"],
+              [{ helper: "check-operation-authorization", target: process.cwd(), environment, nodeVersion: "18.0.0" }, "node-version-unsupported"]
+            ];
+            for (const [input, expected] of expectations) {
+              const result = prepareDispatch(input);
+              if (result.code !== expected) throw new Error(`expected ${expected}, received ${result.code ?? "ok"}`);
+            }
+            const missing = resolveRuntime({ environment: { HOME: process.env.RUNNER_TEMP + "/empty", USERPROFILE: process.env.RUNNER_TEMP + "/empty" } });
+            if (missing.code !== "runtime-not-installed") throw new Error("missing runtime was not classified");
+            console.log("classification surface verified");
+          '
+
+      - name: Dry-run receipt parity
+        shell: bash
+        run: |
+          node scripts/runtime/install-runtime.mjs --local "$(pwd)" --agent claude --dry-run --allow-dirty-source \
+            > "${RUNNER_TEMP}/receipt-node.json" || true
+          node -e '
+            const fs = require("node:fs");
+            const receipt = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/receipt-node.json", "utf8"));
+            for (const field of ["schemaVersion", "tool", "ok", "agents", "source", "runtime", "activation", "paths", "dryRun"]) {
+              if (!(field in receipt)) throw new Error(`receipt is missing ${field}`);
+            }
+            if (receipt.dryRun !== true) throw new Error("dry run did not report itself");
+            console.log("receipt contract verified");
+          '
+
+      - name: PowerShell script analysis
+        shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction Stop
+          $results = Invoke-ScriptAnalyzer -Path ./scripts/install-ai-skills.ps1 -Severity Error, Warning
+          $results | Format-Table -AutoSize
+          if ($results | Where-Object { $_.Severity -eq 'Error' }) { throw "PSScriptAnalyzer reported errors" }
