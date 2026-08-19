@@ -95,16 +95,26 @@ $workspace = Join-Path ([System.IO.Path]::GetTempPath()) ("ai-skills-install-" +
 New-Item -ItemType Directory -Path $workspace -Force | Out-Null
 Add-Argument '--workspace', $workspace
 
+# The receipt is captured inside the guarded block and written after it. Writing
+# to the success stream and then calling exit from inside try/finally discards
+# the output as the scope unwinds, which leaves the caller with nothing to parse.
+$receiptText = $null
+$code = 1
 try {
-    # Splatting needs a plain array, and the receipt is captured and re-emitted
-    # so it survives the script's exit rather than depending on stream timing.
+    # Splatting requires a plain array, not a generic collection.
     $argumentList = $forwarded.ToArray()
     $installer = Join-Path $repositoryRoot 'scripts/runtime/install-runtime.mjs'
-    $output = & node $installer @argumentList
+    $receiptText = (& node $installer @argumentList | Out-String)
     $code = $LASTEXITCODE
-    if ($null -ne $output) { $output | ForEach-Object { Write-Output $_ } }
-    exit $code
 }
 finally {
     Remove-Item -LiteralPath $workspace -Recurse -Force -ErrorAction SilentlyContinue
 }
+
+if ([string]::IsNullOrWhiteSpace($receiptText)) {
+    Write-Receipt -Code 'installer-produced-no-receipt' -Phase 'invoke' -Detail ([ordered]@{ exitCode = $code })
+    exit 1
+}
+
+Write-Output $receiptText.Trim()
+exit $code

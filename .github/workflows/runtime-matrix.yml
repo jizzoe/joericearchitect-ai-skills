@@ -41,6 +41,17 @@ jobs:
         with:
           node-version: "20"
 
+      - name: PowerShell environment diagnostics
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          Get-ExecutionPolicy -List | Format-Table -AutoSize
+          Write-Output "PSNativeCommandUseErrorActionPreference: $($PSNativeCommandUseErrorActionPreference)"
+          Write-Output "--- direct file invocation ---"
+          & pwsh -NoProfile -File ./scripts/install-ai-skills.ps1 -Local (Get-Location).Path -Agent claude -DryRun
+          Write-Output "direct file invocation exit: $LASTEXITCODE"
+
       - name: PowerShell entrypoint parity
         if: runner.os == 'Windows'
         shell: pwsh
