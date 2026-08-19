@@ -41,33 +41,15 @@ jobs:
         with:
           node-version: "20"
 
-      - name: PowerShell environment diagnostics
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Continue'
-          Get-ExecutionPolicy -List | Format-Table -AutoSize
-          Write-Output "PSNativeCommandUseErrorActionPreference: $($PSNativeCommandUseErrorActionPreference)"
-          Write-Output "--- direct file invocation ---"
-          & pwsh -NoProfile -File ./scripts/install-ai-skills.ps1 -Local (Get-Location).Path -Agent claude -DryRun
-          Write-Output "direct file invocation exit: $LASTEXITCODE"
-
       - name: PowerShell entrypoint parity
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Continue'
-          Write-Output "pwsh $($PSVersionTable.PSVersion)"
-          Write-Output "node $(& node --version)"
-          Write-Output "installer present: $(Test-Path ./scripts/install-ai-skills.ps1)"
-          $raw = & ./scripts/install-ai-skills.ps1 -Local (Get-Location).Path -Agent claude -DryRun -AllowDirtySource 2>&1
-          Write-Output "exit code: $LASTEXITCODE"
-          Write-Output "--- raw output ---"
-          $raw | ForEach-Object { Write-Output $_ }
-          Write-Output "--- end raw output ---"
-          $receipt = ($raw | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }) -join "`n" | ConvertFrom-Json
+          $receipt = & ./scripts/install-ai-skills.ps1 -Local (Get-Location).Path -Agent claude -DryRun -AllowDirtySource | ConvertFrom-Json
+          if (-not $receipt) { throw "PowerShell entrypoint produced no receipt" }
           if (-not $receipt.dryRun) { throw "PowerShell dry run did not report itself" }
           if ($receipt.tool -ne 'install-ai-skills') { throw "unexpected receipt tool: $($receipt.tool)" }
+          if ($receipt.runtime.contractVersion -ne 1) { throw "unexpected contract version: $($receipt.runtime.contractVersion)" }
           Write-Output "PowerShell receipt parity verified"
 
       - name: Runtime unit and contract tests

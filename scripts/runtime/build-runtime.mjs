@@ -12,7 +12,8 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 
 import {
-  BUILT_MANIFEST_FILENAME, MANIFEST_SCHEMA_VERSION, loadManifest, repositoryRootFromModule, safeRelativePath
+  BUILT_MANIFEST_FILENAME, MANIFEST_SCHEMA_VERSION, isMainModule, loadManifest, repositoryRootFromModule,
+  safeRelativePath
 } from "./registry.mjs";
 
 const RESOLUTION_FAILURES = [
@@ -218,7 +219,7 @@ function parseArgs(argv) {
   return args;
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   try {
     const args = parseArgs(process.argv.slice(2));
     if (args.help || !args.output) {

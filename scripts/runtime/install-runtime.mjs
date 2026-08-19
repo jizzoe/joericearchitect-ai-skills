@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 
-import { BUILT_MANIFEST_FILENAME, REQUIRED_NODE_MAJOR, nodeVersionSupported } from "./registry.mjs";
+import { BUILT_MANIFEST_FILENAME, REQUIRED_NODE_MAJOR, isMainModule, nodeVersionSupported } from "./registry.mjs";
 import { redactCredential } from "../skills/install-global-skill.mjs";
 import { buildRuntime } from "./build-runtime.mjs";
 import {
@@ -318,7 +318,7 @@ runtime. Skill installation is delegated to scripts/skills/install-global-skill.
 PATH is never modified; the receipt reports what activation requires.
 `;
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   try {
     const args = parseArgs(process.argv.slice(2));
     if (args.help) {

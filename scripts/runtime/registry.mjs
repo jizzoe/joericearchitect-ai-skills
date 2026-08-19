@@ -7,7 +7,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const MANIFEST_SCHEMA_VERSION = 1;
 export const REQUIRED_NODE_MAJOR = 20;
@@ -21,6 +21,22 @@ const helperShape = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 // sits at the same relative path in a checkout and in an installed runtime.
 export const MANIFEST_RELATIVE_PATH = "scripts/runtime/manifest.json";
 export const BUILT_MANIFEST_FILENAME = "runtime-manifest.json";
+
+/**
+ * True when the module is the process entrypoint.
+ *
+ * Comparing `import.meta.url` against a literal `file://` plus `process.argv[1]`
+ * never matches on Windows, where argv carries a drive-letter path with
+ * backslashes, so a CLI guarded that way exits zero without running.
+ */
+export function isMainModule(moduleUrl, argv = process.argv) {
+  if (!argv[1]) return false;
+  try {
+    return moduleUrl === pathToFileURL(argv[1]).href;
+  } catch {
+    return false;
+  }
+}
 
 export function repositoryRootFromModule(moduleUrl) {
   return path.resolve(path.dirname(fileURLToPath(moduleUrl)), "../..");

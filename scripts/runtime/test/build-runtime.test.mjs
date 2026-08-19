@@ -3,12 +3,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   buildRuntime, digestFiles, listFiles, localImportSpecifiers, smokeInvoke, verifyClosure
 } from "../build-runtime.mjs";
-import { validateManifest, safeRelativePath } from "../registry.mjs";
+import { isMainModule, validateManifest, safeRelativePath } from "../registry.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -44,7 +44,7 @@ const baseManifest = {
 const exampleHelper = [
   'import fs from "node:fs";',
   'import path from "node:path";',
-  'import { fileURLToPath } from "node:url";',
+  'import { fileURLToPath, pathToFileURL } from "node:url";',
   'const root = process.env.RUNTIME_HOME ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");',
   'fs.readFileSync(path.join(root, "quality/rules.json"), "utf8");',
   'process.stdout.write("ok\\n");'
@@ -258,4 +258,27 @@ test("closure and smoke helpers report their own failures without throwing", () 
   assert.equal(closure.ok, false);
   const smoke = smokeInvoke({ staging: root, entrypoints: [{ name: "absent", module: "scripts/absent.mjs" }] });
   assert.equal(smoke.ok, false);
+});
+
+test("the main-module guard resolves a platform path rather than a literal file URL", () => {
+  // A `file://` + process.argv[1] comparison never matches on Windows, where
+  // argv carries a drive-letter path with backslashes, so the CLI would exit
+  // zero without running.
+  const posix = "/repo/scripts/runtime/build-runtime.mjs";
+  assert.equal(isMainModule(pathToFileURL(posix).href, ["node", posix]), true);
+  assert.equal(isMainModule("file:///repo/scripts/runtime/other.mjs", ["node", posix]), false);
+  assert.equal(isMainModule(pathToFileURL(posix).href, ["node"]), false);
+
+  const windows = "D:\\a\\repo\\scripts\\runtime\\build-runtime.mjs";
+  const windowsUrl = pathToFileURL(windows).href;
+  assert.equal(isMainModule(windowsUrl, ["node", windows]), true);
+  // The literal form this replaced would not have matched.
+  assert.notEqual(windowsUrl, `file://${windows}`);
+
+  // Every runtime CLI uses the shared guard.
+  for (const module of ["build-runtime.mjs", "launcher.mjs", "install-runtime.mjs"]) {
+    const source = fs.readFileSync(path.join(repositoryRoot, "scripts/runtime", module), "utf8");
+    assert.match(source, /isMainModule\(import\.meta\.url\)/, `${module} must use the shared main guard`);
+    assert.doesNotMatch(source, /`file:\/\/\$\{process\.argv\[1\]\}`/, `${module} must not compare a literal file URL`);
+  }
 });

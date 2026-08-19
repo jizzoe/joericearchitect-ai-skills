@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LEGACY_HELPER_REFERENCE, loadManifest, verbDeclared } from "../runtime/registry.mjs";
+import { LEGACY_HELPER_REFERENCE, isMainModule, loadManifest, verbDeclared } from "../runtime/registry.mjs";
 
 const CANONICAL_ROOT = "skills/base";
 const ADAPTER_ROOTS = [".claude/skills", ".agents/skills"];
@@ -138,7 +138,7 @@ export function validateRuntimeReferences(repositoryRoot = process.cwd()) {
   return { valid: issues.length === 0, issues };
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   const repositoryRoot = process.argv[2]
     ? path.resolve(process.argv[2])
     : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");

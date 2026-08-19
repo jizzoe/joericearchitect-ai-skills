@@ -13,7 +13,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import {
-  BUILT_MANIFEST_FILENAME, findEntrypoint, nodeVersionSupported, REQUIRED_NODE_MAJOR,
+  BUILT_MANIFEST_FILENAME, findEntrypoint, isMainModule, nodeVersionSupported, REQUIRED_NODE_MAJOR,
   validateManifest, validateTargetRepository, verbDeclared
 } from "./registry.mjs";
 import {
@@ -314,6 +314,6 @@ export function main(argv, { write = (line) => process.stdout.write(`${line}\n`)
   return result.status;
 }
 
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url)) {
   process.exit(main(process.argv.slice(2)));
 }
