@@ -16,6 +16,8 @@ import { LEGACY_HELPER_REFERENCE, loadManifest, verbDeclared } from "../runtime/
 const CANONICAL_ROOT = "skills/base";
 const ADAPTER_ROOTS = [".claude/skills", ".agents/skills"];
 const LAUNCHER_INVOCATION = /ai-skills-runtime run ([a-z0-9-]+)(?:\s+([a-z0-9-]+))?/g;
+const CODE_SPAN = /`[^`\n]+`/g;
+const FENCED_BLOCK = /```[\s\S]*?```/g;
 const CONTRACT_DECLARATION = /Required runtime contract version:\s*(\d+)/;
 
 // Policy that belongs to the canonical skill only. A thin adapter repeating it
@@ -41,6 +43,14 @@ function issue(ruleId, filePath, message) {
   return { ruleId, path: filePath, message };
 }
 
+/**
+ * Invocations are only read from code spans and fenced blocks. Scanning prose
+ * would treat the ordinary word after a helper name as a subcommand verb.
+ */
+function invocationText(contents) {
+  return [...(contents.match(CODE_SPAN) ?? []), ...(contents.match(FENCED_BLOCK) ?? [])].join("\n");
+}
+
 export function validateRuntimeReferences(repositoryRoot = process.cwd()) {
   const declaration = loadManifest(repositoryRoot);
   if (!declaration.valid) {
@@ -63,7 +73,7 @@ export function validateRuntimeReferences(repositoryRoot = process.cwd()) {
         `unresolved workspace-relative helper reference: ${match[0]}`));
     }
 
-    for (const match of contents.matchAll(LAUNCHER_INVOCATION)) {
+    for (const match of invocationText(contents).matchAll(LAUNCHER_INVOCATION)) {
       const [, helper, verb] = match;
       const entry = declared.get(helper);
       if (!entry) {
@@ -73,8 +83,8 @@ export function validateRuntimeReferences(repositoryRoot = process.cwd()) {
       if (entry.invocation === "subcommand" && verb && !verbDeclared(entry, verb)) {
         issues.push(issue("runtime-references.verb-not-declared", relative, `verb not declared for ${helper}: ${verb}`));
       }
-      if (entry.invocation !== "subcommand" && verb && declared.has(verb) === false && /^[a-z0-9-]+$/.test(verb) && contents.includes(`run ${helper} ${verb}`)) {
-        // A cli-shaped helper takes no verb; a stray word here would be passed
+      if (entry.invocation !== "subcommand" && verb && !verb.startsWith("--")) {
+        // A cli-shaped helper takes no verb; a stray token here would be passed
         // through as an argument and silently ignored.
         issues.push(issue("runtime-references.verb-not-supported", relative, `${helper} takes no subcommand verb: ${verb}`));
       }

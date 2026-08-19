@@ -42,5 +42,5 @@
 
 ## 6. Completion evidence
 
-- [ ] 6.1 Run focused builder, launcher, entrypoint, installer, metadata, adapter-drift, CI matrix, and installed-profile fixtures; record exact commands, source revision, runtime digest and contract version, `mode`, supported agent versions, and any unavailable prerequisite. Depends on: 5.1, 5.2, 5.3, 5.4.
-- [ ] 6.2 Run `openspec validate distribute-shared-sdd-runtime --strict`, `openspec validate --all --strict`, whitespace/secret/scope review, and a bounded local code review; correct objective findings and refresh current-head evidence. Depends on: 6.1.
+- [x] 6.1 Run focused builder, launcher, entrypoint, installer, metadata, adapter-drift, CI matrix, and installed-profile fixtures; record exact commands, source revision, runtime digest and contract version, `mode`, supported agent versions, and any unavailable prerequisite. Depends on: 5.1, 5.2, 5.3, 5.4.
+- [x] 6.2 Run `openspec validate distribute-shared-sdd-runtime --strict`, `openspec validate --all --strict`, whitespace/secret/scope review, and a bounded local code review; correct objective findings and refresh current-head evidence. Depends on: 6.1.

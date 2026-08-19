@@ -112,6 +112,23 @@ test("a declared entrypoint that is absent from the tree is reported", () => {
   assert.ok(codesOf(result).includes("runtime-references.entrypoint-missing"));
 });
 
+test("prose after a helper name is not mistaken for a subcommand verb", () => {
+  // Only code spans and fenced blocks are scanned; an ordinary sentence that
+  // continues after an invocation must not be read as a verb.
+  const skill = compliantSkill.replace(
+    "Use `ai-skills-runtime run example-helper` and",
+    "Use `ai-skills-runtime run example-helper` and then review the result, or run\n`ai-skills-runtime run example-subcommand allowed-verb`, and"
+  );
+  const result = validateRuntimeReferences(fixture({ skill }));
+  assert.equal(result.valid, true, JSON.stringify(result.issues, null, 2));
+});
+
+test("a verb written for a cli-shaped helper inside a code span is rejected", () => {
+  const skill = compliantSkill.replace("run example-helper`", "run example-helper stray-token`");
+  const result = validateRuntimeReferences(fixture({ skill }));
+  assert.ok(codesOf(result).includes("runtime-references.verb-not-supported"));
+});
+
 test("an invalid manifest is reported rather than silently passing", () => {
   const result = validateRuntimeReferences(fixture({ manifest: { schemaVersion: 99 } }));
   assert.equal(result.valid, false);

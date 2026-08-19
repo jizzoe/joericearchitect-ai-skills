@@ -127,6 +127,7 @@ export function prepareDispatch({ helper, verb, target, requiredContractVersion,
     runtimeRoot: resolved.root,
     modulePath: path.join(resolved.root, entry.module),
     entrypoint: entry,
+    ...(entry.invocation === "subcommand" ? { verb } : {}),
     target: validatedTarget.target,
     contractVersion: manifest.contractVersion,
     sourceRevision: manifest.sourceRevision,
@@ -136,6 +137,8 @@ export function prepareDispatch({ helper, verb, target, requiredContractVersion,
 
 export function dispatch(plan, passthroughArgs, { run = spawnSync, environment = process.env } = {}) {
   const args = [plan.modulePath];
+  // The verb comes from the validated plan, so a caller cannot drop or change
+  // it between validation and dispatch.
   if (plan.entrypoint.invocation === "subcommand") args.push(plan.verb);
   args.push(...passthroughArgs);
   const result = run(process.execPath, args, {
@@ -307,7 +310,7 @@ export function main(argv, { write = (line) => process.stdout.write(`${line}\n`)
     write(JSON.stringify(plan, null, 2));
     return 1;
   }
-  const result = dispatch({ ...plan, verb: args.verb }, args.passthrough);
+  const result = dispatch(plan, args.passthrough);
   return result.status;
 }
 

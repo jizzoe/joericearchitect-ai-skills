@@ -258,6 +258,28 @@ test("a dry run reports the full paired receipt and changes nothing", () => {
   assert.deepEqual(fs.readdirSync(home), []);
 });
 
+test("an occupied version directory without a manifest is never activated", () => {
+  const { environment } = isolatedHome("occupied-home-");
+  const paths = runtimePaths(environment, "linux");
+  const workspace = temporaryDirectory("occupied-workspace-");
+
+  // Learn the digest this source produces, then occupy that directory with
+  // content carrying no manifest.
+  const planned = installAiSkills({ local: checkout, agents: ["claude"], dryRun: true, environment, platform: "linux", workspace, run: stubbedRun() });
+  fs.mkdirSync(planned.runtime.path, { recursive: true });
+  fs.writeFileSync(path.join(planned.runtime.path, "unexpected.txt"), "not a runtime\n");
+
+  for (const force of [false, true]) {
+    const receipt = installAiSkills({
+      local: checkout, agents: ["claude"], force, environment, platform: "linux",
+      workspace: temporaryDirectory("occupied-workspace-2-"), run: stubbedRun()
+    });
+    assert.equal(receipt.ok, false, `force=${force} should not activate an unverifiable directory`);
+    assert.equal(receipt.code, "runtime-version-directory-occupied");
+    assert.equal(fs.existsSync(paths.activePath), false);
+  }
+});
+
 test("the launcher shim resolves the active runtime rather than a fixed version", () => {
   const paths = runtimePaths({ HOME: "/home/example" }, "linux");
   const posix = launcherShim("linux", paths);

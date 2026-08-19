@@ -240,8 +240,16 @@ export function installAiSkills({
 
   try {
     if (fs.existsSync(versionPath)) {
-      if (!force && !fs.existsSync(path.join(versionPath, BUILT_MANIFEST_FILENAME))) {
-        return failure({ phase: "activate", code: "runtime-version-directory-occupied", detail: versionPath, ...base });
+      // The digest already names this content. Reuse it only when it carries a
+      // manifest; an occupied directory without one is never activated, with or
+      // without overwrite intent.
+      if (!fs.existsSync(path.join(versionPath, BUILT_MANIFEST_FILENAME))) {
+        fs.rmSync(stagingOutput, { recursive: true, force: true });
+        return failure({
+          phase: "activate", code: "runtime-version-directory-occupied", detail: versionPath, ...base,
+          skills: skills.results,
+          recovery: priorActive ? `previously active runtime retained at ${priorActive.activePath}` : "no runtime was activated"
+        });
       }
       fs.rmSync(stagingOutput, { recursive: true, force: true });
     } else {
