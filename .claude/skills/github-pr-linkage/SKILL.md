@@ -4,4 +4,5 @@ Canonical skill: `skills/base/github-pr-linkage/SKILL.md`
 
 Claude should follow the canonical skill and use
 `scripts/validation/validate-pr-contract.mjs` and
-`scripts/validation/validate-openspec-linkage.mjs`.
+`scripts/validation/validate-openspec-linkage.mjs`. This discovery adapter must
+not duplicate canonical policy.

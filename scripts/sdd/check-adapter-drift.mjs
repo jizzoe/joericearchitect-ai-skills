@@ -2,98 +2,39 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const REQUIRED_ADAPTERS = [
-  {
-    adapter: ".claude/skills/autonomous-goal-runner/SKILL.md",
-    canonical: "skills/base/autonomous-goal-runner/SKILL.md",
-    phrases: ["canonical autonomous goal runner", "must not duplicate"]
-  },
-  {
-    adapter: ".agents/skills/autonomous-goal-runner/SKILL.md",
-    canonical: "skills/base/autonomous-goal-runner/SKILL.md",
-    phrases: ["canonical autonomous goal runner", "must not duplicate"]
-  },
-  {
-    adapter: ".claude/skills/autonomous-sdd-lifecycle/SKILL.md",
-    canonical: "skills/base/autonomous-sdd-lifecycle/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate"]
-  },
-  {
-    adapter: ".agents/skills/autonomous-sdd-lifecycle/SKILL.md",
-    canonical: "skills/base/autonomous-sdd-lifecycle/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate"]
-  },
-  {
-    adapter: "workflows/autonomous-sdd-lifecycle/workflow.md",
-    canonical: "skills/base/autonomous-sdd-lifecycle/SKILL.md",
-    phrases: ["compatibility", "must not duplicate"]
-  },
-  {
-    adapter: ".claude/skills/autonomous-sdd-delivery/SKILL.md",
-    canonical: "skills/base/autonomous-sdd-delivery/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate canonical"]
-  },
-  {
-    adapter: ".agents/skills/autonomous-sdd-delivery/SKILL.md",
-    canonical: "skills/base/autonomous-sdd-delivery/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate canonical"]
-  },
-  {
-    adapter: ".claude/skills/sdd-workspace-cleanup/SKILL.md",
-    canonical: "skills/base/sdd-workspace-cleanup/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate canonical"]
-  },
-  {
-    adapter: ".agents/skills/sdd-workspace-cleanup/SKILL.md",
-    canonical: "skills/base/sdd-workspace-cleanup/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate canonical"]
-  },
-  {
-    adapter: ".claude/skills/independent-review/SKILL.md",
-    canonical: "skills/base/independent-review/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate"]
-  },
-  {
-    adapter: ".agents/skills/independent-review/SKILL.md",
-    canonical: "skills/base/independent-review/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate"]
-  },
-  {
-    adapter: ".claude/skills/base-code-review/SKILL.md",
-    canonical: "skills/base/base-code-review/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate canonical"]
-  },
-  {
-    adapter: ".agents/skills/base-code-review/SKILL.md",
-    canonical: "skills/base/base-code-review/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate canonical"]
-  },
-  {
-    adapter: ".claude/skills/base-verification-loop/SKILL.md",
-    canonical: "skills/base/base-verification-loop/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate canonical"]
-  },
-  {
-    adapter: ".agents/skills/base-verification-loop/SKILL.md",
-    canonical: "skills/base/base-verification-loop/SKILL.md",
-    phrases: ["canonical instructions", "must not duplicate canonical"]
-  }
-];
+const canonicalSkillsRoot = "skills/base";
+const platforms = [".claude", ".agents"];
+const maximumAdapterBytes = 1024;
 
-function exists(root, relPath) {
-  return fs.existsSync(path.join(root, relPath));
+function canonicalSkillNames(root) {
+  const directory = path.join(root, canonicalSkillsRoot);
+  if (!fs.existsSync(directory)) return [];
+  return fs.readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(directory, entry.name, "SKILL.md")))
+    .map((entry) => entry.name)
+    .sort();
+}
+
+function requiredAdapters(root) {
+  return canonicalSkillNames(root).flatMap((name) => {
+    const canonical = `${canonicalSkillsRoot}/${name}/SKILL.md`;
+    return platforms.map((platform) => ({
+      adapter: `${platform}/skills/${name}/SKILL.md`,
+      canonical
+    }));
+  });
 }
 
 export function checkAdapterDrift(root = process.cwd()) {
   const issues = [];
 
-  for (const item of REQUIRED_ADAPTERS) {
+  for (const item of requiredAdapters(root)) {
     const adapterPath = path.join(root, item.adapter);
-    if (!exists(root, item.adapter)) {
+    if (!fs.existsSync(adapterPath)) {
       issues.push({ code: "missing-adapter", adapter: item.adapter });
       continue;
     }
-    if (!exists(root, item.canonical)) {
+    if (!fs.existsSync(path.join(root, item.canonical))) {
       issues.push({ code: "missing-canonical", canonical: item.canonical });
       continue;
     }
@@ -101,10 +42,11 @@ export function checkAdapterDrift(root = process.cwd()) {
     if (!text.includes(item.canonical)) {
       issues.push({ code: "missing-canonical-reference", adapter: item.adapter });
     }
-    for (const phrase of item.phrases) {
-      if (!text.includes(phrase)) {
-        issues.push({ code: "missing-adapter-phrase", adapter: item.adapter, phrase });
-      }
+    if (!/must\s+not duplicate/.test(text)) {
+      issues.push({ code: "missing-no-policy-duplication-statement", adapter: item.adapter });
+    }
+    if (Buffer.byteLength(text, "utf8") > maximumAdapterBytes) {
+      issues.push({ code: "adapter-exceeds-thinness-limit", adapter: item.adapter, maximumAdapterBytes });
     }
   }
 

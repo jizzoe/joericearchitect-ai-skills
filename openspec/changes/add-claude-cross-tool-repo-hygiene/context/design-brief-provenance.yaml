@@ -1,0 +1,6 @@
+schema_version: 1
+source_path: "ai-planning/design-briefs/claude-cross-tool-repo-hygiene.md"
+source_sha256: "f3a5f15a2e76b12bc8d3d77d4e1e8944fc786b1fd2d647500ed0f610e78bbe1b"
+copied_at: "2026-08-19T00:30:48.391Z"
+selection_mode: "explicit"
+change: "add-claude-cross-tool-repo-hygiene"

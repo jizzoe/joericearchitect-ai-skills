@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "skill": "base-code-review",
+  "status": "completed",
+  "mode": "autonomous",
+  "summary": "Bounded same-session review found no unresolved findings in the canonical adapter inventory, root guidance import, focused tests, documentation, or OpenSpec artifacts.",
+  "artifacts": [
+    { "kind": "file", "operation": "read", "subject": "CLAUDE.md" },
+    { "kind": "file", "operation": "read", "subject": "scripts/sdd/check-adapter-drift.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/sdd/test/check-adapter-drift.test.mjs" },
+    { "kind": "file", "operation": "read", "subject": "docs/skill-authoring.md" },
+    { "kind": "file", "operation": "read", "subject": "openspec/changes/add-claude-cross-tool-repo-hygiene" }
+  ],
+  "evidence": [
+    { "id": "focused-adapter-tests", "type": "test", "subject": "adapter-drift fixtures", "result": "passed", "reference": "node --test scripts/sdd/test/check-adapter-drift.test.mjs" },
+    { "id": "adapter-contract", "type": "validation", "subject": "canonical Claude and Codex adapter inventory", "result": "passed", "reference": "node scripts/sdd/check-adapter-drift.mjs" },
+    { "id": "quality-regressions", "type": "test", "subject": "lifecycle and implementation-quality regressions", "result": "passed", "reference": "node --test evals/workflows/autonomous-sdd-lifecycle/run-fixtures.test.mjs scripts/sdd/test/autonomous-sdd-controller.test.mjs scripts/validation/test/skill-metadata.test.mjs evals/skills/implementation-quality/run-fixtures.test.mjs" },
+    { "id": "change-validation", "type": "validation", "subject": "selected OpenSpec change", "result": "passed", "reference": "openspec validate add-claude-cross-tool-repo-hygiene --strict" },
+    { "id": "reviewed-diff", "type": "review", "subject": "bounded repository diff", "result": "passed", "reference": "git diff --check and scoped diff review" },
+    { "id": "credential-scan", "type": "validation", "subject": "changed reusable assets", "result": "passed", "reference": "scoped credential-pattern scan found no match" }
+  ],
+  "assumptions": ["The displayed changed-path list excludes unrelated user-authored planning files."],
+  "openQuestions": [],
+  "nextAction": { "kind": "continue", "description": "Run formal OpenSpec Verify and proceed only to an authenticated external delivery transition." },
+  "details": {
+    "assurance": "local-review",
+    "worker": { "executionIdentity": "same-session-claude-cross-tool-hygiene-review", "sameSession": true, "readOnly": true, "canMutate": false, "canApprove": false },
+    "reviewedScope": {
+      "targets": ["CLAUDE.md", ".claude/skills", ".agents/skills", "docs/skill-authoring.md", "scripts/sdd/check-adapter-drift.mjs", "scripts/sdd/test/check-adapter-drift.test.mjs", "openspec/changes/add-claude-cross-tool-repo-hygiene"],
+      "contextPaths": ["openspec/changes/add-claude-cross-tool-repo-hygiene/proposal.md", "openspec/changes/add-claude-cross-tool-repo-hygiene/design.md", "openspec/changes/add-claude-cross-tool-repo-hygiene/specs/cross-assistant-assets/spec.md", "openspec/changes/add-claude-cross-tool-repo-hygiene/tasks.md", "openspec/changes/add-claude-cross-tool-repo-hygiene/evidence/requirements-mapping.md"],
+      "evidenceIds": ["focused-adapter-tests", "adapter-contract", "quality-regressions", "change-validation", "reviewed-diff", "credential-scan"]
+    },
+    "findings": [],
+    "coverage": [
+      { "area": "requirements, scenario behavior, and root guidance", "status": "reviewed", "evidenceIds": ["focused-adapter-tests", "change-validation"] },
+      { "area": "deterministic validation, regression tests, and missing-adapter recovery", "status": "reviewed", "evidenceIds": ["focused-adapter-tests", "adapter-contract", "quality-regressions"] },
+      { "area": "canonical ownership, portability, generated assets, and documentation", "status": "reviewed", "evidenceIds": ["adapter-contract", "reviewed-diff"] },
+      { "area": "credentials, untrusted content, and scope safety", "status": "reviewed", "evidenceIds": ["credential-scan", "reviewed-diff"] },
+      { "area": "user interface and accessibility", "status": "not-applicable", "evidenceIds": [] }
+    ],
+    "standardsSelection": { "selectedRuleIds": [], "scopedOverrides": [], "notApplicableRuleIds": [] },
+    "evidenceGaps": [],
+    "scopeSummary": "Reviewed the selected documentation and deterministic Node validation change against its two modified requirements and six scenarios. The local-review result is advisory only and does not approve delivery."
+  }
+}
