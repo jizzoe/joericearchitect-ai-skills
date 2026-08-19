@@ -4,6 +4,22 @@ Canonical reusable skills live under `skills/base/<skill-name>/SKILL.md`.
 Claude and Codex discovery wrappers are not canonical skill definitions and
 must stay thin.
 
+Every direct `skills/base/<skill-name>/SKILL.md` package requires matching
+repository-owned discovery adapters at `.claude/skills/<skill-name>/SKILL.md`
+and `.agents/skills/<skill-name>/SKILL.md`. Each adapter must reference its
+canonical skill, state that it must not duplicate canonical policy, and remain
+at most 1024 bytes. The adapter-drift check discovers the canonical catalog
+deterministically, so a new package is automatically required to have both
+adapters:
+
+```bash
+node scripts/sdd/check-adapter-drift.mjs
+```
+
+OpenSpec-generated `openspec-*` skills and `opsx` commands are deliberately
+excluded: they are not `skills/base` packages and must be refreshed through
+OpenSpec rather than hand-edited as repository-owned adapters.
+
 Every canonical `SKILL.md` starts with YAML frontmatter:
 
 ```yaml

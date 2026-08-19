@@ -3,4 +3,5 @@
 Canonical skill: `skills/base/github-issue-to-openspec/SKILL.md`
 
 Claude should follow the canonical skill and use repository scripts under
-`scripts/github/`. This wrapper exists only for assistant discovery.
+`scripts/github/`. This wrapper exists only for assistant discovery and must
+not duplicate canonical policy.
