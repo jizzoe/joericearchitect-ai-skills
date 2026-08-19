@@ -4,6 +4,11 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { executeWorkspaceCleanup, planWorkspaceCleanup } from "./sdd-workspace-cleanup.mjs";
+import {
+  authContextBindingDigest,
+  validateGithubAuthContextBinding,
+  validateGithubAuthContextEvidence
+} from "./github-cli-auth-context.mjs";
 import { bindIssueIntakeEvidence, validateIssueIntakeBinding } from "./issue-intake-binding.mjs";
 
 const phases = Object.freeze([
@@ -73,6 +78,14 @@ function validIssueIntakeRecord(record, selectedEntry) {
     timestamp(evidence.observedAt) && text(evidence.reference);
 }
 
+function validAuthContextRecord(record, selectedEntry) {
+  if (!record || record.selectedEntry !== selectedEntry || !validateGithubAuthContextBinding(record.binding) ||
+      record.binding.selectedEntry !== selectedEntry || record.bindingDigest !== authContextBindingDigest(record.binding) ||
+      !timestamp(record.registeredAt) || !["pending", "delivered"].includes(record.status)) return false;
+  if (record.status === "pending") return record.evidence === undefined;
+  return validateGithubAuthContextEvidence(record.evidence) && record.evidence.bindingDigest === record.bindingDigest;
+}
+
 function validCompletedEntry(entry, repository) {
   const receiptValid = (receipt) => receipt && ["started", "completed", "already-completed", "blocked"].includes(receipt.status) &&
       ["worktree", "branch"].includes(receipt.kind) && text(receipt.id) && timestamp(receipt.at) && text(receipt.recoveryReference) &&
@@ -126,6 +139,7 @@ export function createControllerRecord({ authorization, repository, selectedEntr
       checkpointPath: checkpointForRun(runId),
       resourceRecords: [],
       issueIntakeRecords: [],
+      authContextRecords: [],
       cleanupReceipts: [],
       completedEntries: [],
       currentPhase: "propose",
@@ -173,6 +187,44 @@ export function bindControllerIssueIntake(record, { payloadDigest, issue, observ
   matches[0].evidence = bound.evidence;
   if (!validIssueIntakeRecord(matches[0], next.selectedEntry)) return { valid: false, reason: "controller-issue-intake-delivery-invalid" };
   return { valid: true, record: next, intake: matches[0] };
+}
+
+export function registerControllerAuthContext(record, binding, { now = new Date().toISOString() } = {}) {
+  if (record?.schemaVersion !== 4 || !timestamp(now) || !validateGithubAuthContextBinding(binding) ||
+      binding.selectedEntry !== record.selectedEntry) return { valid: false, reason: "controller-auth-context-registration-invalid" };
+  const next = structuredClone(record);
+  next.authContextRecords ??= [];
+  if (!Array.isArray(next.authContextRecords) || next.authContextRecords.some((item) => !validAuthContextRecord(item, next.selectedEntry)) ||
+      next.authContextRecords.some((item) => item.bindingDigest === authContextBindingDigest(binding))) {
+    return { valid: false, reason: "controller-auth-context-registration-invalid" };
+  }
+  const authContext = {
+    selectedEntry: next.selectedEntry,
+    status: "pending",
+    binding: structuredClone(binding),
+    bindingDigest: authContextBindingDigest(binding),
+    registeredAt: now
+  };
+  if (!validAuthContextRecord(authContext, next.selectedEntry)) return { valid: false, reason: "controller-auth-context-registration-invalid" };
+  next.authContextRecords.push(authContext);
+  return { valid: true, record: next, authContext };
+}
+
+export function bindControllerAuthContext(record, { bindingDigest, evidence } = {}) {
+  if (record?.schemaVersion !== 4 || !text(bindingDigest) || !validateGithubAuthContextEvidence(evidence)) {
+    return { valid: false, reason: "controller-auth-context-evidence-invalid" };
+  }
+  const next = structuredClone(record);
+  if (!Array.isArray(next.authContextRecords) || next.authContextRecords.some((item) => !validAuthContextRecord(item, next.selectedEntry))) {
+    return { valid: false, reason: "controller-auth-context-evidence-invalid" };
+  }
+  const matches = next.authContextRecords.filter((item) => item.bindingDigest === bindingDigest);
+  if (matches.length !== 1 || matches[0].status !== "pending" || evidence.bindingDigest !== bindingDigest ||
+      evidence.binding.selectedEntry !== next.selectedEntry) return { valid: false, reason: "controller-auth-context-evidence-invalid" };
+  matches[0].status = "delivered";
+  matches[0].evidence = structuredClone(evidence);
+  if (!validAuthContextRecord(matches[0], next.selectedEntry)) return { valid: false, reason: "controller-auth-context-evidence-invalid" };
+  return { valid: true, record: next, authContext: matches[0] };
 }
 
 export function registerControllerResource(record, resource, { now = new Date().toISOString() } = {}) {
@@ -246,12 +298,14 @@ export function advanceControllerQueue(record, { now = new Date().toISOString() 
     completedAt: now,
     resourceRecords: next.resourceRecords,
     issueIntakeRecords: next.issueIntakeRecords ?? [],
+    authContextRecords: next.authContextRecords ?? [],
     cleanupReceipts: next.cleanupReceipts
   });
   next.queueIndex = nextIndex;
   next.selectedEntry = next.queueEntries[nextIndex];
   next.resourceRecords = [];
   next.issueIntakeRecords = [];
+  next.authContextRecords = [];
   next.cleanupReceipts = [];
   next.currentPhase = "propose";
   next.steps = phases.map((id) => ({ id, status: "pending" }));
@@ -262,9 +316,11 @@ export function inspectControllerRecord(record, { authorization, repository, now
   if (!record || record.schemaVersion === 1 || record.schemaVersion === 2 || record.schemaVersion === 3) return { classification: "paused", reason: "controller-record-legacy", nextPhase: null };
   if (record.schemaVersion !== 4 || !validRunId(record.runId) || record.checkpointPath !== checkpointForRun(record.runId) || !text(record.selectedEntry) || !text(record.repository) || !text(record.checkpointPath) || !Array.isArray(record.steps) ||
       !Array.isArray(record.resourceRecords) || (record.issueIntakeRecords !== undefined && !Array.isArray(record.issueIntakeRecords)) ||
+      (record.authContextRecords !== undefined && !Array.isArray(record.authContextRecords)) ||
       !Array.isArray(record.cleanupReceipts) || !Array.isArray(record.completedEntries) ||
       record.resourceRecords.some((resource) => !validResource(resource, record)) ||
       (record.issueIntakeRecords ?? []).some((intake) => !validIssueIntakeRecord(intake, record.selectedEntry)) ||
+      (record.authContextRecords ?? []).some((authContext) => !validAuthContextRecord(authContext, record.selectedEntry)) ||
       record.completedEntries.some((entry) => !validCompletedEntry(entry, record.repository))) {
     return { classification: "paused", reason: "controller-record-invalid", nextPhase: null };
   }
@@ -368,6 +424,20 @@ export function persistControllerIssueIntakeEvidence({ repositoryPath, record, p
   if (!bound.valid) return bound;
   const persisted = persistControllerRecord({ repositoryPath, record: bound.record, runGit });
   return persisted.valid ? { valid: true, record: bound.record, intake: bound.intake, path: persisted.path } : persisted;
+}
+
+export function persistControllerAuthContext({ repositoryPath, record, binding, now, runGit } = {}) {
+  const registered = registerControllerAuthContext(record, binding, { now });
+  if (!registered.valid) return registered;
+  const persisted = persistControllerRecord({ repositoryPath, record: registered.record, runGit });
+  return persisted.valid ? { valid: true, record: registered.record, authContext: registered.authContext, path: persisted.path } : persisted;
+}
+
+export function persistControllerAuthContextEvidence({ repositoryPath, record, bindingDigest, evidence, runGit } = {}) {
+  const bound = bindControllerAuthContext(record, { bindingDigest, evidence });
+  if (!bound.valid) return bound;
+  const persisted = persistControllerRecord({ repositoryPath, record: bound.record, runGit });
+  return persisted.valid ? { valid: true, record: bound.record, authContext: bound.authContext, path: persisted.path } : persisted;
 }
 
 export function bindControllerLifecycleDelivery({ repositoryPath, record, kind, id, deliveryEvidence, runGit } = {}) {

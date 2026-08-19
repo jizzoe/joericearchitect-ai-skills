@@ -204,7 +204,7 @@ test("the repository's own manifest and helper inventory build a complete runtim
   assert.equal(result.ok, true, JSON.stringify(result));
   // Every helper a canonical skill names must be declared and staged.
   const declared = new Set(result.manifest.entrypoints.map((entry) => entry.name));
-  for (const helper of ["check-operation-authorization", "platform-review-adapters", "autonomous-sdd-controller",
+  for (const helper of ["check-operation-authorization", "github-cli-auth-context", "platform-review-adapters", "autonomous-sdd-controller",
     "independent-review-contract", "research-planning-skill-runtime", "sdd-lifecycle-hygiene",
     "sdd-workspace-cleanup", "create-or-find-issue", "select-next-work", "validate-pr-contract"]) {
     assert.ok(declared.has(helper), `missing declared helper: ${helper}`);

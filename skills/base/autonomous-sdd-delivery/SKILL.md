@@ -23,6 +23,15 @@ The cleanup entry requires a fresh resource inspection for mutable eligibility;
 if any registered resource is not exactly eligible, it pauses rather than
 claiming an empty cleanup plan is complete.
 
+Before a GitHub CLI lifecycle action, use the declared
+`github-cli-auth-context` runtime helper to run a fixed, read-only current
+context probe and persist its exact operation binding and normalized result in
+the controller. An authentication-shaped restricted result permits a request
+for the existing host-permission boundary only for the same probe. It does not
+permit automatic host escalation or a GitHub write. Host contrast evidence is
+operation-, repository-, optional-payload-digest-, and expiry-bound; unknown,
+invalid-or-expired, denied, stale, or mismatched evidence pauses the action.
+
 Without valid controller context, generated OpenSpec actions retain their
 ordinary bounded behavior. Do not infer targets, persist credentials, bypass
 evidence or independent-review gates, or continue through unavailable runtime

@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: "harden-github-cli-auth-context-detection"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 146
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/146"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/harden-github-cli-auth-context-detection/"

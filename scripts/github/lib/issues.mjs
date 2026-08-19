@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { ghCommand } from "./gh.mjs";
 import { stringifyTracking } from "../../validation/lib/tracking.mjs";
+import { authorizeGithubAuthContextEvidence } from "../../sdd/github-cli-auth-context.mjs";
 import { authorizeBoundIssueIntake } from "../../sdd/issue-intake-binding.mjs";
 
 export function renderManagedIssueBlock({ markers, changeName, changeDir }) {
@@ -52,7 +53,7 @@ export function findIssueByExactTitle({ repo, title, existingIssues, dryRun = fa
 }
 
 export function createOrFindIssue({ repo, title, body, labels = [], managedBlock, existingIssues, dryRun = false,
-  intakeBinding, selectedEntry, runtime, now }) {
+  intakeBinding, authContextEvidence, authContextExecutionContext, selectedEntry, runtime, now }) {
   if (intakeBinding) {
     const authorization = authorizeBoundIssueIntake({
       binding: intakeBinding,
@@ -68,6 +69,24 @@ export function createOrFindIssue({ repo, title, body, labels = [], managedBlock
         error: authorization.issues[0].code,
         promptRequired: authorization.promptRequired,
         recoveryReference: authorization.recoveryReference
+      };
+    }
+    const authContext = authorizeGithubAuthContextEvidence({
+      evidence: authContextEvidence,
+      selectedEntry,
+      operation: intakeBinding.operation,
+      repository: repo,
+      payloadDigest: intakeBinding.payloadDigest,
+      executionContext: authContextExecutionContext,
+      now
+    });
+    if (!authContext.allowed) {
+      return {
+        ok: false,
+        classification: authContext.classification,
+        error: authContext.reason,
+        promptRequired: false,
+        recoveryReference: authContext.recoveryReference ?? intakeBinding.recoveryReference
       };
     }
   }

@@ -4,6 +4,7 @@ import { inspectCheckpoint } from "./checkpoint.mjs";
 import { canonicalFailureSignature } from "./correction-chain.mjs";
 import { canonicalGitCommit, immutableReviewManifest, reviewInputMatchesGitDiff, validateIndependentReviewEvidence, validateIndependentReviewV1 } from "./independent-review.mjs";
 import { authorizeBoundIssueIntake } from "./issue-intake-binding.mjs";
+import { authorizeGithubAuthContextEvidence } from "./github-cli-auth-context.mjs";
 
 export const profileOperations = {
   "research-read-only": new Set(["read-source", "write-findings", "write-sources", "write-result", "notify-state"]),
@@ -268,6 +269,16 @@ export function checkOperationAuthorization(input) {
       now: input.now
     });
     if (!intake.allowed) return fail(intake.issues[0].code, intake.recoveryReference);
+    const authContext = authorizeGithubAuthContextEvidence({
+      evidence: request.authContextEvidence,
+      selectedEntry: request.selectedEntry,
+      operation: request.issueIntakeBinding.operation,
+      repository: request.issueIntakeBinding.repository,
+      payloadDigest: request.issueIntakeBinding.payloadDigest,
+      executionContext: request.authContextExecutionContext,
+      now: input.now
+    });
+    if (!authContext.allowed) return fail(authContext.reason, authContext.recoveryReference);
   }
   if (operation === "objective-correction") {
     const correctionIssue = durableCorrectionState(authorization, request);

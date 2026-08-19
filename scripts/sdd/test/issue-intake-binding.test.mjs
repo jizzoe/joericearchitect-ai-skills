@@ -9,6 +9,7 @@ import {
   createIssueIntakeBinding,
   issueIntakePayloadDigest
 } from "../issue-intake-binding.mjs";
+import { createGithubAuthContextBinding, evaluateGithubAuthContextContrast } from "../github-cli-auth-context.mjs";
 
 const selectedEntry = "frictionless-prototype";
 const managedBlock = "<!-- sdd-managed:start -->\nOpenSpec change: `frictionless-prototype`\n<!-- sdd-managed:end -->";
@@ -22,6 +23,15 @@ const payload = {
 const expiresAt = "2026-08-14T00:00:00.000Z";
 const binding = createIssueIntakeBinding({ selectedEntry, payload, expiresAt }).binding;
 const runtime = { permittedOperations: ["issue-create-or-update"] };
+const authContextBinding = createGithubAuthContextBinding({
+  selectedEntry, operation: "issue-create-or-reuse", repository: payload.repository,
+  payloadDigest: binding.payloadDigest, expiresAt
+}).binding;
+const authContextEvidence = evaluateGithubAuthContextContrast({
+  binding: authContextBinding,
+  restrictedProbe: { commandKind: "github-api-user", contextType: "restricted", state: "success", account: "octocat", observedAt: "2026-08-13T12:00:00.000Z" },
+  observedAt: "2026-08-13T12:00:00.000Z"
+}).evidence;
 
 test("reviewed issue payload canonicalizes labels and binds an exact digest", () => {
   assert.deepEqual(binding.labels, ["sdd", "type:feature"]);
@@ -39,6 +49,7 @@ test("bound create-or-reuse finds an exact duplicate without a second prompt", (
     labels: payload.labels,
     managedBlock,
     intakeBinding: binding,
+    authContextEvidence,
     selectedEntry,
     runtime,
     now: "2026-08-13T12:00:00.000Z",
@@ -78,11 +89,26 @@ test("operation authorization retains exact target, expiry, and runtime gates fo
     target: "issue-intake:frictionless-prototype",
     selectedEntry,
     issueIntakeBinding: binding,
-    issuePayload: payload
+    issuePayload: payload,
+    authContextEvidence
   };
   assert.equal(checkOperationAuthorization({ authorization, runtime, request, now: "2026-08-13T12:00:00.000Z" }).allowed, true);
   assert.equal(checkOperationAuthorization({ authorization, runtime: { permittedOperations: [] }, request, now: "2026-08-13T12:00:00.000Z" }).issues[0].code, "runtime-permission-gap");
   assert.equal(checkOperationAuthorization({ authorization: { ...authorization, targets: ["issue-intake:other"] }, runtime, request, now: "2026-08-13T12:00:00.000Z" }).issues[0].code, "unauthorized-target");
+});
+
+test("bound issue helper rejects absent or non-authorizing auth-context evidence before GitHub", () => {
+  const base = {
+    repo: payload.repository, title: payload.title, body: payload.body, labels: payload.labels, managedBlock,
+    intakeBinding: binding, selectedEntry, runtime, now: "2026-08-13T12:00:00.000Z", existingIssues: []
+  };
+  assert.equal(createOrFindIssue(base).error, "github-auth-context-evidence-invalid-or-expired");
+  const denied = evaluateGithubAuthContextContrast({
+    binding: authContextBinding,
+    restrictedProbe: { commandKind: "github-api-user", contextType: "restricted", state: "authentication-shaped", observedAt: "2026-08-13T12:00:00.000Z" },
+    hostPermission: "denied", observedAt: "2026-08-13T12:00:00.000Z"
+  }).evidence;
+  assert.equal(createOrFindIssue({ ...base, authContextEvidence: denied }).error, "github-auth-context-host-permission-denied");
 });
 
 test("managed content, tracking-adjacent Project plans, and human text remain reconcilable", () => {

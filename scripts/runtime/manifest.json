@@ -32,6 +32,20 @@
       "payloadWrapper": "scripts/sdd/check-operation-authorization.mjs"
     },
     {
+      "name": "github-cli-auth-context",
+      "module": "scripts/runtime/bin/github-cli-auth-context.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": [
+          "--help"
+        ],
+        "exitCodes": [
+          0
+        ]
+      },
+      "payloadWrapper": "scripts/sdd/github-cli-auth-context.mjs"
+    },
+    {
       "name": "resolve-sdd-delivery-request",
       "module": "scripts/sdd/resolve-sdd-delivery-request.mjs",
       "invocation": "cli",
@@ -250,6 +264,8 @@
         "register-controller-lifecycle-resource",
         "persist-controller-issue-intake",
         "persist-controller-issue-intake-evidence",
+        "persist-controller-auth-context",
+        "persist-controller-auth-context-evidence",
         "bind-controller-lifecycle-delivery",
         "persist-controller-cleanup-receipt",
         "execute-controller-lifecycle-cleanup"
