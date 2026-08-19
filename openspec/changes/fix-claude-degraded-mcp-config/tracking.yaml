@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: fix-claude-degraded-mcp-config
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 138
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/138
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - openspec/changes/fix-claude-degraded-mcp-config/
