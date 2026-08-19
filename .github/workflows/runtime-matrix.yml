@@ -47,6 +47,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Continue'
           Write-Output "pwsh $($PSVersionTable.PSVersion)"
+          Write-Output "node $(& node --version)"
+          Write-Output "installer present: $(Test-Path ./scripts/install-ai-skills.ps1)"
           $raw = & ./scripts/install-ai-skills.ps1 -Local (Get-Location).Path -Agent claude -DryRun -AllowDirtySource 2>&1
           Write-Output "exit code: $LASTEXITCODE"
           Write-Output "--- raw output ---"

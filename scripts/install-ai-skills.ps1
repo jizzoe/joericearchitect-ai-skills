@@ -75,35 +75,35 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
 
 # Every value crosses the boundary as a discrete argument, so a path containing
 # spaces or quotes is never re-parsed by a shell.
-$forwarded = [System.Collections.Generic.List[string]]::new()
-if ($Local) {
-    $forwarded.Add('--local')
-    $forwarded.Add((Resolve-Path -LiteralPath $Local).Path)
+$forwarded = [System.Collections.ArrayList]::new()
+function Add-Argument {
+    param([Parameter(Mandatory)][string[]] $Value)
+    # ArrayList.Add returns an index; discarding it keeps the success stream
+    # clean so only the receipt reaches stdout.
+    foreach ($item in $Value) { [void] $forwarded.Add($item) }
 }
-if ($Remote) {
-    $forwarded.Add('--remote')
-    $forwarded.Add($Remote)
-}
-if ($Pin) {
-    $forwarded.Add('--pin')
-    $forwarded.Add($Pin)
-}
-foreach ($selected in ($Agent | Where-Object { $_ })) {
-    $forwarded.Add('--agent')
-    $forwarded.Add($selected)
-}
-if ($Force) { $forwarded.Add('--force') }
-if ($DryRun) { $forwarded.Add('--dry-run') }
-if ($AllowDirtySource) { $forwarded.Add('--allow-dirty-source') }
+
+if ($Local) { Add-Argument '--local', (Resolve-Path -LiteralPath $Local).Path }
+if ($Remote) { Add-Argument '--remote', $Remote }
+if ($Pin) { Add-Argument '--pin', $Pin }
+foreach ($selected in ($Agent | Where-Object { $_ })) { Add-Argument '--agent', $selected }
+if ($Force) { Add-Argument '--force' }
+if ($DryRun) { Add-Argument '--dry-run' }
+if ($AllowDirtySource) { Add-Argument '--allow-dirty-source' }
 
 $workspace = Join-Path ([System.IO.Path]::GetTempPath()) ("ai-skills-install-" + [System.Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $workspace -Force | Out-Null
-$forwarded.Add('--workspace')
-$forwarded.Add($workspace)
+Add-Argument '--workspace', $workspace
 
 try {
-    & node (Join-Path $repositoryRoot 'scripts/runtime/install-runtime.mjs') @forwarded
-    exit $LASTEXITCODE
+    # Splatting needs a plain array, and the receipt is captured and re-emitted
+    # so it survives the script's exit rather than depending on stream timing.
+    $argumentList = $forwarded.ToArray()
+    $installer = Join-Path $repositoryRoot 'scripts/runtime/install-runtime.mjs'
+    $output = & node $installer @argumentList
+    $code = $LASTEXITCODE
+    if ($null -ne $output) { $output | ForEach-Object { Write-Output $_ } }
+    exit $code
 }
 finally {
     Remove-Item -LiteralPath $workspace -Recurse -Force -ErrorAction SilentlyContinue
