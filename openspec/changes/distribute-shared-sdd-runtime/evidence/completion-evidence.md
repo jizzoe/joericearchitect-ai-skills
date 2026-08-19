@@ -60,13 +60,25 @@ run against an authenticated disposable profile.
 
 ## Unavailable prerequisites
 
-- **PowerShell**: `pwsh` is absent on this host, so the Bash/PowerShell receipt
-  parity assertion degraded to the Bash half only. The `Shared Runtime Matrix`
-  workflow runs the PowerShell entrypoint and PSScriptAnalyzer on
-  `windows-latest`, and the parity test asserts the full contract wherever
-  `pwsh` exists. Until that matrix has run on a pull request, the PowerShell
-  path is evidenced by static analysis and shared-contract construction rather
-  than by an executed parity run.
+- **PowerShell**: `pwsh` is absent on the delivery host, so the local parity
+  run asserted the Bash half only. The `Shared Runtime Matrix` workflow runs
+  the PowerShell entrypoint and PSScriptAnalyzer on `windows-latest`, and the
+  parity test asserts the receipt contract for whichever shells exist.
+
+## Windows matrix findings
+
+The first matrix run caught two portability defects that no local check could
+have surfaced, both corrected at this head:
+
+- `structurally invalid targets are refused before dispatch` asserted a
+  POSIX-shaped absolute literal. On Windows that path fails the earlier
+  canonicality check, so the test now builds an absent target from the
+  platform's own temporary root.
+- The shell parity test compared the Bash entrypoint against PowerShell on
+  Windows, where Git Bash cannot run it. Parity is now asserted per shell
+  against the Node installer that owns the receipt contract, and the Bash
+  entrypoint is documented as the POSIX path with PowerShell as the Windows
+  one.
 - **Authenticated agent profiles**: not provisioned in this session, as above.
 
 ## Local review

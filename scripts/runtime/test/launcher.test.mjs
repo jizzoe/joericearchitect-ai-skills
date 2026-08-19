@@ -118,8 +118,11 @@ test("an undeclared helper and an unregistered verb are refused", () => {
 test("structurally invalid targets are refused before dispatch", () => {
   const environment = devEnvironment();
   assert.equal(prepareDispatch({ helper: "check-operation-authorization", environment }).code, "target-repository-absent");
-  assert.equal(prepareDispatch({ helper: "check-operation-authorization", target: "relative/path", environment }).code, "target-repository-not-absolute");
-  assert.equal(prepareDispatch({ helper: "check-operation-authorization", target: "/does/not/exist", environment }).code, "target-repository-missing");
+  assert.equal(prepareDispatch({ helper: "check-operation-authorization", target: path.join("relative", "path"), environment }).code, "target-repository-not-absolute");
+  // Built from the platform's own temporary root: a POSIX-shaped literal is not
+  // canonical on Windows and would fail the earlier canonicality check instead.
+  const absentTarget = path.join(os.tmpdir(), "ai-skills-target-that-does-not-exist");
+  assert.equal(prepareDispatch({ helper: "check-operation-authorization", target: absentTarget, environment }).code, "target-repository-missing");
 
   // An existing directory that is not a Git work tree root is still refused.
   const plain = fs.realpathSync(temporaryDirectory("not-a-repo-"));

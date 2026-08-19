@@ -81,9 +81,12 @@ scripts/install-ai-skills.sh --local "$(pwd)" --agent claude
 scripts/install-ai-skills.sh --local "$(pwd)" --agent claude --dry-run
 ```
 
-On Windows, `scripts/install-ai-skills.ps1` takes the same options as
-PowerShell parameters (`-Local`, `-Remote`, `-Pin`, `-Agent`, `-Force`,
-`-DryRun`) and emits the same receipt fields.
+`scripts/install-ai-skills.sh` is the POSIX entrypoint. On Windows use
+`scripts/install-ai-skills.ps1`, which takes the same options as PowerShell
+parameters (`-Local`, `-Remote`, `-Pin`, `-Agent`, `-Force`, `-DryRun`) and
+emits the same receipt fields. Both reproduce the same receipt contract, which
+the Node installer owns; running the Bash entrypoint under a Windows POSIX
+emulation layer is not supported.
 
 A remote source must be pinned to a tag or commit SHA; an unpinned remote
 source is refused rather than resolved to whatever the default branch holds. An

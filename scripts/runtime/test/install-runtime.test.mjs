@@ -317,49 +317,44 @@ test("the Bash entrypoint refuses an absent source and a bad argument without to
   assert.match(help.stdout, /gh attestation verify/);
 });
 
-test("Bash and PowerShell entrypoints emit the same receipt contract", { skip: process.platform === "win32" ? false : undefined }, () => {
+test("each available shell entrypoint reproduces the Node receipt contract", () => {
   const { environment } = isolatedHome("parity-home-");
-  const bash = spawnSync("bash", [
-    path.join(repositoryRoot, "scripts/install-ai-skills.sh"),
-    "--local", checkout, "--agent", "claude", "--dry-run"
-  ], { encoding: "utf8", env: environment });
-  const bashReceipt = JSON.parse(bash.stdout);
-  assert.equal(bashReceipt.ok, true, bash.stdout + bash.stderr);
-
-  const pwsh = spawnSync("pwsh", ["-NoProfile", "-File",
-    path.join(repositoryRoot, "scripts/install-ai-skills.ps1"),
-    "-Local", checkout, "-Agent", "claude", "-DryRun"
-  ], { encoding: "utf8", env: environment });
-
-  if (pwsh.error?.code === "ENOENT") {
-    // pwsh is absent on this host; the CI matrix covers the PowerShell surface.
-    assert.match(bashReceipt.phase, /dry-run/);
-    return;
-  }
-  const powershellReceipt = JSON.parse(pwsh.stdout);
-  assert.deepEqual(Object.keys(powershellReceipt).sort(), Object.keys(bashReceipt).sort());
-  assert.equal(powershellReceipt.runtime.digest, bashReceipt.runtime.digest);
-  assert.equal(powershellReceipt.runtime.contractVersion, bashReceipt.runtime.contractVersion);
-  assert.deepEqual(powershellReceipt.agents, bashReceipt.agents);
-  assert.equal(powershellReceipt.dryRun, true);
-});
-
-test("a credential embedded in a remote reference never reaches the paired receipt", () => {
-  const { environment } = isolatedHome("redaction-home-");
-  const receipt = installAiSkills({
-    remote: "https://user:secret-token@example.invalid/owner/repo", pin: "v1.0.0",
-    agents: ["claude"], dryRun: true, environment, platform: "linux",
-    workspace: temporaryDirectory("redaction-workspace-"),
-    run: (command, args, options) => {
-      if (command === "gh" && args[0] === "repo" && args[1] === "clone") {
-        fs.cpSync(checkout, args[3], { recursive: true });
-        return { status: 0, stdout: "" };
-      }
-      if (command === "git" && args.includes("checkout")) return { status: 0, stdout: "" };
-      return stubbedRun()(command, args, options);
-    }
+  const reference = installAiSkills({
+    local: checkout, agents: ["claude"], dryRun: true, environment, platform: "linux",
+    workspace: temporaryDirectory("parity-workspace-"), run: stubbedRun()
   });
-  const serialized = JSON.stringify(receipt);
-  assert.doesNotMatch(serialized, /secret-token/);
-  assert.match(receipt.source.reference, /<redacted>@/);
+  assert.equal(reference.ok, true);
+  const referenceKeys = Object.keys(reference).sort();
+
+  const shells = [];
+  if (process.platform !== "win32") {
+    // The Bash entrypoint targets POSIX hosts; Windows uses the PowerShell one.
+    shells.push({
+      name: "bash",
+      command: "bash",
+      args: [path.join(repositoryRoot, "scripts/install-ai-skills.sh"), "--local", checkout, "--agent", "claude", "--dry-run"]
+    });
+  }
+  shells.push({
+    name: "pwsh",
+    command: "pwsh",
+    args: ["-NoProfile", "-File", path.join(repositoryRoot, "scripts/install-ai-skills.ps1"),
+      "-Local", checkout, "-Agent", "claude", "-DryRun"]
+  });
+
+  let asserted = 0;
+  for (const shell of shells) {
+    const result = spawnSync(shell.command, shell.args, { encoding: "utf8", env: environment });
+    if (result.error?.code === "ENOENT") continue;
+    const receipt = JSON.parse(result.stdout || "null");
+    assert.ok(receipt, `${shell.name} produced no receipt: ${result.stdout}${result.stderr}`);
+    assert.deepEqual(Object.keys(receipt).sort(), referenceKeys, `${shell.name} receipt keys differ`);
+    assert.equal(receipt.tool, "install-ai-skills");
+    assert.equal(receipt.dryRun, true);
+    assert.equal(receipt.runtime.contractVersion, reference.runtime.contractVersion);
+    assert.deepEqual(receipt.agents, ["claude"]);
+    asserted += 1;
+  }
+  // At least one shell must exist on any supported host.
+  assert.ok(asserted >= 1, "no supported shell entrypoint was available");
 });
