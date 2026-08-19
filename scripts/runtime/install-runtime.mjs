@@ -13,6 +13,7 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 
 import { BUILT_MANIFEST_FILENAME, REQUIRED_NODE_MAJOR, nodeVersionSupported } from "./registry.mjs";
+import { redactCredential } from "../skills/install-global-skill.mjs";
 import { buildRuntime } from "./build-runtime.mjs";
 import {
   METADATA_SCHEMA_VERSION, activationState, appendInstalledHistory, previouslyActive,
@@ -185,7 +186,9 @@ export function installAiSkills({
 
   const base = {
     agents: [...agents],
-    source: { kind: source.kind, reference: source.reference, revision: sourceRevision, pin: source.pin ?? null },
+    // A remote reference can carry an embedded credential, and this receipt is
+    // retained as delivery evidence, so it is redacted before it is recorded.
+    source: { kind: source.kind, reference: redactCredential(source.reference), revision: sourceRevision, pin: source.pin ?? null },
     overwriteIntent: force === true,
     dryRun: dryRun === true,
     priorSkillPin,

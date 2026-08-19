@@ -115,8 +115,12 @@ export function buildInstallArguments(options) {
   return args;
 }
 
+export function redactCredential(value) {
+  return typeof value === "string" ? value.replace(/(https?:\/\/)[^@\s/]+@/i, "$1<redacted>@") : value;
+}
+
 export function redactArguments(args) {
-  return args.map((argument) => argument.replace(/(https?:\/\/)[^@\s/]+@/i, "$1<redacted>@"));
+  return args.map(redactCredential);
 }
 
 /**
@@ -124,14 +128,16 @@ export function redactArguments(args) {
  * scraping output or reimplementing gh invocation. Arguments are redacted, and
  * no credential, token, or resolved secret is ever included.
  */
-export function installResult(options, { status, unpinnedRemote }) {
+export function installResult(options, { status, unpinnedRemote, phase, code }) {
   return {
     schemaVersion: 1,
     tool: "install-global-skill",
     ok: status === 0,
+    phase,
+    ...(code ? { code } : {}),
     agent: options.agent,
     source: options.local ? "local" : "remote",
-    sourceReference: options.local ?? options.remote,
+    sourceReference: redactCredential(options.local ?? options.remote),
     selection: options.all ? "all" : "skill",
     skill: options.skill ?? null,
     overwriteIntent: options.force === true,
@@ -146,8 +152,8 @@ export function installResult(options, { status, unpinnedRemote }) {
 export function run(options, { spawn = spawnSync, stdio = "inherit", write = (line) => console.log(line), writeError = (line) => console.error(line) } = {}) {
   const args = buildInstallArguments(options);
   const unpinnedRemote = Boolean(options.remote) && !options.pin;
-  const emit = (status) => {
-    if (options.result) write(JSON.stringify(installResult(options, { status, unpinnedRemote }), null, 2));
+  const emit = (status, phase, code) => {
+    if (options.result) write(JSON.stringify(installResult(options, { status, unpinnedRemote, phase, code }), null, 2));
     return status;
   };
 
@@ -155,15 +161,16 @@ export function run(options, { spawn = spawnSync, stdio = "inherit", write = (li
 
   if (options.dryRun) {
     if (!options.result) write(JSON.stringify({ command: "gh", args: redactArguments(args) }, null, 2));
-    return emit(0);
+    return emit(0, "dry-run");
   }
 
   const result = spawn("gh", args, { stdio });
   if (result.error) {
     writeError(`Unable to start gh: ${result.error.message}`);
-    return emit(1);
+    return emit(1, "invoke", "gh-unavailable");
   }
-  return emit(result.status ?? 1);
+  const status = result.status ?? 1;
+  return emit(status, status === 0 ? "complete" : "invoke", status === 0 ? undefined : "gh-skill-install-failed");
 }
 
 export function main(args = process.argv.slice(2)) {
@@ -177,6 +184,14 @@ export function main(args = process.argv.slice(2)) {
   } catch (error) {
     console.error(error.message);
     console.error("Use --help for usage.");
+    // A paired entrypoint asked for a machine-readable result, so an argument
+    // failure is reported in that shape too rather than only as prose.
+    if (args.includes("--result")) {
+      console.log(JSON.stringify({
+        schemaVersion: 1, tool: "install-global-skill", ok: false,
+        phase: "validate", code: "invalid-arguments", detail: error.message
+      }, null, 2));
+    }
     return error.exitCode ?? 1;
   }
 }

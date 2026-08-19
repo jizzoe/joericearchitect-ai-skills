@@ -343,3 +343,23 @@ test("Bash and PowerShell entrypoints emit the same receipt contract", { skip: p
   assert.deepEqual(powershellReceipt.agents, bashReceipt.agents);
   assert.equal(powershellReceipt.dryRun, true);
 });
+
+test("a credential embedded in a remote reference never reaches the paired receipt", () => {
+  const { environment } = isolatedHome("redaction-home-");
+  const receipt = installAiSkills({
+    remote: "https://user:secret-token@example.invalid/owner/repo", pin: "v1.0.0",
+    agents: ["claude"], dryRun: true, environment, platform: "linux",
+    workspace: temporaryDirectory("redaction-workspace-"),
+    run: (command, args, options) => {
+      if (command === "gh" && args[0] === "repo" && args[1] === "clone") {
+        fs.cpSync(checkout, args[3], { recursive: true });
+        return { status: 0, stdout: "" };
+      }
+      if (command === "git" && args.includes("checkout")) return { status: 0, stdout: "" };
+      return stubbedRun()(command, args, options);
+    }
+  });
+  const serialized = JSON.stringify(receipt);
+  assert.doesNotMatch(serialized, /secret-token/);
+  assert.match(receipt.source.reference, /<redacted>@/);
+});

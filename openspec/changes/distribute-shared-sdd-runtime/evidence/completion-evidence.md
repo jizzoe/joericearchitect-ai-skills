@@ -29,7 +29,7 @@ Built from the branch head with `node scripts/runtime/build-runtime.mjs
 ## Commands run
 
 ```bash
-node --test "scripts/**/test/*.test.mjs" "evals/**/*.test.mjs"   # 443 passed, 0 failed
+node --test "scripts/**/test/*.test.mjs" "evals/**/*.test.mjs"   # 450 passed, 0 failed
 node --test scripts/runtime/test/                                # builder, launcher, entrypoints, installer, cross-assistant
 node --test evals/skills/global-skill-installation/run-runtime-completeness.test.mjs
 node evals/skills/global-skill-installation/run-runtime-completeness.mjs
@@ -88,6 +88,22 @@ three objective findings, all corrected at this head with regression tests:
 3. `dispatch()` required the caller to re-supply the verb that
    `prepareDispatch` had already validated, so a subcommand dispatch could
    silently lose it. The validated plan now carries the verb.
+
+A formal Verify pass over the four delta specs found two further gaps, also
+corrected at this head:
+
+4. The `skill-install-utility` delta requires the machine-readable result to
+   state the failed phase. It stated only `ok` and `status`. The result now
+   carries `phase` (`validate`, `dry-run`, `invoke`, `complete`) and a recovery
+   `code`, and an argument failure is reported in the same shape when
+   `--result` is requested.
+5. Both receipts echoed the source reference verbatim, so a remote source
+   carrying an embedded credential
+   (`https://user:token@host/owner/repo`) would have written that credential
+   into evidence retained on disk. Both now redact it. Regressions: "a
+   credential embedded in a remote source is redacted in the result" and "a
+   credential embedded in a remote reference never reaches the paired
+   receipt".
 
 This is same-session local review with `assurance: local-review`. It is
 neither isolated nor independent and does not satisfy a production
