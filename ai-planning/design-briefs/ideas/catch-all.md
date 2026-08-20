@@ -25,9 +25,17 @@ Unshaped ideas to revisit and organize later.
   after Apply on the exact head and gates readiness for Verify; closeout runs
   only after Verify evidence is current. Defer broader harness-engineering
   exploration until this document restructure is ready to resume.
-- **Control-plane document-refactor sequencing:** first establish, review, and
-  iterate on the complete big-picture main design and a thin roadmap. Each
-  roadmap slice names its future detailed brief and marks it `not yet created`
-  rather than using a broken placeholder link. Create and link the detailed
-  slice briefs only after the big picture is accepted; archive superseded
-  sources only after the later migration review.
+- **Control-plane document-refactor sequencing:** the complete big-picture main
+  design and thin roadmap now link all 19 draft slice briefs under
+  `ai-planning/design-briefs/autonomous-sdd-reliability-control-plane/`.
+  Review and iterate on these planning records before beginning OpenSpec work;
+  archive superseded sources only after the later migration review.
+- **Autonomous SDD first reliable-release boundary:** first prove that one
+  individually approved change in one repository can complete safely and
+  repeatedly through closeout or an exact actionable stop. M4-S3 is the first
+  point where the complete real path exists and approved backlog proof may
+  begin; M4-S4 requires both ten consecutive real backlog completions and a
+  separately counted disposable fault matrix before milestone queues, parallel
+  child work, five-slice execution, or Temporal. Admission seals conditional
+  delivery authorization; post-planning Apply eligibility is deterministic and
+  creates no second routine owner prompt.

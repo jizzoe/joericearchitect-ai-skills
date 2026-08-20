@@ -1,9 +1,9 @@
 # Autonomous SDD document restructure and multi-agent handoff
 
-- Date: 2026-08-19
-- Status: First big-picture documentation refactor completed; ready for owner
-  review and iteration. No detailed slice brief, OpenSpec, implementation,
-  archive, or delivery work is authorized by this handoff.
+- Date: 2026-08-20
+- Status: Big-picture refactor and all 19 draft slice briefs completed; ready
+  for owner review. No OpenSpec, implementation, archive, or delivery work is
+  authorized by this handoff.
 - Primary sources at capture: `ai-planning/design-briefs/autonomous-sdd-reliability-control-plane.md`
   and `ai-planning/plans/autonomous-sdd-reliability-control-plane-roadmap.md`.
 
@@ -65,6 +65,11 @@ It must contain:
 - cross-cutting risks, rollout controls, qualification thresholds, and a map to
   the slice briefs.
 
+The first reliable-release promise is one approved change in one repository,
+executed serially and safely through closeout or an exact actionable stop.
+Repeated real single-change qualification must pass before milestone queues,
+parallel child work, five-slice execution, or Temporal.
+
 The main design explains what must remain true across the whole initiative. It
 does not become a detailed task list or repeat every slice's test procedure.
 
@@ -81,13 +86,17 @@ For each slice, retain only:
 - hard dependencies and explicit pre-Propose decisions;
 - readiness state;
 - proposed OpenSpec change name;
-- entry and exit evidence; and
+- the containing milestone's exit evidence, recorded once for that milestone;
+  and
 - delivery status when work begins.
 
 Move detailed architecture, state models, adapter behavior, non-goals, failure
 handling, and acceptance criteria out of the roadmap into either the main
-design or the matching slice brief. The roadmap must not become a competing
-source of behavior or policy.
+design or the matching slice brief. The roadmap is the sole authority for
+milestone dependencies, readiness, and exit evidence; linked detailed briefs
+own slice acceptance and link to the containing milestone gate. The main design
+must not repeat milestone exit paragraphs, and the roadmap must not become a
+competing source of architecture or policy.
 
 ### 3. Detailed slice briefs
 
@@ -118,11 +127,11 @@ design review finds a real dependency conflict:
 | Milestone | Detailed briefs |
 |---|---|
 | M1 — Contract convergence | M1-S1 run and isolated work-unit contract; M1-S2 operations, profiles, gates, and outcomes; M1-S3 runtime configuration provenance |
-| M2 — Deterministic local single-change backend | M2-S1 local registry, ledger, lease, and resource claims; M2-S2 deterministic transition engine; M2-S3 canonical status and recovery reporting |
+| M2 — Deterministic local single-change backend | M2-S1 discoverable authoritative history, safe resume/takeover, stale-owner rejection, and one coarse repository claim; M2-S2 deterministic transition engine; M2-S3 canonical status and recovery reporting |
 | M3 — Independent-review reliability | M3-S1 strict multi-step artifact delivery; M3-S2 review admission and dispatcher; M3-S3 review/correction binding to the exact code head |
-| M4 — Full lifecycle integration | M4-S1 GitHub intake and implementation delivery; M4-S2 Sync and Archive delivery; M4-S3 exact-owned finalization and cleanup |
+| M4 — Full lifecycle integration and v1 proof | M4-S1 GitHub intake and implementation delivery; M4-S2 Sync and Archive delivery; M4-S3 exact-owned finalization and cleanup; M4-S4 real-completion and disposable-fault qualification |
 | M5 — Milestone queues and owner shorthand | M5-S1 milestone/slice queue adapter; M5-S2 design-brief delivery shorthand |
-| M6 — Reliability qualification and default cutover | M6-S1 composition and fault-injection qualification; M6-S2 repeated five-slice unattended delivery; M6-S3 default-path cutover |
+| M6 — Five-slice qualification and default cutover | M6-S1 milestone composition and fault-injection qualification; M6-S2 repeated five-slice unattended delivery; M6-S3 default-path cutover |
 | M7 — Optional Temporal execution backend | M7-S1 Temporal execution backend |
 
 The main design carries the generic future-backend rule. M7-S1 alone carries
@@ -130,17 +139,21 @@ Temporal-specific workflow, activity, replay, payload, worker, and operations
 detail. M7 remains optional, must follow local qualification, and requires its
 own sourced design brief and explicit owner decision before Propose.
 
+Fine-grained claims and parallel child or role execution are deliberately not a
+current slice. After M4-S4, measured throughput or contention may justify a
+separate Explore decision and roadmap slice. Parallelism is not required for
+serial five-slice qualification and cannot be introduced implicitly through M5,
+M6, or Temporal.
+
 ## Confirmed document-refactor sequencing
 
-The owner confirmed a staged approach rather than creating every detailed
-slice brief immediately:
+The owner confirmed and then advanced through this staged approach:
 
 1. **Big picture first:** update the main design with the full system
    architecture, multi-agent operating model, and harness-environment direction;
    reduce the roadmap to dependency mapping and execution order.
-2. **Planned briefs, not placeholder links:** for each roadmap slice, name the
-   future detailed brief and mark it `not yet created`. Do not create broken
-   links or imply that the future brief already exists.
+2. **Planned briefs, not placeholder links:** first name each future detailed
+   brief without creating broken links or implying that it already exists.
 3. **Review and iterate:** review the two master documents until the owner is
    satisfied that the whole-system direction is coherent and all material
    decisions are confirmed or clearly recorded as open.
@@ -149,10 +162,11 @@ slice brief immediately:
 5. **Preserve before archive:** perform the source-to-destination migration
    review and archive only verified superseded control-plane sources.
 
-Step 1 is now complete in the current workspace. The next session starts at
-step 3: review and iterate on the two master documents. It must not create
-slice briefs, archive sources, create an OpenSpec change, or implement the
-control plane unless separately asked.
+Steps 1 through 4 are now complete in the current workspace. The next planning
+checkpoint is owner review of the main design, roadmap, and linked slice briefs.
+Step 5 remains blocked until the source-to-destination migration review proves
+that no material content would be lost. No OpenSpec change, archive, or control-
+plane implementation is authorized unless separately requested.
 
 ## Current refactor checkpoint
 
@@ -161,17 +175,19 @@ The first pass now exists in:
 - `ai-planning/design-briefs/autonomous-sdd-reliability-control-plane.md` — the
   big-picture authority for architecture, durable execution, multi-agent
   roles/handoffs, harness foundations, risks, open decisions, and the
-  transitional detailed slice inventory;
+  linked detailed slice inventory;
 - `ai-planning/plans/autonomous-sdd-reliability-control-plane-roadmap.md` — the
-  thin dependency/execution map with 18 planned detailed-brief names marked
-  `not yet created`; and
+  thin dependency/execution map linking all 19 draft detailed briefs;
+- `ai-planning/design-briefs/autonomous-sdd-reliability-control-plane/` — the
+  19 slice-specific draft design briefs; and
 - `ai-planning/design-briefs/ideas/catch-all.md` — the concise durable memory
   pointer and sequencing reminder.
 
 The refactor preserves all 18 prior slice IDs and proposed OpenSpec change
-names. The old roadmap's profile/exposure/recovery rationale and historical
-source digest are retained in the main design. No planned detailed-brief file
-or archive was created.
+names and adds M4-S4 as the explicit repeated single-change qualification gate,
+for 19 slices total. The old roadmap's profile/exposure/recovery rationale and
+historical source digest are retained in the main design. No archive, OpenSpec
+change, or implementation was created.
 
 ## Multi-agent operating model
 
@@ -192,6 +208,7 @@ not two agents freely editing the same worktree:
 
 ```text
 Planning
+  -> approved-intent conformance and Apply-eligibility gate
   -> test-and-evidence handoff and recorded suite/evidence receipt
   -> implementation
   -> independent review of the exact current head
@@ -199,6 +216,12 @@ Planning
   -> OpenSpec Verify
   -> closeout
 ```
+
+Admission first seals the owner's conditional full-lifecycle
+`deliveryAuthorization`. The later `applyEligibility` gate is a deterministic
+check that planning still conforms to that grant; it is not a second routine
+owner authorization. Material drift pauses for an explicit authorization
+amendment, while standalone Propose retains its ordinary stop before Apply.
 
 The test-and-evidence worker is broader than a unit-test writer. Requirements
 such as recovery, concurrency, cleanup safety, external-state reconciliation,
@@ -222,15 +245,19 @@ long-lived processes must always run.
 
 - **M1:** record role identity, role permissions, inputs, outputs, and handoff
   receipts in the contracts and operation graph.
-- **M2:** make those handoffs durable, isolated, resumable, fenced, and safe
-  across worktrees and restarts.
+- **M2:** make those handoffs durable, isolated, resumable, stale-owner-safe,
+  and discoverable across worktrees and restarts while rejecting another
+  mutating run for the same repository.
 - **M3:** provide strict independent-review admission, dispatch, exact-head
   binding, and rereview behavior.
 - **M4:** provide the closeout worker's exact delivery, reconciliation, and
-  cleanup adapters.
+  cleanup adapters. M4-S3 is the first point where enough exists to begin real
+  approved backlog proof; M4-S4 separately requires ten consecutive real
+  backlog completions and a complete disposable fault matrix. Expected
+  disposable pauses never increment the real-run counter.
 - **M5:** coordinate role-bounded child work units across an ordered milestone.
-- **M6:** prove the full role sequence through fault injection and repeated
-  unattended five-slice runs.
+- **M6:** extend the already-qualified single-change engine to milestone faults
+  and repeated unattended five-slice runs.
 - **M7:** require Temporal to preserve the same role, handoff, evidence, and
   authority rules rather than invent a second model.
 
@@ -263,22 +290,22 @@ retain the prior discussion of durable execution, isolated work units,
 concurrency, restart recovery, strict review, cleanup, configuration
 provenance, qualification, and optional Temporal support.
 
-## Deferred topic: harness engineering
+## Focused follow-up: harness engineering
 
-Harness-engineering exploration is deliberately deferred until after this
-document-restructure planning is ready to resume. When resumed, assess the
-restructured documents and multi-agent model for agent legibility, progressive
-context disclosure, mechanically enforced invariants, feedback loops,
-observability, capability-scoped tools, and continuous documentation cleanup.
-Do not treat this handoff as a completed harness-engineering assessment.
+The main design now includes the initial harness-engineering foundation:
+progressive context, deterministic controls, capability-scoped tools, legible
+state, mechanical invariants, feedback loops, observability, documentation
+hygiene, and replaceable workers. A later focused exploration may refine those
+requirements. Do not treat this handoff as a completed focused assessment.
 
 ## Recommended next session
 
 1. Read this handoff, the current main control-plane brief, and the current
    roadmap.
 2. Review the two master documents for whole-system coherence, content
-   preservation, open decisions, multi-agent boundaries, harness foundations,
-   dependency order, and readability.
+   preservation, the single-change v1/M4-S4 proof boundary, open decisions,
+   multi-agent boundaries, harness foundations, dependency order, and
+   readability.
 3. Iterate only on those two master documents and this handoff as directed by
    the owner. Do not create slice briefs, archive sources, open an OpenSpec
    change, or implement the control plane.

@@ -2,14 +2,16 @@
 
 Date: 2026-08-16
 
-Last updated: 2026-08-19
+Last updated: 2026-08-20
 
 Status: Owner-directed big-picture architecture draft under review. The owner
 confirmed the deterministic control-plane direction, durable isolated work
 units, future Temporal expandability, the multi-agent operating model, and the
-two-master-document refactor. Named open decisions remain unresolved. This
-brief does not authorize OpenSpec Propose, Apply, GitHub mutation, archival, or
-implementation.
+two-master-document refactor. The owner also confirmed that reliable repeated
+single-change delivery must be proven before milestone queues, multi-work-unit
+parallelism, five-slice execution, or Temporal. Named open decisions remain
+unresolved. This brief does not authorize OpenSpec Propose, Apply, GitHub
+mutation, archival, or implementation.
 
 ## Document role
 
@@ -17,14 +19,14 @@ This is the main design document for the autonomous SDD reliability control
 plane. It owns the whole-system outcome, architecture, safety invariants,
 agent roles, harness foundations, shared risks, and open decisions. The
 [roadmap](../plans/autonomous-sdd-reliability-control-plane-roadmap.md) owns
-only milestone/slice dependency mapping and execution order. Future detailed
-slice briefs will own slice-specific implementation design after this big
-picture is reviewed and accepted.
+only milestone/slice dependency mapping, readiness, execution order, and
+milestone exit evidence. The linked detailed slice briefs own slice-specific
+implementation design and acceptance evidence, subject to owner review.
 
-Until those detailed briefs exist, the planned-slice inventory in this
-document preserves the current implementation direction. A planned filename
-is not a link and does not claim that the brief, an OpenSpec change, or any
-implementation exists.
+The planned-slice inventory in this document preserves the architecture-level
+implementation direction and links to the draft detailed briefs. A linked
+draft does not claim that its decisions are accepted or that an OpenSpec
+change or implementation exists.
 
 ## 1. Problem and desired outcome
 
@@ -38,12 +40,32 @@ Different runs can therefore select different helpers, inspect different
 worktrees or configuration sources, request approvals at different points, or
 classify the same reviewer outcome differently.
 
-The desired outcome is a truly unattended, fail-closed SDD delivery path that
-can complete an authorized five-slice milestone over a multi-hour run when all
-objective gates pass. It should ask for no routine owner approvals, stop only
-for a material decision or a real unrecoverable gate, resume idempotently after
-interruption, preserve unrelated dirty work, and make every stop explainable
-from one canonical durable record.
+The long-term desired outcome is a truly unattended, fail-closed SDD delivery
+path that can complete an authorized five-slice milestone over a multi-hour run
+when all objective gates pass. It should ask for no routine owner approvals,
+stop only for a material decision or a real unrecoverable gate, resume
+idempotently after interruption, preserve unrelated dirty work, and make every
+stop explainable from one canonical durable record.
+
+The first reliable-release promise is deliberately smaller:
+
+> Given one approved change in one repository, the runner can safely drive it
+> from admission through implementation, independent review, OpenSpec Verify,
+> and closeout, or stop with an exact actionable reason, without touching
+> unrelated work.
+
+The delivery horizons are therefore explicit:
+
+1. **Single-change v1:** one repository, one approved change, one active
+   mutating autonomous run, serial role handoffs, explicit pause/resume, strict
+   review, full closeout, and repeated qualification against real eligible
+   changes.
+2. **Milestone expansion:** dependency-valid queues, owner shorthand, isolated
+   child work units, and five-slice qualification only after single-change v1
+   is proven.
+3. **Later concurrency and backend expansion:** fine-grained overlapping-run
+   coordination, safe parallel role execution, and optional Temporal only after
+   the earlier contracts and qualification evidence are stable.
 
 Success means that autonomy and rigor reinforce each other: scripts own state
 selection, transition ordering, authorization, tool transport, retries, and
@@ -273,8 +295,9 @@ each failed run is observed.
 ### Option C: Build a deterministic SDD reliability control plane
 
 Create one executable transition engine, one canonical run schema, one runtime
-configuration loader, one typed operation graph, and one exhaustive outcome
-registry. Reuse the existing bounded helpers behind typed adapters.
+configuration loader, one typed operation graph, and one complete emitted-
+outcome registry with a fail-closed unknown default. Reuse the existing bounded
+helpers behind typed adapters.
 
 - Directly addresses nondeterministic selection and false status conclusions.
 - Makes approvals, retries, pauses, and review transport testable without
@@ -312,10 +335,17 @@ Implement the state machine outside the assistant runtime.
 - Confirmed owner direction: separate planning, test-and-evidence,
   implementation, independent-review, and closeout responsibilities through
   explicit durable handoffs.
+- Confirmed owner direction: prove one approved change can complete safely and
+  repeatedly before building milestone queues, enabling multi-work-unit
+  parallelism, qualifying five-slice execution, or adopting Temporal.
+- Confirmed v1 conflict boundary: plan for at most one active mutating
+  autonomous run per canonical repository. Preserve a backend-neutral claim
+  contract, but defer disjoint concurrent runs and fine-grained claims until a
+  later threat model and qualification justify them.
 - Assumption: strict independent review remains mandatory for
   `production-rapid`; reliability improvements must not accept transcripts,
   self-review, stale heads, mutable packages, or unverifiable results.
-- Assumption: the first reliable release may target one local repository and
+- Assumption: the first reliable release targets one local repository and its
   configured GitHub lifecycle before adding cross-repository milestone slices.
 - Assumption: existing archived review and cleanup contracts remain valid
   unless a conformance test proves an incompatibility.
@@ -337,9 +367,10 @@ review, and recovery requirements are strict:
 | Candidate slices | Data rationale | Exposure rationale | Recovery rationale |
 |---|---|---|---|
 | M1-S1 through M1-S3 | Internal schemas and safe configuration metadata | Reusable global authorization, role, handoff, and review contracts | Contract drift can incorrectly permit or block later actions; strict review and reversible migration are required. |
-| M2-S1 through M2-S3 | Local run, event, lease, claim, handoff, and status records | The engine controls repository mutation and worker sequencing | Restart and concurrency defects can corrupt authoritative state; fail-closed recovery is required. |
+| M2-S1 through M2-S3 | Local run, event, execution-ownership, coarse-claim, handoff, and status records | The engine controls repository mutation and worker sequencing | Restart, stale-owner, and conflicting-run defects can corrupt authoritative state; fail-closed recovery is required. |
 | M3-S1 through M3-S3 | Sealed review packages and safe evidence metadata | Production assurance and reviewer transport boundary | A false pass or false unavailable result changes delivery eligibility; strict exact-head evidence is required. |
 | M4-S1 through M4-S3 | Repository, GitHub, OpenSpec, branch, and worktree state | Real external and destructive lifecycle transitions | Every mutation must be exact, idempotent, and recoverable without touching unrelated work. |
+| M4-S4 | Durable qualification evidence, approved backlog-change metadata, and safe disposable-fixture metadata | Opt-in execution against real eligible changes plus isolated disruptive fault testing | Every run and failure remains auditable; the two gates remain separately counted, fail closed, and cannot rerun away flakes or broaden an item's authority. |
 | M5-S1 and M5-S2 | Approved roadmap/brief metadata and normalized run inputs | Global queue and shorthand entrypoints | Thin adapters must be reversible and must not duplicate or widen engine authority. |
 | M6-S1 through M6-S3 | Disposable qualification evidence, harness metrics, and safe diagnostics | Default routing for autonomous SDD delivery | Audit-mode rollback and retained failure evidence are required before and after cutover. |
 | M7-S1 | Temporal history, safe workflow metadata, worker handoffs, and backend projections | Optional external durable-execution service and workers | Temporal remains optional, preserves contract parity, shares claim authority, and never exposes credentials or creates a second state authority. |
@@ -390,13 +421,16 @@ rereviews, pauses for human judgment, or completes.
    remaining run time. A strict-only run should fail before Apply when its
    mandatory review path cannot work.
 
-6. **One review dispatcher and exhaustive outcome registry.** The dispatcher
-   owns strict launch, receipt consumption, exact-head invalidation, bounded
-   objective correction, rereview, authorized degraded fallback, and terminal
-   evidence. Every emitted code must map exactly once to retry, correction,
-   degraded eligibility, human decision, or terminal failure. Existing
-   multi-step artifact, configuration-provenance, and inspection-environment
-   briefs become sequenced implementation inputs.
+6. **One review dispatcher and complete emitted-outcome registry.** The
+   dispatcher owns strict launch, receipt consumption, exact-head invalidation,
+   bounded objective correction, rereview, authorized degraded fallback, and
+   terminal evidence. Every emitted code must map exactly once to retry,
+   correction, degraded eligibility, human decision, or terminal failure.
+   Existing multi-step artifact, configuration-provenance, and inspection-
+   environment briefs become sequenced implementation inputs. Any unknown,
+   malformed, or unmapped outcome pauses fail-closed, preserves non-sensitive
+   diagnostic evidence, and cannot trigger retry or another external action
+   until it is explicitly classified.
 
 7. **Review once per code head and assurance contract.** Bind a successful
    review to current Apply evidence, immutable package, and exact head, then
@@ -413,35 +447,67 @@ rereviews, pauses for human judgment, or completes.
    the next safe transition and never infer failure solely from a missing file
    in the current worktree.
 
-9. **Milestone adapter after single-change reliability.** Convert an approved
-   milestone plan into immutable queue entries with per-slice brief paths,
-   dependencies, target scope, and evidence. The adapter submits entries to the
-   same engine; it does not duplicate lifecycle policy.
+9. **Milestone adapter after repeated single-change qualification.** Convert an
+   approved milestone plan into immutable queue entries with per-slice brief
+   paths, dependencies, target scope, and evidence only after the real
+   single-change lifecycle meets its qualification gate. The adapter submits
+   entries to the same engine; it does not duplicate lifecycle policy.
 
-10. **Composition-first verification.** Add schema conformance tests, a
-    model-independent fake-adapter end-to-end run, real Codex multi-step review
-    acceptance, interruption/restart tests at every transition, concurrent
-    runner tests, stale-head and partial-external-state recovery, worktree
-    discovery tests, exact prompt-count assertions, and a disposable five-slice
-    soak. Unit tests remain necessary but are not release evidence for
-    unattended delivery.
+10. **Composition-first verification in two proof stages.** Add schema
+    conformance tests, a model-independent fake-adapter end-to-end run, real
+    Codex multi-step review acceptance, interruption/restart tests at every
+    transition, conflicting-run rejection, stale-head and partial-external-
+    state recovery, worktree discovery tests, and exact prompt-count
+    assertions. Then prove repeated real single-change delivery before adding
+    queue-specific fault tests and a disposable five-slice soak. Unit tests
+    remain necessary but are not release evidence for unattended delivery.
+
+### Compact v1 transition contract
+
+M1-S2 will finalize exact state and operation names, but v1 must preserve this
+small behavioral spine rather than expose every helper as an independent
+workflow decision:
+
+| Stage | Authority and required evidence | Permitted next behavior |
+|---|---|---|
+| Admitted | Exact owner-approved intent and a sealed conditional full-lifecycle `deliveryAuthorization`, canonical repository/worktree, immutable safe snapshot, live capability readiness, and coarse repository claim | Enter planning or pause before mutation |
+| Planned | Planning artifacts conform to approved intent and pass structural validation; material ambiguities are absent | Produce the independent requirements-to-evidence receipt |
+| Evidence-ready | Every requirement maps to proportional approved evidence and initial failing evidence exists where applicable | Invoke the implementation role |
+| Applied | Implementation and required local/CI evidence bind to the current workspace and exact head | Launch current-head independent review |
+| Reviewed | Strict review result is accepted for the exact head, or bounded objective correction has returned through Apply and rereview | Invoke OpenSpec Verify |
+| Verified | OpenSpec Verify and other required current-head gates pass | Enter closeout |
+| Closing | Delivery, Sync, Archive, issue/Project convergence, and exact-owned cleanup advance through individually evidenced external attempts | Complete or pause at the exact incomplete transition |
+| Complete | All required terminal predicates agree and no owned cleanup remains unresolved | No further mutation |
+
+Only the deterministic controller selects a transition. Role workers produce
+typed evidence but do not advance state or expand their own authority. At any
+nonterminal stage, retryable infrastructure may retry within budget; objective
+quality failures return to the owning role; material decisions, unknown
+outcomes, expired or changed live authority, ambiguous state, and exhausted
+budgets pause. `in-doubt` external operations reconcile before any later
+mutation. Emergency cancellation preserves evidence and is not completion.
 
 ### Durable execution and backend portability
 
 The design separates four ownership scopes:
 
-- A **parent run** owns milestone intent, ordered child dependencies, global
-  deadline, selected execution backend, and summaries of child terminal state.
-- A **work unit** owns exactly one slice and its authorization/configuration
+- A **parent run** owns bounded delivery intent, global deadline, selected
+  execution backend, and summaries of child terminal state. Single-change v1
+  has exactly one child; later milestone execution also owns ordered child
+  dependencies.
+- A **work unit** owns exactly one approved change or later milestone slice and
+  its authorization/configuration
   digests, role handoffs, lifecycle state, attempts and correction budget,
   evidence/artifact namespace, derived targets, resource ownership, and cleanup
   result.
 - A **transition attempt** owns one stable attempt ID and idempotency key,
-  target and precondition digests, backend fence, write-ahead state, adapter
-  receipt, and retry or reconciliation outcome.
+  target and precondition digests, backend ownership generation or equivalent
+  stale-owner proof, write-ahead state, adapter receipt, and retry or
+  reconciliation outcome.
 - A **resource claim** serializes conflicting work across runs and work units
-  using canonical repository identity, exact conflict scope, owner, fencing
-  epoch, expiry, and release or recovery evidence.
+  using canonical repository identity, exact conflict scope, owner, provider-
+  appropriate stale-owner protection, expiry where applicable, and release or
+  recovery evidence.
 
 The backend owns durable scheduling, authoritative execution history, replay,
 timers, and delivery of transition work. Backend-neutral domain contracts own
@@ -454,19 +520,50 @@ compete with that history for control authority.
 Resource-claim coordination is a separate repository-scoped authority rather
 than a history projection. Repository configuration selects one claim provider
 and safe identity; every admitted run snapshots the binding and records claim
-request, acquisition, renewal, fencing, release, and recovery receipts in its
-own history. All active local and future-backend workers for the repository use
-the same provider. Changing providers while runs or claims are active fails
-closed.
+request, acquisition, renewal or ownership refresh where applicable, release,
+and recovery receipts in its own history. All active local and future-backend
+workers for the repository use the same provider. Changing providers while runs
+or claims are active fails closed.
 
-The first backend is local and must prove the contract through a discoverable
-registry, append-only ledger, atomic revision updates, leases, fencing, and
-compare-and-swap behavior. These are local implementation choices, not
-requirements imposed on every future backend. Before finalizing that design,
-Explore must compare bespoke local primitives with an existing local-first
-durable-execution substrate and the actual single-writer/concurrent-run threat
-model. The decision and rejected alternatives must be recorded rather than
-assuming that a custom lease/ledger is automatically the safest choice.
+The first release uses the claim abstraction conservatively: exactly one
+repository-wide mutating claim may be active for the canonical repository.
+Another autonomous run may inspect status, but it cannot enter a mutating
+transition until that claim is safely released or an exact stale-owner takeover
+completes. Disjoint concurrent runs, narrower resource claims, and parallel
+child work units are later expansion behavior, not v1 requirements.
+
+The first backend is local and must prove discoverable authoritative history,
+atomic state advancement, crash-safe resume or takeover, stale-owner rejection,
+and the coarse repository claim. Explore must determine the smallest substrate
+that satisfies those behaviors by comparing bespoke ledger/lease/fencing/CAS
+primitives with an existing local-first durable-execution substrate and the
+actual single-writer/takeover threat model. Append-only storage, leases,
+fencing, and compare-and-swap are candidate mechanics rather than a package
+that v1 must implement regardless of evidence. The decision and rejected
+alternatives must be recorded before Propose.
+
+The local v1 backend has an explicit complexity guardrail. M1-S1 must constrain
+it to one local host on a local filesystem, one canonical repository, one
+active mutating run, operator-invoked resume or takeover, and direct transition
+selection and adapter invocation by the current runner. For this backend,
+replay means rebuilding current state from durable records; timers mean
+persisted deadlines evaluated when the runner is invoked; and transition
+delivery means the current runner calls a fixed adapter. Local v1 must not add
+a resident daemon, automatic process restart, a general task queue or timer
+service, multi-host or distributed-worker coordination, arbitrary workflow
+graphs, deterministic replay of worker code, high availability, clustering, or
+search and retention infrastructure.
+
+Before M2-S1 Propose, the substrate decision must return for explicit owner
+review if the design requires more than one local ownership or coordination
+mechanism for exclusive transition ownership, any background service,
+multi-host correctness, generalized scheduling, or materially more than
+approximately 1,000-1,200 new or
+substantially rewritten production lines for M2-S1. The line range is a
+planning tripwire, not an acceptance metric and not a reason to compress the
+implementation, omit tests, or hide complexity in dependencies or generated
+code. Crossing any tripwire pauses M2-S1 until a renewed build-versus-adopt
+comparison evaluates Temporal and other suitable durable-execution substrates.
 
 Temporal remains an optional post-qualification adapter. A future Temporal
 backend may map the parent to a parent Workflow, work units to child Workflows,
@@ -487,8 +584,30 @@ through durable `prepared`, `in-flight`, `observed`, `committed`, or `in-doubt`
 states. A crash after remote success but before local receipt persistence must
 reconcile from authoritative external state; an unobservable or conflicting
 outcome becomes `in-doubt` and pauses instead of blindly repeating the write.
-Stale fences, wrong target kinds, expired authority, or mismatched claims
-cannot invoke or commit the operation.
+Stale execution ownership or fences, wrong target kinds, expired authority, or
+mismatched claims cannot invoke or commit the operation.
+
+### Routine continuation, material decisions, and emergency stop
+
+A **routine continuation** remains inside the exact approved change,
+repository, targets, delivery profile, assurance policy, deadline, and
+mutation classes. Its deterministic prerequisites, current evidence,
+authorization, runtime permission, and live external capabilities all pass. It
+requires no additional owner prompt.
+
+A **material decision** changes or interprets approved intent rather than merely
+executing it. Examples include changing requirements, architecture, scope,
+target, risk profile, assurance mode, destructive behavior, credential scope,
+or requirements-derived evidence; overriding a conflict; accepting an unknown
+external result; or proceeding after a safety invariant fails. These decisions
+pause for the owner and cannot be reframed as routine correction.
+
+An operator may emergency-pause or cancel an exact run by canonical repository
+and run identity. The control plane stops admitting new mutations, preserves
+history and current evidence, and does not infer that cancellation authorizes
+cleanup. In-flight external operations first reconcile to `committed` or
+`in-doubt`. Resume requires explicit permission plus fresh live-state,
+authorization, capability, claim, workspace, and evidence checks.
 
 ### Multi-agent operating model
 
@@ -510,7 +629,7 @@ The first reliable release uses a durable serial handoff:
 ```text
 admission
   -> planning
-  -> planning review and Apply authorization
+  -> approved-intent conformance and Apply-eligibility gate
   -> test-and-evidence receipt
   -> implementation and focused/broad verification evidence
   -> independent review of the exact current head
@@ -519,10 +638,35 @@ admission
   -> closeout
 ```
 
+The accountable planning authority is the owner-approved detailed brief and
+sealed bounded delivery authorization, not the planning agent. For a complete
+autonomous delivery, admission records `deliveryAuthorization`: the exact
+repository, approved intent, targets, profile, mutation classes, assurance
+policy, budget, and expiry, including conditional permission for later Apply.
+It does not claim that planning is already complete or eligible to mutate.
+
+The planning agent translates approved intent into OpenSpec artifacts. After
+planning, the controller evaluates `applyEligibility`: a deterministic gate
+that checks artifact completeness, strict validation, approved-intent
+conformance, requirements-to-evidence traceability, current authorization,
+runtime permission, and live readiness. Passing eligibility opens Apply inside
+the existing grant without a second routine owner prompt. A material ambiguity,
+intent change, widened target or mutation class, changed profile, or expired
+authorization fails eligibility and pauses for an explicit owner authorization
+amendment. The planning agent cannot approve its own newly invented product or
+architecture decision.
+
+A standalone Propose invocation has no implicit `deliveryAuthorization`; it
+stops at the ordinary Propose boundary until the owner explicitly authorizes
+Apply for the named change.
+
 The test-and-evidence role is broader than a unit-test writer because recovery,
-concurrency, cleanup safety, external reconciliation, and backend parity need
-integration, fault-injection, and end-to-end proof. The implementation role may
-add implementation-local unit coverage but cannot unilaterally change the
+concurrency, cleanup safety, external reconciliation, and backend parity may
+need integration, fault-injection, and end-to-end proof. Every change requires
+requirements-to-evidence traceability, but the approved profile and affected
+behavior select the proportional mix of unit, integration, fault, lifecycle,
+security, and acceptance evidence. The implementation role may add
+implementation-local unit coverage but cannot unilaterally change the
 requirements-derived evidence contract. Any justified evidence change returns
 to the planning/test boundary and receives a new durable receipt.
 
@@ -601,14 +745,107 @@ completion and false-pass rates, routine owner prompts, human-decision pauses,
 retry/correction counts, repeated failure signatures, recovery time, stale or
 missing context incidents, reviewer launch/result failures, evidence gaps,
 resource leaks, and documentation/invariant drift. Exact rollout thresholds
-remain an owner decision.
+are proposed below and remain owner-reviewable before qualification begins.
+
+### Trust boundaries and live authority
+
+The control plane is designed for accidental failure and adversarial or
+confused inputs. These invariants apply to every backend and role:
+
+- Repository files, issues, pull requests, comments, prompts, adapter output,
+  review output, and model output are untrusted data. None can grant authority,
+  widen a target, select credentials, or become executable instructions merely
+  because a worker read it.
+- Role and adapter capability scopes are enforced outside the model. A worker
+  receives exact targets and structured operations; an out-of-scope request is
+  rejected and recorded rather than attempted.
+- The admission snapshot freezes approved intent, target identity, profile,
+  configuration provenance, and safe capability expectations. It does **not**
+  freeze live permission. Credentials, repository ownership, branch protection,
+  policy, external capabilities, and resource conflicts are revalidated before
+  every external mutation and after restart, takeover, or a meaningful delay.
+- Credentials, raw environment, sensitive repository content, and secret-
+  bearing command output are excluded from durable histories, handoff receipts,
+  sealed review packages, logs, status projections, and future workflow
+  histories. Only redacted capability results and safe provenance are stored.
+- Pause, cancel, resume, takeover, claim release, and cleanup bind to exact run,
+  repository, work-unit, target, current revision, and operator permission.
+  Ambiguous or stale operator commands fail closed.
+
+Qualification includes prompt-injection fixtures, out-of-scope worker actions,
+secret-canary scans, wrong-run resume/takeover/cancel attempts, revoked
+credentials, changed repository policy, stale permissions, and malformed or
+unknown adapter outcomes. A safe design is not proven merely because normal
+inputs pass.
+
+### Single-change proof point and release criteria
+
+The system is **ready to begin real single-change proof after M4-S3**: by then
+the contracts, local durable engine, strict review path, GitHub/OpenSpec
+lifecycle, finalization, and exact-owned cleanup exist as one integrated path.
+It is **not yet proven** at that point. M4-S4 uses individually approved,
+eligible changes from the owner's backlog to establish repeated evidence. Each
+backlog item retains its own accepted brief, exact authorization, profile,
+requirements-to-evidence map, and stop conditions; backlog membership is not
+standing authorization.
+
+M4-S4 has two independent qualification gates that must both pass:
+
+1. **Real-change completion gate.** Ten consecutive individually approved
+   backlog changes complete end to end through closeout. These runs may include
+   an explicitly authorized pause or controller restart between completed
+   transitions, followed by safe resume and eventual completion. Qualification
+   does not deliberately corrupt external receipts, credentials, policy,
+   repository state, review evidence, or in-flight work during a real backlog
+   change. A typed pause/resume may count only after that same run eventually
+   completes. Any terminal or still-incomplete real run, or any discovered
+   invariant defect, breaks the completion streak; every natural failure
+   remains evidence.
+2. **Disposable fault-matrix gate.** Every required fault scenario passes in a
+   disposable repository, clone, test account, fixture, or other environment
+   whose exact isolation and cleanup are proven before injection. The matrix
+   includes remote-success/local-receipt loss, process death and takeover,
+   stale review heads, conflicting-run rejection, dirty-unrelated-work
+   preservation, reviewer unavailability at admission and after Apply, revoked
+   live permission or policy drift, wrong-run operator actions, prompt/secret
+   attacks, and malformed or unknown outcomes.
+
+Before M4-S4 Propose, its detailed brief must define a scenario-to-environment
+matrix. Every row records the allowed environment class, exact target and
+isolation proof, injection boundary, mutation prohibition or allowance,
+expected completion/recovery/pause state, required evidence, cleanup contract,
+time or transition bound, and effect on qualification counters. A disruptive
+scenario is disposable-only by default. Real-change injection is permitted only
+for a proven non-destructive pause or restart between completed transitions,
+with exact per-run authorization and no unresolved external attempt.
+
+An expected disposable pause satisfies only that fault-matrix row; it never
+increments the ten-run real completion count. No fault scenario increments that
+count. A failed fault row blocks M4-S4 and must be corrected and rerun. If the
+defect could have affected prior real runs, those runs become stale and the
+completion streak restarts after correction.
+
+Both gates require zero false passes, duplicate or unaccounted external
+mutations, unrelated or dirty-resource changes, routine owner prompts inside
+valid authority, unresolved terminal resource leaks, or stops without a typed
+safe next action. Every injected failure must converge safely or reach its
+specified fail-closed pause within the row's bound. All real and disposable
+runs, failures, corrections, and invalidations remain in the qualification
+record; rerunning cannot erase them.
+
+Meeting both M4-S4 gates makes single-change v1 eligible for explicit opt-in use
+and unblocks milestone-queue design. It does not enable parallelism, five-slice
+default routing, or Temporal. Later five-slice qualification initially requires
+three consecutive real multi-hour milestone runs under the same zero-tolerance
+safety criteria before default cutover can be considered.
 
 ## 5. Scope, non-goals, constraints, dependencies, and risks
 
 ### Scope
 
-- Canonical autonomous-run schema, registry, event ledger, lease, and
-  migration from compatible v1 controller/checkpoint state.
+- Canonical autonomous-run schema, discoverable durable local state, coarse
+  repository claim, safe resume/takeover, and migration from compatible v1
+  controller/checkpoint state.
 - Deterministic single-repository transition engine from brief/Propose through
   cleanup.
 - Shared authorization, operation, target-kind, evidence, approval, review,
@@ -637,6 +874,8 @@ remain an owner decision.
   history, or changing credentials and permission scopes.
 - Cross-repository or deployment/release autonomy in the first control-plane
   release.
+- Disjoint concurrent mutating runs, fine-grained resource claims, parallel
+  child execution, milestone queues, or Temporal in single-change v1.
 - Replacing OpenSpec, GitHub, Git, or the existing bounded skills with a new
   planning system.
 - Treating multi-agent execution as unrestricted parallel editing or assuming
@@ -655,7 +894,8 @@ remain an owner decision.
 - Reusable assets contain no product-specific constants, credentials, or
   absolute local paths.
 - External actions remain exact, idempotent, evidence-gated, and limited by
-  both run authorization and active runtime permission.
+  both immutable run authorization and freshly revalidated live runtime
+  permission, external policy, and capability state.
 - A changed head invalidates current code review; material findings and
   exhausted correction budgets still pause.
 - Existing dirty user work and unrelated branches/worktrees must remain
@@ -669,8 +909,8 @@ remain an owner decision.
   implementations.
 - The open strict multi-step artifact-delivery and configuration-provenance
   decisions.
-- An owner decision on review reuse, canonical registry ownership, and rollout
-  acceptance thresholds.
+- An owner decision on review reuse, canonical registry ownership, and
+  confirmation or adjustment of the proposed qualification thresholds.
 - A disposable test repository or fixture service capable of exercising merge,
   Sync, Archive, issue/Project reconciliation, and cleanup without production
   impact.
@@ -681,7 +921,7 @@ remain an owner decision.
 |---|---|
 | A large redesign hides new defects | Deliver in contract-first slices with compatibility fixtures and a shadow/audit mode before mutation. |
 | A centralized engine becomes over-privileged | Keep adapters capability-scoped; evaluate authorization and runtime permission before every transition. |
-| A lease strands a run after process death | Use expiring leases with revision-bound recovery and evidence reread before takeover. |
+| Execution ownership strands a run after process death | Select an expiry, host-ownership, or equivalent stale-owner mechanism during Explore; bind takeover to current revision and reread evidence before resuming. |
 | Review reuse accidentally accepts stale code | Bind reuse to exact package digest, head, Apply evidence, relevant artifact digests, and transition prerequisites. |
 | Config snapshots retain sensitive data | Store only safe normalized capability metadata and digests; never persist credentials or raw environment. |
 | Migration mistakes old worktrees for active runs | Inventory all worktrees, require exact v1 linkage, and classify ambiguous legacy state as audit-only. |
@@ -691,6 +931,8 @@ remain an owner decision.
 | More context reduces agent accuracy | Use a thin entry map and progressive role-specific disclosure with durable sources and freshness checks. |
 | Harness rules decay into advisory prose | Promote repeated invariants into executable checks and run documentation/context hygiene as a measured maintenance loop. |
 | A bespoke local backend recreates distributed-systems failures | Validate the real concurrency threat model and compare existing local-first durable substrates before fixing the implementation design. |
+| Untrusted repository content or model output attempts to widen authority | Treat all content as data; enforce exact targets, structured operations, and role capabilities outside the model; test prompt injection and scope escape. |
+| An admission snapshot outlives credentials or repository policy | Freeze intent but revalidate live authorization, permissions, protection rules, ownership, and capabilities before every external mutation and after resume. |
 
 ## 6. Open questions and blocking decisions
 
@@ -701,10 +943,12 @@ remain an owner decision.
 - **Parent/work-unit boundary:** Confirm the exact parent-owned summaries and
   child-owned state so no parent projection can mutate or become authoritative
   over a child's transition history.
-- **Local durability substrate:** Confirm the actual concurrent-writer threat
-  model and whether the local backend should use bespoke ledger/lease/CAS
+- **Local durability substrate:** Within the confirmed one-active-mutating-run
+  v1 boundary, confirm the process-death, stale-owner, and takeover threat model
+  and whether the local backend should use bespoke ledger/lease/fencing/CAS
   primitives, an existing local-first durable engine, or a host-managed resume
-  primitive. Record evidence and rejected alternatives before Propose.
+  primitive. Apply the local-v1 complexity guardrail and its build-versus-adopt
+  tripwires; record evidence and rejected alternatives before Propose.
 - **Resource-claim authority:** Confirm where the repository-scoped claim
   provider lives, how it is discovered and fenced, and how provider switching
   is prohibited while runs or claims are active.
@@ -722,51 +966,67 @@ remain an owner decision.
 - **Admission policy:** Confirm that strict-only delivery should stop at
   admission, before implementation, when the real multi-step strict path is not
   ready.
-- **Rollout threshold:** Define the required number and duration of clean
-  unattended single-change and five-slice runs before the control plane becomes
-  the default rather than shadow/audit mode.
+- **Qualification threshold confirmation:** Confirm or adjust the proposed ten
+  consecutive real single-change runs before M4-S4 Propose and the proposed
+  three consecutive real five-slice multi-hour runs before M6-S2 Propose. M4-S4
+  also requires an approved scenario-to-environment matrix that keeps
+  disruptive fault injection out of real backlog work.
 - **Agent execution identities:** Confirm whether roles may reuse one model or
   session identity across transitions and which roles require a fresh isolated
   process. Independent review must remain distinct and isolated.
 - **Test/evidence change authority:** Confirm the narrow cases in which an
   implementation-discovered requirement ambiguity may return to planning and
   revise the requirements-derived evidence contract.
-- **Harness-health threshold:** Select the metrics and failure levels that
-  block default cutover, including routine prompts, false passes, repeated
-  failure signatures, recovery time, resource leaks, and context drift.
+- **Harness-health performance threshold:** The zero-tolerance safety failures
+  are defined above; select the remaining timing, retry, repeated-signature,
+  availability, and context-drift levels that block opt-in release or default
+  cutover.
+- **Parallelism adoption trigger:** After M4-S4, decide from measured serial
+  throughput and contention whether fine-grained claims and parallel child or
+  role execution justify a separate roadmap slice. Parallelism cannot be folded
+  silently into M5, M6, or Temporal and is not required to prove serial
+  five-slice delivery.
 
 These decisions block the exact OpenSpec requirements and schema, but they do
 not block agreement on the systemic diagnosis or contract-first direction.
 
 ## 7. Planned slice design inventory
 
-The roadmap sequences these slices. The planned filenames below reserve clear
-destinations for later detailed design; every file is **not yet created**. The
-current implementation direction remains in this section until each future
-brief is created and reviewed.
+The roadmap sequences these slices. Every linked file below is now a draft
+slice decision record for owner review. The concise descriptions after the
+table remain architecture-level summaries; the linked brief owns the slice's
+detailed design, acceptance evidence, open decisions, and next OpenSpec action.
+
+The [roadmap](../plans/autonomous-sdd-reliability-control-plane-roadmap.md) is
+the sole authority for milestone dependencies, readiness, and exit evidence.
+The descriptions below preserve architecture and slice-design inputs only; they
+do not define or override milestone gates. Each linked detailed brief owns its
+slice-specific acceptance criteria and evidence while linking to the
+roadmap's containing milestone gate.
 
 Planned directory: `ai-planning/design-briefs/autonomous-sdd-reliability-control-plane/`
 
 | Slice | Proposed OpenSpec change | Planned detailed brief |
 |---|---|---|
-| M1-S1 | `establish-autonomous-sdd-run-v2-contract` | `m1-s1-run-and-work-unit-contract.md` — not yet created |
-| M1-S2 | `unify-autonomous-sdd-operation-contract` | `m1-s2-operation-profile-gate-and-outcome-contract.md` — not yet created |
-| M1-S3 | `establish-autonomous-sdd-runtime-config-provenance` | `m1-s3-runtime-configuration-provenance.md` — not yet created |
-| M2-S1 | `add-autonomous-sdd-local-execution-backend` | `m2-s1-local-durable-execution-backend.md` — not yet created |
-| M2-S2 | `add-autonomous-sdd-transition-engine` | `m2-s2-deterministic-transition-engine.md` — not yet created |
-| M2-S3 | `add-autonomous-sdd-run-status-and-recovery` | `m2-s3-run-status-and-recovery.md` — not yet created |
-| M3-S1 | `harden-strict-review-multistep-artifact-delivery` | `m3-s1-strict-review-artifact-delivery.md` — not yet created |
-| M3-S2 | `add-autonomous-sdd-review-admission-and-dispatcher` | `m3-s2-review-admission-and-dispatch.md` — not yet created |
-| M3-S3 | `bind-autonomous-review-to-code-head` | `m3-s3-exact-head-review-and-correction.md` — not yet created |
-| M4-S1 | `integrate-autonomous-sdd-github-delivery` | `m4-s1-github-intake-and-implementation-delivery.md` — not yet created |
-| M4-S2 | `integrate-autonomous-sdd-sync-and-archive` | `m4-s2-sync-and-archive-delivery.md` — not yet created |
-| M4-S3 | `integrate-autonomous-sdd-finalization-and-cleanup` | `m4-s3-finalization-and-cleanup.md` — not yet created |
-| M5-S1 | `add-autonomous-sdd-milestone-slice-adapter` | `m5-s1-milestone-slice-queue.md` — not yet created |
-| M5-S2 | `add-autonomous-design-brief-delivery-shorthand` | `m5-s2-design-brief-delivery-shorthand.md` — not yet created |
-| M6-S1 | `qualify-autonomous-sdd-composition-reliability` | `m6-s1-composition-and-fault-qualification.md` — not yet created |
-| M6-S2 | `qualify-autonomous-sdd-five-slice-soak` | `m6-s2-five-slice-unattended-qualification.md` — not yet created |
-| M6-S3 | `enable-autonomous-sdd-control-plane-default` | `m6-s3-default-control-plane-cutover.md` — not yet created |
-| M7-S1 | `add-autonomous-sdd-temporal-execution-backend` | `m7-s1-temporal-execution-backend.md` — not yet created |
+| M1-S1 | `establish-autonomous-sdd-run-v2-contract` | [Run and isolated work-unit contract](autonomous-sdd-reliability-control-plane/m1-s1-run-and-work-unit-contract.md) |
+| M1-S2 | `unify-autonomous-sdd-operation-contract` | [Operation, profile, gate, and outcome contract](autonomous-sdd-reliability-control-plane/m1-s2-operation-profile-gate-and-outcome-contract.md) |
+| M1-S3 | `establish-autonomous-sdd-runtime-config-provenance` | [Runtime configuration provenance](autonomous-sdd-reliability-control-plane/m1-s3-runtime-configuration-provenance.md) |
+| M2-S1 | `add-autonomous-sdd-local-execution-backend` | [Local durable execution backend](autonomous-sdd-reliability-control-plane/m2-s1-local-durable-execution-backend.md) |
+| M2-S2 | `add-autonomous-sdd-transition-engine` | [Deterministic transition engine](autonomous-sdd-reliability-control-plane/m2-s2-deterministic-transition-engine.md) |
+| M2-S3 | `add-autonomous-sdd-run-status-and-recovery` | [Run status and recovery](autonomous-sdd-reliability-control-plane/m2-s3-run-status-and-recovery.md) |
+| M3-S1 | `harden-strict-review-multistep-artifact-delivery` | [Strict-review artifact delivery](autonomous-sdd-reliability-control-plane/m3-s1-strict-review-artifact-delivery.md) |
+| M3-S2 | `add-autonomous-sdd-review-admission-and-dispatcher` | [Review admission and dispatch](autonomous-sdd-reliability-control-plane/m3-s2-review-admission-and-dispatch.md) |
+| M3-S3 | `bind-autonomous-review-to-code-head` | [Exact-head review and correction](autonomous-sdd-reliability-control-plane/m3-s3-exact-head-review-and-correction.md) |
+| M4-S1 | `integrate-autonomous-sdd-github-delivery` | [GitHub intake and implementation delivery](autonomous-sdd-reliability-control-plane/m4-s1-github-intake-and-implementation-delivery.md) |
+| M4-S2 | `integrate-autonomous-sdd-sync-and-archive` | [Sync and Archive delivery](autonomous-sdd-reliability-control-plane/m4-s2-sync-and-archive-delivery.md) |
+| M4-S3 | `integrate-autonomous-sdd-finalization-and-cleanup` | [Finalization and cleanup](autonomous-sdd-reliability-control-plane/m4-s3-finalization-and-cleanup.md) |
+| M4-S4 | `qualify-autonomous-sdd-single-change-reliability` | [Single-change reliability qualification](autonomous-sdd-reliability-control-plane/m4-s4-single-change-reliability-qualification.md) |
+| M5-S1 | `add-autonomous-sdd-milestone-slice-adapter` | [Milestone/slice queue](autonomous-sdd-reliability-control-plane/m5-s1-milestone-slice-queue.md) |
+| M5-S2 | `add-autonomous-design-brief-delivery-shorthand` | [Design-brief delivery shorthand](autonomous-sdd-reliability-control-plane/m5-s2-design-brief-delivery-shorthand.md) |
+| M6-S1 | `qualify-autonomous-sdd-composition-reliability` | [Composition and fault qualification](autonomous-sdd-reliability-control-plane/m6-s1-composition-and-fault-qualification.md) |
+| M6-S2 | `qualify-autonomous-sdd-five-slice-soak` | [Five-slice unattended qualification](autonomous-sdd-reliability-control-plane/m6-s2-five-slice-unattended-qualification.md) |
+| M6-S3 | `enable-autonomous-sdd-control-plane-default` | [Default control-plane cutover](autonomous-sdd-reliability-control-plane/m6-s3-default-control-plane-cutover.md) |
+| M7-S1 | `add-autonomous-sdd-temporal-execution-backend` | [Optional Temporal execution backend](autonomous-sdd-reliability-control-plane/m7-s1-temporal-execution-backend.md) |
 
 ### M1 — Contract convergence
 
@@ -774,15 +1034,17 @@ Planned directory: `ai-planning/design-briefs/autonomous-sdd-reliability-control
   transition-attempt, and resource-claim records; v1 migration/projection;
   immutable backend/history and claim-authority binding; identities, revisions,
   snapshots, deadlines, budgets, evidence, review, external records, and
-  cleanup ownership. It does not execute, lease, review, switch backends, or
-  auto-migrate ambiguous legacy state. Acceptance rejects redundant/cross-unit
-  state, validates one authoritative history and claim authority, preserves
-  ambiguous v1 state as audit-only, and proves schema portability without a
-  Temporal runtime.
+  cleanup ownership. It also records the accepted local-v1 threat model,
+  complexity guardrail, and build-versus-adopt tripwire before M2-S1. It does
+  not execute, lease, review, switch backends, or auto-migrate ambiguous legacy
+  state. Acceptance rejects redundant/cross-unit state, validates one
+  authoritative history and claim authority, preserves ambiguous v1 state as
+  audit-only, and proves schema portability without a Temporal runtime.
 - **M1-S2** makes one typed operation graph authoritative for names, target and
   record kinds, profiles, prerequisites, freshness, approval, review,
   correction, recovery, write-ahead state, idempotency, resource claims, and
-  exhaustive outcomes. It does not perform external mutations or redesign
+  complete emitted outcomes and the fail-closed unknown-outcome default. It
+  does not perform external mutations or redesign
   review transport. Acceptance covers wrong-kind rejection, stale Sync,
   enforced resolver permissions, reachable bounded correction, no interactive
   preapproval in an autonomous grant, one disposition per error, and one
@@ -796,30 +1058,29 @@ Planned directory: `ai-planning/design-briefs/autonomous-sdd-reliability-control
   the validated shape is the consumed shape and that admission never guesses a
   later source.
 
-M1 exits only when resolver output is valid run input, the schema family and
-operation graph are authoritative, configuration is consumable, backend/history
-and claim-provider bindings are singular, and every known cross-contract probe
-exists as failing-before/fixed-after evidence.
-
 ### M2 — Deterministic local single-change execution
 
-- **M2-S1** supplies the first local backend: discoverable registry outside
-  removable worktrees, append-only history, projections, atomic revisions,
-  lease/heartbeat/fencing/takeover, the local resource-claim provider, canonical
-  worktree binding, and non-destructive v1 inventory. It does not invoke phases,
-  delete legacy records, implement Temporal, or turn local mechanics into the
-  portable contract. Acceptance covers competing writers, stale fences,
-  restart/takeover, overlapping versus disjoint claims, provider-switch denial,
-  deterministic claim order, moved/removed worktrees, cross-worktree discovery,
+- **M2-S1** supplies the first local backend: a discoverable authoritative
+  history outside removable worktrees, projections, atomic state advancement,
+  safe restart/takeover, stale-owner rejection, the coarse repository-wide
+  claim provider, canonical worktree binding, and non-destructive v1 inventory.
+  The detailed brief selects the smallest evidenced storage and coordination
+  mechanics; it does not assume that append-only storage, leases, fencing, and
+  CAS are all independently required. It does not invoke phases, allow disjoint
+  concurrent mutating runs, delete legacy records, implement Temporal, or turn
+  local mechanics into the portable contract. Acceptance covers a conflicting
+  runner being denied, process death and exact takeover, stale-owner rejection,
+  provider-switch denial, moved/removed worktrees, cross-worktree discovery,
   and preservation of ambiguous state.
 - **M2-S2** separates the deterministic next-transition function from backend
   scheduling/persistence and executes fixed adapters through durable attempt
-  envelopes and write-ahead states. It starts with fake adapters around
-  Propose, planning review, Apply, and Verify; real review, GitHub, Sync,
-  Archive, and cleanup arrive later. Acceptance requires zero routine prompts,
-  one owned transition, convergent replay, restart at every boundary,
-  observe-before-retry after receipt loss, stale-fence rejection, and exact
-  pause evidence.
+  envelopes and write-ahead states. It starts with non-mutating simulated
+  adapters shaped like Propose, planning conformance, Apply, and Verify; they
+  cannot edit a real repository or count as production Apply evidence. Real
+  review, GitHub, Sync, Archive, and cleanup arrive later. Acceptance requires
+  zero routine prompts, one owned transition, convergent replay, restart at
+  every boundary, observe-before-retry after receipt loss, stale-owner
+  rejection, and exact pause evidence.
 - **M2-S3** provides read-only repository-wide status and one safe resume,
   no-op, or pause result. It distinguishes running, retryable infrastructure,
   quality-blocked, waiting-human, configuration-discovery-gap, expired,
@@ -827,10 +1088,6 @@ exists as failing-before/fixed-after evidence.
   projection, evidence, Git/worktree, and OpenSpec linkage. It does not mutate
   or clean state. Reports must agree from every worktree and rebuild stale
   projections from authoritative history.
-
-M2 exits with a fake-adapter single-change completion plus kill/restart,
-stale-fence, concurrent-writer, cross-run claim, and worktree-discovery proof;
-it makes no real external-mutation or production-review claim.
 
 ### M3 — Independent-review reliability
 
@@ -854,11 +1111,9 @@ it makes no real external-mutation or production-review claim.
   later non-code transitions; relevant changes deterministically invalidate it
   and trigger affected checks plus rereview. Objective findings correct within
   the durable per-signature budget; human decisions pause; transition-specific
-  external evidence remains independently current.
-
-M3 exits when strict readiness is proven before Apply, a real isolated reviewer
-returns accepted exact-head evidence, correction/rereview needs no owner relay,
-and unchanged code does not launch redundant reviewers.
+  external evidence remains independently current. No real mutating Apply
+  adapter may be enabled until the live review-artifact and admission path
+  required by the roadmap's M3 gate has passed.
 
 ### M4 — Full lifecycle integration
 
@@ -872,8 +1127,9 @@ and unchanged code does not launch redundant reviewers.
   delivery, content-preserving Archive, Archive delivery, default-branch
   confirmation, claims for shared spec/archive destinations, and durable
   reconciliation. It does not invent requirements, resolve ambiguous spec
-  conflicts, or archive before implementation and Sync delivery. Overlapping
-  runs serialize and unchanged code reuses current review.
+  conflicts, or archive before implementation and Sync delivery. A conflicting
+  second mutating run remains denied or safely serialized, and unchanged code
+  reuses current review.
 - **M4-S3** makes exact-owned finalization and cleanup terminal transitions:
   ownership is registered when resources are created; ineligible resources get
   recovery states; issue/Project/default branch/run status converge; durable
@@ -881,11 +1137,15 @@ and unchanged code does not launch redundant reviewers.
   force-removal, reset/clean, and inferred legacy ownership. Dirty, unrelated,
   primary, locked, divergent, and ambiguous resources remain intact; partial
   cleanup resumes safely.
-
-M4 exits only after a disposable real single-change lifecycle completes with
-zero routine prompts, exact/idempotent/fenced/claimed external transitions,
-receipt-loss recovery, current non-duplicated review, and preservation of all
-unrelated or dirty resources.
+- **M4-S4** is the single-change v1 qualification gate. After M4-S3 supplies the
+  complete path, it runs two separately counted suites: individually approved
+  eligible backlog changes through real end-to-end completion, and disruptive
+  recovery scenarios through the approved disposable-environment matrix. It
+  records every run and counter effect, applies the ten-consecutive-completion,
+  full-fault-matrix, and zero-tolerance safety criteria above, and cannot rerun
+  away failures, lower gates, treat backlog membership as standing
+  authorization, inject disruptive faults into real changes, or begin
+  milestone-queue work early.
 
 ### M5 — Milestone queues and owner shorthand
 
@@ -903,20 +1163,16 @@ unrelated or dirty resources.
   authority, fuzzy selection, or gate bypass, and Claude/Codex wrappers must
   normalize identically.
 
-M5 exits when five slices execute in dependency order through one engine,
-child state cannot leak, parent status is derived, and shorthand remains only
-an entry adapter.
+### M6 — Five-slice qualification and default cutover
 
-### M6 — Qualification and default cutover
-
-- **M6-S1** builds the executable composition/fault suite: cross-contract
-  conformance; interruption at every boundary; backend and claim-provider
-  conformance; leases/fences; overlapping/disjoint claims; remote-success/local-
-  receipt loss; stale heads; partial GitHub state; expired authority; worktree
-  relocation/removal; review unavailability; correction exhaustion;
-  parent/child corruption; exact prompt counts; and role-handoff integrity. It
-  uses disposable repositories/fixtures and never substitutes fake adapters
-  for real qualification.
+- **M6-S1** extends the already-passing single-change suite with milestone and
+  child-work-unit composition faults: dependency ordering; parent/child
+  corruption and projection rebuild; queue interruption; child pause, expiry,
+  and failure propagation; claim isolation; wrong-child evidence; exact prompt
+  counts; and role-handoff integrity. It uses disposable repositories/fixtures
+  and never substitutes fake adapters for real qualification. Fine-grained
+  overlapping-run parallelism remains outside this milestone unless separately
+  designed and approved.
 - **M6-S2** runs repeated fresh and resumed five-slice multi-hour soaks through
   the real engine, strict reviewer, GitHub lifecycle, Sync, Archive, and cleanup.
   It records prompt/owner intervention, timings, retries/corrections, resource
@@ -927,10 +1183,6 @@ an entry adapter.
   compatibility diagnostics, a tested rollback, and removal criteria. It never
   deletes ambiguous legacy state or removes rollback early; generated assistant
   assets require parity and cache-refresh verification.
-
-M6 exits only when repeated real runs meet the threshold, routine approvals are
-zero inside valid authority, every stop has evidence and recovery, harness
-health is reported, and both default cutover and rollback are proven.
 
 ### M7 — Optional Temporal execution backend
 
@@ -944,27 +1196,17 @@ health is reported, and both default cutover and rollback are proven.
   content in history, never changes domain gates, and never creates a separate
   claim authority or automatic live migration.
 
-M7 requires M6 qualification, a current sourced Temporal assessment, stable
-portable contracts, deployment/data/versioning/ownership decisions, and
-explicit owner approval. It exits only after local/Temporal conformance,
-replay, duplicate Activity, worker/service interruption, history rollover,
-parent/child pause, projection rebuild, shared-claim conflict, and payload-
-safety tests pass without weakening local behavior.
-
 ## 8. Document evolution and preservation
 
-The current detailed slice inventory is transitional. After the two master
-documents are reviewed and accepted:
+The slice briefs now exist as drafts. Their remaining evolution is:
 
-1. Create detailed slice briefs in dependency order using the planned names.
-2. Move the matching slice detail from this inventory into each brief and
-   replace the roadmap's planned name/status with a real link.
-3. Build a source-to-destination map for every related older control-plane
+1. Review the slice briefs in dependency order and refine unresolved decisions.
+2. Build a source-to-destination map for every related older control-plane
    brief, decision, requirement, risk, non-goal, assumption, and acceptance
    condition.
-4. Run a final migration review proving that each material source item is
+3. Run a final migration review proving that each material source item is
    preserved or explicitly superseded with a reason.
-5. Archive only verified superseded control-plane briefs. Do not archive
+4. Archive only verified superseded control-plane briefs. Do not archive
    unrelated briefs or delete historical content.
 
 The roadmap must remain thin during this evolution. The main design owns shared
@@ -974,13 +1216,13 @@ owns execution truth.
 
 ## 9. Recommended next step
 
-Review and iterate on this big-picture design together with the thin roadmap.
-Resolve or retain the named open decisions explicitly. Do not create detailed
-slice briefs, archive older sources, create OpenSpec artifacts, or implement
-the control plane until the owner accepts the two-master-document direction.
+Review and iterate on this big-picture design, thin roadmap, and linked slice
+briefs. Resolve or retain the named open decisions explicitly. Do not archive
+older sources, create OpenSpec artifacts, or implement the control plane until
+the owner accepts the relevant slice brief and authorizes the next action.
 
-After acceptance, create M1-S1's detailed brief first and use OpenSpec Explore
-to resolve canonical registry ownership, parent/child ownership, local durable-
-execution substrate, authoritative history, and resource-claim authority.
+Begin with M1-S1 and use OpenSpec Explore to resolve canonical registry
+ownership, parent/child ownership, local durable-execution substrate,
+authoritative history, resource-claim authority, and the complexity guardrail.
 
 No OpenSpec artifacts or implementation changes were created by this brief.
