@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: "establish-autonomous-sdd-run-v2-contract"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 150
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/150"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/establish-autonomous-sdd-run-v2-contract/"

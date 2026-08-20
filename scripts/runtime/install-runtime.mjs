@@ -112,6 +112,16 @@ export function launcherShim(platform, paths) {
   ].join("\n") + "\n";
 }
 
+/** GitHub CLI may print human advisory lines before the final JSON receipt. */
+export function parseSkillInstallResult(stdout) {
+  if (typeof stdout !== "string") return null;
+  try { return JSON.parse(stdout); } catch { /* fall through to the final JSON object */ }
+  for (let index = stdout.lastIndexOf("\n{"); index >= 0; index = stdout.lastIndexOf("\n{", index - 1)) {
+    try { return JSON.parse(stdout.slice(index + 1)); } catch { /* try an earlier object boundary */ }
+  }
+  return null;
+}
+
 export function installSkills({ agents, source, force, dryRun, repositoryRoot, run = spawnSync }) {
   const results = [];
   for (const agent of agents) {
@@ -123,12 +133,7 @@ export function installSkills({ agents, source, force, dryRun, repositoryRoot, r
     if (force) args.push("--force");
     if (dryRun) args.push("--dry-run");
     const result = run(process.execPath, args, { encoding: "utf8" });
-    let parsed = null;
-    try {
-      parsed = JSON.parse(result.stdout ?? "");
-    } catch {
-      parsed = null;
-    }
+    const parsed = parseSkillInstallResult(result.stdout ?? "");
     if (!parsed) return { ok: false, code: "skill-install-result-unreadable", detail: agent, results };
     results.push(parsed);
     if (!parsed.ok) return { ok: false, code: "skill-install-failed", detail: agent, results };

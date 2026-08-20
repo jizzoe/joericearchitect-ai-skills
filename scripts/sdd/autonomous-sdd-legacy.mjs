@@ -1,0 +1,70 @@
+import fs from "node:fs";
+import path from "node:path";
+
+const text = (value) => typeof value === "string" && value.trim().length > 0;
+const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
+function classifyRecord(record, reference) {
+  if (!object(record)) return { reference, classification: "ambiguous", reason: "legacy-record-not-object" };
+  if (![1, 2, 3, 4].includes(record.schemaVersion)) return { reference, classification: "ambiguous", reason: "legacy-schema-unknown" };
+  if (!text(record.runId) || !text(record.selectedEntry) || !text(record.repository)) {
+    return { reference, classification: "ambiguous", reason: "legacy-record-identity-incomplete" };
+  }
+  const terminal = record.currentPhase === null || (Array.isArray(record.steps) && record.steps.length > 0 && record.steps.every((step) => step?.status === "complete"));
+  return {
+    reference,
+    classification: terminal ? "compatible-terminal" : "active-legacy",
+    reason: terminal ? "legacy-record-terminal" : "legacy-record-still-authoritative",
+    runId: record.runId,
+    selectedEntry: record.selectedEntry,
+    repository: record.repository
+  };
+}
+
+/** Decode legacy content only. This function never writes, upgrades, or deletes it. */
+export function decodeLegacyRecord(content, { reference = "legacy:unknown" } = {}) {
+  if (typeof content === "string") {
+    try { return classifyRecord(JSON.parse(content), reference); } catch { return { reference, classification: "ambiguous", reason: "legacy-record-json-invalid" }; }
+  }
+  return classifyRecord(content, reference);
+}
+
+/** Deterministically inventory caller-provided legacy evidence without mutating it. */
+export function inventoryLegacyRecords(records = []) {
+  if (!Array.isArray(records)) return { valid: false, reason: "legacy-inventory-input-invalid" };
+  const entries = records.map((item, index) => decodeLegacyRecord(item?.content ?? item?.record ?? item, {
+    reference: item?.reference ?? `legacy:${index}`
+  }));
+  const ambiguous = entries.filter((entry) => entry.classification === "ambiguous");
+  const active = entries.filter((entry) => entry.classification === "active-legacy");
+  return Object.freeze({
+    valid: true,
+    entries: Object.freeze(entries),
+    classification: ambiguous.length ? "ambiguous" : active.length ? "active-legacy" : "compatible",
+    ambiguous: Object.freeze(ambiguous),
+    active: Object.freeze(active)
+  });
+}
+
+/** Read an existing checkpoint tree without rewriting any content or timestamps. */
+export function inventoryLegacyDirectory(directory, { fileSystem = fs } = {}) {
+  if (!text(directory)) return { valid: false, reason: "legacy-directory-input-invalid" };
+  try {
+    if (!fileSystem.existsSync(directory)) return inventoryLegacyRecords([]);
+    const files = [];
+    const walk = (current) => {
+      for (const entry of fileSystem.readdirSync(current, { withFileTypes: true })) {
+        const target = path.join(current, entry.name);
+        if (entry.isDirectory()) walk(target);
+        else if (entry.isFile() && entry.name.endsWith(".json")) files.push({ reference: target, content: fileSystem.readFileSync(target, "utf8") });
+      }
+    };
+    walk(directory);
+    return inventoryLegacyRecords(files);
+  } catch { return { valid: false, reason: "legacy-directory-unreadable" }; }
+}
+
+/** A permanent cutover guard used by former mutation entrypoints. */
+export function denyLegacyMutation() {
+  return { valid: false, reason: "legacy-write-denied", classification: "paused" };
+}

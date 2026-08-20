@@ -25,12 +25,16 @@ published choices, and perform no selection or mutation.
 1. Inspect durable state: Git, OpenSpec active changes, tasks, issues,
    Projects, pull requests, living specs, archive paths, and current evidence.
 2. Select one change through the authorized queue or dependency-aware policy.
-3. Create or resume the versioned selected-entry controller record before a
-   lifecycle action. Persist it in the repository's Git common-directory state
-   root, not in a removable worktree. It binds normalized authorization,
-   selected entry, repository, expiry, immutable unique run ID, derived
-   run-specific checkpoint reference, and current phase; never overwrite a
-   checkpoint whose stored run identity differs. Use
+3. Admit or resume the v2 parent run and selected work unit before a lifecycle
+   action. Invoke `autonomous-sdd-controller admit-v2-run`; it must durably
+   persist the normalized authorization digest, canonical credential-free
+   repository identity, expiry, immutable run identity, provider bindings, and
+   generation-one repository claim in the configured state root. An ambiguous
+   or active legacy record, weaker provider, stale claim, expired request, or
+   immutable admission conflict pauses before lifecycle selection. Use
+   `inspect-v2-admission` or `recover-v2-run` to recover only the exact durable
+   admission; legacy controller records are read-only audit evidence and can
+   never create or advance an official run. Use
    `registerControllerLifecycleResource` to register each resource before
    selection or creation, and persist its returned controller record. It
    contains no credentials or standing approval. Before selecting or creating
@@ -142,6 +146,12 @@ published choices, and perform no selection or mutation.
 - `../autonomous-goal-runner/references/review-matrix.md`
 
 ## Shared Runtime
+
+For durable v2 admission, invoke the controller through the installed runtime:
+
+```
+ai-skills-runtime run autonomous-sdd-controller admit-v2-run --repository <absolute-target-repository> -- --input <admission.json>
+```
 
 Invoke the authentication-context helper through the installed runtime, never
 by importing a workspace script:
