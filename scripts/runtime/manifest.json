@@ -258,9 +258,10 @@
       "module": "scripts/runtime/bin/autonomous-sdd-controller.mjs",
       "invocation": "subcommand",
       "verbs": [
-        "create-controller-record",
+        "admit-v2-run",
+        "inspect-v2-admission",
+        "recover-v2-run",
         "inspect-controller-record",
-        "advance-controller-record",
         "register-controller-lifecycle-resource",
         "persist-controller-issue-intake",
         "persist-controller-issue-intake-evidence",

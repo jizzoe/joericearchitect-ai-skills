@@ -1,0 +1,200 @@
+import crypto from "node:crypto";
+
+export const RUN_CONTRACT_VERSION = 2;
+export const RECORD_KINDS = Object.freeze([
+  "repository", "parent-run", "work-unit", "transition-attempt", "resource-claim",
+  "evidence", "projection", "archive-manifest", "legacy-classification"
+]);
+export const PARENT_CHILD_SUMMARY_KEYS = Object.freeze([
+  "workUnitId", "ordinal", "approvedChangeId", "terminalStatus", "terminalReason",
+  "startedAt", "terminalAt", "finalHead", "attemptCount", "correctionCount",
+  "claimDisposition", "cleanupDisposition", "childHistoryReference",
+  "childHistoryDigest", "terminalSummaryDigest"
+]);
+
+const identifier = /^[a-z0-9][a-z0-9-]{2,127}$/i;
+const digest = /^[0-9a-f]{64}$/i;
+const timestamp = (value) => typeof value === "string" && !Number.isNaN(Date.parse(value));
+const text = (value) => typeof value === "string" && value.trim().length > 0;
+const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const secretKey = /(?:password|secret|token|credential|api[_-]?key|authorization|private[_-]?key)/i;
+const secretValue = /(?:gh[pousr]_[A-Za-z0-9]{20,}|Bearer\s+\S+|AKIA[A-Z0-9]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/;
+const sensitiveKey = (key) => secretKey.test(key) && !/digest$/i.test(key);
+
+export function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (object(value)) return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
+  return value;
+}
+
+export function digestValue(value) {
+  return crypto.createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
+}
+
+function hasSensitiveValue(value, seen = new Set()) {
+  if (value === null || typeof value !== "object") return typeof value === "string" && secretValue.test(value);
+  if (seen.has(value)) return false;
+  seen.add(value);
+  if (Array.isArray(value)) return value.some((item) => hasSensitiveValue(item, seen));
+  return Object.entries(value).some(([key, item]) => sensitiveKey(key) || hasSensitiveValue(item, seen));
+}
+
+function exactKeys(value, allowed) {
+  return object(value) && Object.keys(value).every((key) => allowed.includes(key));
+}
+
+function normalizedPath(value) {
+  const trimmed = value.replace(/^\/+|\/+$/g, "").replace(/\.git$/i, "");
+  if (!trimmed || trimmed.split("/").some((part) => !part || part === "." || part === "..")) return null;
+  return trimmed.toLowerCase();
+}
+
+/**
+ * Produces a stable credential-free identity for common Git fetch URL forms.
+ * It intentionally returns null for unknown schemes, user credentials, query
+ * fragments, local paths, or malformed remotes instead of guessing.
+ */
+export function normalizeCanonicalRemote(remote) {
+  if (!text(remote)) return null;
+  const value = remote.trim();
+  if (value.includes("?") || value.includes("#") || /:\/\//.test(value) && /:\/\/[^/]*@/.test(value)) return null;
+  const scp = value.match(/^git@([A-Za-z0-9.-]+):(.+)$/);
+  if (scp) {
+    const path = normalizedPath(scp[2]);
+    return path ? `${scp[1].toLowerCase()}/${path}` : null;
+  }
+  let parsed;
+  try { parsed = new URL(value); } catch { return null; }
+  if (!["https:", "ssh:"].includes(parsed.protocol) || parsed.username || parsed.password || parsed.port || parsed.search || parsed.hash) return null;
+  const path = normalizedPath(parsed.pathname);
+  return path && parsed.hostname ? `${parsed.hostname.toLowerCase()}/${path}` : null;
+}
+
+export function deriveRepositoryId(remote) {
+  const identity = normalizeCanonicalRemote(remote);
+  return identity ? `r1-${crypto.createHash("sha256").update(identity).digest("hex")}` : null;
+}
+
+function validBinding(value) {
+  return object(value) && exactKeys(value, ["id", "digest"]) && text(value.id) && digest.test(value.digest);
+}
+
+function validParentSummary(value) {
+  if (!object(value) || !exactKeys(value, PARENT_CHILD_SUMMARY_KEYS) || !identifier.test(value.workUnitId) ||
+      !Number.isInteger(value.ordinal) || value.ordinal < 1 || !identifier.test(value.approvedChangeId) ||
+      !text(value.terminalStatus) || !text(value.terminalReason) || !timestamp(value.startedAt) ||
+      !timestamp(value.terminalAt) || !text(value.finalHead) || !Number.isInteger(value.attemptCount) ||
+      value.attemptCount < 0 || !Number.isInteger(value.correctionCount) || value.correctionCount < 0 ||
+      !text(value.claimDisposition) || !text(value.cleanupDisposition) || !text(value.childHistoryReference) ||
+      !digest.test(value.childHistoryDigest) || !digest.test(value.terminalSummaryDigest)) return false;
+  return Date.parse(value.terminalAt) >= Date.parse(value.startedAt);
+}
+
+export function validateParentRun(record) {
+  if (!exactKeys(record, ["kind", "schemaVersion", "parentRunId", "approvedIntentDigest", "deadline", "historyBinding", "claimProviderBinding", "children"]) ||
+      record.kind !== "parent-run" || record.schemaVersion !== RUN_CONTRACT_VERSION || !identifier.test(record.parentRunId) ||
+      !digest.test(record.approvedIntentDigest) || !timestamp(record.deadline) || !validBinding(record.historyBinding) ||
+      !validBinding(record.claimProviderBinding) || !Array.isArray(record.children) || record.children.length > 1 ||
+      !record.children.every(validParentSummary) || hasSensitiveValue(record)) return false;
+  return new Set(record.children.map((child) => child.workUnitId)).size === record.children.length;
+}
+
+export function validateWorkUnit(record) {
+  if (!exactKeys(record, ["kind", "schemaVersion", "workUnitId", "parentRunId", "ordinal", "approvedChangeId", "authorizationDigest", "configurationDigest", "lifecycleState", "evidenceNamespace", "historyBinding", "claimProviderBinding"]) ||
+      record.kind !== "work-unit" || record.schemaVersion !== RUN_CONTRACT_VERSION || !identifier.test(record.workUnitId) ||
+      !identifier.test(record.parentRunId) || record.ordinal !== 1 || !identifier.test(record.approvedChangeId) ||
+      !digest.test(record.authorizationDigest) || !digest.test(record.configurationDigest) || !text(record.lifecycleState) ||
+      !identifier.test(record.evidenceNamespace) || !validBinding(record.historyBinding) ||
+      !validBinding(record.claimProviderBinding) || hasSensitiveValue(record)) return false;
+  return true;
+}
+
+export function validateTransitionAttempt(record) {
+  return exactKeys(record, ["kind", "schemaVersion", "attemptId", "workUnitId", "idempotencyKey", "preconditionDigest", "targetDigest", "ownershipGeneration", "state", "receipt", "result"]) &&
+    record.kind === "transition-attempt" && record.schemaVersion === RUN_CONTRACT_VERSION && identifier.test(record.attemptId) &&
+    identifier.test(record.workUnitId) && text(record.idempotencyKey) && digest.test(record.preconditionDigest) &&
+    digest.test(record.targetDigest) && Number.isInteger(record.ownershipGeneration) && record.ownershipGeneration >= 1 &&
+    ["prepared", "in-flight", "in-doubt", "completed"].includes(record.state) && object(record.receipt) && object(record.result) && !hasSensitiveValue(record);
+}
+
+export function validateResourceClaim(record) {
+  return exactKeys(record, ["kind", "schemaVersion", "claimId", "repositoryId", "workUnitId", "owner", "ownershipGeneration", "providerBinding", "state", "acquiredAt", "recoveryEvidence"]) &&
+    record.kind === "resource-claim" && record.schemaVersion === RUN_CONTRACT_VERSION && identifier.test(record.claimId) &&
+    /^r1-[0-9a-f]{64}$/i.test(record.repositoryId) && identifier.test(record.workUnitId) && object(record.owner) &&
+    Number.isInteger(record.ownershipGeneration) && record.ownershipGeneration >= 1 && validBinding(record.providerBinding) &&
+    ["active", "released", "in-doubt"].includes(record.state) && timestamp(record.acquiredAt) && object(record.recoveryEvidence) && !hasSensitiveValue(record);
+}
+
+export function validateRepository(record) {
+  return exactKeys(record, ["kind", "schemaVersion", "repositoryId", "canonicalRemoteDigest", "historyBinding", "claimProviderBinding"]) &&
+    record.kind === "repository" && record.schemaVersion === RUN_CONTRACT_VERSION && /^r1-[0-9a-f]{64}$/i.test(record.repositoryId) &&
+    digest.test(record.canonicalRemoteDigest) && validBinding(record.historyBinding) && validBinding(record.claimProviderBinding) && !hasSensitiveValue(record);
+}
+
+export function validateEvidence(record) {
+  return exactKeys(record, ["kind", "schemaVersion", "evidenceId", "workUnitId", "subject", "contentDigest", "createdAt"]) &&
+    record.kind === "evidence" && record.schemaVersion === RUN_CONTRACT_VERSION && identifier.test(record.evidenceId) &&
+    identifier.test(record.workUnitId) && text(record.subject) && digest.test(record.contentDigest) && timestamp(record.createdAt) && !hasSensitiveValue(record);
+}
+
+export function validateProjection(record) {
+  return exactKeys(record, ["kind", "schemaVersion", "parentRunId", "children"]) && record.kind === "projection" &&
+    record.schemaVersion === RUN_CONTRACT_VERSION && identifier.test(record.parentRunId) && Array.isArray(record.children) &&
+    record.children.length === 1 && record.children.every(validParentSummary) && !hasSensitiveValue(record);
+}
+
+export function validateArchiveManifest(record) {
+  return exactKeys(record, ["kind", "schemaVersion", "parentRunId", "archivedAt", "reason", "projectionDigest"]) &&
+    record.kind === "archive-manifest" && record.schemaVersion === RUN_CONTRACT_VERSION && identifier.test(record.parentRunId) &&
+    timestamp(record.archivedAt) && text(record.reason) && digest.test(record.projectionDigest) && !hasSensitiveValue(record);
+}
+
+export function validateLegacyClassification(record) {
+  return exactKeys(record, ["kind", "schemaVersion", "reference", "classification", "reason", "recordDigest"]) &&
+    record.kind === "legacy-classification" && record.schemaVersion === RUN_CONTRACT_VERSION && text(record.reference) &&
+    ["compatible-terminal", "active-legacy", "ambiguous"].includes(record.classification) && text(record.reason) &&
+    digest.test(record.recordDigest) && !hasSensitiveValue(record);
+}
+
+export function validateDomainRecord(record) {
+  if (!object(record) || !RECORD_KINDS.includes(record.kind)) return { valid: false, reason: "unknown-record-kind" };
+  const validators = {
+    repository: validateRepository,
+    "parent-run": validateParentRun,
+    "work-unit": validateWorkUnit,
+    "transition-attempt": validateTransitionAttempt,
+    "resource-claim": validateResourceClaim,
+    evidence: validateEvidence,
+    projection: validateProjection,
+    "archive-manifest": validateArchiveManifest,
+    "legacy-classification": validateLegacyClassification
+  };
+  const valid = validators[record.kind]?.(record) ?? false;
+  return valid ? { valid: true, digest: digestValue(record) } : { valid: false, reason: "invalid-domain-record" };
+}
+
+export function buildParentProjection(parentRun, workUnit, terminalSummary) {
+  if (!validateParentRun(parentRun) || !validateWorkUnit(workUnit) || workUnit.parentRunId !== parentRun.parentRunId ||
+      !validParentSummary(terminalSummary) || terminalSummary.workUnitId !== workUnit.workUnitId) {
+    return { valid: false, reason: "parent-projection-input-invalid" };
+  }
+  return {
+    valid: true,
+    projection: {
+      kind: "projection",
+      schemaVersion: RUN_CONTRACT_VERSION,
+      parentRunId: parentRun.parentRunId,
+      children: [canonical(terminalSummary)]
+    }
+  };
+}
+
+export function serializeDomainRecord(record) {
+  const validation = validateDomainRecord(record);
+  return validation.valid ? { valid: true, content: `${JSON.stringify(canonical(record))}\n`, digest: validation.digest } : validation;
+}
+
+export function deserializeDomainRecord(content) {
+  if (!text(content)) return { valid: false, reason: "record-content-invalid" };
+  try { return validateDomainRecord(JSON.parse(content)); } catch { return { valid: false, reason: "record-json-invalid" }; }
+}

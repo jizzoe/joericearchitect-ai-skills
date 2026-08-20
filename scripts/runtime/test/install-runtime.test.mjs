@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   RECEIPT_SCHEMA_VERSION, SUPPORTED_AGENTS, installAiSkills, launcherShim, parseArgs,
-  preflightNode, resolveSource
+  parseSkillInstallResult, preflightNode, resolveSource
 } from "../install-runtime.mjs";
 import { activatePrevious } from "../launcher.mjs";
 import { readActiveMetadata, readInstalledHistory, runtimePaths } from "../runtime-home.mjs";
@@ -181,6 +181,12 @@ test("explicit overwrite intent is carried into the delegated skill installation
   });
   assert.equal(receipt.overwriteIntent, true);
   assert.equal(receipt.skills[0].overwriteIntent, true);
+});
+
+test("installer accepts the final receipt after GitHub CLI advisory output", () => {
+  const receipt = { schemaVersion: 1, tool: "install-global-skill", ok: true };
+  assert.deepEqual(parseSkillInstallResult(`warning from GitHub CLI\n${JSON.stringify(receipt, null, 2)}\n`), receipt);
+  assert.equal(parseSkillInstallResult("warning only"), null);
 });
 
 test("a failed skill installation activates no runtime and retains the prior one", () => {
