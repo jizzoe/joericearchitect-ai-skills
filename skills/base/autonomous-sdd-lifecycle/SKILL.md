@@ -150,7 +150,7 @@ published choices, and perform no selection or mutation.
 For durable v2 admission, invoke the controller through the installed runtime:
 
 ```
-ai-skills-runtime run autonomous-sdd-controller --repository <absolute-target-repository> -- admit-v2-run --input <admission.json>
+ai-skills-runtime run autonomous-sdd-controller admit-v2-run --repository <absolute-target-repository> -- --input <admission.json>
 ```
 
 Invoke the authentication-context helper through the installed runtime, never
