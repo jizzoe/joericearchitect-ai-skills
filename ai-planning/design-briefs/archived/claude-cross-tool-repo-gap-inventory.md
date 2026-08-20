@@ -1,9 +1,10 @@
 # Claude Cross-Tool Repo Gap Inventory
 
 Date: 2026-08-15
-Status: Design brief. Inventory and proposed fixes only — nothing in this
-document has been implemented. Propose an OpenSpec change per accepted fix
-before touching governed assets, per `AGENTS.md` and `docs/sdd-workflow.md`.
+Status: Archived 2026-08-18. Superseded by `claude-cross-tool-repo-hygiene.md`
+and `claude-independent-review-runtime-readiness.md`. This inventory remains
+the historical source record; its accepted scope decisions and later live-test
+evidence are carried into those two successor briefs.
 
 ## Purpose and scope
 
