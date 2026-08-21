@@ -13,5 +13,5 @@
 
 ## 3. Delivery evidence
 
-- [ ] 3.1 Run focused and full tests, strict OpenSpec validation, same-session
+- [x] 3.1 Run focused and full tests, strict OpenSpec validation, same-session
   review, and formal Verify.
