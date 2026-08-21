@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { archiveTerminalRun, defaultStateHome, publishImmutableRecord, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
+import { buildParentProjection, digestValue, validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
 import { executeWorkspaceCleanup, planWorkspaceCleanup } from "./sdd-workspace-cleanup.mjs";
 import {
   authContextBindingDigest,
@@ -30,6 +32,104 @@ const selectedByAuthorization = (selectedEntry, authorization) =>
   text(selectedEntry) && Array.isArray(authorization?.target?.entries) && authorization.target.entries.includes(selectedEntry);
 const validRunId = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9-]{7,127}$/i.test(value);
 const checkpointForRun = (runId) => `runs/${runId}/controller.json`;
+const digest = (value) => typeof value === "string" && /^[0-9a-f]{64}$/i.test(value);
+const repositoryId = (value) => typeof value === "string" && /^r1-[0-9a-f]{64}$/i.test(value);
+
+function exactKeys(value, keys) {
+  return value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.includes(key));
+}
+
+function fullHead(value) {
+  return typeof value === "string" && /^[0-9a-f]{40}$/i.test(value);
+}
+
+function safeJson(fileSystem, target) {
+  try { return JSON.parse(fileSystem.readFileSync(target, "utf8")); } catch { return null; }
+}
+
+function terminalizationEvidence(value) {
+  const delivery = (item) => exactKeys(item, ["merged", "reference", "deliveredHeadCommit"]) && item.merged === true && text(item.reference) && fullHead(item.deliveredHeadCommit);
+  return exactKeys(value, ["current", "implementation", "sync", "archive", "issueClosed", "projectDone", "cleanupCompleted", "observedAt"]) &&
+    value.current === true && delivery(value.implementation) && delivery(value.sync) && delivery(value.archive) &&
+    value.issueClosed === true && value.projectDone === true && value.cleanupCompleted === true && timestamp(value.observedAt);
+}
+
+function terminalDetails(value) {
+  return exactKeys(value, ["terminalStatus", "terminalReason", "terminalAt", "finalHead", "attemptCount", "correctionCount", "cleanupDisposition", "childHistoryReference", "childHistoryDigest"]) &&
+    value.terminalStatus === "complete" && text(value.terminalReason) && timestamp(value.terminalAt) && fullHead(value.finalHead) &&
+    Number.isInteger(value.attemptCount) && value.attemptCount >= 0 && Number.isInteger(value.correctionCount) && value.correctionCount >= 0 &&
+    value.cleanupDisposition === "completed" && text(value.childHistoryReference) && digest(value.childHistoryDigest);
+}
+
+function validTerminalizationRequest(value) {
+  return exactKeys(value, ["schemaVersion", "parentRunId", "workUnitId", "claimId", "repositoryId", "approvedChangeId", "provider", "completionEvidence", "terminal"]) &&
+    value.schemaVersion === 1 && validRunId(value.parentRunId) && validRunId(value.workUnitId) && validRunId(value.claimId) &&
+    repositoryId(value.repositoryId) && validRunId(value.approvedChangeId) && terminalizationEvidence(value.completionEvidence) && terminalDetails(value.terminal) &&
+    validateProviderCapabilities(value.provider).valid;
+}
+
+function terminalSummaryFor({ claim, workUnit, terminal }) {
+  const summary = {
+    workUnitId: workUnit.workUnitId,
+    ordinal: workUnit.ordinal,
+    approvedChangeId: workUnit.approvedChangeId,
+    terminalStatus: terminal.terminalStatus,
+    terminalReason: terminal.terminalReason,
+    startedAt: claim.acquiredAt,
+    terminalAt: terminal.terminalAt,
+    finalHead: terminal.finalHead,
+    attemptCount: terminal.attemptCount,
+    correctionCount: terminal.correctionCount,
+    claimDisposition: "released",
+    cleanupDisposition: terminal.cleanupDisposition,
+    childHistoryReference: terminal.childHistoryReference,
+    childHistoryDigest: terminal.childHistoryDigest
+  };
+  return { ...summary, terminalSummaryDigest: digestValue(summary) };
+}
+
+function terminalizationArchiveMatch({ paths, terminalization, requestDigest, fileSystem = fs }) {
+  try {
+    if (!fileSystem.existsSync(paths.archive)) return null;
+    const years = fileSystem.readdirSync(paths.archive, { withFileTypes: true });
+    for (const year of years) {
+      if (!year.isDirectory() || year.name.startsWith(".")) continue;
+      const yearPath = path.join(paths.archive, year.name);
+      for (const month of fileSystem.readdirSync(yearPath, { withFileTypes: true })) {
+        if (!month.isDirectory() || month.name.startsWith(".")) continue;
+        const monthPath = path.join(yearPath, month.name);
+        for (const day of fileSystem.readdirSync(monthPath, { withFileTypes: true })) {
+          if (!day.isDirectory() || day.name.startsWith(".")) continue;
+          const runPath = path.join(monthPath, day.name, terminalization.parentRunId);
+          if (!fileSystem.existsSync(runPath) || fileSystem.lstatSync(runPath).isSymbolicLink()) continue;
+          const receipt = safeJson(fileSystem, path.join(runPath, "terminalization-receipt.json"));
+          if (!validateDomainRecord(receipt).valid || receipt.kind !== "terminalization-receipt") continue;
+          if (receipt.parentRunId !== terminalization.parentRunId || receipt.workUnitId !== terminalization.workUnitId ||
+              receipt.claimId !== terminalization.claimId || receipt.repositoryId !== terminalization.repositoryId ||
+              receipt.approvedChangeId !== terminalization.approvedChangeId) {
+            return { valid: false, reason: "terminalization-archive-identity-conflict", archivePath: runPath };
+          }
+          if (receipt.requestDigest !== requestDigest) return { valid: false, reason: "terminalization-archive-request-conflict", archivePath: runPath };
+          return { valid: true, archivePath: runPath, receipt };
+        }
+      }
+    }
+    return null;
+  } catch { return { valid: false, reason: "terminalization-archive-inspection-unavailable" }; }
+}
+
+function publishExpectedRecord({ directory, name, record, provider, fileSystem = fs }) {
+  const expected = validateDomainRecord(record);
+  if (!expected.valid) return { valid: false, reason: "terminalization-record-invalid" };
+  const published = publishImmutableRecord({ directory, name, record, provider, fileSystem });
+  if (published.valid) return published;
+  if (published.reason !== "immutable-record-already-exists") return published;
+  const existing = safeJson(fileSystem, path.join(directory, `${name}.json`));
+  const actual = validateDomainRecord(existing);
+  return actual.valid && actual.digest === expected.digest
+    ? { valid: true, classification: "already-published", path: path.join(directory, `${name}.json`), digest: actual.digest }
+    : { valid: false, reason: "terminalization-record-conflict" };
+}
 
 function safeContainedDestination(repositoryPath, checkpointPath) {
   const root = fs.realpathSync(repositoryPath);
@@ -113,6 +213,98 @@ export function resolveControllerStateRoot({ repositoryPath, runGit = defaultRun
   } catch {
     return { valid: false, reason: "controller-state-root-unavailable" };
   }
+}
+
+/**
+ * Closes one exact fully delivered v2 run without accepting caller-chosen
+ * storage paths or silently altering a mismatched active claim.
+ */
+export function terminalizeV2Run({ readableRepositoryName, terminalization, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+  if (!validTerminalizationRequest(terminalization) || !timestamp(now) || !text(readableRepositoryName)) {
+    return { valid: false, classification: "paused", reason: "terminalization-input-invalid" };
+  }
+  const providerCapability = validateProviderCapabilities(terminalization.provider);
+  const paths = statePaths({ stateHome, readableName: readableRepositoryName, repositoryId: terminalization.repositoryId });
+  if (!providerCapability.valid || !paths) return { valid: false, classification: "paused", reason: "terminalization-state-unavailable" };
+
+  const requestDigest = digestValue(terminalization);
+  const archived = terminalizationArchiveMatch({ paths, terminalization, requestDigest, fileSystem });
+  if (archived?.valid) {
+    return { valid: true, classification: "already-terminalized", requestDigest, archivePath: archived.archivePath, receipt: archived.receipt };
+  }
+  if (archived && !archived.valid) return { ...archived, classification: "paused", requestDigest };
+
+  const activePath = path.join(paths.active, terminalization.parentRunId);
+  try {
+    if (!fileSystem.existsSync(activePath) || fileSystem.lstatSync(activePath).isSymbolicLink()) {
+      return { valid: false, classification: "paused", reason: "terminalization-active-run-unavailable", requestDigest };
+    }
+  } catch { return { valid: false, classification: "paused", reason: "terminalization-active-run-unavailable", requestDigest }; }
+
+  const parentRun = safeJson(fileSystem, path.join(activePath, "parent-run.json"));
+  const workUnit = safeJson(fileSystem, path.join(activePath, "work-unit.json"));
+  const claim = safeJson(fileSystem, path.join(activePath, "resource-claim.json"));
+  if (![parentRun, workUnit, claim].every((record) => validateDomainRecord(record).valid)) {
+    return { valid: false, classification: "paused", reason: "terminalization-active-record-invalid", requestDigest };
+  }
+  if (parentRun.parentRunId !== terminalization.parentRunId || workUnit.parentRunId !== parentRun.parentRunId ||
+      workUnit.workUnitId !== terminalization.workUnitId || workUnit.approvedChangeId !== terminalization.approvedChangeId ||
+      claim.claimId !== terminalization.claimId || claim.workUnitId !== workUnit.workUnitId || claim.repositoryId !== terminalization.repositoryId ||
+      claim.state !== "active" || claim.providerBinding.id !== providerCapability.provider.id ||
+      claim.providerBinding.digest !== digestValue(providerCapability.provider) ||
+      parentRun.claimProviderBinding.id !== claim.providerBinding.id || parentRun.claimProviderBinding.digest !== claim.providerBinding.digest ||
+      workUnit.claimProviderBinding.id !== claim.providerBinding.id || workUnit.claimProviderBinding.digest !== claim.providerBinding.digest) {
+    return { valid: false, classification: "paused", reason: "terminalization-identity-or-claim-mismatch", requestDigest };
+  }
+
+  const terminalSummary = terminalSummaryFor({ claim, workUnit, terminal: terminalization.terminal });
+  const projection = buildParentProjection(parentRun, workUnit, terminalSummary);
+  const observedAt = Date.parse(terminalization.completionEvidence.observedAt);
+  const nowAt = Date.parse(now);
+  if (!projection.valid || observedAt > nowAt || nowAt - observedAt > 60 * 60 * 1000 ||
+      Date.parse(terminalSummary.terminalAt) > nowAt || Date.parse(terminalSummary.terminalAt) < Date.parse(claim.acquiredAt) ||
+      terminalization.completionEvidence.archive.deliveredHeadCommit !== terminalSummary.finalHead) {
+    return { valid: false, classification: "paused", reason: "terminalization-terminal-evidence-invalid", requestDigest };
+  }
+
+  const receipt = {
+    kind: "terminalization-receipt",
+    schemaVersion: 2,
+    parentRunId: parentRun.parentRunId,
+    workUnitId: workUnit.workUnitId,
+    claimId: claim.claimId,
+    repositoryId: claim.repositoryId,
+    approvedChangeId: workUnit.approvedChangeId,
+    requestDigest,
+    completionEvidenceDigest: digestValue(terminalization.completionEvidence),
+    terminalSummary,
+    createdAt: now
+  };
+  const receiptValidation = validateDomainRecord(receipt);
+  if (!receiptValidation.valid) return { valid: false, classification: "paused", reason: "terminalization-receipt-invalid", requestDigest };
+  const claimRelease = {
+    kind: "claim-release",
+    schemaVersion: 2,
+    claimId: claim.claimId,
+    repositoryId: claim.repositoryId,
+    workUnitId: workUnit.workUnitId,
+    disposition: "released",
+    releasedAt: now,
+    terminalizationReceiptDigest: receiptValidation.digest
+  };
+  const projectionRecord = projection.projection;
+  for (const [name, record] of [["terminalization-receipt", receipt], ["claim-release", claimRelease], ["projection", projectionRecord]]) {
+    const published = publishExpectedRecord({ directory: activePath, name, record, provider: providerCapability.provider, fileSystem });
+    if (!published.valid) return { valid: false, classification: "failed", reason: published.reason, requestDigest };
+  }
+
+  const archivedRun = archiveTerminalRun({ paths, parentRun, workUnit, terminalSummary, claim, attempts: [], cleanupPending: false, recoveryPending: false, now, fileSystem });
+  if (!archivedRun.valid) return { valid: false, classification: "failed", reason: archivedRun.reason, requestDigest, ...(archivedRun.archivePath ? { archivePath: archivedRun.archivePath } : {}) };
+  const verified = terminalizationArchiveMatch({ paths, terminalization, requestDigest, fileSystem });
+  if (!verified?.valid || verified.archivePath !== archivedRun.archivePath) {
+    return { valid: false, classification: "failed", reason: "terminalization-post-archive-verification-failed", requestDigest };
+  }
+  return { valid: true, classification: "terminalized", requestDigest, archivePath: archivedRun.archivePath, receipt: verified.receipt, index: archivedRun.index };
 }
 
 export function authorizationDigest(authorization) {

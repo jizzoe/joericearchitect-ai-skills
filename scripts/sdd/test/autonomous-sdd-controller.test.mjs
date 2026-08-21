@@ -22,13 +22,16 @@ import {
   registerControllerAuthContext,
   registerControllerResource,
   registerControllerLifecycleResource,
-  resolveControllerStateRoot
+  resolveControllerStateRoot,
+  terminalizeV2Run
 } from "../autonomous-sdd-controller.mjs";
 import { inspectCheckpoint } from "../checkpoint.mjs";
 import { checkAdapterDrift } from "../check-adapter-drift.mjs";
 import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
 import { createIssueIntakeBinding } from "../issue-intake-binding.mjs";
 import { createGithubAuthContextBinding, evaluateGithubAuthContextContrast } from "../github-cli-auth-context.mjs";
+import { digestValue, RUN_CONTRACT_VERSION } from "../autonomous-sdd-run-contract.mjs";
+import { createRepositoryClaim, ensureStateLayout, statePaths } from "../autonomous-sdd-local-store.mjs";
 
 const started = "2026-08-13T12:00:00.000Z";
 const authorization = resolveSddDeliveryRequest({ target: "complete-delivery", mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-only", expiration: "12h" }, { goalStartedAt: started }).effectiveAuthorization;
@@ -52,6 +55,55 @@ const authContextEvidence = evaluateGithubAuthContextContrast({
   observedAt: started
 }).evidence;
 
+const terminalProvider = { schemaVersion: 1, id: "native-claim", generationFence: true, explicitTakeover: true, durableWrite: true, directoryMetadataDurability: true, platforms: { windows: "LockFileEx", posix: "advisory-lock" } };
+const terminalBinding = { id: terminalProvider.id, digest: digestValue(terminalProvider) };
+const terminalHash = (value) => value.repeat(64).slice(0, 64);
+
+function terminalizationFixture(stateHome, overrides = {}) {
+  const repositoryId = `r1-${terminalHash("1")}`;
+  const input = { stateHome, readableName: "example-repository", repositoryId };
+  const paths = statePaths(input);
+  ensureStateLayout(input);
+  const parentRun = { kind: "parent-run", schemaVersion: RUN_CONTRACT_VERSION, parentRunId: "parent-run-001", approvedIntentDigest: terminalHash("a"), deadline: "2026-08-20T16:00:00.000Z", historyBinding: terminalBinding, claimProviderBinding: terminalBinding, children: [] };
+  const workUnit = { kind: "work-unit", schemaVersion: RUN_CONTRACT_VERSION, workUnitId: "work-unit-001", parentRunId: parentRun.parentRunId, ordinal: 1, approvedChangeId: "example-change", authorizationDigest: terminalHash("b"), configurationDigest: terminalHash("c"), lifecycleState: "admitted", evidenceNamespace: "evidence-001", historyBinding: terminalBinding, claimProviderBinding: terminalBinding };
+  const claim = createRepositoryClaim({ claimId: "claim-001", repositoryId, workUnitId: workUnit.workUnitId, owner: { host: "host", boot: "boot", pidStart: "pid" }, providerBinding: terminalBinding, acquiredAt: "2026-08-20T12:00:00.000Z", recoveryEvidence: {} }).record;
+  const active = path.join(paths.active, parentRun.parentRunId);
+  fs.mkdirSync(active, { recursive: true });
+  for (const [name, record] of [["parent-run", parentRun], ["work-unit", workUnit], ["resource-claim", claim]]) fs.writeFileSync(path.join(active, `${name}.json`), `${JSON.stringify(record)}\n`);
+  const terminalization = {
+    schemaVersion: 1,
+    parentRunId: parentRun.parentRunId,
+    workUnitId: workUnit.workUnitId,
+    claimId: claim.claimId,
+    repositoryId,
+    approvedChangeId: workUnit.approvedChangeId,
+    provider: terminalProvider,
+    completionEvidence: {
+      current: true,
+      implementation: { merged: true, reference: "implementation-pr", deliveredHeadCommit: "d".repeat(40) },
+      sync: { merged: true, reference: "sync-pr", deliveredHeadCommit: "e".repeat(40) },
+      archive: { merged: true, reference: "archive-pr", deliveredHeadCommit: "f".repeat(40) },
+      issueClosed: true,
+      projectDone: true,
+      cleanupCompleted: true,
+      observedAt: "2026-08-20T12:20:00.000Z"
+    },
+    terminal: {
+      terminalStatus: "complete",
+      terminalReason: "delivered-and-archived",
+      terminalAt: "2026-08-20T12:30:00.000Z",
+      finalHead: "f".repeat(40),
+      attemptCount: 1,
+      correctionCount: 0,
+      cleanupDisposition: "completed",
+      childHistoryReference: "external-delivery-evidence",
+      childHistoryDigest: terminalHash("d")
+    },
+    ...overrides
+  };
+  return { paths, terminalization };
+}
+
 test("controller record starts at planning and resumes first incomplete phase", () => {
   assert.equal(created.valid, true);
   assert.deepEqual(inspectControllerRecord(created.record, { authorization, repository: "owner/repository", now: started }), { classification: "continue", reason: "controller-first-incomplete-phase", nextPhase: "propose" });
@@ -65,6 +117,95 @@ test("controller consumes the canonical operation gate rather than helper-local 
   const record = createControllerRecord({ authorization, repository: "owner/repository", runId: "controller-run-0099" }).record;
   const result = evaluateControllerOperation({ record, operation: "apply", stage: "planned", targetKind: "change", authorization, claimActive: true, evidenceCurrent: { applyEligibility: true, reviewReady: true }, now: started });
   assert.equal(result.allowed, true);
+});
+
+test("controller terminalizes one exact completed v2 bundle and preserves idempotent archive evidence", () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "terminalize-v2-run-"));
+  try {
+    const { paths, terminalization } = terminalizationFixture(stateHome);
+    const first = terminalizeV2Run({ readableRepositoryName: "example-repository", stateHome, terminalization, now: "2026-08-20T12:31:00.000Z" });
+    assert.equal(first.valid, true);
+    assert.equal(first.classification, "terminalized");
+    assert.equal(fs.existsSync(path.join(paths.active, terminalization.parentRunId)), false);
+    assert.equal(fs.existsSync(path.join(first.archivePath, "terminalization-receipt.json")), true);
+    assert.equal(fs.existsSync(path.join(first.archivePath, "claim-release.json")), true);
+    assert.equal(JSON.parse(fs.readFileSync(paths.index + "/repository-status.json", "utf8")).state, "archived");
+    const repeated = terminalizeV2Run({ readableRepositoryName: "example-repository", stateHome, terminalization, now: "2026-08-20T12:32:00.000Z" });
+    assert.equal(repeated.valid, true);
+    assert.equal(repeated.classification, "already-terminalized");
+    assert.equal(repeated.archivePath, first.archivePath);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
+});
+
+test("controller terminalization rejects mismatched completion evidence without changing active state", () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "terminalize-v2-reject-"));
+  try {
+    const { paths, terminalization } = terminalizationFixture(stateHome, {
+      completionEvidence: {
+        current: true,
+        implementation: { merged: true, reference: "implementation-pr", deliveredHeadCommit: "d".repeat(40) },
+        sync: { merged: true, reference: "sync-pr", deliveredHeadCommit: "e".repeat(40) },
+        archive: { merged: true, reference: "archive-pr", deliveredHeadCommit: "0".repeat(40) },
+        issueClosed: true,
+        projectDone: true,
+        cleanupCompleted: true,
+        observedAt: "2026-08-20T12:20:00.000Z"
+      }
+    });
+    const result = terminalizeV2Run({ readableRepositoryName: "example-repository", stateHome, terminalization, now: "2026-08-20T12:31:00.000Z" });
+    assert.equal(result.valid, false);
+    assert.equal(result.classification, "paused");
+    assert.equal(result.reason, "terminalization-terminal-evidence-invalid");
+    assert.equal(fs.existsSync(path.join(paths.active, terminalization.parentRunId)), true);
+    assert.equal(fs.existsSync(paths.archive), true);
+    assert.equal(fs.readdirSync(paths.archive).length, 0);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
+});
+
+test("controller terminalization refuses incomplete cleanup without changing active state", () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "terminalize-v2-incomplete-cleanup-"));
+  try {
+    const { paths, terminalization } = terminalizationFixture(stateHome, {
+      completionEvidence: {
+        current: true,
+        implementation: { merged: true, reference: "implementation-pr", deliveredHeadCommit: "d".repeat(40) },
+        sync: { merged: true, reference: "sync-pr", deliveredHeadCommit: "e".repeat(40) },
+        archive: { merged: true, reference: "archive-pr", deliveredHeadCommit: "f".repeat(40) },
+        issueClosed: true,
+        projectDone: true,
+        cleanupCompleted: false,
+        observedAt: "2026-08-20T12:20:00.000Z"
+      }
+    });
+    const result = terminalizeV2Run({ readableRepositoryName: "example-repository", stateHome, terminalization, now: "2026-08-20T12:31:00.000Z" });
+    assert.equal(result.valid, false);
+    assert.equal(result.classification, "paused");
+    assert.equal(result.reason, "terminalization-input-invalid");
+    assert.equal(fs.existsSync(path.join(paths.active, terminalization.parentRunId)), true);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
+});
+
+test("controller terminalization refuses stale delivery evidence without changing active state", () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "terminalize-v2-stale-evidence-"));
+  try {
+    const { paths, terminalization } = terminalizationFixture(stateHome, {
+      completionEvidence: {
+        current: true,
+        implementation: { merged: true, reference: "implementation-pr", deliveredHeadCommit: "d".repeat(40) },
+        sync: { merged: true, reference: "sync-pr", deliveredHeadCommit: "e".repeat(40) },
+        archive: { merged: true, reference: "archive-pr", deliveredHeadCommit: "f".repeat(40) },
+        issueClosed: true,
+        projectDone: true,
+        cleanupCompleted: true,
+        observedAt: "2026-08-20T10:00:00.000Z"
+      }
+    });
+    const result = terminalizeV2Run({ readableRepositoryName: "example-repository", stateHome, terminalization, now: "2026-08-20T12:31:00.000Z" });
+    assert.equal(result.valid, false);
+    assert.equal(result.classification, "paused");
+    assert.equal(result.reason, "terminalization-terminal-evidence-invalid");
+    assert.equal(fs.existsSync(path.join(paths.active, terminalization.parentRunId)), true);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });
 
 test("controller rejects expired, stale, and conflicting context", () => {

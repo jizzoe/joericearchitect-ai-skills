@@ -6,7 +6,7 @@ import {
   executeControllerLifecycleCleanup, inspectControllerRecord, persistControllerCleanupReceipt,
   persistControllerAuthContext, persistControllerAuthContextEvidence,
   persistControllerIssueIntake, persistControllerIssueIntakeEvidence,
-  registerControllerLifecycleResource, resolveControllerStateRoot
+  registerControllerLifecycleResource, resolveControllerStateRoot, terminalizeV2Run
 } from "../../sdd/autonomous-sdd-controller.mjs";
 import { admitV2Run, inspectV2Admission } from "../../sdd/autonomous-sdd-admission.mjs";
 import { reconcileLegacyBootstrapRecord, publishLegacyReconciliationReceipt } from "../../sdd/autonomous-sdd-legacy-reconciliation.mjs";
@@ -30,6 +30,7 @@ runAsMain({
     },
     "inspect-v2-admission": (payload) => inspectV2Admission(payload),
     "recover-v2-run": (payload) => inspectV2Admission(payload),
+    "terminalize-v2-run": (payload) => terminalizeV2Run(payload),
     "inspect-controller-record": (payload) => inspectControllerRecord(payload?.record, {
       authorization: payload?.authorization,
       repository: payload?.repository ?? repositoryPath(payload),

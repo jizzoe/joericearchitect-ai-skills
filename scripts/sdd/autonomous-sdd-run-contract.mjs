@@ -3,7 +3,8 @@ import crypto from "node:crypto";
 export const RUN_CONTRACT_VERSION = 2;
 export const RECORD_KINDS = Object.freeze([
   "repository", "parent-run", "work-unit", "transition-attempt", "resource-claim",
-  "evidence", "projection", "archive-manifest", "legacy-classification"
+  "evidence", "projection", "archive-manifest", "legacy-classification",
+  "claim-release", "terminalization-receipt"
 ]);
 export const PARENT_CHILD_SUMMARY_KEYS = Object.freeze([
   "workUnitId", "ordinal", "approvedChangeId", "terminalStatus", "terminalReason",
@@ -156,6 +157,21 @@ export function validateLegacyClassification(record) {
     digest.test(record.recordDigest) && !hasSensitiveValue(record);
 }
 
+export function validateClaimRelease(record) {
+  return exactKeys(record, ["kind", "schemaVersion", "claimId", "repositoryId", "workUnitId", "disposition", "releasedAt", "terminalizationReceiptDigest"]) &&
+    record.kind === "claim-release" && record.schemaVersion === RUN_CONTRACT_VERSION && identifier.test(record.claimId) &&
+    /^r1-[0-9a-f]{64}$/i.test(record.repositoryId) && identifier.test(record.workUnitId) && record.disposition === "released" &&
+    timestamp(record.releasedAt) && digest.test(record.terminalizationReceiptDigest) && !hasSensitiveValue(record);
+}
+
+export function validateTerminalizationReceipt(record) {
+  return exactKeys(record, ["kind", "schemaVersion", "parentRunId", "workUnitId", "claimId", "repositoryId", "approvedChangeId", "requestDigest", "completionEvidenceDigest", "terminalSummary", "createdAt"]) &&
+    record.kind === "terminalization-receipt" && record.schemaVersion === RUN_CONTRACT_VERSION && identifier.test(record.parentRunId) &&
+    identifier.test(record.workUnitId) && identifier.test(record.claimId) && /^r1-[0-9a-f]{64}$/i.test(record.repositoryId) &&
+    identifier.test(record.approvedChangeId) && digest.test(record.requestDigest) && digest.test(record.completionEvidenceDigest) &&
+    validParentSummary(record.terminalSummary) && timestamp(record.createdAt) && !hasSensitiveValue(record);
+}
+
 export function validateDomainRecord(record) {
   if (!object(record) || !RECORD_KINDS.includes(record.kind)) return { valid: false, reason: "unknown-record-kind" };
   const validators = {
@@ -167,7 +183,9 @@ export function validateDomainRecord(record) {
     evidence: validateEvidence,
     projection: validateProjection,
     "archive-manifest": validateArchiveManifest,
-    "legacy-classification": validateLegacyClassification
+    "legacy-classification": validateLegacyClassification,
+    "claim-release": validateClaimRelease,
+    "terminalization-receipt": validateTerminalizationReceipt
   };
   const valid = validators[record.kind]?.(record) ?? false;
   return valid ? { valid: true, digest: digestValue(record) } : { valid: false, reason: "invalid-domain-record" };
