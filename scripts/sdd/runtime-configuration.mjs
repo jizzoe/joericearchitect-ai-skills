@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 
 const secret = /(?:password|secret|token|credential|api[_-]?key|private[_-]?key|gh[pousr]_[A-Za-z0-9]{20,}|Bearer\s+\S+)/i;
-const relative = (value) => typeof value === "string" && value.length > 0 && !path.isAbsolute(value) && !value.split(/[\\/]/).includes("..");
+const relative = (value) => typeof value === "string" && value.length > 0 && !path.isAbsolute(value) && !/^(?:[a-z]:[\\/]|\\\\)/i.test(value) && !value.split(/[\\/]/).includes("..");
 const canonical = (value) => Array.isArray(value) ? value.map(canonical) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])])) : value;
 export const runtimeConfigurationDigest = (value) => crypto.createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
 

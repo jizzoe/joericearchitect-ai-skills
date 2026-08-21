@@ -104,6 +104,8 @@ test("v2 admission persists an isolated parent, work unit, and generation-one cl
     assert.equal(admitted.classification, "admitted");
     assert.deepEqual(admitted.parentRun.children, []);
     assert.equal(admitted.workUnit.approvedChangeId, "v2-contract");
+    assert.deepEqual(admitted.workUnit.configurationSnapshot, { schemaVersion: 1, sources: [], values: {} });
+    assert.equal(admitted.workUnit.configurationDigest, digestValue(admitted.workUnit.configurationSnapshot));
     assert.equal(admitted.claim.ownershipGeneration, 1);
     assert.equal(admitted.operationContract.compactStage, "admitted");
     assert.equal(admitted.operationContract.agentTopology.topology, "multi-agent");
@@ -203,6 +205,22 @@ test("runtime configuration is redacted, deterministic, and fails closed", () =>
   const valid = resolveRuntimeConfiguration({ product: { runtime: { schemaVersion: 1, evidenceRoot: "evidence", claimProvider: "native-claim" } } });
   assert.equal(valid.valid, true);
   assert.equal(resolveRuntimeConfiguration({ product: { runtime: { schemaVersion: 1, evidenceRoot: "../escape" } } }).reason, "runtime-configuration-unsafe-path");
+  assert.equal(resolveRuntimeConfiguration({ product: { runtime: { schemaVersion: 1, evidenceRoot: "C:\\\\Users\\\\unsafe" } } }).reason, "runtime-configuration-unsafe-path");
   assert.equal(resolveRuntimeConfiguration({ product: { runtime: { schemaVersion: 1, token: "secret" } } }).reason, "runtime-configuration-invalid");
   assert.equal(resolveRuntimeConfiguration({ sealed: { claimProvider: "other" }, product: { runtime: { schemaVersion: 1, claimProvider: "native-claim" } } }).reason, "runtime-configuration-authority-conflict");
+});
+
+test("admission seals the configuration snapshot and never rereads it for a resumed run", () => {
+  const stateHome = root();
+  const repositoryPath = root();
+  try {
+    fs.mkdirSync(path.join(repositoryPath, "config"));
+    fs.writeFileSync(path.join(repositoryPath, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+    const admitted = admitV2Run(fixture(stateHome, { repositoryPath }));
+    assert.deepEqual(admitted.workUnit.configurationSnapshot, { schemaVersion: 1, sources: ["config/ai-skills.json:runtime"], values: { evidenceRoot: "evidence" } });
+    fs.writeFileSync(path.join(repositoryPath, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "changed" } }));
+    const resumed = admitV2Run(fixture(stateHome, { repositoryPath }));
+    assert.equal(resumed.classification, "resumed");
+    assert.deepEqual(resumed.workUnit.configurationSnapshot, admitted.workUnit.configurationSnapshot);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); fs.rmSync(repositoryPath, { recursive: true, force: true }); }
 });

@@ -21,6 +21,7 @@ const object = (value) => value !== null && typeof value === "object" && !Array.
 const secretKey = /(?:password|secret|token|credential|api[_-]?key|authorization|private[_-]?key)/i;
 const secretValue = /(?:gh[pousr]_[A-Za-z0-9]{20,}|Bearer\s+\S+|AKIA[A-Z0-9]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)/;
 const sensitiveKey = (key) => secretKey.test(key) && !/digest$/i.test(key);
+const relativePath = (value) => text(value) && !value.startsWith("/") && !/^(?:[a-z]:[\\/]|\\\\)/i.test(value) && !value.split(/[\\/]/).includes("..");
 
 export function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
@@ -91,6 +92,19 @@ function validParentSummary(value) {
   return Date.parse(value.terminalAt) >= Date.parse(value.startedAt);
 }
 
+function validConfigurationSnapshot(value) {
+  if (!object(value) || !exactKeys(value, ["schemaVersion", "sources", "values"]) || value.schemaVersion !== 1 ||
+      !Array.isArray(value.sources) || !object(value.values)) return false;
+  const allowed = ["evidenceRoot", "claimProvider", "reviewAdapter"];
+  if (Object.keys(value.values).some((key) => !allowed.includes(key))) return false;
+  if (value.values.evidenceRoot !== undefined && !relativePath(value.values.evidenceRoot)) return false;
+  for (const key of ["claimProvider", "reviewAdapter"]) {
+    if (value.values[key] !== undefined && (!text(value.values[key]) || !/^[a-z0-9][a-z0-9-]*$/i.test(value.values[key]))) return false;
+  }
+  const sourced = value.sources.length === 1 && value.sources[0] === "config/ai-skills.json:runtime";
+  return (Object.keys(value.values).length === 0 && value.sources.length === 0) || sourced;
+}
+
 export function validateParentRun(record) {
   if (!exactKeys(record, ["kind", "schemaVersion", "parentRunId", "approvedIntentDigest", "deadline", "historyBinding", "claimProviderBinding", "children"]) ||
       record.kind !== "parent-run" || record.schemaVersion !== RUN_CONTRACT_VERSION || !identifier.test(record.parentRunId) ||
@@ -101,10 +115,11 @@ export function validateParentRun(record) {
 }
 
 export function validateWorkUnit(record) {
-  if (!exactKeys(record, ["kind", "schemaVersion", "workUnitId", "parentRunId", "ordinal", "approvedChangeId", "authorizationDigest", "configurationDigest", "lifecycleState", "evidenceNamespace", "historyBinding", "claimProviderBinding"]) ||
+  if (!exactKeys(record, ["kind", "schemaVersion", "workUnitId", "parentRunId", "ordinal", "approvedChangeId", "authorizationDigest", "configurationSnapshot", "configurationDigest", "lifecycleState", "evidenceNamespace", "historyBinding", "claimProviderBinding"]) ||
       record.kind !== "work-unit" || record.schemaVersion !== RUN_CONTRACT_VERSION || !identifier.test(record.workUnitId) ||
       !identifier.test(record.parentRunId) || record.ordinal !== 1 || !identifier.test(record.approvedChangeId) ||
-      !digest.test(record.authorizationDigest) || !digest.test(record.configurationDigest) || !text(record.lifecycleState) ||
+      !digest.test(record.authorizationDigest) || !validConfigurationSnapshot(record.configurationSnapshot) ||
+      !digest.test(record.configurationDigest) || record.configurationDigest !== digestValue(record.configurationSnapshot) || !text(record.lifecycleState) ||
       !identifier.test(record.evidenceNamespace) || !validBinding(record.historyBinding) ||
       !validBinding(record.claimProviderBinding) || hasSensitiveValue(record)) return false;
   return true;

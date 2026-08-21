@@ -120,7 +120,7 @@ export function admitV2Run({ authorization, canonicalRemote, readableRepositoryN
     digest: digestOperationContract({ authorizationDigest, profile: authorization.qualityProfile, reviewPolicy: authorization.reviewPolicy, agentTopology: topology, compactStage: "admitted" })
   };
   const parentRun = { kind: "parent-run", schemaVersion: RUN_CONTRACT_VERSION, parentRunId, approvedIntentDigest: authorizationDigest, deadline: authorization.expiresAt, historyBinding, claimProviderBinding: providerBinding, children: [] };
-  const workUnit = { kind: "work-unit", schemaVersion: RUN_CONTRACT_VERSION, workUnitId, parentRunId, ordinal: 1, approvedChangeId: selectedEntry, authorizationDigest, configurationDigest: resolvedConfiguration.digest, lifecycleState: "admitted", evidenceNamespace: `evidence-${workUnitId}`, historyBinding, claimProviderBinding: providerBinding };
+  const workUnit = { kind: "work-unit", schemaVersion: RUN_CONTRACT_VERSION, workUnitId, parentRunId, ordinal: 1, approvedChangeId: selectedEntry, authorizationDigest, configurationSnapshot: resolvedConfiguration.snapshot, configurationDigest: resolvedConfiguration.digest, lifecycleState: "admitted", evidenceNamespace: `evidence-${workUnitId}`, historyBinding, claimProviderBinding: providerBinding };
   const claimed = createRepositoryClaim({ claimId, repositoryId, workUnitId, owner, ownershipGeneration: 1, providerBinding, acquiredAt: now, recoveryEvidence: {} });
   if (!validateDomainRecord(parentRun).valid || !validateDomainRecord(workUnit).valid || !claimed.valid) return fail("v2-admission-record-invalid");
   const staging = path.join(layout.paths.active, `.${parentRunId}.${crypto.randomUUID()}.staging`);

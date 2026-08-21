@@ -65,7 +65,7 @@ function terminalizationFixture(stateHome, overrides = {}) {
   const paths = statePaths(input);
   ensureStateLayout(input);
   const parentRun = { kind: "parent-run", schemaVersion: RUN_CONTRACT_VERSION, parentRunId: "parent-run-001", approvedIntentDigest: terminalHash("a"), deadline: "2026-08-20T16:00:00.000Z", historyBinding: terminalBinding, claimProviderBinding: terminalBinding, children: [] };
-  const workUnit = { kind: "work-unit", schemaVersion: RUN_CONTRACT_VERSION, workUnitId: "work-unit-001", parentRunId: parentRun.parentRunId, ordinal: 1, approvedChangeId: "example-change", authorizationDigest: terminalHash("b"), configurationDigest: terminalHash("c"), lifecycleState: "admitted", evidenceNamespace: "evidence-001", historyBinding: terminalBinding, claimProviderBinding: terminalBinding };
+  const workUnit = { kind: "work-unit", schemaVersion: RUN_CONTRACT_VERSION, workUnitId: "work-unit-001", parentRunId: parentRun.parentRunId, ordinal: 1, approvedChangeId: "example-change", authorizationDigest: terminalHash("b"), configurationSnapshot: { schemaVersion: 1, sources: [], values: {} }, configurationDigest: "ff0ec9a5e013e585c3fbc79c15a58470db800a93cd9a705f2c14db3f1e1520de", lifecycleState: "admitted", evidenceNamespace: "evidence-001", historyBinding: terminalBinding, claimProviderBinding: terminalBinding };
   const claim = createRepositoryClaim({ claimId: "claim-001", repositoryId, workUnitId: workUnit.workUnitId, owner: { host: "host", boot: "boot", pidStart: "pid" }, providerBinding: terminalBinding, acquiredAt: "2026-08-20T12:00:00.000Z", recoveryEvidence: {} }).record;
   const active = path.join(paths.active, parentRun.parentRunId);
   fs.mkdirSync(active, { recursive: true });

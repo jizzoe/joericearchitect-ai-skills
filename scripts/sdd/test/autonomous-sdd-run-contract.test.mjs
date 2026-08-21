@@ -20,7 +20,8 @@ const parent = {
 };
 const workUnit = {
   kind: "work-unit", schemaVersion: RUN_CONTRACT_VERSION, workUnitId: "work-unit-001", parentRunId: "parent-run-001",
-  ordinal: 1, approvedChangeId: "example-change", authorizationDigest: hash("e"), configurationDigest: hash("f"),
+  ordinal: 1, approvedChangeId: "example-change", authorizationDigest: hash("e"),
+  configurationSnapshot: { schemaVersion: 1, sources: [], values: {} }, configurationDigest: "ff0ec9a5e013e585c3fbc79c15a58470db800a93cd9a705f2c14db3f1e1520de",
   lifecycleState: "admitted", evidenceNamespace: "evidence-001", historyBinding: binding("local-history"), claimProviderBinding: binding("native-claim")
 };
 
@@ -54,6 +55,19 @@ test("portable serialization rejects unknown kinds and round-trips domain conten
   assert.equal(serialized.valid, true);
   assert.equal(deserializeDomainRecord(serialized.content).valid, true);
   assert.equal(validateDomainRecord({ kind: "vendor-workflow", schemaVersion: RUN_CONTRACT_VERSION }).reason, "unknown-record-kind");
+});
+
+test("work units require a redacted snapshot whose digest is exact", () => {
+  assert.equal(validateDomainRecord(workUnit).valid, true);
+  const secret = structuredClone(workUnit);
+  secret.configurationSnapshot.values.token = "ghp_aaaaaaaaaaaaaaaaaaaa";
+  assert.equal(validateDomainRecord(secret).reason, "invalid-domain-record");
+  const changed = structuredClone(workUnit);
+  changed.configurationSnapshot.sources = ["environment"];
+  assert.equal(validateDomainRecord(changed).reason, "invalid-domain-record");
+  const mismatch = structuredClone(workUnit);
+  mismatch.configurationDigest = hash("f");
+  assert.equal(validateDomainRecord(mismatch).reason, "invalid-domain-record");
 });
 
 test("every declared v2 record kind has a strict portable fixture", () => {

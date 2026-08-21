@@ -76,6 +76,21 @@ recovery rule. A matching binding prevents a repeat skill-level prompt when
 host permission is present; it cannot override authentication, connector,
 network, sandbox, or host-policy denial.
 
+### Runtime configuration provenance
+
+At admission, the runtime reads only the versioned `runtime` section in
+`config/ai-skills.json`. It accepts only safe, allowlisted values, such as a
+relative evidence directory or a named provider/adapter. It rejects unknown
+settings, secret-shaped text, absolute or escaping paths, and a conflict with
+the sealed request.
+
+The admitted work unit stores a canonical, redacted snapshot of those values,
+their source (`config/ai-skills.json:runtime`), and a digest of that snapshot.
+The snapshot is the run's receipt of what configuration it was allowed to use;
+a later edit to the file cannot change a run that has already started. Live
+facts—such as whether GitHub is currently reachable—are checked separately
+before an external action and never rewrite that admitted snapshot.
+
 ## Recovery
 
 On resume, trust durable state over chat history or transient logs:
