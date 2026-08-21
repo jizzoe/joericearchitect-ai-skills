@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { admitV2Run, inspectV2Admission } from "../autonomous-sdd-admission.mjs";
+import { terminalizeV2Run } from "../autonomous-sdd-controller.mjs";
 import { decodeLegacyRecord, denyLegacyMutation, inventoryLegacyDirectory, inventoryLegacyRecords } from "../autonomous-sdd-legacy.mjs";
 import { legacyRecordDigest, publishLegacyReconciliationReceipt, reconcileLegacyBootstrapRecord } from "../autonomous-sdd-legacy-reconciliation.mjs";
 import { deriveRepositoryId, digestValue } from "../autonomous-sdd-run-contract.mjs";
@@ -18,6 +19,36 @@ const authorization = resolveSddDeliveryRequest({ target: "v2-contract", mode: "
 const provider = { schemaVersion: 1, id: "native-claim", generationFence: true, explicitTakeover: true, durableWrite: true, directoryMetadataDurability: true, platforms: { windows: "LockFileEx", posix: "advisory-lock" } };
 const historyBinding = { id: "local-history", digest: "a".repeat(64) };
 const fixture = (stateHome, overrides = {}) => ({ authorization, canonicalRemote: "git@github.com:owner/repository.git", readableRepositoryName: "repository", historyBinding, provider, owner: { host: "fixture-host", boot: "fixture-boot", pidStart: "fixture-process" }, stateHome, parentRunId: "parent-run-001", workUnitId: "work-unit-001", claimId: "claim-001", now, ...overrides });
+const terminalizationFor = (admitted) => ({
+  schemaVersion: 1,
+  parentRunId: admitted.parentRun.parentRunId,
+  workUnitId: admitted.workUnit.workUnitId,
+  claimId: admitted.claim.claimId,
+  repositoryId: admitted.repositoryId,
+  approvedChangeId: admitted.workUnit.approvedChangeId,
+  provider,
+  completionEvidence: {
+    current: true,
+    implementation: { merged: true, reference: "implementation-pr", deliveredHeadCommit: "d".repeat(40) },
+    sync: { merged: true, reference: "sync-pr", deliveredHeadCommit: "e".repeat(40) },
+    archive: { merged: true, reference: "archive-pr", deliveredHeadCommit: "f".repeat(40) },
+    issueClosed: true,
+    projectDone: true,
+    cleanupCompleted: true,
+    observedAt: "2026-08-20T12:20:00.000Z"
+  },
+  terminal: {
+    terminalStatus: "complete",
+    terminalReason: "delivered-and-archived",
+    terminalAt: "2026-08-20T12:30:00.000Z",
+    finalHead: "f".repeat(40),
+    attemptCount: 1,
+    correctionCount: 0,
+    cleanupDisposition: "completed",
+    childHistoryReference: "external-delivery-evidence",
+    childHistoryDigest: "d".repeat(64)
+  }
+});
 
 test("legacy inventory is read-only, deterministic, and blocks dual authority", () => {
   const legacy = { schemaVersion: 4, runId: "legacy-run-001", selectedEntry: "v2-contract", repository: "owner/repository", currentPhase: "apply", steps: [] };
@@ -97,6 +128,31 @@ test("expired, active legacy, and immutable-conflict inputs preserve the existin
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });
 
+test("terminalization releases the completed claim, while a different later claim still blocks a third admission", () => {
+  const stateHome = root();
+  const nextAuthorization = resolveSddDeliveryRequest({ target: "next-change", mode: "autonomous", qualityProfile: "prototype-rapid", authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h" }, { goalStartedAt: now }).effectiveAuthorization;
+  const otherAuthorization = resolveSddDeliveryRequest({ target: "other-change", mode: "autonomous", qualityProfile: "prototype-rapid", authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h" }, { goalStartedAt: now }).effectiveAuthorization;
+  try {
+    const first = admitV2Run(fixture(stateHome));
+    const terminalized = terminalizeV2Run({ readableRepositoryName: "repository", stateHome, terminalization: terminalizationFor(first), now: "2026-08-20T12:31:00.000Z" });
+    assert.equal(terminalized.classification, "terminalized");
+    const next = admitV2Run(fixture(stateHome, {
+      authorization: nextAuthorization,
+      parentRunId: "next-parent-001",
+      workUnitId: "next-work-unit-001",
+      claimId: "next-claim-001"
+    }));
+    assert.equal(next.classification, "admitted");
+    const blocked = admitV2Run(fixture(stateHome, {
+      authorization: otherAuthorization,
+      parentRunId: "other-parent-001",
+      workUnitId: "other-work-unit-001",
+      claimId: "other-claim-001"
+    }));
+    assert.equal(blocked.reason, "v2-admission-immutable-conflict");
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
+});
+
 test("the runtime exposes durable v2 admission and refuses construction-only legacy verbs", () => {
   const module = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../runtime/bin/autonomous-sdd-controller.mjs");
   const refused = spawnSync(process.execPath, [module, "create-controller-record", "--stdin"], { encoding: "utf8", input: "{}" });
@@ -104,7 +160,11 @@ test("the runtime exposes durable v2 admission and refuses construction-only leg
   assert.equal(JSON.parse(refused.stdout).error.code, "operation-not-declared");
   const source = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../runtime/manifest.json"), "utf8");
   assert.match(source, /"admit-v2-run"/);
+  assert.match(source, /"terminalize-v2-run"/);
   assert.doesNotMatch(source, /"create-controller-record"|"advance-controller-record"/);
+  const malformed = spawnSync(process.execPath, [module, "terminalize-v2-run", "--stdin"], { encoding: "utf8", input: "{}" });
+  assert.equal(malformed.status, 0);
+  assert.equal(JSON.parse(malformed.stdout).result.reason, "terminalization-input-invalid");
 });
 
 test("both generated assistant adapters remain thin and delegate v2 admission to canonical policy", () => {

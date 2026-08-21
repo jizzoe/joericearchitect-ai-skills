@@ -66,7 +66,9 @@ test("every declared v2 record kind has a strict portable fixture", () => {
     { kind: "evidence", schemaVersion: RUN_CONTRACT_VERSION, evidenceId: "evidence-001", workUnitId: "work-unit-001", subject: "focused test", contentDigest: hash("5"), createdAt: "2026-08-20T12:00:00.000Z" },
     buildParentProjection(parent, workUnit, summary).projection,
     { kind: "archive-manifest", schemaVersion: RUN_CONTRACT_VERSION, parentRunId: "parent-run-001", archivedAt: "2026-08-20T12:02:00.000Z", reason: "verified", projectionDigest: hash("6") },
-    { kind: "legacy-classification", schemaVersion: RUN_CONTRACT_VERSION, reference: "runs/legacy/controller.json", classification: "ambiguous", reason: "schema-incomplete", recordDigest: hash("7") }
+    { kind: "legacy-classification", schemaVersion: RUN_CONTRACT_VERSION, reference: "runs/legacy/controller.json", classification: "ambiguous", reason: "schema-incomplete", recordDigest: hash("7") },
+    { kind: "claim-release", schemaVersion: RUN_CONTRACT_VERSION, claimId: "claim-001", repositoryId: `r1-${hash("1")}`, workUnitId: "work-unit-001", disposition: "released", releasedAt: "2026-08-20T12:02:00.000Z", terminalizationReceiptDigest: hash("8") },
+    { kind: "terminalization-receipt", schemaVersion: RUN_CONTRACT_VERSION, parentRunId: "parent-run-001", workUnitId: "work-unit-001", claimId: "claim-001", repositoryId: `r1-${hash("1")}`, approvedChangeId: "example-change", requestDigest: hash("9"), completionEvidenceDigest: hash("a"), terminalSummary: summary, createdAt: "2026-08-20T12:02:00.000Z" }
   ];
   assert.deepEqual(records.map((record) => record.kind).sort(), [...RECORD_KINDS].sort());
   for (const record of records) assert.equal(validateDomainRecord(record).valid, true, record.kind);

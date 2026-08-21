@@ -89,6 +89,23 @@ On resume, trust durable state over chat history or transient logs:
 Continue from the first incomplete evidenced step. If durable sources conflict
 and approved policy does not define precedence, pause before mutating state.
 
+### Terminalizing a completed v2 run
+
+A **repository claim** is the runtime's exclusive-work marker. It prevents two
+automated runs from changing the same repository at the same time. A completed
+run must not keep that marker active forever: after delivery and exact-owned
+cleanup are independently proven, the controller's declared
+`terminalize-v2-run` operation can record the run's terminal summary, record
+that its claim was released, archive its audit bundle, and rebuild status.
+
+This operation is deliberately narrow. It accepts one structured request for
+one exact run; it does not accept a caller-chosen state path, manually edited
+records, an inferred target, or incomplete/stale lifecycle evidence. If it
+pauses, explain in plain English which proof is missing, why the claim guard
+exists, whether the stop would still be expected in a completed control plane,
+and the exact repair or resume action. A terminalized run no longer blocks a
+later admission, but another genuine active or ambiguous claim still must.
+
 ## Security Boundaries
 
 - Never store credentials, token values, or secret material in repository
