@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { archiveTerminalRun, defaultStateHome, publishImmutableRecord, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
 import { buildParentProjection, digestValue, validateBootstrapPreSnapshotWorkUnit, validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
-import { executeWorkspaceCleanup, planWorkspaceCleanup } from "./sdd-workspace-cleanup.mjs";
+import { executeWorkspaceCleanup, migrateLegacyWorkspaceResource, planWorkspaceCleanup } from "./sdd-workspace-cleanup.mjs";
 import {
   authContextBindingDigest,
   validateGithubAuthContextBinding,
@@ -45,6 +45,55 @@ function fullHead(value) {
 
 function safeJson(fileSystem, target) {
   try { return JSON.parse(fileSystem.readFileSync(target, "utf8")); } catch { return null; }
+}
+
+const bootstrapAttachmentName = "bootstrap-cleanup-attachment.json";
+function validBootstrapAttachmentResource(value) {
+  return exactKeys(value, ["kind", "id", "role", "headCommit", "disposition"]) &&
+    ["worktree", "branch"].includes(value.kind) && text(value.id) && text(value.role) && fullHead(value.headCommit) &&
+    ["migrate", "retain"].includes(value.disposition);
+}
+function validBootstrapAttachmentBinding(value, now) {
+  return exactKeys(value, ["schemaVersion", "parentRunId", "workUnitId", "claimId", "repositoryId", "repository", "approvedChangeId", "archiveHead", "expiresAt", "classification", "resources"]) &&
+    value.schemaVersion === 1 && validRunId(value.parentRunId) && validRunId(value.workUnitId) && validRunId(value.claimId) && repositoryId(value.repositoryId) &&
+    text(value.repository) && validRunId(value.approvedChangeId) && fullHead(value.archiveHead) && timestamp(value.expiresAt) && Date.parse(value.expiresAt) > Date.parse(now) &&
+    value.classification === "pre-configuration-snapshot-bootstrap-cleanup" && Array.isArray(value.resources) && value.resources.length > 0 &&
+    value.resources.every(validBootstrapAttachmentResource) && new Set(value.resources.map((resource) => `${resource.kind}:${resource.id}`)).size === value.resources.length;
+}
+function validBootstrapAttachment(record, now) {
+  return exactKeys(record, ["schemaVersion", "kind", "binding", "resources", "receipts", "retainedResources", "createdAt", "updatedAt"]) &&
+    record.schemaVersion === 1 && record.kind === "bootstrap-cleanup-attachment" && validBootstrapAttachmentBinding(record.binding, now) &&
+    Array.isArray(record.resources) && Array.isArray(record.receipts) && Array.isArray(record.retainedResources) &&
+    timestamp(record.createdAt) && timestamp(record.updatedAt) &&
+    record.resources.every((resource) => validResource(resource, { selectedEntry: record.binding.approvedChangeId, repository: record.binding.repository }) &&
+      record.binding.resources.some((binding) => binding.disposition === "migrate" && binding.kind === resource.kind && binding.id === resource.id && binding.headCommit === resource.headCommit)) &&
+    new Set(record.resources.map((resource) => `${resource.kind}:${resource.id}`)).size === record.resources.length &&
+    record.receipts.every((receipt) => ["started", "completed", "already-completed", "blocked"].includes(receipt?.status) &&
+      record.resources.some((resource) => resource.kind === receipt.kind && resource.id === receipt.id)) &&
+    record.retainedResources.every((resource) => exactKeys(resource, ["kind", "id", "headCommit", "reason", "recordedAt"]) &&
+      ["worktree", "branch"].includes(resource.kind) && text(resource.id) && fullHead(resource.headCommit) && text(resource.reason) && timestamp(resource.recordedAt) &&
+      record.binding.resources.some((binding) => binding.disposition === "retain" && binding.kind === resource.kind && binding.id === resource.id && binding.headCommit === resource.headCommit)) &&
+    new Set(record.retainedResources.map((resource) => `${resource.kind}:${resource.id}`)).size === record.retainedResources.length;
+}
+function attachmentPath(paths, binding) { return path.join(paths.active, binding.parentRunId, bootstrapAttachmentName); }
+function writeAttachment(file, record, fileSystem = fs) {
+  try {
+    const temporary = `${file}.${crypto.randomUUID()}.tmp`;
+    fileSystem.writeFileSync(temporary, `${JSON.stringify(record)}\n`, { mode: 0o600 });
+    fileSystem.renameSync(temporary, file);
+    return { valid: true, path: file };
+  } catch { return { valid: false, reason: "bootstrap-cleanup-attachment-persist-failed" }; }
+}
+function bootstrapAttachmentTerminal(record) {
+  const migrated = record.binding.resources.filter((resource) => resource.disposition === "migrate");
+  const retained = record.binding.resources.filter((resource) => resource.disposition === "retain");
+  return migrated.every((binding) => {
+    const resource = record.resources.find((item) => item.kind === binding.kind && item.id === binding.id && item.headCommit === binding.headCommit);
+    if (!resource) return false;
+    const receipts = record.receipts.filter((receipt) => receipt.kind === resource.kind && receipt.id === resource.id);
+    return ["completed", "already-completed"].includes(receipts.at(-1)?.status);
+  }) && retained.every((binding) => record.retainedResources.some((resource) =>
+    resource.kind === binding.kind && resource.id === binding.id && resource.headCommit === binding.headCommit));
 }
 
 function terminalizationEvidence(value) {
@@ -266,6 +315,15 @@ export function terminalizeV2Run({ readableRepositoryName, terminalization, stat
       parentRun.claimProviderBinding.id !== claim.providerBinding.id || parentRun.claimProviderBinding.digest !== claim.providerBinding.digest ||
       workUnit.claimProviderBinding.id !== claim.providerBinding.id || workUnit.claimProviderBinding.digest !== claim.providerBinding.digest) {
     return { valid: false, classification: "paused", reason: "terminalization-identity-or-claim-mismatch", requestDigest };
+  }
+  if (bootstrapWorkUnit) {
+    const attachment = safeJson(fileSystem, attachmentPath(paths, terminalization.bootstrapCompatibility));
+    if (!attachment || !validBootstrapAttachment(attachment, now) || attachment.binding.parentRunId !== terminalization.parentRunId ||
+        attachment.binding.workUnitId !== terminalization.workUnitId || attachment.binding.claimId !== terminalization.claimId ||
+        attachment.binding.repositoryId !== terminalization.repositoryId || attachment.binding.approvedChangeId !== terminalization.approvedChangeId ||
+        attachment.binding.archiveHead !== terminalization.completionEvidence.archive.deliveredHeadCommit || !bootstrapAttachmentTerminal(attachment)) {
+      return { valid: false, classification: "paused", reason: "terminalization-bootstrap-cleanup-attachment-incomplete", requestDigest };
+    }
   }
 
   const terminalSummary = terminalSummaryFor({ claim, workUnit, terminal: terminalization.terminal });
@@ -657,6 +715,122 @@ export function bindControllerLifecycleDelivery({ repositoryPath, record, kind, 
   if (!bound.valid) return bound;
   const persisted = persistControllerRecord({ repositoryPath, record: bound.record, runGit });
   return persisted.valid ? { valid: true, record: bound.record, path: persisted.path } : persisted;
+}
+
+/** Attaches one independently signed legacy migration to one exact active bootstrap run. */
+export function attachBootstrapCleanupMigration({ readableRepositoryName, attachmentBinding, migration, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+  if (!text(readableRepositoryName) || !validBootstrapAttachmentBinding(attachmentBinding, now) || !migration || !timestamp(now)) {
+    return { valid: false, classification: "paused", reason: "bootstrap-cleanup-attachment-input-invalid" };
+  }
+  const paths = statePaths({ stateHome, readableName: readableRepositoryName, repositoryId: attachmentBinding.repositoryId });
+  const active = paths && path.join(paths.active, attachmentBinding.parentRunId);
+  const parentRun = active && safeJson(fileSystem, path.join(active, "parent-run.json"));
+  const workUnit = active && safeJson(fileSystem, path.join(active, "work-unit.json"));
+  const claim = active && safeJson(fileSystem, path.join(active, "resource-claim.json"));
+  if (!paths || !validateDomainRecord(parentRun).valid || !validateBootstrapPreSnapshotWorkUnit(workUnit) || !validateDomainRecord(claim).valid ||
+      parentRun.parentRunId !== attachmentBinding.parentRunId || workUnit.workUnitId !== attachmentBinding.workUnitId || claim.claimId !== attachmentBinding.claimId ||
+      claim.repositoryId !== attachmentBinding.repositoryId || workUnit.approvedChangeId !== attachmentBinding.approvedChangeId || claim.state !== "active") {
+    return { valid: false, classification: "paused", reason: "bootstrap-cleanup-attachment-active-run-mismatch" };
+  }
+  const migrated = migrateLegacyWorkspaceResource({ ...migration, selectedEntry: attachmentBinding.approvedChangeId, repository: attachmentBinding.repository, now });
+  if (!migrated.valid) return { valid: false, classification: "paused", reason: migrated.reason };
+  const resource = { ...migrated.resource, registeredHeadCommit: migrated.resource.headCommit };
+  if (!attachmentBinding.resources.some((binding) => binding.disposition === "migrate" && binding.kind === resource.kind &&
+      binding.id === resource.id && binding.headCommit === resource.headCommit)) {
+    return { valid: false, classification: "paused", reason: "bootstrap-cleanup-attachment-resource-unbound" };
+  }
+  const destination = attachmentPath(paths, attachmentBinding);
+  const existing = safeJson(fileSystem, destination);
+  const record = existing ?? { schemaVersion: 1, kind: "bootstrap-cleanup-attachment", binding: structuredClone(attachmentBinding), resources: [], receipts: [], retainedResources: [], createdAt: now, updatedAt: now };
+  if (!validBootstrapAttachment(record, now) || JSON.stringify(canonical(record.binding)) !== JSON.stringify(canonical(attachmentBinding))) {
+    return { valid: false, classification: "paused", reason: "bootstrap-cleanup-attachment-conflict" };
+  }
+  const dependentWorktree = resource.kind === "branch" && attachmentBinding.resources.find((binding) =>
+    binding.disposition === "migrate" && binding.kind === "worktree" && binding.role === resource.role);
+  if (dependentWorktree) {
+    const worktree = record.resources.find((item) => item.kind === "worktree" && item.id === dependentWorktree.id);
+    const receipt = worktree && record.receipts.filter((item) => item.kind === worktree.kind && item.id === worktree.id).at(-1);
+    if (!receipt || !["completed", "already-completed"].includes(receipt.status)) {
+      return { valid: false, classification: "paused", reason: "bootstrap-cleanup-branch-dependency-incomplete" };
+    }
+    if (!timestamp(migration?.ownerAuthorization?.reviewedAt) || Date.parse(migration.ownerAuthorization.reviewedAt) <= Date.parse(receipt.at)) {
+      return { valid: false, classification: "paused", reason: "bootstrap-cleanup-branch-migration-not-fresh" };
+    }
+  }
+  if (record.resources.some((existingResource) => existingResource.kind === resource.kind && existingResource.id === resource.id)) {
+    return { valid: false, classification: "paused", reason: "bootstrap-cleanup-attachment-duplicate" };
+  }
+  record.resources.push(resource);
+  record.updatedAt = now;
+  const persisted = writeAttachment(destination, record, fileSystem);
+  return persisted.valid ? { valid: true, classification: "attached", record, path: destination, resource } : { valid: false, classification: "failed", reason: persisted.reason };
+}
+
+/** Records an exact unsafe resource that the repair binding names for retention. */
+export function retainBootstrapCleanupResource({ readableRepositoryName, attachmentBinding, retention, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+  if (!text(readableRepositoryName) || !validBootstrapAttachmentBinding(attachmentBinding, now) || !retention || !timestamp(now)) {
+    return { valid: false, classification: "paused", reason: "bootstrap-cleanup-retention-input-invalid" };
+  }
+  const bound = attachmentBinding.resources.find((resource) => resource.disposition === "retain" && resource.kind === retention.kind &&
+    resource.id === retention.id && resource.headCommit === retention.headCommit);
+  if (!bound || !text(retention.reason)) return { valid: false, classification: "paused", reason: "bootstrap-cleanup-retention-resource-unbound" };
+  const paths = statePaths({ stateHome, readableName: readableRepositoryName, repositoryId: attachmentBinding.repositoryId });
+  const active = paths && path.join(paths.active, attachmentBinding.parentRunId);
+  const parentRun = active && safeJson(fileSystem, path.join(active, "parent-run.json"));
+  const workUnit = active && safeJson(fileSystem, path.join(active, "work-unit.json"));
+  const claim = active && safeJson(fileSystem, path.join(active, "resource-claim.json"));
+  if (!paths || !validateDomainRecord(parentRun).valid || !validateBootstrapPreSnapshotWorkUnit(workUnit) || !validateDomainRecord(claim).valid ||
+      parentRun.parentRunId !== attachmentBinding.parentRunId || workUnit.workUnitId !== attachmentBinding.workUnitId || claim.claimId !== attachmentBinding.claimId ||
+      claim.repositoryId !== attachmentBinding.repositoryId || workUnit.approvedChangeId !== attachmentBinding.approvedChangeId || claim.state !== "active") {
+    return { valid: false, classification: "paused", reason: "bootstrap-cleanup-retention-active-run-mismatch" };
+  }
+  const destination = attachmentPath(paths, attachmentBinding);
+  const existing = safeJson(fileSystem, destination);
+  const record = existing ?? { schemaVersion: 1, kind: "bootstrap-cleanup-attachment", binding: structuredClone(attachmentBinding), resources: [], receipts: [], retainedResources: [], createdAt: now, updatedAt: now };
+  if (!validBootstrapAttachment(record, now) || JSON.stringify(canonical(record.binding)) !== JSON.stringify(canonical(attachmentBinding))) {
+    return { valid: false, classification: "paused", reason: "bootstrap-cleanup-retention-conflict" };
+  }
+  if (record.retainedResources.some((resource) => resource.kind === retention.kind && resource.id === retention.id)) {
+    return { valid: false, classification: "paused", reason: "bootstrap-cleanup-retention-duplicate" };
+  }
+  const retained = { kind: retention.kind, id: retention.id, headCommit: retention.headCommit, reason: retention.reason, recordedAt: now };
+  record.retainedResources.push(retained);
+  record.updatedAt = now;
+  const persisted = writeAttachment(destination, record, fileSystem);
+  return persisted.valid ? { valid: true, classification: "retained", record, path: destination, retained } : { valid: false, classification: "failed", reason: persisted.reason };
+}
+
+export function executeBootstrapCleanupAttachment({ readableRepositoryName, attachmentBinding, cleanupContext, operations = {}, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+  if (!text(readableRepositoryName) || !validBootstrapAttachmentBinding(attachmentBinding, now) || typeof operations.inspectResource !== "function") {
+    return { classification: "paused", reason: "bootstrap-cleanup-attachment-input-invalid", outcomes: [] };
+  }
+  const paths = statePaths({ stateHome, readableName: readableRepositoryName, repositoryId: attachmentBinding.repositoryId });
+  const destination = paths && attachmentPath(paths, attachmentBinding);
+  const record = destination && safeJson(fileSystem, destination);
+  if (!record || !validBootstrapAttachment(record, now) || JSON.stringify(canonical(record.binding)) !== JSON.stringify(canonical(attachmentBinding))) {
+    return { classification: "paused", reason: "bootstrap-cleanup-attachment-unavailable", outcomes: [] };
+  }
+  let resources;
+  try { resources = record.resources.map((resource) => operations.inspectResource(resource)); }
+  catch { return { classification: "paused", reason: "bootstrap-cleanup-attachment-fresh-inspection-failed", outcomes: [] }; }
+  const plan = planWorkspaceCleanup({ ...cleanupContext, selectedEntry: attachmentBinding.approvedChangeId, repository: attachmentBinding.repository, resources });
+  if (plan.classification !== "planned" || plan.resources.some((entry) => entry.classification !== "eligible")) {
+    if (plan.classification === "planned") {
+      for (const entry of plan.resources.filter((item) => item.classification !== "eligible")) {
+        const resource = record.resources.find((item) => item.id === entry.id);
+        if (resource) record.receipts.push({ kind: resource.kind, id: resource.id, status: "blocked", at: now });
+      }
+      record.updatedAt = now;
+      writeAttachment(destination, record, fileSystem);
+    }
+    return { classification: "paused", reason: "bootstrap-cleanup-attachment-resource-ineligible", outcomes: [], plan };
+  }
+  const result = executeWorkspaceCleanup(plan, { ...operations, persistOutcome: (outcome) => {
+    record.receipts.push({ kind: outcome.resource.kind, id: outcome.resource.id, status: outcome.status, at: now });
+    record.updatedAt = now;
+    return { persisted: writeAttachment(destination, record, fileSystem).valid };
+  }});
+  return { ...result, record, plan };
 }
 
 export function executeControllerLifecycleCleanup({ repositoryPath, record, cleanupContext, operations = {}, now = new Date().toISOString(), runGit } = {}) {
