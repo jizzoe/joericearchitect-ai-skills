@@ -141,8 +141,8 @@ test("workspace io confines reads and writes to the validated target", () => {
 test("every declared payload and subcommand entrypoint answers --help", () => {
   const { manifest } = loadManifest(repositoryRoot);
   const wrapped = manifest.entrypoints.filter((entry) => entry.module.startsWith("scripts/runtime/bin/"));
-  // Eight helpers that export functions but are not dispatchable as programs.
-  assert.equal(wrapped.length, 8);
+  // Nine helpers that export functions and are dispatchable through a wrapper.
+  assert.equal(wrapped.length, 9);
   for (const entry of wrapped) {
     const result = spawnSync(process.execPath, [path.join(repositoryRoot, entry.module), "--help"], { encoding: "utf8" });
     assert.equal(result.status, 0, `${entry.name} --help exited ${result.status}`);

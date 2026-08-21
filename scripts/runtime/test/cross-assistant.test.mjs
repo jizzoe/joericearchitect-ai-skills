@@ -44,6 +44,26 @@ test("both assistants select the same helper through one shared runtime", () => 
   assert.equal(new Set(plans.map((plan) => plan.digest)).size, 1);
 });
 
+test("both assistants receive the same canonical operation gate through the runtime", () => {
+  const plans = SUPPORTED_AGENTS.map(() => prepareDispatch({
+    helper: "autonomous-sdd-operation-contract", target: firstTarget, environment
+  }));
+  assert.equal(plans.every((plan) => plan.ok), true);
+  assert.equal(new Set(plans.map((plan) => plan.modulePath)).size, 1);
+  const responses = plans.map((plan) => spawnSync(process.execPath, [plan.modulePath, "--stdin"], {
+    encoding: "utf8",
+    env: { ...process.env, AI_SKILLS_TARGET_REPOSITORY: firstTarget },
+    input: JSON.stringify({ operation: "evaluate-operation-gate", payload: {
+      operation: "apply", stage: "planned", targetKind: "change", claimActive: true,
+      authorization: { qualityProfile: "prototype-rapid", expiresAt: "2099-01-01T00:00:00.000Z" },
+      evidenceCurrent: { applyEligibility: true }
+    } })
+  }));
+  const payloads = responses.map((response) => JSON.parse(response.stdout).result);
+  assert.deepEqual(payloads[0], payloads[1]);
+  assert.equal(payloads[0].allowed, true);
+});
+
 test("one runtime serves two agents holding different skill revisions in one contract version", () => {
   const record = doctor({
     environment,

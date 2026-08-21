@@ -73,7 +73,10 @@ test("v2 admission persists an isolated parent, work unit, and generation-one cl
     assert.deepEqual(admitted.parentRun.children, []);
     assert.equal(admitted.workUnit.approvedChangeId, "v2-contract");
     assert.equal(admitted.claim.ownershipGeneration, 1);
+    assert.equal(admitted.operationContract.compactStage, "admitted");
+    assert.equal(admitted.operationContract.agentTopology.topology, "multi-agent");
     assert.equal(fs.existsSync(path.join(admitted.paths.active, "parent-run-001", "parent-run.json")), true);
+    assert.equal(fs.existsSync(path.join(admitted.paths.active, "parent-run-001", "operation-contract.json")), true);
     const providerBinding = { id: provider.id, digest: digestValue(provider) };
     assert.equal(inspectV2Admission({ stateHome, readableRepositoryName: "repository", repositoryId: admitted.repositoryId, authorization, providerBinding, now }).classification, "resumed");
     assert.equal(admitV2Run(fixture(stateHome)).classification, "resumed");

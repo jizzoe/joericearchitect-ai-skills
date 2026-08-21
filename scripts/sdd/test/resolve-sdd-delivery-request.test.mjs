@@ -56,8 +56,9 @@ test("all missing inputs produce one concise pre-mutation clarification", () => 
   const result = resolveSddDeliveryRequest({}, { goalStartedAt: started });
   assert.equal(result.ready, false);
   assert.equal(result.classification, "needs-input");
-  assert.equal(result.issues.length, sddDeliveryRequestInputs.length);
-  for (const definition of sddDeliveryRequestInputs) {
+  const required = sddDeliveryRequestInputs.filter((definition) => !["reviewPolicy", "agentPolicy"].includes(definition.field));
+  assert.equal(result.issues.length, required.length);
+  for (const definition of required) {
     assert.match(result.clarification, new RegExp(`- ${definition.field}:`));
     assert.match(result.clarification, new RegExp(definition.values[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -155,6 +156,23 @@ test("legacy independent-review input remains compatible only when consistent", 
   assert.equal(rejected.ready, false);
   assert.equal(rejected.issues[0].field, "independentReviewPolicy");
   assert.match(rejected.clarification, /independentReviewPolicy:/);
+});
+
+test("prototype policy defaults topology conservatively and preserves explicit topology", () => {
+  const prototype = resolveSddDeliveryRequest({
+    target: "operation-contract", mode: "autonomous", qualityProfile: "prototype-rapid",
+    authorizationProfile: "sdd-delivery", expiration: "4h"
+  }, { goalStartedAt: started });
+  assert.equal(prototype.ready, true);
+  assert.equal(prototype.effectiveAuthorization.reviewPolicy, "same-session-local");
+  assert.equal(prototype.effectiveAuthorization.agentPolicy, "auto");
+  assert.equal(prototype.effectiveAuthorization.agentTopology.topology, "multi-agent");
+  const explicit = resolveSddDeliveryRequest({
+    target: "operation-contract", mode: "autonomous", qualityProfile: "prototype-rapid",
+    authorizationProfile: "sdd-delivery", expiration: "4h", agentPolicy: "single-agent", agentSignals: { complexity: "high" }
+  }, { goalStartedAt: started });
+  assert.equal(explicit.effectiveAuthorization.agentTopology.topology, "single-agent");
+  assert.equal(explicit.effectiveAuthorization.agentTopology.source, "explicit");
 });
 
 test("ship-sdd accepts an explicitly ordered bracketed queue and resolves exact brief scope", () => {

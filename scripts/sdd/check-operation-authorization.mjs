@@ -5,6 +5,7 @@ import { canonicalFailureSignature } from "./correction-chain.mjs";
 import { canonicalGitCommit, immutableReviewManifest, reviewInputMatchesGitDiff, validateIndependentReviewEvidence, validateIndependentReviewV1 } from "./independent-review.mjs";
 import { authorizeBoundIssueIntake } from "./issue-intake-binding.mjs";
 import { authorizeGithubAuthContextEvidence } from "./github-cli-auth-context.mjs";
+import { evaluateOperationGate, routeOperationOutcome } from "./autonomous-sdd-operation-contract.mjs";
 
 export const profileOperations = {
   "research-read-only": new Set(["read-source", "write-findings", "write-sources", "write-result", "notify-state"]),
@@ -238,6 +239,24 @@ function durableCorrectionState(authorization, request) {
 
 export function checkOperationAuthorization(input) {
   const { authorization = {}, runtime = {}, config = {}, request = {} } = input;
+  if (request.operationContract) {
+    const gate = evaluateOperationGate({
+      operation: request.operationContract.operation,
+      stage: request.operationContract.stage,
+      targetKind: request.operationContract.targetKind,
+      authorization,
+      claimActive: request.operationContract.claimActive,
+      evidenceCurrent: request.operationContract.evidenceCurrent,
+      adapterAvailable: request.operationContract.adapterAvailable,
+      runtimePermitted: runtime.permission === true,
+      now: request.now
+    });
+    if (!gate.allowed) return { allowed: false, classification: "paused", issues: [{ code: `operation-contract-${gate.reason}` }], operationContract: gate };
+    const outcome = request.operationContract.outcome
+      ? routeOperationOutcome({ operation: request.operationContract.operation, outcome: request.operationContract.outcome, failureSignature: request.operationContract.failureSignature, correctionAttempts: request.operationContract.correctionAttempts, correctionBudget: authorization.correctionBudgetPerFailureSignature })
+      : null;
+    if (outcome?.classification === "paused") return { allowed: false, classification: "paused", issues: [{ code: `operation-contract-${outcome.reason}` }], operationContract: gate, outcome };
+  }
   const profile = request.profile;
   const operation = request.operation;
   if (!profileOperations[profile]) return fail("unknown-profile", profile);

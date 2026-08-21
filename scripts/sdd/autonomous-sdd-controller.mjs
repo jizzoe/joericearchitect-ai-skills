@@ -10,6 +10,7 @@ import {
   validateGithubAuthContextEvidence
 } from "./github-cli-auth-context.mjs";
 import { bindIssueIntakeEvidence, validateIssueIntakeBinding } from "./issue-intake-binding.mjs";
+import { evaluateOperationGate } from "./autonomous-sdd-operation-contract.mjs";
 
 const phases = Object.freeze([
   "propose", "planning-review", "apply", "verify", "delivery", "sync", "archive", "cleanup"
@@ -116,6 +117,14 @@ export function resolveControllerStateRoot({ repositoryPath, runGit = defaultRun
 
 export function authorizationDigest(authorization) {
   return crypto.createHash("sha256").update(JSON.stringify(canonical(authorization))).digest("hex");
+}
+
+/** Consume the canonical operation gate; callers cannot infer lifecycle policy from a helper name. */
+export function evaluateControllerOperation({ record, operation, stage, targetKind, authorization, claimActive, evidenceCurrent, adapterAvailable, runtimePermitted, now } = {}) {
+  if (!record || record.selectedEntry !== authorization?.target?.entries?.[0]) {
+    return { allowed: false, classification: "paused", reason: "controller-operation-entry-mismatch", disposition: "human-decision" };
+  }
+  return evaluateOperationGate({ operation, stage, targetKind, authorization, claimActive, evidenceCurrent, adapterAvailable, runtimePermitted, now });
 }
 
 export function createControllerRecord({ authorization, repository, selectedEntry, runId = crypto.randomUUID() } = {}) {

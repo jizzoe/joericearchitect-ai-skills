@@ -41,6 +41,9 @@ published choices, and perform no selection or mutation.
    each non-primary implementation, Sync, or Archive worktree or branch,
    durably register its exact identity, role, head, ownership token, and
    recovery reference.
+   Resolve internal lifecycle work through the canonical operation contract;
+   its compact stage, typed target, gate result, and outcome disposition take
+   precedence over helper names or free-form caller results.
    For autonomous prototype intake, persist the exact reviewed issue binding
    with `persistControllerIssueIntake` before publication and bind the returned
    issue evidence with `persistControllerIssueIntakeEvidence`. If the payload,
@@ -157,6 +160,13 @@ For durable v2 admission, invoke the controller through the installed runtime:
 
 ```
 ai-skills-runtime run autonomous-sdd-controller admit-v2-run --repository <absolute-target-repository> -- --input <admission.json>
+```
+
+For normalized topology, gates, outcomes, and review-reuse checks, use the
+declared operation-contract helper:
+
+```
+ai-skills-runtime run autonomous-sdd-operation-contract --repository <absolute-target-repository> -- --stdin
 ```
 
 Invoke the authentication-context helper through the installed runtime, never

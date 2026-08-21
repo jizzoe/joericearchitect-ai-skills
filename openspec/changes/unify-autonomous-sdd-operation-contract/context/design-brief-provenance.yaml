@@ -1,0 +1,6 @@
+schema_version: 1
+source_path: "ai-planning/design-briefs/autonomous-sdd-reliability-control-plane/m1-s2-operation-profile-gate-and-outcome-contract.md"
+source_sha256: "6a3f16be1fadbc8133a18238d2f1d36c7815230176fdd2aa85a1793d20e9edf4"
+copied_at: "2026-08-21T03:13:02.945Z"
+selection_mode: "explicit"
+change: "unify-autonomous-sdd-operation-contract"

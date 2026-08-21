@@ -5,6 +5,7 @@ import { canonicalJson } from "./independent-review-contract.mjs";
 import { validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { validateFindingDispositions } from "./review-findings.mjs";
 import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
+import { validateReviewReuse } from "./autonomous-sdd-operation-contract.mjs";
 // Pure evaluator for an independently executed, read-only review channel.
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
@@ -40,6 +41,13 @@ export function canonicalGitCommit(commit, repositoryPath) {
   } catch {
     return null;
   }
+}
+
+// Review closure may reuse a sealed review only when the canonical operation
+// contract proves every policy-relevant input is unchanged. This adapter keeps
+// its repository-specific review transport separate from that portable rule.
+export function validateCloseoutReviewReuse(input = {}) {
+  return validateReviewReuse(input);
 }
 
 function reviewerIsUsable(reviewer, implementerSession) {
