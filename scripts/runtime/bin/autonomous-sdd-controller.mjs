@@ -9,6 +9,7 @@ import {
   registerControllerLifecycleResource, resolveControllerStateRoot
 } from "../../sdd/autonomous-sdd-controller.mjs";
 import { admitV2Run, inspectV2Admission } from "../../sdd/autonomous-sdd-admission.mjs";
+import { reconcileLegacyBootstrapRecord, publishLegacyReconciliationReceipt } from "../../sdd/autonomous-sdd-legacy-reconciliation.mjs";
 
 // The controller persists its state in the target repository's Git common
 // directory, so the validated launcher target is the default repository path.
@@ -23,6 +24,10 @@ runAsMain({
   invocation: "subcommand",
   operations: {
     "admit-v2-run": (payload) => admitV2Run({ ...payload, legacyDirectory: legacyDirectory(payload) }),
+    "reconcile-legacy-bootstrap-record": (payload) => {
+      const result = reconcileLegacyBootstrapRecord(payload);
+      return result.valid ? publishLegacyReconciliationReceipt({ ...payload, receipt: result.receipt }) : result;
+    },
     "inspect-v2-admission": (payload) => inspectV2Admission(payload),
     "recover-v2-run": (payload) => inspectV2Admission(payload),
     "inspect-controller-record": (payload) => inspectControllerRecord(payload?.record, {
