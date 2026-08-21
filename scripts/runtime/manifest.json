@@ -280,6 +280,13 @@
           0
         ]
       }
+    },
+    {
+      "name": "autonomous-sdd-operation-contract",
+      "module": "scripts/runtime/bin/autonomous-sdd-operation-contract.mjs",
+      "invocation": "cli",
+      "payloadWrapper": "scripts/sdd/autonomous-sdd-operation-contract.mjs",
+      "smoke": { "args": ["--help"], "exitCodes": [0] }
     }
   ]
 }

@@ -48,6 +48,13 @@ an exact current binding avoids a second skill-level prompt only when the host
 runtime already permits the write. Host authentication, permission, or sandbox
 denial remains a fail-closed recovery stop.
 
+Autonomous work uses one canonical operation contract. It normalizes
+`reviewPolicy` and `agentPolicy`, conservatively classifies `auto` topology,
+keeps delivery authorization distinct from Apply readiness, and routes every
+operation result to one typed disposition. Review reuse is invalidated by any
+change to its sealed package, head, artifacts, Apply evidence, dispositions,
+or policy gates.
+
 After Archive, exact owned-resource cleanup audits first and changes only clean,
 recorded, confirmed-delivered local worktrees and branches. Legacy, primary,
 locked, dirty, ambiguous, unregistered, or evidence-mismatched resources stay

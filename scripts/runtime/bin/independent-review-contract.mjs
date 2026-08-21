@@ -3,6 +3,7 @@ import { runAsMain } from "../payload-wrapper.mjs";
 import {
   buildReviewPackage, packageDigest, validateReviewPackage, validateReviewResult
 } from "../../sdd/independent-review-contract.mjs";
+import { validateCloseoutReviewReuse } from "../../sdd/independent-review.mjs";
 
 runAsMain({
   helper: "independent-review-contract",
@@ -16,6 +17,7 @@ runAsMain({
       configuredReviewer: payload?.configuredReviewer,
       implementerSession: payload?.implementerSession,
       seenRecordIds: new Set(payload?.seenRecordIds ?? [])
-    })
+    }),
+    "validate-closeout-review-reuse": (payload) => validateCloseoutReviewReuse(payload ?? {})
   }
 });

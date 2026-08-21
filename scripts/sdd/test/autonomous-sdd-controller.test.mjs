@@ -13,6 +13,7 @@ import {
   bindControllerLifecycleDelivery,
   bindControllerResourceDelivery,
   createControllerRecord,
+  evaluateControllerOperation,
   executeControllerLifecycleCleanup,
   inspectControllerRecord,
   persistControllerRecord,
@@ -58,6 +59,12 @@ test("controller record starts at planning and resumes first incomplete phase", 
   resumed.steps[0] = { id: "propose", status: "complete", evidence: { current: true } };
   resumed.steps[1] = { id: "planning-review", status: "complete", evidence: { current: true } };
   assert.equal(inspectControllerRecord(resumed, { authorization, repository: "owner/repository", now: started }).nextPhase, "apply");
+});
+
+test("controller consumes the canonical operation gate rather than helper-local policy", () => {
+  const record = createControllerRecord({ authorization, repository: "owner/repository", runId: "controller-run-0099" }).record;
+  const result = evaluateControllerOperation({ record, operation: "apply", stage: "planned", targetKind: "change", authorization, claimActive: true, evidenceCurrent: { applyEligibility: true, reviewReady: true }, now: started });
+  assert.equal(result.allowed, true);
 });
 
 test("controller rejects expired, stale, and conflicting context", () => {

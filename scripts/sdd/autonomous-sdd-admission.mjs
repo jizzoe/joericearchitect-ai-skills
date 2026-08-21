@@ -6,6 +6,7 @@ import { deriveRepositoryId, digestValue, normalizeCanonicalRemote, RUN_CONTRACT
 import { inventoryLegacyDirectory, inventoryLegacyRecords } from "./autonomous-sdd-legacy.mjs";
 import { inventoryLegacyReconciliationReceipts } from "./autonomous-sdd-legacy-reconciliation.mjs";
 import { createRepositoryClaim, defaultStateHome, ensureStateLayout, publishImmutableRecord, rebuildRepositoryIndex, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
+import { digestOperationContract, normalizeAgentPolicy } from "./autonomous-sdd-operation-contract.mjs";
 
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const identifier = /^[a-z0-9][a-z0-9-]{2,127}$/i;
@@ -104,6 +105,17 @@ export function admitV2Run({ authorization, canonicalRemote, readableRepositoryN
   const layout = ensureStateLayout({ stateHome: resolvedStateHome, readableName: readableRepositoryName, repositoryId }, { fileSystem });
   if (!layout.valid) return layout;
   const authorizationDigest = digestValue(authorization);
+  const topology = authorization.agentTopology ?? normalizeAgentPolicy(authorization.agentPolicy, authorization.agentSignals);
+  if (!topology?.valid && topology?.policy === undefined) return fail("operation-contract-topology-invalid");
+  const operationContract = {
+    schemaVersion: 1,
+    authorizationDigest,
+    profile: authorization.qualityProfile,
+    reviewPolicy: authorization.reviewPolicy,
+    agentTopology: topology,
+    compactStage: "admitted",
+    digest: digestOperationContract({ authorizationDigest, profile: authorization.qualityProfile, reviewPolicy: authorization.reviewPolicy, agentTopology: topology, compactStage: "admitted" })
+  };
   const parentRun = { kind: "parent-run", schemaVersion: RUN_CONTRACT_VERSION, parentRunId, approvedIntentDigest: authorizationDigest, deadline: authorization.expiresAt, historyBinding, claimProviderBinding: providerBinding, children: [] };
   const workUnit = { kind: "work-unit", schemaVersion: RUN_CONTRACT_VERSION, workUnitId, parentRunId, ordinal: 1, approvedChangeId: selectedEntry, authorizationDigest, configurationDigest: digestValue({ canonicalRemoteIdentity, repositoryId, historyBinding, providerBinding }), lifecycleState: "admitted", evidenceNamespace: `evidence-${workUnitId}`, historyBinding, claimProviderBinding: providerBinding };
   const claimed = createRepositoryClaim({ claimId, repositoryId, workUnitId, owner, ownershipGeneration: 1, providerBinding, acquiredAt: now, recoveryEvidence: {} });
@@ -117,10 +129,11 @@ export function admitV2Run({ authorization, canonicalRemote, readableRepositoryN
       const published = publishImmutableRecord({ directory: staging, name, record, provider: providerCapability.provider, fileSystem });
       if (!published.valid) throw new Error(published.reason);
     }
+    fileSystem.writeFileSync(path.join(staging, "operation-contract.json"), `${JSON.stringify(operationContract)}\n`, { encoding: "utf8", mode: 0o600 });
     fileSystem.renameSync(staging, active);
     const index = rebuildRepositoryIndex({ paths: layout.paths, parentRunId, archivePath: active, state: "active", fileSystem });
     if (!index.valid) return fail(index.reason, { paths: layout.paths, parentRun, workUnit, claim: claimed.record });
-    return { valid: true, classification: "admitted", paths: layout.paths, canonicalRemoteIdentity, repositoryId, providerBinding, selectedEntry, parentRun, workUnit, claim: claimed.record, index };
+    return { valid: true, classification: "admitted", paths: layout.paths, canonicalRemoteIdentity, repositoryId, providerBinding, selectedEntry, parentRun, workUnit, claim: claimed.record, operationContract, index };
   } catch (error) {
     try { fileSystem.rmSync(staging, { recursive: true, force: true }); } catch { /* preserve no partial active admission */ }
     return fail("v2-admission-persist-failed", { detail: error instanceof Error ? error.message : "unknown" });

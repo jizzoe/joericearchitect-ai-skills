@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import { normalizeAgentPolicy as normalizeCanonicalAgentPolicy } from "./autonomous-sdd-operation-contract.mjs";
 
 const changeName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const modes = ["autonomous", "interactive"];
 const qualityProfiles = ["production-rapid", "prototype-rapid"];
 const authorizationProfiles = ["sdd-delivery"];
 const reviewPolicies = ["strict-only", "strict-first-degraded", "same-session-local"];
+const agentPolicies = ["auto", "multi-agent", "single-agent"];
 const independentReviewPolicies = new Set(["strict-only", "strict-first-degraded"]);
 const shorthandProfiles = Object.freeze({
   prod: Object.freeze({ mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", reviewPolicy: "strict-only", expiration: "4h" }),
@@ -37,6 +39,11 @@ export const sddDeliveryRequestInputs = Object.freeze([
     field: "reviewPolicy",
     summary: "Assurance policy selected by the execution-mode and quality-profile matrix.",
     values: reviewPolicies
+  }),
+  Object.freeze({
+    field: "agentPolicy",
+    summary: "Agent-context topology; auto is deterministic and conservative.",
+    values: agentPolicies
   }),
   Object.freeze({
     field: "expiration",
@@ -107,7 +114,9 @@ function requestedFields(input) {
     reviewPolicy: input?.reviewPolicy ?? legacyReviewPolicy,
     legacyReviewPolicy,
     reviewPolicyExplicit: input?.reviewPolicy !== undefined,
-    expiration: input?.expiration
+    expiration: input?.expiration,
+    agentPolicy: input?.agentPolicy,
+    agentSignals: input?.agentSignals
   };
 }
 
@@ -131,9 +140,11 @@ function reviewPolicyIssue(values) {
 
 export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date().toISOString() } = {}) {
   const values = requestedFields(input);
+  if (values.reviewPolicy === undefined && values.mode === "autonomous" && values.qualityProfile === "prototype-rapid") values.reviewPolicy = "same-session-local";
+  if (values.reviewPolicy === undefined && values.qualityProfile === "production-rapid") values.reviewPolicy = "strict-only";
   const gaps = [];
   const missing = [];
-  for (const definition of sddDeliveryRequestInputs) {
+  for (const definition of sddDeliveryRequestInputs.filter((item) => !["reviewPolicy", "agentPolicy"].includes(item.field))) {
     const value = values[definition.field];
     if (value === undefined || value === null || value === "") {
       const record = issue("missing-delivery-request-input", definition.field);
@@ -152,6 +163,8 @@ export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date
     const policyIssue = reviewPolicyIssue(values);
     if (policyIssue) gaps.push(policyIssue);
   }
+  const agentTopology = normalizeCanonicalAgentPolicy(values.agentPolicy, values.agentSignals);
+  if (!agentTopology.valid) gaps.push(issue("invalid-delivery-request-input", "agentPolicy", values.agentPolicy));
   if (values.expiration !== undefined && !expiration) gaps.push(issue("invalid-delivery-request-input", "expiration"));
 
   const requestedBudget = input.correctionBudgetPerFailureSignature;
@@ -197,6 +210,8 @@ export function resolveSddDeliveryRequest(input = {}, { goalStartedAt = new Date
     qualityProfile: values.qualityProfile,
     authorizationProfile: values.authorizationProfile,
     reviewPolicy: values.reviewPolicy,
+    agentPolicy: agentTopology.policy,
+    agentTopology,
     ...(independentReviewPolicies.has(values.reviewPolicy)
       ? { independentReviewPolicy: values.reviewPolicy, independentReviewPolicyDeprecated: true }
       : {}),
