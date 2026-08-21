@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: "unify-autonomous-sdd-operation-contract"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 158
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/158"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/unify-autonomous-sdd-operation-contract/"
