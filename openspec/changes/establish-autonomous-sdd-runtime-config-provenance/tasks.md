@@ -11,5 +11,5 @@
   source-authority and live-probe boundary.
 - [x] 2.2 Add conflict, unknown-field, unsafe-path, secret-shaped, stale-proof,
   portability, and no-reread regression tests.
-- [ ] 2.3 Run focused and full tests, strict validation, same-session review,
+- [x] 2.3 Run focused and full tests, strict validation, same-session review,
   and OpenSpec Verify.
