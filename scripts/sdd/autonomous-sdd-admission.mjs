@@ -7,6 +7,7 @@ import { inventoryLegacyDirectory, inventoryLegacyRecords } from "./autonomous-s
 import { inventoryLegacyReconciliationReceipts } from "./autonomous-sdd-legacy-reconciliation.mjs";
 import { createRepositoryClaim, defaultStateHome, ensureStateLayout, publishImmutableRecord, rebuildRepositoryIndex, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
 import { digestOperationContract, normalizeAgentPolicy } from "./autonomous-sdd-operation-contract.mjs";
+import { loadRuntimeConfiguration, resolveRuntimeConfiguration } from "./runtime-configuration.mjs";
 
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const identifier = /^[a-z0-9][a-z0-9-]{2,127}$/i;
@@ -76,7 +77,7 @@ export function inspectV2Admission({ stateHome, readableRepositoryName, reposito
 }
 
 /** Persist parent, selected work unit, and initial generation-one claim before any lifecycle phase. */
-export function admitV2Run({ authorization, canonicalRemote, readableRepositoryName, historyBinding, provider, owner, stateHome, legacyRecords = [], legacyDirectory, parentRunId = crypto.randomUUID(), workUnitId = crypto.randomUUID(), claimId = crypto.randomUUID(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+export function admitV2Run({ authorization, canonicalRemote, readableRepositoryName, historyBinding, provider, owner, repositoryPath, runtimeConfiguration, stateHome, legacyRecords = [], legacyDirectory, parentRunId = crypto.randomUUID(), workUnitId = crypto.randomUUID(), claimId = crypto.randomUUID(), now = new Date().toISOString(), fileSystem = fs } = {}) {
   const selectedEntry = validateAuthorization(authorization, now);
   const canonicalRemoteIdentity = normalizeCanonicalRemote(canonicalRemote);
   const repositoryId = deriveRepositoryId(canonicalRemote);
@@ -84,6 +85,8 @@ export function admitV2Run({ authorization, canonicalRemote, readableRepositoryN
   if (!canonicalRemoteIdentity || !repositoryId || !identifier.test(readableRepositoryName ?? "") || !binding(historyBinding) || !provider || !owner || !identifier.test(parentRunId) || !identifier.test(workUnitId) || !identifier.test(claimId)) return fail("v2-admission-input-invalid");
   const providerCapability = validateProviderCapabilities(provider);
   if (!providerCapability.valid) return fail(providerCapability.reason);
+  const resolvedConfiguration = repositoryPath ? loadRuntimeConfiguration({ repositoryPath, sealed: runtimeConfiguration?.sealed, fileSystem }) : resolveRuntimeConfiguration(runtimeConfiguration);
+  if (!resolvedConfiguration.valid) return fail(resolvedConfiguration.reason);
   const providerBinding = { id: provider.id, digest: digestValue(providerCapability.provider) };
   const resolvedStateHome = stateHome ?? defaultStateHome();
   const reconciliation = inventoryLegacyReconciliationReceipts({ stateHome: resolvedStateHome, readableRepositoryName, repositoryId, fileSystem });
@@ -117,7 +120,7 @@ export function admitV2Run({ authorization, canonicalRemote, readableRepositoryN
     digest: digestOperationContract({ authorizationDigest, profile: authorization.qualityProfile, reviewPolicy: authorization.reviewPolicy, agentTopology: topology, compactStage: "admitted" })
   };
   const parentRun = { kind: "parent-run", schemaVersion: RUN_CONTRACT_VERSION, parentRunId, approvedIntentDigest: authorizationDigest, deadline: authorization.expiresAt, historyBinding, claimProviderBinding: providerBinding, children: [] };
-  const workUnit = { kind: "work-unit", schemaVersion: RUN_CONTRACT_VERSION, workUnitId, parentRunId, ordinal: 1, approvedChangeId: selectedEntry, authorizationDigest, configurationDigest: digestValue({ canonicalRemoteIdentity, repositoryId, historyBinding, providerBinding }), lifecycleState: "admitted", evidenceNamespace: `evidence-${workUnitId}`, historyBinding, claimProviderBinding: providerBinding };
+  const workUnit = { kind: "work-unit", schemaVersion: RUN_CONTRACT_VERSION, workUnitId, parentRunId, ordinal: 1, approvedChangeId: selectedEntry, authorizationDigest, configurationDigest: resolvedConfiguration.digest, lifecycleState: "admitted", evidenceNamespace: `evidence-${workUnitId}`, historyBinding, claimProviderBinding: providerBinding };
   const claimed = createRepositoryClaim({ claimId, repositoryId, workUnitId, owner, ownershipGeneration: 1, providerBinding, acquiredAt: now, recoveryEvidence: {} });
   if (!validateDomainRecord(parentRun).valid || !validateDomainRecord(workUnit).valid || !claimed.valid) return fail("v2-admission-record-invalid");
   const staging = path.join(layout.paths.active, `.${parentRunId}.${crypto.randomUUID()}.staging`);
