@@ -107,7 +107,7 @@ authorization, configuration, role/handoff, evidence, and outcome contracts.
 |---|---|---|---|
 | M1-S1 — Run and isolated work-unit contract | `establish-autonomous-sdd-run-v2-contract` | Explore-ready after decisions on registry ownership, parent/child boundary, authoritative history, the one-active-mutating-run v1 threat model, local durability substrate, and coarse resource-claim authority | [M1-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m1-s1-run-and-work-unit-contract.md) |
 | M1-S2 — Operations, profiles, gates, and outcomes | `unify-autonomous-sdd-operation-contract` | Explore-ready after M1-S1; requires prototype-profile and exact-head-review-reuse decisions | [M1-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m1-s2-operation-profile-gate-and-outcome-contract.md) |
-| M1-S3 — Runtime configuration provenance | `establish-autonomous-sdd-runtime-config-provenance` | Explore-ready after M1-S1; requires configuration-authority decision; may be designed alongside M1-S2 but merges after schema ownership | [M1-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m1-s3-runtime-configuration-provenance.md) |
+| M1-S3 — Runtime configuration provenance | `establish-autonomous-sdd-runtime-config-provenance` | Delivered and archived; owner confirmed bounded layered authority, versioned product-config namespace, and fail-closed conflicts | [M1-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m1-s3-runtime-configuration-provenance.md) |
 
 **Exit evidence:** resolver output is valid run input; one schema family owns
 the four durable scopes and role handoffs; every run has one backend/history
