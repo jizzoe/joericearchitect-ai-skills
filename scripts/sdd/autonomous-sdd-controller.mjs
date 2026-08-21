@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { archiveTerminalRun, defaultStateHome, publishImmutableRecord, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
-import { buildParentProjection, digestValue, validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
+import { buildParentProjection, digestValue, validateBootstrapPreSnapshotWorkUnit, validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
 import { executeWorkspaceCleanup, planWorkspaceCleanup } from "./sdd-workspace-cleanup.mjs";
 import {
   authContextBindingDigest,
@@ -61,10 +61,19 @@ function terminalDetails(value) {
     value.cleanupDisposition === "completed" && text(value.childHistoryReference) && digest(value.childHistoryDigest);
 }
 
+function validBootstrapCompatibility(value, terminalization, now) {
+  return exactKeys(value, ["schemaVersion", "parentRunId", "workUnitId", "claimId", "repositoryId", "approvedChangeId", "archiveHead", "expiresAt", "classification"]) &&
+    value.schemaVersion === 1 && value.parentRunId === terminalization.parentRunId && value.workUnitId === terminalization.workUnitId &&
+    value.claimId === terminalization.claimId && value.repositoryId === terminalization.repositoryId && value.approvedChangeId === terminalization.approvedChangeId &&
+    value.archiveHead === terminalization.completionEvidence.archive.deliveredHeadCommit && fullHead(value.archiveHead) && timestamp(value.expiresAt) &&
+    Date.parse(value.expiresAt) > Date.parse(now) && value.classification === "pre-configuration-snapshot-bootstrap";
+}
+
 function validTerminalizationRequest(value) {
-  return exactKeys(value, ["schemaVersion", "parentRunId", "workUnitId", "claimId", "repositoryId", "approvedChangeId", "provider", "completionEvidence", "terminal"]) &&
+  return exactKeys(value, ["schemaVersion", "parentRunId", "workUnitId", "claimId", "repositoryId", "approvedChangeId", "provider", "completionEvidence", "terminal", "bootstrapCompatibility"]) &&
     value.schemaVersion === 1 && validRunId(value.parentRunId) && validRunId(value.workUnitId) && validRunId(value.claimId) &&
-    repositoryId(value.repositoryId) && validRunId(value.approvedChangeId) && terminalizationEvidence(value.completionEvidence) && terminalDetails(value.terminal) &&
+      repositoryId(value.repositoryId) && validRunId(value.approvedChangeId) && terminalizationEvidence(value.completionEvidence) && terminalDetails(value.terminal) &&
+      (value.bootstrapCompatibility === undefined || typeof value.bootstrapCompatibility === "object") &&
     validateProviderCapabilities(value.provider).valid;
 }
 
@@ -244,7 +253,9 @@ export function terminalizeV2Run({ readableRepositoryName, terminalization, stat
   const parentRun = safeJson(fileSystem, path.join(activePath, "parent-run.json"));
   const workUnit = safeJson(fileSystem, path.join(activePath, "work-unit.json"));
   const claim = safeJson(fileSystem, path.join(activePath, "resource-claim.json"));
-  if (![parentRun, workUnit, claim].every((record) => validateDomainRecord(record).valid)) {
+  const normalWorkUnit = validateDomainRecord(workUnit).valid;
+  const bootstrapWorkUnit = validateBootstrapPreSnapshotWorkUnit(workUnit) && validBootstrapCompatibility(terminalization.bootstrapCompatibility, terminalization, now);
+  if (!validateDomainRecord(parentRun).valid || !validateDomainRecord(claim).valid || (!normalWorkUnit && !bootstrapWorkUnit)) {
     return { valid: false, classification: "paused", reason: "terminalization-active-record-invalid", requestDigest };
   }
   if (parentRun.parentRunId !== terminalization.parentRunId || workUnit.parentRunId !== parentRun.parentRunId ||
@@ -258,7 +269,7 @@ export function terminalizeV2Run({ readableRepositoryName, terminalization, stat
   }
 
   const terminalSummary = terminalSummaryFor({ claim, workUnit, terminal: terminalization.terminal });
-  const projection = buildParentProjection(parentRun, workUnit, terminalSummary);
+  const projection = buildParentProjection(parentRun, workUnit, terminalSummary, { allowBootstrapPreSnapshot: bootstrapWorkUnit });
   const observedAt = Date.parse(terminalization.completionEvidence.observedAt);
   const nowAt = Date.parse(now);
   if (!projection.valid || observedAt > nowAt || nowAt - observedAt > 60 * 60 * 1000 ||
@@ -298,7 +309,7 @@ export function terminalizeV2Run({ readableRepositoryName, terminalization, stat
     if (!published.valid) return { valid: false, classification: "failed", reason: published.reason, requestDigest };
   }
 
-  const archivedRun = archiveTerminalRun({ paths, parentRun, workUnit, terminalSummary, claim, attempts: [], cleanupPending: false, recoveryPending: false, now, fileSystem });
+  const archivedRun = archiveTerminalRun({ paths, parentRun, workUnit, terminalSummary, claim, attempts: [], cleanupPending: false, recoveryPending: false, allowBootstrapPreSnapshot: bootstrapWorkUnit, now, fileSystem });
   if (!archivedRun.valid) return { valid: false, classification: "failed", reason: archivedRun.reason, requestDigest, ...(archivedRun.archivePath ? { archivePath: archivedRun.archivePath } : {}) };
   const verified = terminalizationArchiveMatch({ paths, terminalization, requestDigest, fileSystem });
   if (!verified?.valid || verified.archivePath !== archivedRun.archivePath) {

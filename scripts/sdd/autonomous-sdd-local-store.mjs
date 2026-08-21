@@ -127,10 +127,10 @@ export function assertOwnershipGeneration(claim, generation) {
     ? { valid: true } : fail("ownership-generation-stale");
 }
 
-export function archiveEligibility({ claim, parentRun, workUnit, terminalSummary, attempts = [], cleanupPending = false, recoveryPending = false } = {}) {
+export function archiveEligibility({ claim, parentRun, workUnit, terminalSummary, attempts = [], cleanupPending = false, recoveryPending = false, allowBootstrapPreSnapshot = false } = {}) {
   if (!validateDomainRecord(claim).valid || claim?.kind !== "resource-claim" || claim.state !== "active") return fail("archive-claim-not-held");
   if (cleanupPending || recoveryPending || !Array.isArray(attempts) || attempts.some((attempt) => ["prepared", "in-flight", "in-doubt"].includes(attempt?.state))) return fail("archive-reconciliation-incomplete");
-  const projection = buildParentProjection(parentRun, workUnit, terminalSummary);
+  const projection = buildParentProjection(parentRun, workUnit, terminalSummary, { allowBootstrapPreSnapshot });
   return projection.valid ? { valid: true, projection: projection.projection } : fail("archive-projection-invalid");
 }
 
@@ -150,9 +150,9 @@ export function rebuildRepositoryIndex({ paths, parentRunId, archivePath, state 
   } catch { return fail("index-rebuild-failed"); }
 }
 
-export function archiveTerminalRun({ paths, parentRun, workUnit, terminalSummary, claim, attempts, cleanupPending, recoveryPending, now = new Date().toISOString(), fileSystem = fs } = {}) {
+export function archiveTerminalRun({ paths, parentRun, workUnit, terminalSummary, claim, attempts, cleanupPending, recoveryPending, allowBootstrapPreSnapshot = false, now = new Date().toISOString(), fileSystem = fs } = {}) {
   if (!paths?.active || !paths?.archive || !identifier.test(parentRun?.parentRunId ?? "") || !timestamp(now)) return fail("archive-input-invalid");
-  const eligibility = archiveEligibility({ claim, parentRun, workUnit, terminalSummary, attempts, cleanupPending, recoveryPending });
+  const eligibility = archiveEligibility({ claim, parentRun, workUnit, terminalSummary, attempts, cleanupPending, recoveryPending, allowBootstrapPreSnapshot });
   if (!eligibility.valid) return eligibility;
   const source = path.join(paths.active, parentRun.parentRunId);
   const date = new Date(now);

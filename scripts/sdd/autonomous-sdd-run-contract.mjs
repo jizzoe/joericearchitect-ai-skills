@@ -125,6 +125,17 @@ export function validateWorkUnit(record) {
   return true;
 }
 
+/** Accepts only the original v2 work-unit shape used before configuration snapshots existed. */
+export function validateBootstrapPreSnapshotWorkUnit(record) {
+  if (!exactKeys(record, ["kind", "schemaVersion", "workUnitId", "parentRunId", "ordinal", "approvedChangeId", "authorizationDigest", "configurationDigest", "lifecycleState", "evidenceNamespace", "historyBinding", "claimProviderBinding"]) ||
+      record.kind !== "work-unit" || record.schemaVersion !== RUN_CONTRACT_VERSION || !identifier.test(record.workUnitId) ||
+      !identifier.test(record.parentRunId) || record.ordinal !== 1 || !identifier.test(record.approvedChangeId) ||
+      !digest.test(record.authorizationDigest) || !digest.test(record.configurationDigest) || !text(record.lifecycleState) ||
+      !identifier.test(record.evidenceNamespace) || !validBinding(record.historyBinding) ||
+      !validBinding(record.claimProviderBinding) || hasSensitiveValue(record)) return false;
+  return true;
+}
+
 export function validateTransitionAttempt(record) {
   return exactKeys(record, ["kind", "schemaVersion", "attemptId", "workUnitId", "idempotencyKey", "preconditionDigest", "targetDigest", "ownershipGeneration", "state", "receipt", "result"]) &&
     record.kind === "transition-attempt" && record.schemaVersion === RUN_CONTRACT_VERSION && identifier.test(record.attemptId) &&
@@ -206,8 +217,8 @@ export function validateDomainRecord(record) {
   return valid ? { valid: true, digest: digestValue(record) } : { valid: false, reason: "invalid-domain-record" };
 }
 
-export function buildParentProjection(parentRun, workUnit, terminalSummary) {
-  if (!validateParentRun(parentRun) || !validateWorkUnit(workUnit) || workUnit.parentRunId !== parentRun.parentRunId ||
+export function buildParentProjection(parentRun, workUnit, terminalSummary, { allowBootstrapPreSnapshot = false } = {}) {
+  if (!validateParentRun(parentRun) || !(validateWorkUnit(workUnit) || (allowBootstrapPreSnapshot && validateBootstrapPreSnapshotWorkUnit(workUnit))) || workUnit.parentRunId !== parentRun.parentRunId ||
       !validParentSummary(terminalSummary) || terminalSummary.workUnitId !== workUnit.workUnitId) {
     return { valid: false, reason: "parent-projection-input-invalid" };
   }

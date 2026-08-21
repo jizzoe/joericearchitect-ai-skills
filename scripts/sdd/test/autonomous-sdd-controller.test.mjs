@@ -137,6 +137,30 @@ test("controller terminalizes one exact completed v2 bundle and preserves idempo
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });
 
+test("controller terminalizes one exact pre-snapshot bootstrap record without rewriting it", () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "terminalize-v2-bootstrap-"));
+  try {
+    const { paths, terminalization } = terminalizationFixture(stateHome);
+    const workUnitPath = path.join(paths.active, terminalization.parentRunId, "work-unit.json");
+    const bootstrapWorkUnit = JSON.parse(fs.readFileSync(workUnitPath, "utf8"));
+    delete bootstrapWorkUnit.configurationSnapshot;
+    bootstrapWorkUnit.configurationDigest = terminalHash("c");
+    const original = `${JSON.stringify(bootstrapWorkUnit)}\n`;
+    fs.writeFileSync(workUnitPath, original);
+    assert.equal(terminalizeV2Run({ readableRepositoryName: "example-repository", stateHome, terminalization, now: "2026-08-20T12:31:00.000Z" }).reason, "terminalization-active-record-invalid");
+    terminalization.bootstrapCompatibility = {
+      schemaVersion: 1, parentRunId: terminalization.parentRunId, workUnitId: terminalization.workUnitId,
+      claimId: terminalization.claimId, repositoryId: terminalization.repositoryId, approvedChangeId: terminalization.approvedChangeId,
+      archiveHead: terminalization.completionEvidence.archive.deliveredHeadCommit, expiresAt: "2026-08-20T13:00:00.000Z",
+      classification: "pre-configuration-snapshot-bootstrap"
+    };
+    const result = terminalizeV2Run({ readableRepositoryName: "example-repository", stateHome, terminalization, now: "2026-08-20T12:31:00.000Z" });
+    assert.equal(result.classification, "terminalized");
+    assert.equal(fs.readFileSync(path.join(result.archivePath, "work-unit.json"), "utf8"), original);
+    assert.match(JSON.parse(fs.readFileSync(path.join(result.archivePath, "terminalization-receipt.json"), "utf8")).terminalSummary.terminalReason, /delivered-and-archived/);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
+});
+
 test("controller terminalization rejects mismatched completion evidence without changing active state", () => {
   const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "terminalize-v2-reject-"));
   try {
