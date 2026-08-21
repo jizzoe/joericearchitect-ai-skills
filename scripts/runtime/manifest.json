@@ -54,6 +54,13 @@
       }
     },
     {
+      "name": "runtime-configuration",
+      "module": "scripts/runtime/bin/runtime-configuration.mjs",
+      "invocation": "cli",
+      "smoke": { "args": ["--help"], "exitCodes": [0] },
+      "payloadWrapper": "scripts/sdd/runtime-configuration.mjs"
+    },
+    {
       "name": "review-launcher-recovery",
       "module": "scripts/sdd/review-launcher-recovery.mjs",
       "invocation": "cli",
