@@ -4,5 +4,6 @@
     "researchRoot": "docs/research",
     "designBriefRoot": "docs/design-briefs",
     "planRoot": "docs/plans"
-  }
+  },
+  "runtime": { "schemaVersion": 1, "evidenceRoot": "docs/evidence" }
 }

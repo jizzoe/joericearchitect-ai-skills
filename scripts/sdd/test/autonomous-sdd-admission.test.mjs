@@ -12,6 +12,7 @@ import { decodeLegacyRecord, denyLegacyMutation, inventoryLegacyDirectory, inven
 import { legacyRecordDigest, publishLegacyReconciliationReceipt, reconcileLegacyBootstrapRecord } from "../autonomous-sdd-legacy-reconciliation.mjs";
 import { deriveRepositoryId, digestValue } from "../autonomous-sdd-run-contract.mjs";
 import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
+import { resolveRuntimeConfiguration } from "../runtime-configuration.mjs";
 
 const root = () => fs.mkdtempSync(path.join(os.tmpdir(), "autonomous-sdd-admission-"));
 const now = "2026-08-20T12:00:00.000Z";
@@ -196,4 +197,12 @@ test("a second configured product uses only caller-provided identity and state",
     const implementation = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../autonomous-sdd-admission.mjs"), "utf8");
     assert.doesNotMatch(implementation, /owner\/repository|second-product|github\.com/);
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
+});
+
+test("runtime configuration is redacted, deterministic, and fails closed", () => {
+  const valid = resolveRuntimeConfiguration({ product: { runtime: { schemaVersion: 1, evidenceRoot: "evidence", claimProvider: "native-claim" } } });
+  assert.equal(valid.valid, true);
+  assert.equal(resolveRuntimeConfiguration({ product: { runtime: { schemaVersion: 1, evidenceRoot: "../escape" } } }).reason, "runtime-configuration-unsafe-path");
+  assert.equal(resolveRuntimeConfiguration({ product: { runtime: { schemaVersion: 1, token: "secret" } } }).reason, "runtime-configuration-invalid");
+  assert.equal(resolveRuntimeConfiguration({ sealed: { claimProvider: "other" }, product: { runtime: { schemaVersion: 1, claimProvider: "native-claim" } } }).reason, "runtime-configuration-authority-conflict");
 });

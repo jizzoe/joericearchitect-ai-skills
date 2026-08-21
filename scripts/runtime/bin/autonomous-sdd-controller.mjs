@@ -23,7 +23,7 @@ runAsMain({
   helper: "autonomous-sdd-controller",
   invocation: "subcommand",
   operations: {
-    "admit-v2-run": (payload) => admitV2Run({ ...payload, legacyDirectory: legacyDirectory(payload) }),
+    "admit-v2-run": (payload) => admitV2Run({ ...payload, repositoryPath: repositoryPath(payload), legacyDirectory: legacyDirectory(payload) }),
     "reconcile-legacy-bootstrap-record": (payload) => {
       const result = reconcileLegacyBootstrapRecord(payload);
       return result.valid ? publishLegacyReconciliationReceipt({ ...payload, receipt: result.receipt }) : result;
