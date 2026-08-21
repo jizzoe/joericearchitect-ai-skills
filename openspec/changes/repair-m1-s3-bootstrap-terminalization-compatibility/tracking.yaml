@@ -1,0 +1,19 @@
+schema_version: 1
+openspec:
+  change: repair-m1-s3-bootstrap-terminalization-compatibility
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 170
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/170
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - ai-planning/handoff-docs/autonomous-sdd-blocker-register-and-plain-english-handoff.md
+      - openspec/changes/repair-m1-s3-bootstrap-terminalization-compatibility/
+      - scripts/sdd/autonomous-sdd-controller.mjs
+      - scripts/sdd/autonomous-sdd-local-store.mjs
+      - scripts/sdd/autonomous-sdd-run-contract.mjs
+      - scripts/sdd/test/autonomous-sdd-controller.test.mjs
