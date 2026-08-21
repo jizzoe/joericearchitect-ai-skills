@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { deriveRepositoryId, digestValue, normalizeCanonicalRemote, RUN_CONTRACT_VERSION, validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
 import { inventoryLegacyDirectory, inventoryLegacyRecords } from "./autonomous-sdd-legacy.mjs";
+import { inventoryLegacyReconciliationReceipts } from "./autonomous-sdd-legacy-reconciliation.mjs";
 import { createRepositoryClaim, defaultStateHome, ensureStateLayout, publishImmutableRecord, rebuildRepositoryIndex, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
 
 const text = (value) => typeof value === "string" && value.trim().length > 0;
@@ -83,8 +84,11 @@ export function admitV2Run({ authorization, canonicalRemote, readableRepositoryN
   const providerCapability = validateProviderCapabilities(provider);
   if (!providerCapability.valid) return fail(providerCapability.reason);
   const providerBinding = { id: provider.id, digest: digestValue(providerCapability.provider) };
-  const suppliedLegacy = inventoryLegacyRecords(legacyRecords);
-  const discoveredLegacy = legacyDirectory === undefined ? inventoryLegacyRecords([]) : inventoryLegacyDirectory(legacyDirectory, { fileSystem });
+  const resolvedStateHome = stateHome ?? defaultStateHome();
+  const reconciliation = inventoryLegacyReconciliationReceipts({ stateHome: resolvedStateHome, readableRepositoryName, repositoryId, fileSystem });
+  if (!reconciliation.valid) return fail(reconciliation.reason);
+  const suppliedLegacy = inventoryLegacyRecords(legacyRecords, { reconciliationReceipts: reconciliation.receipts, now });
+  const discoveredLegacy = legacyDirectory === undefined ? inventoryLegacyRecords([], { reconciliationReceipts: reconciliation.receipts, now }) : inventoryLegacyDirectory(legacyDirectory, { fileSystem, reconciliationReceipts: reconciliation.receipts, now });
   if (!suppliedLegacy.valid || !discoveredLegacy.valid) return fail(!suppliedLegacy.valid ? suppliedLegacy.reason : discoveredLegacy.reason);
   const legacyEntries = [...suppliedLegacy.entries, ...discoveredLegacy.entries];
   const legacy = {
@@ -94,7 +98,6 @@ export function admitV2Run({ authorization, canonicalRemote, readableRepositoryN
   };
   if (legacy.classification === "ambiguous") return fail("legacy-inventory-ambiguous", { legacy });
   if (legacy.classification === "active-legacy") return fail("legacy-authority-active", { legacy });
-  const resolvedStateHome = stateHome ?? defaultStateHome();
   const inspection = inspectV2Admission({ stateHome: resolvedStateHome, readableRepositoryName, repositoryId, authorization, providerBinding, parentRunId, now, fileSystem });
   if (!inspection.valid) return inspection;
   if (inspection.classification === "resumed") return { ...inspection, canonicalRemoteIdentity, repositoryId, providerBinding, selectedEntry };

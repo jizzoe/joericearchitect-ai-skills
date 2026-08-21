@@ -259,6 +259,7 @@
       "invocation": "subcommand",
       "verbs": [
         "admit-v2-run",
+        "reconcile-legacy-bootstrap-record",
         "inspect-v2-admission",
         "recover-v2-run",
         "inspect-controller-record",

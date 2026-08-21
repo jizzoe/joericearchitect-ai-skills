@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 
 import { admitV2Run, inspectV2Admission } from "../autonomous-sdd-admission.mjs";
 import { decodeLegacyRecord, denyLegacyMutation, inventoryLegacyDirectory, inventoryLegacyRecords } from "../autonomous-sdd-legacy.mjs";
-import { digestValue } from "../autonomous-sdd-run-contract.mjs";
+import { legacyRecordDigest, publishLegacyReconciliationReceipt, reconcileLegacyBootstrapRecord } from "../autonomous-sdd-legacy-reconciliation.mjs";
+import { deriveRepositoryId, digestValue } from "../autonomous-sdd-run-contract.mjs";
 import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
 
 const root = () => fs.mkdtempSync(path.join(os.tmpdir(), "autonomous-sdd-admission-"));
@@ -42,6 +43,24 @@ test("admission inventories an existing legacy checkpoint directory before writi
     const result = admitV2Run(fixture(stateHome, { legacyDirectory: legacyHome }));
     assert.equal(result.reason, "legacy-authority-active");
     assert.equal(fs.existsSync(path.join(stateHome, "repositories")), false);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); fs.rmSync(legacyHome, { recursive: true, force: true }); }
+});
+
+test("admission accepts only an exact terminal reconciliation receipt for an otherwise active legacy record", () => {
+  const stateHome = root();
+  const legacyHome = root();
+  try {
+    const legacy = { schemaVersion: 4, runId: "legacy-run-001", selectedEntry: "v2-contract", repository: "owner/repository", currentPhase: "apply", resourceRecords: [] };
+    const content = `${JSON.stringify(legacy)}\n`;
+    const reference = path.join(legacyHome, "runs", "legacy-run-001", "controller.json");
+    fs.mkdirSync(path.dirname(reference), { recursive: true }); fs.writeFileSync(reference, content);
+    const reconciliationAuthorization = { schemaVersion: 1, approved: true, id: "bootstrap-reconciliation", scopeDigest: "b".repeat(64), expiresAt: "2026-08-20T13:00:00.000Z", selectedEntry: "v2-contract", repository: "owner/repository", legacyRecords: [{ reference, recordDigest: legacyRecordDigest(content) }] };
+    const evidence = { observedAt: now, issue: { state: "CLOSED", reference: "issue" }, implementation: { merged: true, reference: "implementation", topicHeadCommit: "1".repeat(40), deliveredHeadCommit: "2".repeat(40) }, sync: { merged: true, reference: "sync", topicHeadCommit: "3".repeat(40), deliveredHeadCommit: "4".repeat(40) }, archive: { merged: true, reference: "archive", topicHeadCommit: "5".repeat(40), deliveredHeadCommit: "6".repeat(40) }, cleanup: [] };
+    const receipt = reconcileLegacyBootstrapRecord({ authorization: reconciliationAuthorization, legacy: { reference, content }, evidence, now });
+    assert.equal(receipt.valid, true);
+    assert.equal(publishLegacyReconciliationReceipt({ receipt: receipt.receipt, stateHome, readableRepositoryName: "repository", repositoryId: deriveRepositoryId("git@github.com:owner/repository.git") }).valid, true);
+    assert.equal(admitV2Run(fixture(stateHome, { legacyDirectory: legacyHome })).classification, "admitted");
+    assert.equal(fs.readFileSync(reference, "utf8"), content);
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); fs.rmSync(legacyHome, { recursive: true, force: true }); }
 });
 
@@ -89,6 +108,7 @@ test("both generated assistant adapters remain thin and delegate v2 admission to
   const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
   const canonical = fs.readFileSync(path.join(repository, "skills/base/autonomous-sdd-lifecycle/SKILL.md"), "utf8");
   assert.match(canonical, /admit-v2-run/);
+  assert.match(canonical, /reconcile-legacy-bootstrap-record/);
   for (const adapter of [".agents/skills/autonomous-sdd-lifecycle/SKILL.md", ".claude/skills/autonomous-sdd-lifecycle/SKILL.md"]) {
     const content = fs.readFileSync(path.join(repository, adapter), "utf8");
     assert.match(content, /canonical: \.\.\/\.\.\/\.\.\/skills\/base\/autonomous-sdd-lifecycle\/SKILL\.md/);

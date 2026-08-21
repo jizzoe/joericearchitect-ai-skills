@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { legacyRecordDigest, validateLegacyReconciliationReceipt } from "./autonomous-sdd-legacy-reconciliation.mjs";
+
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -30,11 +32,19 @@ export function decodeLegacyRecord(content, { reference = "legacy:unknown" } = {
 }
 
 /** Deterministically inventory caller-provided legacy evidence without mutating it. */
-export function inventoryLegacyRecords(records = []) {
+export function inventoryLegacyRecords(records = [], { reconciliationReceipts = [], now = new Date().toISOString() } = {}) {
   if (!Array.isArray(records)) return { valid: false, reason: "legacy-inventory-input-invalid" };
-  const entries = records.map((item, index) => decodeLegacyRecord(item?.content ?? item?.record ?? item, {
-    reference: item?.reference ?? `legacy:${index}`
-  }));
+  if (!Array.isArray(reconciliationReceipts)) return { valid: false, reason: "legacy-reconciliation-inventory-input-invalid" };
+  const entries = records.map((item, index) => {
+    const content = item?.content ?? item?.record ?? item;
+    const reference = item?.reference ?? `legacy:${index}`;
+    const entry = decodeLegacyRecord(content, { reference });
+    const recordDigest = legacyRecordDigest(content);
+    const reconciled = entry.classification === "active-legacy" && reconciliationReceipts.some((receipt) =>
+      validateLegacyReconciliationReceipt(receipt, { reference, recordDigest, selectedEntry: entry.selectedEntry, repository: entry.repository, now })
+    );
+    return reconciled ? { ...entry, classification: "compatible-terminal", reason: "legacy-record-terminal-reconciled" } : entry;
+  });
   const ambiguous = entries.filter((entry) => entry.classification === "ambiguous");
   const active = entries.filter((entry) => entry.classification === "active-legacy");
   return Object.freeze({
@@ -47,10 +57,10 @@ export function inventoryLegacyRecords(records = []) {
 }
 
 /** Read an existing checkpoint tree without rewriting any content or timestamps. */
-export function inventoryLegacyDirectory(directory, { fileSystem = fs } = {}) {
+export function inventoryLegacyDirectory(directory, { fileSystem = fs, reconciliationReceipts = [], now = new Date().toISOString() } = {}) {
   if (!text(directory)) return { valid: false, reason: "legacy-directory-input-invalid" };
   try {
-    if (!fileSystem.existsSync(directory)) return inventoryLegacyRecords([]);
+    if (!fileSystem.existsSync(directory)) return inventoryLegacyRecords([], { reconciliationReceipts, now });
     const files = [];
     const walk = (current) => {
       for (const entry of fileSystem.readdirSync(current, { withFileTypes: true })) {
@@ -60,7 +70,7 @@ export function inventoryLegacyDirectory(directory, { fileSystem = fs } = {}) {
       }
     };
     walk(directory);
-    return inventoryLegacyRecords(files);
+    return inventoryLegacyRecords(files, { reconciliationReceipts, now });
   } catch { return { valid: false, reason: "legacy-directory-unreadable" }; }
 }
 

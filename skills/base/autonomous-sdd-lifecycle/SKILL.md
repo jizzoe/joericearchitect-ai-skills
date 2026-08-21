@@ -47,6 +47,12 @@ published choices, and perform no selection or mutation.
    selected entry, repository, digest, or expiry conflicts on resume, pause
    before mutation. A current exact binding plus host runtime permission removes
    the second skill-level publication prompt; it does not override the host.
+   If admission reports a legacy controller as active despite independently
+   verified completed delivery, do not alter or delete the legacy record. Use
+   `reconcile-legacy-bootstrap-record` only when a separate exact
+   owner-authorized reconciliation binding is available; it publishes an
+   immutable sidecar receipt and returns to ordinary admission without creating
+   a v2 run, claim, or lifecycle phase.
    Before every GitHub CLI lifecycle operation, create or reuse an exact,
    non-secret authentication-context binding for its selected entry, operation,
    repository, optional payload digest, command kind, and expiry. Persist the
