@@ -1,0 +1,19 @@
+schema_version: 1
+openspec:
+  change: establish-autonomous-sdd-runtime-config-provenance
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 165
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/165
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - config/ai-skills.json
+      - openspec/changes/establish-autonomous-sdd-runtime-config-provenance/
+      - scripts/runtime/bin/autonomous-sdd-controller.mjs
+      - scripts/sdd/autonomous-sdd-admission.mjs
+      - scripts/sdd/runtime-configuration.mjs
+      - scripts/sdd/test/autonomous-sdd-admission.test.mjs
