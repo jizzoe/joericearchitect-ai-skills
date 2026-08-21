@@ -1,0 +1,18 @@
+schema_version: 1
+openspec:
+  change: repair-bootstrap-cleanup-fresh-inspection
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 178
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/178
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - ai-planning/handoff-docs/autonomous-sdd-blocker-register-and-plain-english-handoff.md
+      - openspec/changes/repair-bootstrap-cleanup-fresh-inspection/
+      - scripts/sdd/sdd-workspace-cleanup.mjs
+      - scripts/sdd/test/autonomous-sdd-controller.test.mjs
+      - scripts/sdd/test/sdd-workspace-cleanup.test.mjs

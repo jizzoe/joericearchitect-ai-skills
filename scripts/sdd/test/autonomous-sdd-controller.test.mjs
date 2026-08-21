@@ -205,6 +205,7 @@ test("bootstrap cleanup attachment accepts only an exact signed migration and re
     const legacyResource = {
       kind: "worktree", id: "/tmp/legacy-worktree", role: "implementation", headCommit: "a".repeat(40), ownershipToken: "token", recoveryReference: "fixture",
       owned: true, deliveryCurrent: true, registered: true, clean: true, primary: false, locked: false,
+      exists: true,
       deliveryEvidence: { current: true, reference: "pr-1", headCommit: "a".repeat(40), deliveredHeadCommit: "d".repeat(40), mergedPullRequest: { merged: true, pullRequest: "1", topicHeadCommit: "a".repeat(40), finalHeadCommit: "d".repeat(40) } }
     };
     const { entry, repository, registeredAt, migration: previousMigration, ...resourceBinding } = legacyResource;
@@ -225,18 +226,21 @@ test("bootstrap cleanup attachment accepts only an exact signed migration and re
     const earlyBranchMigration = { legacyResource: branchResource, inspectedResource: structuredClone(branchResource), ownerAuthorization: branchAuthorization, trustedOwner: "owner", trustedOwnerPublicKey: keyPair.publicKey.export({ type: "spki", format: "pem" }) };
     assert.equal(attachBootstrapCleanupMigration({ readableRepositoryName: "example-repository", attachmentBinding: binding, migration: earlyBranchMigration, stateHome, now: "2026-08-20T12:30:15.000Z" }).reason, "bootstrap-cleanup-branch-dependency-incomplete");
     const cleanupContext = { archiveVisible: true, issueClosed: true, projectDone: true, deliveryEvidence: { current: true, reference: "archive-pr", headCommit: terminalization.completionEvidence.archive.deliveredHeadCommit } };
-    const interrupted = executeBootstrapCleanupAttachment({
+    const initiallyBlocked = executeBootstrapCleanupAttachment({
       readableRepositoryName: "example-repository", attachmentBinding: binding, stateHome, now: "2026-08-20T12:30:30.000Z",
-      cleanupContext, operations: { inspectResource: (resource) => ({ ...resource, exists: true }), removeWorktree: () => { throw new Error("interrupted"); } }
+      cleanupContext, operations: { inspectResource: (resource) => ({ ...resource, exists: true, clean: false }) }
     });
-    assert.equal(interrupted.classification, "partial");
-    assert.equal(interrupted.outcomes[0].status, "blocked");
-    const cleaned = executeBootstrapCleanupAttachment({
+    assert.equal(initiallyBlocked.classification, "paused");
+    const blockedAttachment = JSON.parse(fs.readFileSync(path.join(paths.active, terminalization.parentRunId, "bootstrap-cleanup-attachment.json"), "utf8"));
+    assert.equal(blockedAttachment.receipts.at(-1).status, "blocked");
+    const removals = [];
+    const resumed = executeBootstrapCleanupAttachment({
       readableRepositoryName: "example-repository", attachmentBinding: binding, stateHome, now: "2026-08-20T12:30:45.000Z",
-      cleanupContext, operations: { inspectResource: (resource) => ({ ...resource, exists: false }) }
+      cleanupContext, operations: { inspectResource: (resource) => ({ ...resource, exists: true }), removeWorktree: (id) => { removals.push(id); return { committed: true }; } }
     });
-    assert.equal(cleaned.classification, "completed");
-    assert.equal(cleaned.outcomes[0].status, "already-completed");
+    assert.equal(resumed.classification, "completed");
+    assert.deepEqual(removals, [legacyResource.id]);
+    assert.equal(resumed.outcomes.at(-1).status, "completed");
     const freshBranchAuthorization = { ...branchAuthorization, reviewedAt: "2026-08-20T12:31:00.000Z" };
     freshBranchAuthorization.signature = crypto.sign(null, Buffer.from(JSON.stringify(legacyMigrationAuthorizationPayload(freshBranchAuthorization))), keyPair.privateKey).toString("base64");
     const freshBranchMigration = { ...earlyBranchMigration, ownerAuthorization: freshBranchAuthorization };

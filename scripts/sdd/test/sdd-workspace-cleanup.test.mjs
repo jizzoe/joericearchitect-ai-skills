@@ -58,6 +58,31 @@ test("cleanup executes worktrees first and resumes from reread resource state", 
   assert.deepEqual(result.outcomes.map((outcome) => outcome.status), ["already-completed", "completed"]);
 });
 
+test("cleanup treats migration-time existence as transient but blocks a real fresh mismatch", () => {
+  const plan = planWorkspaceCleanup({ ...evidence, resources: [
+    resource({ kind: "worktree", id: "migrated-worktree", registered: true, clean: true, exists: true })
+  ] });
+  const calls = [];
+  const receipts = [];
+  const completed = executeWorkspaceCleanup(plan, {
+    inspectResource: (item) => ({ ...item, exists: true }),
+    removeWorktree: (id) => { calls.push(id); return { committed: true }; },
+    persistOutcome: (outcome) => { receipts.push(outcome.status); return { persisted: true }; }
+  });
+  assert.equal(completed.classification, "completed");
+  assert.deepEqual(calls, ["migrated-worktree"]);
+  assert.deepEqual(receipts, ["started", "completed"]);
+  assert.deepEqual(completed.outcomes.map((outcome) => outcome.status), ["completed"]);
+
+  const blocked = executeWorkspaceCleanup(plan, {
+    inspectResource: (item) => ({ ...item, exists: true, clean: false }),
+    removeWorktree: () => { throw new Error("must not remove mismatched resource"); },
+    persistOutcome: () => ({ persisted: true })
+  });
+  assert.equal(blocked.classification, "partial");
+  assert.equal(blocked.outcomes[0].receipt, "fresh-resource-mismatch");
+});
+
 test("cleanup will not mutate unless each action outcome can be persisted", () => {
   const plan = planWorkspaceCleanup({ ...evidence, resources: [resource({ kind: "branch", ancestryMerged: true })] });
   assert.equal(executeWorkspaceCleanup(plan, { deleteLocalBranch: () => ({ committed: true }) }).reason, "cleanup-fresh-inspection-or-persistence-missing");

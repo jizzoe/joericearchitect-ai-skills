@@ -63,8 +63,14 @@ function resourceEligible(resource, { selectedEntry, repository }) {
 
 function freshResourceMatches(action, current) {
   if (current?.exists !== true || !resourceEligible(current, { selectedEntry: action.resource.entry, repository: action.resource.repository })) return false;
-  const { exists, ...withoutExistence } = current;
-  return JSON.stringify(canonical(withoutExistence)) === JSON.stringify(canonical(action.resource));
+  // `exists` is a fresh, point-in-time inspection result. Legacy migrations
+  // can retain its historical value, so it must not become part of durable
+  // resource identity on only one side of this final safety comparison.
+  const currentIdentity = { ...current };
+  const recordedIdentity = { ...action.resource };
+  delete currentIdentity.exists;
+  delete recordedIdentity.exists;
+  return JSON.stringify(canonical(currentIdentity)) === JSON.stringify(canonical(recordedIdentity));
 }
 
 function ineligible(resource, reason) {
