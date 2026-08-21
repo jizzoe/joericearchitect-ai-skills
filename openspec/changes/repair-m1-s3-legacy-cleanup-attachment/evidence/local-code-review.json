@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "skill": "base-code-review",
+  "status": "completed",
+  "mode": "autonomous",
+  "summary": "Bounded same-session local review found no remaining objective findings in the exact M1-S3 legacy-cleanup attachment repair.",
+  "artifacts": [
+    { "kind": "file", "operation": "read", "subject": "scripts/sdd/autonomous-sdd-controller.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/runtime/bin/autonomous-sdd-controller.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/runtime/manifest.json" },
+    { "kind": "file", "operation": "read", "subject": "scripts/sdd/test/autonomous-sdd-controller.test.mjs" }
+  ],
+  "evidence": [
+    { "id": "focused-suite", "type": "test", "subject": "attachment, cleanup, terminalization, and runtime build tests", "result": "passed", "reference": "48 focused local Node tests at reviewed head" },
+    { "id": "full-local-suite", "type": "test", "subject": "repository Node test suite", "result": "passed", "reference": "502 local Node tests at reviewed head" },
+    { "id": "openspec-strict", "type": "validation", "subject": "all OpenSpec specs and active changes", "result": "passed", "reference": "39 strict validation items at reviewed head" },
+    { "id": "tracking-validation", "type": "validation", "subject": "repair tracking metadata", "result": "passed", "reference": "tracking validator at reviewed head" },
+    { "id": "review-source", "type": "review", "subject": "bounded controller, runtime, documentation, and test diff", "result": "passed", "reference": "same-session local read-only review after locked-worktree inspection correction" }
+  ],
+  "assumptions": [],
+  "openQuestions": [],
+  "nextAction": { "kind": "continue", "description": "Proceed to formal OpenSpec Verify and the authorized repair delivery lifecycle." },
+  "details": {
+    "assurance": "local-review",
+    "worker": { "executionIdentity": "same-session-local-review-worker", "sameSession": true, "readOnly": true, "canMutate": false, "canApprove": false },
+    "reviewedScope": {
+      "targets": ["scripts/sdd/autonomous-sdd-controller.mjs", "scripts/runtime/bin/autonomous-sdd-controller.mjs", "scripts/runtime/manifest.json", "scripts/sdd/test/autonomous-sdd-controller.test.mjs", "ai-planning/handoff-docs/autonomous-sdd-blocker-register-and-plain-english-handoff.md", "openspec/changes/repair-m1-s3-legacy-cleanup-attachment/"],
+      "contextPaths": ["openspec/changes/repair-m1-s3-legacy-cleanup-attachment/proposal.md", "openspec/changes/repair-m1-s3-legacy-cleanup-attachment/design.md", "openspec/changes/repair-m1-s3-legacy-cleanup-attachment/tasks.md", "openspec/changes/repair-m1-s3-legacy-cleanup-attachment/specs/autonomous-sdd-continuation/spec.md", "openspec/changes/repair-m1-s3-legacy-cleanup-attachment/specs/autonomous-sdd-v2-terminalization/spec.md", "openspec/changes/repair-m1-s3-legacy-cleanup-attachment/specs/sdd-workspace-cleanup/spec.md"],
+      "evidenceIds": ["focused-suite", "full-local-suite", "openspec-strict", "tracking-validation", "review-source"]
+    },
+    "findings": [],
+    "coverage": [
+      { "area": "exact binding, immutable historical state, and terminalization", "status": "reviewed", "evidenceIds": ["review-source", "focused-suite"] },
+      { "area": "cleanup sequencing, receipts, retained resources, and recovery", "status": "reviewed", "evidenceIds": ["review-source", "focused-suite"] },
+      { "area": "runtime dispatch, Git safety, and regressions", "status": "reviewed", "evidenceIds": ["review-source", "full-local-suite"] },
+      { "area": "credentials, secrets, portability, and documentation", "status": "reviewed", "evidenceIds": ["review-source", "openspec-strict", "tracking-validation"] },
+      { "area": "web accessibility", "status": "not-applicable", "evidenceIds": [] }
+    ],
+    "standardsSelection": { "selectedRuleIds": [], "scopedOverrides": [], "notApplicableRuleIds": [] },
+    "evidenceGaps": [],
+    "scopeSummary": "Reviewed only the M1-S3 bootstrap cleanup-attachment repair. The controller accepts only expiry-bound resources named by the repair binding, verifies signed fresh migration evidence, records receipts before effects, requires a newly reviewed branch migration after a paired worktree receipt, retains explicitly unsafe resources, and requires the attachment before exceptional terminalization."
+  }
+}

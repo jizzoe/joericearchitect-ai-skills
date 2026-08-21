@@ -267,6 +267,9 @@
       "verbs": [
         "admit-v2-run",
         "terminalize-v2-run",
+        "attach-bootstrap-cleanup-migration",
+        "retain-bootstrap-cleanup-resource",
+        "execute-bootstrap-cleanup-attachment",
         "reconcile-legacy-bootstrap-record",
         "inspect-v2-admission",
         "recover-v2-run",
