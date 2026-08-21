@@ -45,7 +45,9 @@ the runtime launcher without requiring a caller to import a module path. A
 helper that exports functions rather than providing a command-line entrypoint
 SHALL gain an executable entrypoint declared in the manifest, either a payload
 wrapper that reads a JSON request and writes a JSON result or an enumerated
-subcommand set. The launcher SHALL NOT expose any command that resolves or
+subcommand set. A safety-sensitive controller terminalization operation MUST
+be an explicitly declared subcommand and MUST accept only a structured request.
+The launcher SHALL NOT expose any command that resolves or
 returns an importable module path.
 
 #### Scenario: A former library-only helper is invoked
@@ -53,6 +55,13 @@ returns an importable module path.
   functions with no command-line entrypoint
 - **THEN** it invokes the declared entrypoint through the launcher with an
   explicit payload and receives a machine-readable result
+
+#### Scenario: Terminalization is requested through the installed runtime
+- **WHEN** an authorized caller requests controller terminalization for an exact
+  run
+- **THEN** it invokes the manifest-declared controller subcommand with a
+  structured request rather than importing or directly executing a workspace
+  module
 
 #### Scenario: A caller requests a module path
 - **WHEN** a caller asks the launcher to resolve, print, or return a filesystem
