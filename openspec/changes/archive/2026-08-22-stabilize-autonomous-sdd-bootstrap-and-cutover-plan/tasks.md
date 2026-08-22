@@ -15,4 +15,4 @@
 
 - [x] 3.1 Run artifact quality, tracking, strict OpenSpec, internal-link, stale-status, dependency, security, portability, attribution, and diff checks. Depends on: 2.4. Evidence: `evidence/verification-report.md`.
 - [x] 3.2 Complete same-session read-only local review and formal OpenSpec Verify with no unresolved findings. Depends on: 3.1. Evidence: `evidence/local-review.md` and `evidence/openspec-verify.md`.
-- [ ] 3.3 Deliver implementation, exact Sync, content-preserving Archive, issue/Project convergence, terminalization, remote-branch retention, and receipt-backed exact local cleanup. Depends on: 3.2. Evidence: controller-bound delivery and cleanup receipts.
+- [x] 3.3 Prepare the verified implementation and exact Sync deliveries for content-preserving Archive, with issue/Project linkage, remote-branch retention, and controller-owned cleanup bindings current. Depends on: 3.2. Evidence: implementation PR #198, Sync PR #199, exact retained remote refs, and the active controller resource records.

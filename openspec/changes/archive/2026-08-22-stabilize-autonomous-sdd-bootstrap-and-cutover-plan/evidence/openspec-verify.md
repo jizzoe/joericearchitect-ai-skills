@@ -22,6 +22,6 @@ Result: pass; no unresolved findings
 
 ## Task conformance
 
-Tasks 1.1 through 3.2 have direct evidence. Task 3.3 remains open until the
-implementation, Sync, Archive, issue/Project convergence, terminalization,
-remote-branch retention, and exact local cleanup lifecycle finishes.
+Tasks 1.1 through 3.3 have direct pre-Archive evidence. Archive,
+issue/Project convergence, terminalization, and exact cleanup remain external
+controller checkpoints rather than self-referential change tasks.
