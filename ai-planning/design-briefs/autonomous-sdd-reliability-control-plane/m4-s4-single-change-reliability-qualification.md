@@ -72,6 +72,9 @@ Desired outcome: Ten consecutive approved real completions and an independently 
 - Backlog membership never grants standing authorization; every real run has
   its own accepted brief, exact grant, profile, evidence, and stop conditions.
 - Passing qualifies opt-in serial single-change v1 and is the hard gate for M5.
+- Passing moves the complete vertical bundle from `contract-only`/`audit/shadow`
+  to `qualified-opt-in` only. Each real run still needs exact authorization and
+  one immutable mutating owner; default routing remains forbidden until M6-S3.
 
 ## 6. Open questions and blocking decisions
 - Owner must confirm or adjust the ten-run threshold before Propose.

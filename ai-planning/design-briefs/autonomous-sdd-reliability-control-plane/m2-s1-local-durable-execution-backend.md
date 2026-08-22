@@ -1,7 +1,8 @@
 # M2-S1 — Local Durable Execution Backend
 
 Date: 2026-08-20
-Status: Draft for owner review; blocked on M1 and substrate decisions.
+Status: Next dependency-valid slice after the bootstrap/cutover stabilization
+Archive; its delivery still requires separate authorization.
 Proposed change: `add-autonomous-sdd-local-execution-backend`
 
 ## 1. Problem and desired outcome
@@ -43,7 +44,7 @@ Desired outcome: A deliberately small one-host local backend provides durable hi
 - Constraints: History lives outside disposable worktrees; advancement is
   atomic and generation-fenced; one coarse claim prevents overlapping mutation;
   the design pauses if the estimated core exceeds the agreed complexity budget.
-- Dependencies: All M1 slices and the M1-S1 substrate/claim decisions.
+- Dependencies: Delivered M1 slices and accepted bootstrap/cutover stabilization.
 - Risks: The main risk is accidentally rebuilding Temporal features. A second
   authority, unsafe stale-owner takeover, or optimistic line estimate blocks
   Propose and triggers a build-vs-buy reassessment.
@@ -61,6 +62,10 @@ Desired outcome: A deliberately small one-host local backend provides durable hi
   invoked; the current runner directly selects and invokes fixed adapters.
 - No daemon, automatic restart, general queue/timer service, multi-host worker,
   arbitrary workflow graph, HA, clustering, or search/retention service is added.
+- M2-S1 publishes and proves backend behavior in `contract-only` or
+  `audit/shadow` mode. It does not replace the existing real lifecycle owner,
+  even if initialization and claims are executable. Operational activation
+  waits for the complete vertical bundle and M4-S4 qualification.
 
 ### Acceptance evidence
 
@@ -79,5 +84,5 @@ Desired outcome: A deliberately small one-host local backend provides durable hi
 - Confirm filesystem classes that are supported or rejected at admission.
 
 ## 7. Recommended next step
-Recommendation pending owner confirmation: After all M1 contracts and the substrate decision are accepted, Propose add-autonomous-sdd-local-execution-backend.
-Recommended workflow action: OpenSpec Explore. No OpenSpec artifacts were created.
+After the stabilization change archives, create a fresh authorized M2-S1
+delivery. Then continue to M2-S2 and M2-S3 without activating real ownership.

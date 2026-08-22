@@ -2,16 +2,15 @@
 
 Date: 2026-08-16
 
-Last updated: 2026-08-20
+Last updated: 2026-08-22
 
-Status: Owner-directed big-picture architecture draft under review. The owner
-confirmed the deterministic control-plane direction, durable isolated work
-units, future Temporal expandability, the multi-agent operating model, and the
-two-master-document refactor. The owner also confirmed that reliable repeated
-single-change delivery must be proven before milestone queues, multi-work-unit
-parallelism, five-slice execution, or Temporal. Named open decisions remain
-unresolved. This brief does not authorize OpenSpec Propose, Apply, GitHub
-mutation, archival, or implementation.
+Status: Accepted architecture with delivered M1 contracts and an accepted
+bootstrap/cutover correction. The owner confirmed the deterministic control-
+plane direction, durable isolated work units, future Temporal expandability,
+the multi-agent operating model, and proof-before-default sequencing. M1-S1,
+M1-S2, and M1-S3 are delivered and archived. Later slices still require their
+own accepted brief and explicit delivery authorization; this brief does not
+authorize implementation or external mutation.
 
 ## Document role
 
@@ -23,10 +22,10 @@ only milestone/slice dependency mapping, readiness, execution order, and
 milestone exit evidence. The linked detailed slice briefs own slice-specific
 implementation design and acceptance evidence, subject to owner review.
 
-The planned-slice inventory in this document preserves the architecture-level
-implementation direction and links to the draft detailed briefs. A linked
-draft does not claim that its decisions are accepted or that an OpenSpec
-change or implementation exists.
+The planned-slice inventory preserves architecture-level implementation
+direction and links to detailed briefs. Delivered briefs identify their
+evidence; undelivered briefs remain planning inputs and do not authorize an
+OpenSpec change or implementation.
 
 ## 1. Problem and desired outcome
 
@@ -71,6 +70,40 @@ Success means that autonomy and rigor reinforce each other: scripts own state
 selection, transition ordering, authorization, tool transport, retries, and
 evidence binding; models own bounded planning, implementation, verification,
 and independent review within those fixed transitions.
+
+### Bootstrap, activation, and cutover control lane
+
+The first M1 deliveries exposed a sequencing defect: v2 admission and claims
+became live before one released generation could also recover, terminalize,
+release, converge external lifecycle state, clean up, and roll back. The
+contracts remain valid, but publication and activation are now separate.
+
+The control plane uses five explicit modes:
+
+| Mode | Operational rule |
+|---|---|
+| `contract-only` | New schemas/helpers may be published and tested, but the existing released lifecycle owner performs every real mutation. |
+| `audit/shadow` | The new generation may compare discovery and decisions without writing; the existing released owner remains sole mutator. |
+| `bootstrap-hybrid` | One explicitly authorized N-1/bootstrap owner delivers and archives N; N does not prove its own release complete. |
+| `qualified-opt-in` | After M4-S4, an individually authorized run may bind one qualified generation as its sole mutating owner. |
+| `default` | Only M6-S3 may route new eligible work to the qualified generation by default; in-flight runs retain their immutable owner. |
+
+Exactly one generation owns mutation for a run and repository in every mode.
+Publishing a schema, helper, wrapper, or adapter never changes routing or grants
+mutation authority. Runtime N-1 delivers and archives runtime N, and N is
+installed only afterward for later work. Any task that can finish only by using
+the same newly released runtime is self-referential and must be separated
+before Propose.
+
+Real ownership activates only when one generation implements and qualifies the
+minimum vertical bundle: initialize; claim and generation-fence; advance;
+recover/take over; terminalize; release the claim; converge issue, Project, PR,
+default-branch, Sync, and Archive state; exact-clean owned resources; and roll
+back routing without creating a second authority. Slices may implement parts of
+the bundle independently, but no partial horizontal slice activates it.
+
+The accepted detailed correction is
+[Stabilize Autonomous SDD Bootstrap and Cutover Plan](stabilize-autonomous-sdd-bootstrap-and-cutover-plan.md).
 
 ## 2. Evidence and key findings
 
@@ -342,6 +375,14 @@ Implement the state machine outside the assistant runtime.
   autonomous run per canonical repository. Preserve a backend-neutral claim
   contract, but defer disjoint concurrent runs and fine-grained claims until a
   later threat model and qualification justify them.
+- Confirmed activation boundary: contract publication, schema availability,
+  and helper exposure do not activate operational ownership. Runtime N-1
+  releases N, and only a qualified complete vertical bundle can own real work.
+- Confirmed external-boundary ownership: M4-S1 owns exact authenticated-host
+  operation envelopes and branch-retention evidence; M4-S2 owns active-delta
+  overlap and description/scenario-exact Sync preflight; M4-S3 owns terminal
+  convergence and cleanup; M4-S4 owns qualified opt-in; M6-S3 alone owns
+  default cutover.
 - Assumption: strict independent review remains mandatory for
   `production-rapid`; reliability improvements must not accept transcripts,
   self-review, stale heads, mutable packages, or unverifiable results.
@@ -1028,9 +1069,9 @@ Planned directory: `ai-planning/design-briefs/autonomous-sdd-reliability-control
 | M6-S3 | `enable-autonomous-sdd-control-plane-default` | [Default control-plane cutover](autonomous-sdd-reliability-control-plane/m6-s3-default-control-plane-cutover.md) |
 | M7-S1 | `add-autonomous-sdd-temporal-execution-backend` | [Optional Temporal execution backend](autonomous-sdd-reliability-control-plane/m7-s1-temporal-execution-backend.md) |
 
-### M1 — Contract convergence
+### M1 — Contract convergence (delivered)
 
-- **M1-S1** defines the backend-neutral parent-run, child-work-unit,
+- **M1-S1** delivered the backend-neutral parent-run, child-work-unit,
   transition-attempt, and resource-claim records; v1 migration/projection;
   immutable backend/history and claim-authority binding; identities, revisions,
   snapshots, deadlines, budgets, evidence, review, external records, and
@@ -1040,7 +1081,7 @@ Planned directory: `ai-planning/design-briefs/autonomous-sdd-reliability-control
   state. Acceptance rejects redundant/cross-unit state, validates one
   authoritative history and claim authority, preserves ambiguous v1 state as
   audit-only, and proves schema portability without a Temporal runtime.
-- **M1-S2** makes one typed operation graph authoritative for names, target and
+- **M1-S2** delivered one typed operation graph authoritative for names, target and
   record kinds, profiles, prerequisites, freshness, approval, review,
   correction, recovery, write-ahead state, idempotency, resource claims, and
   complete emitted outcomes and the fail-closed unknown-outcome default. It
@@ -1049,7 +1090,7 @@ Planned directory: `ai-planning/design-briefs/autonomous-sdd-reliability-control
   enforced resolver permissions, reachable bounded correction, no interactive
   preapproval in an autonomous grant, one disposition per error, and one
   reconciliation path per external operation.
-- **M1-S3** establishes one validated immutable runtime configuration snapshot
+- **M1-S3** delivered one validated immutable runtime configuration snapshot
   covering paths, reviewer/adapter identity, backend and claim-provider
   selection, evidence locations, attestations, source precedence, safe
   provenance, and redacted capabilities. Credentials, raw environment,
@@ -1198,16 +1239,10 @@ Planned directory: `ai-planning/design-briefs/autonomous-sdd-reliability-control
 
 ## 8. Document evolution and preservation
 
-The slice briefs now exist as drafts. Their remaining evolution is:
-
-1. Review the slice briefs in dependency order and refine unresolved decisions.
-2. Build a source-to-destination map for every related older control-plane
-   brief, decision, requirement, risk, non-goal, assumption, and acceptance
-   condition.
-3. Run a final migration review proving that each material source item is
-   preserved or explicitly superseded with a reason.
-4. Archive only verified superseded control-plane briefs. Do not archive
-   unrelated briefs or delete historical content.
+M1 slice briefs now record delivered evidence. Remaining slice briefs evolve
+in dependency order, with each accepted change preserving a source-to-
+destination map for material decisions and explicitly superseding stale
+content. Historical material is archived only after that migration review.
 
 The roadmap must remain thin during this evolution. The main design owns shared
 architecture; the slice brief owns its detailed behavior; OpenSpec artifacts
@@ -1216,13 +1251,9 @@ owns execution truth.
 
 ## 9. Recommended next step
 
-Review and iterate on this big-picture design, thin roadmap, and linked slice
-briefs. Resolve or retain the named open decisions explicitly. Do not archive
-older sources, create OpenSpec artifacts, or implement the control plane until
-the owner accepts the relevant slice brief and authorizes the next action.
-
-Begin with M1-S1 and use OpenSpec Explore to resolve canonical registry
-ownership, parent/child ownership, local durable-execution substrate,
-authoritative history, resource-claim authority, and the complexity guardrail.
-
-No OpenSpec artifacts or implementation changes were created by this brief.
+After the planning stabilization change is archived, M2-S1 is the next
+dependency-valid implementation slice, followed by M2-S2 and M2-S3. M2 work
+must remain `contract-only` or `audit/shadow`: it builds durable execution and
+recovery but does not become the real lifecycle owner until the entire vertical
+bundle reaches M4-S4 qualification. Each slice still needs its own accepted
+brief and explicit delivery authorization.

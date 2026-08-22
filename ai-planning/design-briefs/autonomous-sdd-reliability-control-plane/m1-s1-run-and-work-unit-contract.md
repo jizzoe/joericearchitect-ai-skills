@@ -1,7 +1,8 @@
 # M1-S1 — Run and Isolated Work-Unit Contract
 
 Date: 2026-08-20
-Status: Draft for owner review; no OpenSpec artifacts or implementation exist.
+Status: Delivered and archived. Issue #150; implementation, Sync, and Archive
+PRs #151, #152, and #153.
 Proposed change: `establish-autonomous-sdd-run-v2-contract`
 
 ## 1. Problem and desired outcome
@@ -149,6 +150,21 @@ Legacy write paths retire only after v2 qualification, decoder fixtures,
 entrypoint write-denial tests, a no-active-legacy inventory, and a tested
 rollback that never makes two systems authoritative for one run.
 
+### Retrospective activation clarification
+
+This slice delivered the v2 schema, local state substrate, admission, and
+repository-claim contracts. Their publication did not constitute safe
+operational activation. The initial rollout nevertheless used v2 admission and
+claims before the same released generation could initialize its controller,
+recover, terminalize, release, converge external lifecycle state, clean up, and
+roll back. The resulting bootstrap repairs are recorded in the blocker register.
+
+The permanent correction is the
+[bootstrap/cutover stabilization plan](../stabilize-autonomous-sdd-bootstrap-and-cutover-plan.md):
+M1 contracts remain delivered, but new runtime generations stay contract-only
+or audit/shadow until the complete vertical activation bundle passes the
+applicable qualification gate. Exactly one generation owns mutation.
+
 ### Acceptance evidence
 
 - Schema fixtures reject redundant parent/child state, cross-work-unit evidence,
@@ -189,5 +205,7 @@ rollback that never makes two systems authoritative for one run.
   evidence. It is not a v1 blocking decision.
 
 ## 7. Recommended next step
-Recommendation pending owner confirmation: Use OpenSpec Explore to resolve the named ownership and substrate decisions, then Propose establish-autonomous-sdd-run-v2-contract.
-Recommended workflow action: OpenSpec Explore. No OpenSpec artifacts were created.
+
+M1-S1 is complete. After the bootstrap/cutover planning change is archived,
+resume with M2-S1 under a separate exact authorization while keeping real
+operational ownership disabled until the full activation bundle is qualified.

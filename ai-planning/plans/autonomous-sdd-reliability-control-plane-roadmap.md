@@ -2,12 +2,12 @@
 
 Date: 2026-08-16
 
-Last updated: 2026-08-20
+Last updated: 2026-08-22
 
-Status: Owner-directed dependency and execution-order plan under review. Its
-linked slice briefs are draft planning records; neither this roadmap nor those
-briefs create an issue, branch, worktree, OpenSpec change, implementation
-authorization, or external mutation.
+Status: Accepted dependency and execution-order plan through M1 and the
+bootstrap/cutover stabilization. M1-S1, M1-S2, and M1-S3 are delivered and
+archived. M2-S1 is next after the stabilization lifecycle completes, but every
+later slice still requires its own accepted brief and explicit authorization.
 
 ## Purpose and authority
 
@@ -21,13 +21,13 @@ only:
 
 - milestone and slice order;
 - hard dependencies and readiness;
-- proposed OpenSpec change names;
-- linked detailed-brief names and review status; and
+- OpenSpec change names;
+- linked detailed-brief names and review/delivery status; and
 - milestone exit evidence.
 
-Every slice below links to its draft detailed brief. Those briefs preserve the
-slice-specific design and acceptance direction for review; their existence does
-not mean the slice is accepted, Propose-ready, or authorized for delivery.
+Every slice below links to its detailed brief. Delivered briefs record accepted
+design and evidence; undelivered briefs preserve design and acceptance
+direction for review. A brief never grants authorization for another delivery.
 
 ## Delivery rules
 
@@ -48,6 +48,16 @@ not mean the slice is accepted, Propose-ready, or authorized for delivery.
   history, resource claims, and current evidence before selecting any slice.
 - A later slice starts only when every hard dependency is delivered and the
   relevant milestone exit evidence remains current.
+- Contract publication is not activation. The operating modes are
+  `contract-only`, `audit/shadow`, `bootstrap-hybrid`, `qualified-opt-in`, and
+  `default`, and exactly one runtime generation owns mutation in every mode.
+- Runtime N-1 delivers and archives runtime N. N is installed afterward for
+  later work and is never required to prove its own releasing change complete.
+  Self-referential release tasks are split before Propose readiness.
+- Real ownership remains disabled until one released generation implements and
+  qualifies initialization, claim/fencing, advancement, recovery,
+  terminalization, claim release, external convergence, exact cleanup, and
+  rollback as one minimum vertical activation bundle.
 - Single-change v1 ends at M4-S4. M4-S3 is the first point where the complete
   real lifecycle exists and approved backlog runs can begin; M4-S4 proves that
   path safely and repeatedly. M5, M6, and M7 remain blocked until that proof.
@@ -64,25 +74,37 @@ not mean the slice is accepted, Propose-ready, or authorized for delivery.
   they link to but do not redefine the containing roadmap milestone gate.
 - No linked brief authorizes creating an OpenSpec change or implementation.
 
+## Deferred external-tracker integration gate
+
+The current control-plane roadmap uses configured GitHub Issues and Projects
+only. Jira linkage is not inferred from branch names, research references, or a
+future connector. Before any Jira issue creation, Jira-to-OpenSpec binding, or
+Jira lifecycle mutation is proposed, recover the accepted Jira-linkage rules
+and create a dedicated accepted slice defining tracker authority, configured
+identifiers, GitHub/OpenSpec/PR relationships, authorization, idempotent
+reconciliation, evidence, and failure behavior. Until then, Jira remains out
+of scope and GitHub remains the only implemented tracker integration. See
+[`ad-hoc-follow-ups.md`](../notes/ad-hoc-follow-ups.md).
+
 ## Dependency and role-enablement shape
 
 ```text
 M1 Contract convergence
-  establishes state, operation, configuration, role, and handoff contracts
+  delivered state, operation, configuration, role, and handoff contracts
     -> M2 Deterministic local single-change execution
-       makes transitions and role handoffs durable and recoverable
+       builds durable transitions and recovery in contract-only/audit mode
       -> M3 Independent-review reliability
          supplies the isolated exact-head reviewer gate
         -> M4 Full lifecycle integration
            supplies delivery, Sync, Archive, closeout, and repeated
            single-change qualification
              M4-S3: enough exists to begin real backlog proof
-             M4-S4: proof gate passes and single-change v1 is qualified
+             M4-S4: proof gate passes; qualified opt-in can begin
           -> M5 Milestone queues and owner shorthand
              coordinates dependency-valid child work units
             -> M6 Five-slice qualification and default cutover
                proves milestone execution, the complete multi-agent harness,
-               and rollback
+               and rollback; M6-S3 alone enables default mode
               -> M7 Optional Temporal backend
                  preserves the same contracts on another durable backend
 ```
@@ -93,10 +115,10 @@ All planned names are relative to:
 
 `ai-planning/design-briefs/autonomous-sdd-reliability-control-plane/`
 
-Every entry now links to a draft slice brief. A brief remains a review input,
-not an approved OpenSpec change or implementation authorization. The roadmap
-remains the sole authority for milestone dependencies, readiness, and exit
-evidence.
+Every entry links to its slice brief. Delivered briefs are historical design
+and evidence records; undelivered briefs remain review inputs rather than
+implementation authorization. The roadmap remains the sole authority for
+milestone dependencies, readiness, and exit evidence.
 
 ## Milestone 1 — Contract convergence
 
@@ -105,8 +127,8 @@ authorization, configuration, role/handoff, evidence, and outcome contracts.
 
 | Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
 |---|---|---|---|
-| M1-S1 — Run and isolated work-unit contract | `establish-autonomous-sdd-run-v2-contract` | Explore-ready after decisions on registry ownership, parent/child boundary, authoritative history, the one-active-mutating-run v1 threat model, local durability substrate, and coarse resource-claim authority | [M1-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m1-s1-run-and-work-unit-contract.md) |
-| M1-S2 — Operations, profiles, gates, and outcomes | `unify-autonomous-sdd-operation-contract` | Explore-ready after M1-S1; requires prototype-profile and exact-head-review-reuse decisions | [M1-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m1-s2-operation-profile-gate-and-outcome-contract.md) |
+| M1-S1 — Run and isolated work-unit contract | `establish-autonomous-sdd-run-v2-contract` | Delivered and archived via issue #150 and implementation/Sync/Archive PRs #151/#152/#153; its early operational admission is retrospectively constrained by the activation lane below | [M1-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m1-s1-run-and-work-unit-contract.md) |
+| M1-S2 — Operations, profiles, gates, and outcomes | `unify-autonomous-sdd-operation-contract` | Delivered and archived via issue #158 and PRs #159/#160/#161; accepted Q1-Q6 decisions are reconciled in the brief, and terminalization repair #162/#163/#164 closes its stranded bootstrap run | [M1-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m1-s2-operation-profile-gate-and-outcome-contract.md) |
 | M1-S3 — Runtime configuration provenance | `establish-autonomous-sdd-runtime-config-provenance` | Delivered and archived; owner confirmed bounded layered authority, versioned product-config namespace, and fail-closed conflicts | [M1-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m1-s3-runtime-configuration-provenance.md) |
 
 **Exit evidence:** resolver output is valid run input; one schema family owns
@@ -125,9 +147,9 @@ current working directory.
 
 | Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
 |---|---|---|---|
-| M2-S1 — Local durable execution backend | `add-autonomous-sdd-local-execution-backend` | Propose-ready after all M1 slices and `repair-v2-controller-initialization`; hardens its controller-to-admission pairing into authoritative history, atomic advancement, exact resume/takeover, stale-owner rejection, and one coarse repository claim | [M2-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s1-local-durable-execution-backend.md) |
-| M2-S2 — Deterministic transition engine | `add-autonomous-sdd-transition-engine` | Propose-ready after M2-S1; consumes the durable initialized-run identity before selecting one legal lifecycle transition | [M2-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s2-deterministic-transition-engine.md) |
-| M2-S3 — Run status and recovery | `add-autonomous-sdd-run-status-and-recovery` | Propose-ready after M2-S2 | [M2-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s3-run-status-and-recovery.md) |
+| M2-S1 — Local durable execution backend | `add-autonomous-sdd-local-execution-backend` | Next and Propose-ready after this stabilization Archive; hardens controller/admission pairing, history, atomic advancement, exact resume/takeover, stale-owner rejection, and one coarse claim, but stays contract-only/audit and does not activate real lifecycle ownership | [M2-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s1-local-durable-execution-backend.md) |
+| M2-S2 — Deterministic transition engine | `add-autonomous-sdd-transition-engine` | Follows M2-S1; consumes the durable initialized-run identity and selects one legal transition under simulated/non-mutating adapters | [M2-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s2-deterministic-transition-engine.md) |
+| M2-S3 — Run status and recovery | `add-autonomous-sdd-run-status-and-recovery` | Follows M2-S2; completes local recovery/status prerequisites without activating real external mutation | [M2-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s3-run-status-and-recovery.md) |
 
 **Exit evidence:** a non-mutating simulated-adapter single-change run completes
 without conversational re-entry; role receipts remain bound across restart;
@@ -163,10 +185,10 @@ backlog changes.
 
 | Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
 |---|---|---|---|
-| M4-S1 — GitHub intake and implementation delivery | `integrate-autonomous-sdd-github-delivery` | Propose-ready after M3 and a disposable GitHub fixture strategy | [M4-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s1-github-intake-and-implementation-delivery.md) |
-| M4-S2 — Sync and Archive delivery | `integrate-autonomous-sdd-sync-and-archive` | Propose-ready after M4-S1 | [M4-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s2-sync-and-archive-delivery.md) |
-| M4-S3 — Finalization and cleanup | `integrate-autonomous-sdd-finalization-and-cleanup` | Propose-ready after M4-S2 and M2-S1 | [M4-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s3-finalization-and-cleanup.md) |
-| M4-S4 — Single-change reliability qualification | `qualify-autonomous-sdd-single-change-reliability` | Propose-ready after M4-S3, approved thresholds, an approved scenario-to-environment/counter matrix, proven disposable fault environments, and a set of individually approved eligible backlog changes | [M4-S4 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s4-single-change-reliability-qualification.md) |
+| M4-S1 — GitHub intake and implementation delivery | `integrate-autonomous-sdd-github-delivery` | After M3 and a disposable GitHub fixture strategy; must include the exact restricted-controller/authenticated-host request-and-receipt envelope plus merge-policy and retained-branch preflight/restoration evidence | [M4-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s1-github-intake-and-implementation-delivery.md) |
+| M4-S2 — Sync and Archive delivery | `integrate-autonomous-sdd-sync-and-archive` | After M4-S1; must graph all active overlapping deltas before mutation and compare accepted requirement descriptions plus scenarios exactly | [M4-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s2-sync-and-archive-delivery.md) |
+| M4-S3 — Finalization and cleanup | `integrate-autonomous-sdd-finalization-and-cleanup` | After M4-S2 and M2-S1; completes terminal convergence, release, and exact receipt-backed cleanup as part of the activation bundle | [M4-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s3-finalization-and-cleanup.md) |
+| M4-S4 — Single-change reliability qualification | `qualify-autonomous-sdd-single-change-reliability` | After M4-S3, approved thresholds/matrix/environments, and individually approved eligible changes; it is the only gate that may enable qualified-opt-in ownership | [M4-S4 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s4-single-change-reliability-qualification.md) |
 
 **Proof boundary:** M4-S3 is the first point where enough has been built to
 start proving one approved change can complete safely and repeatedly. The
@@ -181,7 +203,8 @@ never increment the ten-run count; disruptive faults are not injected into real
 backlog work. There are zero false passes, duplicate or unaccounted mutations,
 unrelated or dirty-resource changes, routine prompts inside valid authority,
 unresolved terminal leaks, or untyped stops. M4 exit qualifies single-change
-v1 for explicit opt-in use and is the hard gate for M5.
+v1 for explicit opt-in use and is the hard gate for M5. It does not enable
+default routing.
 
 ## Milestone 5 — Milestone queues and owner shorthand
 
@@ -209,7 +232,7 @@ default routing with rollback.
 |---|---|---|---|
 | M6-S1 — Milestone composition and fault qualification | `qualify-autonomous-sdd-composition-reliability` | Propose-ready after M5; extends rather than repeats the M4-S4 single-change suite | [M6-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m6-s1-composition-and-fault-qualification.md) |
 | M6-S2 — Five-slice unattended qualification | `qualify-autonomous-sdd-five-slice-soak` | Propose-ready after M6-S1, owner confirmation or adjustment of the proposed three-run threshold, and a disposable end-to-end environment | [M6-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m6-s2-five-slice-unattended-qualification.md) |
-| M6-S3 — Default control-plane cutover | `enable-autonomous-sdd-control-plane-default` | Conditional on M6-S2 threshold and explicit owner approval | [M6-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m6-s3-default-control-plane-cutover.md) |
+| M6-S3 — Default control-plane cutover | `enable-autonomous-sdd-control-plane-default` | Conditional on M6-S2 threshold, tested rollback, no competing active owner, and explicit owner approval; sole authority for `default` mode | [M6-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m6-s3-default-control-plane-cutover.md) |
 
 **Exit evidence:** milestone composition, child isolation, role-handoff,
 restart, dependency-failure, queue-rebuild, review, correction, cleanup,
@@ -246,11 +269,11 @@ Temporal runs serialize overlapping work through one claim authority.
 
 ## Recommended starting point
 
-Review the main design, this roadmap, and linked slice briefs. Begin with the
-M1-S1 brief and run OpenSpec Explore only after the owner accepts it. That
-Explore must resolve registry ownership, parent/child boundaries, the local
-durability substrate and concurrency threat model, authoritative history,
-resource-claim authority, and the complexity guardrail before Propose.
+After `stabilize-autonomous-sdd-bootstrap-and-cutover-plan` completes Archive,
+begin M2-S1 under a new exact authorization, then continue in order through
+M2-S2 and M2-S3. Keep the resulting generation contract-only or audit/shadow;
+do not route real delivery ownership to it before the full activation bundle
+and M4-S4 qualification exist.
 
 ## Roadmap integrity checklist
 
@@ -258,11 +281,13 @@ resource-claim authority, and the complexity guardrail before Propose.
   linked draft brief, and milestone exit evidence.
 - Detailed behavior lives in the linked brief and shared architecture in the
   main design; it is never defined only in this roadmap.
-- No slice claims a created brief, issue, change, branch, PR, approval, or
-  implementation.
+- Delivered slices identify their durable evidence; undelivered slices do not
+  claim an issue, change, branch, PR, approval, or implementation.
 - Each delivered change must leave the repository coherent and recoverable.
 - Milestone gates measure integrated behavior rather than file presence or
   component fixtures alone.
 - M4-S3 remains the start of real backlog proof; only M4-S4 exit qualifies
   repeated single-change v1 and unblocks milestone expansion.
+- Contract publication never activates ownership; M4-S4 enables only explicit
+  opt-in, and M6-S3 alone may enable default routing.
 - Temporal remains optional and post-qualification.
