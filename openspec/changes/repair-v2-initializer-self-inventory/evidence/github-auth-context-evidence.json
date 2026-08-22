@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "current": true,
+  "binding": {
+    "schemaVersion": 1,
+    "selectedEntry": "repair-v2-initializer-self-inventory",
+    "operation": "issue-create-or-reuse",
+    "repository": "jizzoe/joericearchitect-ai-skills",
+    "payloadDigest": "864dfefc13a3b0bb9cf771813d81fc38924fb8235709bf71c1cc8e1a23ec7a51",
+    "commandKind": "repository-read",
+    "probeRepository": "jizzoe/joericearchitect-ai-skills",
+    "expiresAt": "2026-08-22T19:35:55.000Z",
+    "recoveryReference": "rerun only the exact repository-read probe for this issue payload before create-or-reuse"
+  },
+  "bindingDigest": "c40a8e853532a9a22ff12c8e4f378a25849c03fbd443068ffa6c29cc1230ad05",
+  "classification": "authenticated",
+  "restrictedProbe": {
+    "commandKind": "repository-read",
+    "contextType": "restricted",
+    "observedAt": "2026-08-22T16:53:53.000Z",
+    "repository": "jizzoe/joericearchitect-ai-skills",
+    "state": "success"
+  },
+  "observedAt": "2026-08-22T16:53:53.000Z",
+  "recoveryReference": "rerun only the exact repository-read probe for this issue payload before create-or-reuse"
+}

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "current": true,
+  "payloadDigest": "864dfefc13a3b0bb9cf771813d81fc38924fb8235709bf71c1cc8e1a23ec7a51",
+  "number": 187,
+  "url": "https://github.com/jizzoe/joericearchitect-ai-skills/issues/187",
+  "state": "OPEN",
+  "labels": [
+    "sdd",
+    "type:bug"
+  ],
+  "observedAt": "2026-08-22T16:54:00.000Z",
+  "reference": "exact host-bound issue create and reread"
+}

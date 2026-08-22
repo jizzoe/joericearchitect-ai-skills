@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "selectedEntry": "repair-v2-initializer-self-inventory",
+  "operation": "issue-create-or-reuse",
+  "repository": "jizzoe/joericearchitect-ai-skills",
+  "payloadDigest": "864dfefc13a3b0bb9cf771813d81fc38924fb8235709bf71c1cc8e1a23ec7a51",
+  "commandKind": "repository-read",
+  "probeRepository": "jizzoe/joericearchitect-ai-skills",
+  "expiresAt": "2026-08-22T19:35:55.000Z",
+  "recoveryReference": "rerun only the exact repository-read probe for this issue payload before create-or-reuse"
+}

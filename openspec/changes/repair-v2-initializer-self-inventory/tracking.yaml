@@ -1,0 +1,22 @@
+schema_version: 1
+openspec:
+  change: repair-v2-initializer-self-inventory
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 187
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/187
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - ai-planning/handoff-docs/autonomous-sdd-blocker-register-and-plain-english-handoff.md
+      - docs/autonomous-sdd-lifecycle.md
+      - openspec/changes/repair-v2-initializer-self-inventory/
+      - scripts/runtime/bin/autonomous-sdd-controller.mjs
+      - scripts/runtime/test/launcher.test.mjs
+      - scripts/sdd/autonomous-sdd-admission.mjs
+      - scripts/sdd/autonomous-sdd-controller.mjs
+      - scripts/sdd/autonomous-sdd-legacy.mjs
+      - scripts/sdd/test/autonomous-sdd-admission.test.mjs

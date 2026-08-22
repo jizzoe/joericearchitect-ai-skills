@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "selectedEntry": "repair-v2-initializer-self-inventory",
+  "repository": "jizzoe/joericearchitect-ai-skills",
+  "title": "[Repair] Prevent the v2 initializer from inventorying its own checkpoint",
+  "labels": [
+    "sdd",
+    "type:bug"
+  ],
+  "managedBlock": "<!-- sdd-managed:start -->\nOpenSpec change: `repair-v2-initializer-self-inventory`\n\n- Proposal: `openspec/changes/repair-v2-initializer-self-inventory/proposal.md`\n- Specifications: `openspec/changes/repair-v2-initializer-self-inventory/specs/`\n- Design: `openspec/changes/repair-v2-initializer-self-inventory/design.md`\n- Tasks: `openspec/changes/repair-v2-initializer-self-inventory/tasks.md`\n- Tracking: `openspec/changes/repair-v2-initializer-self-inventory/tracking.yaml`\n<!-- sdd-managed:end -->",
+  "payloadDigest": "864dfefc13a3b0bb9cf771813d81fc38924fb8235709bf71c1cc8e1a23ec7a51",
+  "operation": "issue-create-or-reuse",
+  "expiresAt": "2026-08-22T19:35:55.000Z",
+  "ownershipReference": "bootstrap-repair-v2-initializer-self-inventory-20260822",
+  "recoveryReference": "reconcile the exact title and payload digest before create-or-reuse"
+}

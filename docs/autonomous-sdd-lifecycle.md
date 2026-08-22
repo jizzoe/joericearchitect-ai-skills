@@ -44,6 +44,14 @@ targets. Do not include token values or other secrets in authorization text.
    and binds the exact repository claim, and verifies both records before any
    lifecycle action is eligible. If that sequence is interrupted, it preserves
    a resumable pending record and does not treat the claim as usable.
+   Legacy discovery under the repository's Git-common controller root treats
+   only files named exactly `controller.json` as candidates. The initializer
+   may internally exclude only its own derived, contained schema-5 pending
+   checkpoint; the public raw-admission operation discards caller-selected
+   exclusions. Every other malformed, unknown-schema, or active controller
+   remains a fail-closed stop. This boundary must be tested through a staged
+   installed wrapper against real Git-common state, because source-only tests
+   that omit the wrapper's legacy-directory binding cannot prove it.
 4. Run OpenSpec Propose, Apply, Verify, delivery, Sync, and Archive only when
    the current gate and authorization allow that transition.
 5. Implement Apply work in dependency-valid batches.
@@ -108,6 +116,11 @@ On resume, trust durable state over chat history or transient logs:
 
 Continue from the first incomplete evidenced step. If durable sources conflict
 and approved policy does not define precedence, pause before mutating state.
+After installing a repair to initializer inventory, retry the unchanged
+`initialize-v2-delivery` request so it resumes the exact pending controller.
+Require the resulting controller, parent-run, work-unit, repository claim,
+authorization, repository, and provider identities to match; do not recreate
+the checkpoint, hand-edit its state, or bypass legacy ambiguity.
 
 ### Terminalizing a completed v2 run
 
