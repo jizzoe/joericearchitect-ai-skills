@@ -31,10 +31,13 @@
 
 ## 4. One-time repair execution
 
-- [ ] 4.1 After the repair change is delivered and its runtime installed,
+- [x] 4.1 After the repair change is delivered and its runtime installed,
   independently inspect the exact M1-S2 delivery/cleanup evidence and invoke
   terminalization only through the declared runtime. Depends on: 3.3.
-  Evidence: terminal receipt, archived bundle, and rebuilt index.
-- [ ] 4.2 Prove M1-S3 v2 admission no longer sees the M1-S2 claim, update the
+  Evidence: `evidence/post-release-operational-evidence.md` records the exact
+  terminal receipt, archived bundle, claim release, and rebuilt index.
+- [x] 4.2 Prove M1-S3 v2 admission no longer sees the M1-S2 claim, update the
   blocker register with resolution evidence, and resume the first incomplete
   M1-S3 lifecycle step. Depends on: 4.1. Evidence: fresh admission result.
+  Evidence: `evidence/post-release-operational-evidence.md` records M1-S3's
+  subsequent admission, completed delivery, and terminal receipt.
