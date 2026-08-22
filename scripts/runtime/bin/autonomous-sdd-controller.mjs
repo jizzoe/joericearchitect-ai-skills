@@ -10,7 +10,7 @@ import {
   executeControllerLifecycleCleanup, inspectControllerRecord, persistControllerCleanupReceipt,
   persistControllerAuthContext, persistControllerAuthContextEvidence,
   persistControllerIssueIntake, persistControllerIssueIntakeEvidence,
-  registerControllerLifecycleResource, retainBootstrapCleanupResource, resolveControllerStateRoot, terminalizeV2Run
+  initializeV2Delivery, registerControllerLifecycleResource, retainBootstrapCleanupResource, resolveControllerStateRoot, terminalizeV2Run
 } from "../../sdd/autonomous-sdd-controller.mjs";
 import { admitV2Run, inspectV2Admission } from "../../sdd/autonomous-sdd-admission.mjs";
 import { reconcileLegacyBootstrapRecord, publishLegacyReconciliationReceipt } from "../../sdd/autonomous-sdd-legacy-reconciliation.mjs";
@@ -66,6 +66,7 @@ runAsMain({
   helper: "autonomous-sdd-controller",
   invocation: "subcommand",
   operations: {
+    "initialize-v2-delivery": (payload) => initializeV2Delivery({ ...payload, repositoryPath: repositoryPath(payload), legacyDirectory: legacyDirectory(payload) }),
     "admit-v2-run": (payload) => admitV2Run({ ...payload, repositoryPath: repositoryPath(payload), legacyDirectory: legacyDirectory(payload) }),
     "reconcile-legacy-bootstrap-record": (payload) => {
       const result = reconcileLegacyBootstrapRecord(payload);

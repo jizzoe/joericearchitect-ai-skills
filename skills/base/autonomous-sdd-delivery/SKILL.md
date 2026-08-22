@@ -6,8 +6,8 @@ description: Continue one complete, explicit autonomous SDD delivery through its
 # Autonomous SDD Delivery
 
 Use `ai-skills-runtime run resolve-sdd-delivery-request` or its `ship-sdd` parser
-before selection. Create or resume the exact selected-entry controller record
-with `ai-skills-runtime run autonomous-sdd-controller` in repository-common Git state,
+before selection. Initialize or resume the exact selected-entry controller record
+with `ai-skills-runtime run autonomous-sdd-controller initialize-v2-delivery` in repository-common Git state,
 then reread durable state and run only its first incomplete phase. Register
 every non-primary implementation, Sync, and Archive resource before it is
 created or selected, and bind each merged checkpoint to that resource rather

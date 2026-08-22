@@ -39,20 +39,25 @@ targets. Do not include token values or other secrets in authorization text.
 
 1. Inspect durable state.
 2. Select eligible work from the authorized queue or policy.
-3. Run OpenSpec Propose, Apply, Verify, delivery, Sync, and Archive only when
+3. Start a new v2 delivery only through the declared `initialize-v2-delivery`
+   operation. It first writes a non-operational controller record, then creates
+   and binds the exact repository claim, and verifies both records before any
+   lifecycle action is eligible. If that sequence is interrupted, it preserves
+   a resumable pending record and does not treat the claim as usable.
+4. Run OpenSpec Propose, Apply, Verify, delivery, Sync, and Archive only when
    the current gate and authorization allow that transition.
-4. Implement Apply work in dependency-valid batches.
-5. Run tests, OpenSpec validation, review, security, portability, attribution,
+5. Implement Apply work in dependency-valid batches.
+6. Run tests, OpenSpec validation, review, security, portability, attribution,
    and recovery checks before marking tasks complete.
-6. Correct objective failures within the correction budget.
+7. Correct objective failures within the correction budget.
    For autonomous prototype delivery, signatures are canonical and bounded per
    stable failure; distinct signatures may continue within the run bound.
-7. For `prototype-rapid` with `reviewPolicy: same-session-local`, run a bounded
+8. For `prototype-rapid` with `reviewPolicy: same-session-local`, run a bounded
    same-session worker as read-only `local-review` evidence, route objective
    findings back to the controller, rerun affected checks, and request fresh
    review without routine transition prompts. This evidence is not independent
    or production assurance.
-8. For `production-rapid`, obtain independent review after Apply and after
+9. For `production-rapid`, obtain independent review after Apply and after
    every objective fix from a configured, non-interactive, isolated read-only
    reviewer. Give it only immutable full base/head object IDs, the complete diff, relevant
    OpenSpec artifacts, and current validation evidence. Record reviewer
@@ -66,7 +71,7 @@ targets. Do not include token values or other secrets in authorization text.
    durable review IDs as a conflict. Require reviewer identity/type and
    isolation/read-only capability from configured adapter attestation, then
    resolve supplied lowercase full object IDs as canonical commits.
-9. Pause for material decisions, credential changes, destructive actions,
+10. Pause for material decisions, credential changes, destructive actions,
    unexpected external targets, durable-state conflicts, or persistent
    environment failures.
 

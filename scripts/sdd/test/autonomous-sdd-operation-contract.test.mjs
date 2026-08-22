@@ -5,7 +5,7 @@ import { evaluateOperationGate, normalizeAgentPolicy, operationRegistry, routeOp
 import { checkOperationAuthorization } from "../check-operation-authorization.mjs";
 import { validateCloseoutReviewReuse } from "../independent-review.mjs";
 
-const authorization = { qualityProfile: "prototype-rapid", expiresAt: "2026-08-22T00:00:00.000Z" };
+const authorization = { qualityProfile: "prototype-rapid", expiresAt: "2999-01-01T00:00:00.000Z" };
 const sha = "a".repeat(64);
 test("registry is complete and rejects unknown or mismatched operations", () => {
   assert.equal(validateOperationRegistry().valid, true);
