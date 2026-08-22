@@ -4,13 +4,16 @@ import path from "node:path";
 
 import { deriveRepositoryId, digestValue, normalizeCanonicalRemote, RUN_CONTRACT_VERSION, validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
 import { inventoryLegacyDirectory, inventoryLegacyRecords } from "./autonomous-sdd-legacy.mjs";
-import { inventoryLegacyReconciliationReceipts } from "./autonomous-sdd-legacy-reconciliation.mjs";
+import { inventoryLegacyReconciliationReceipts, legacyRecordDigest } from "./autonomous-sdd-legacy-reconciliation.mjs";
 import { createRepositoryClaim, defaultStateHome, ensureStateLayout, publishImmutableRecord, rebuildRepositoryIndex, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
 import { digestOperationContract, normalizeAgentPolicy } from "./autonomous-sdd-operation-contract.mjs";
 import { loadRuntimeConfiguration, resolveRuntimeConfiguration } from "./runtime-configuration.mjs";
 
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const identifier = /^[a-z0-9][a-z0-9-]{2,127}$/i;
+const sha256 = /^[0-9a-f]{64}$/i;
+const controllerPhases = Object.freeze(["propose", "planning-review", "apply", "verify", "delivery", "sync", "archive", "cleanup"]);
+const timestamp = (value) => typeof value === "string" && !Number.isNaN(Date.parse(value));
 const binding = (value) => value && typeof value === "object" && text(value.id) && /^[0-9a-f]{64}$/i.test(value.digest ?? "");
 const fail = (reason, extra = {}) => ({ ...extra, valid: false, reason, classification: "paused" });
 
@@ -50,6 +53,143 @@ function foreignActiveIdentity({ stateHome, readableRepositoryName, repositoryPa
   } catch { return fail("v2-admission-identity-inspection-unavailable"); }
 }
 
+function safeJson(target, fileSystem = fs) {
+  try { return JSON.parse(fileSystem.readFileSync(target, "utf8")); } catch { return null; }
+}
+
+function terminalSummaryDigest(summary) {
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) return null;
+  const value = { ...summary };
+  delete value.terminalSummaryDigest;
+  return digestValue(value);
+}
+
+function archiveMatchesFor(paths, parentRunId, fileSystem = fs) {
+  const matches = [];
+  try {
+    if (!fileSystem.existsSync(paths.archive) || fileSystem.lstatSync(paths.archive).isSymbolicLink()) return matches;
+    const root = fileSystem.realpathSync(paths.archive);
+    for (const year of fileSystem.readdirSync(root, { withFileTypes: true })) {
+      if (!year.isDirectory() || !/^\d{4}$/.test(year.name)) continue;
+      const yearPath = path.join(root, year.name);
+      if (fileSystem.lstatSync(yearPath).isSymbolicLink()) continue;
+      for (const month of fileSystem.readdirSync(yearPath, { withFileTypes: true })) {
+        if (!month.isDirectory() || !/^\d{2}$/.test(month.name)) continue;
+        const monthPath = path.join(yearPath, month.name);
+        if (fileSystem.lstatSync(monthPath).isSymbolicLink()) continue;
+        for (const day of fileSystem.readdirSync(monthPath, { withFileTypes: true })) {
+          if (!day.isDirectory() || !/^\d{2}$/.test(day.name)) continue;
+          const dayPath = path.join(monthPath, day.name);
+          if (fileSystem.lstatSync(dayPath).isSymbolicLink()) continue;
+          const candidate = path.join(dayPath, parentRunId);
+          if (!fileSystem.existsSync(candidate) || !fileSystem.lstatSync(candidate).isDirectory() || fileSystem.lstatSync(candidate).isSymbolicLink()) continue;
+          const canonical = fileSystem.realpathSync(candidate);
+          if (canonical !== root && canonical.startsWith(`${root}${path.sep}`)) matches.push(canonical);
+        }
+      }
+    }
+  } catch { return []; }
+  return matches;
+}
+
+function validTerminalV2Controller(controller, { repository, repositoryId, paths, fileSystem = fs } = {}) {
+  if (!controller || controller.schemaVersion !== 5 || !identifier.test(controller.runId ?? "") || !text(repository) || controller.repository !== repository ||
+      controller.currentPhase !== null || !Array.isArray(controller.steps) || controller.steps.length === 0 ||
+      controller.steps.some((step) => step?.status !== "complete" || step?.evidence?.current !== true) ||
+      controller.v2Admission?.state !== "admitted" || controller.v2Admission.repositoryId !== repositoryId ||
+      !identifier.test(controller.v2Admission?.parentRunId ?? "") || !identifier.test(controller.v2Admission?.workUnitId ?? "") ||
+      !identifier.test(controller.v2Admission?.claimId ?? "") || !timestamp(controller.v2Admission?.admittedAt) ||
+      !sha256.test(controller.authorizationDigest ?? "") || !identifier.test(controller.selectedEntry ?? "") || !timestamp(controller.expiresAt)) return false;
+  if (controller.runId !== `controller-${controller.authorizationDigest.slice(0, 32)}`) return false;
+  if (controller.checkpointPath !== path.posix.join("runs", controller.runId, "controller.json") ||
+      JSON.stringify(controller.allowedLifecycleChain) !== JSON.stringify(controllerPhases) ||
+      controller.steps.length !== controllerPhases.length || controller.steps.some((step, index) => step.id !== controllerPhases[index])) return false;
+  const admission = controller.v2Admission;
+  const archives = archiveMatchesFor(paths, admission.parentRunId, fileSystem);
+  if (archives.length !== 1 || fileSystem.existsSync(path.join(paths.active, admission.parentRunId))) return false;
+  const archive = archives[0];
+  const records = Object.fromEntries([
+    "parent-run", "work-unit", "resource-claim", "terminalization-receipt", "claim-release", "projection", "archive-manifest"
+  ].map((name) => [name, safeJson(path.join(archive, `${name}.json`), fileSystem)]));
+  const validations = Object.fromEntries(Object.entries(records).map(([name, record]) => [name, validateDomainRecord(record)]));
+  if (Object.values(validations).some((validation) => !validation.valid)) return false;
+  const parent = records["parent-run"];
+  const workUnit = records["work-unit"];
+  const claim = records["resource-claim"];
+  const receipt = records["terminalization-receipt"];
+  const release = records["claim-release"];
+  const projection = records.projection;
+  const manifest = records["archive-manifest"];
+  const summary = receipt.terminalSummary;
+  const sameProvider = (bindingValue) => bindingValue?.id === admission.providerBinding?.id && bindingValue?.digest === admission.providerBinding?.digest;
+  const checks = {
+    authorization: controller.authorizationDigest === parent.approvedIntentDigest && controller.authorizationDigest === workUnit.authorizationDigest,
+    deadline: controller.expiresAt === parent.deadline,
+    parent: admission.parentRunId === parent.parentRunId,
+    workUnit: admission.workUnitId === workUnit.workUnitId && workUnit.parentRunId === parent.parentRunId && workUnit.lifecycleState === "admitted",
+    claim: admission.claimId === claim.claimId && claim.workUnitId === workUnit.workUnitId && claim.repositoryId === repositoryId && claim.state === "active",
+    change: workUnit.approvedChangeId === controller.selectedEntry && receipt.approvedChangeId === controller.selectedEntry,
+    receipt: receipt.parentRunId === parent.parentRunId && receipt.workUnitId === workUnit.workUnitId && receipt.claimId === claim.claimId && receipt.repositoryId === repositoryId,
+    release: release.claimId === claim.claimId && release.workUnitId === workUnit.workUnitId && release.repositoryId === repositoryId && release.disposition === "released" && release.terminalizationReceiptDigest === validations["terminalization-receipt"].digest,
+    provider: sameProvider(parent.claimProviderBinding) && sameProvider(workUnit.claimProviderBinding) && sameProvider(claim.providerBinding),
+    projection: projection.parentRunId === parent.parentRunId && projection.children.length === 1 && digestValue(projection.children[0]) === digestValue(summary),
+    manifest: manifest.parentRunId === parent.parentRunId && manifest.projectionDigest === validations.projection.digest &&
+      manifest.reason === summary.terminalReason && manifest.archivedAt === receipt.createdAt && manifest.archivedAt === release.releasedAt,
+    summary: summary.workUnitId === workUnit.workUnitId && summary.approvedChangeId === controller.selectedEntry && summary.terminalStatus === "complete" && summary.claimDisposition === "released" && summary.cleanupDisposition === "completed" && summary.terminalSummaryDigest === terminalSummaryDigest(summary)
+  };
+  return Object.values(checks).every(Boolean);
+}
+
+function verifiedTerminalV2Controllers({ legacyDirectory, repository, stateHome, readableRepositoryName, repositoryId, fileSystem = fs } = {}) {
+  if (!text(legacyDirectory) || !text(repository)) return [];
+  const paths = statePaths({ stateHome, readableName: readableRepositoryName, repositoryId });
+  if (!paths) return [];
+  const verified = [];
+  try {
+    const walk = (current) => {
+      for (const entry of fileSystem.readdirSync(current, { withFileTypes: true })) {
+        const target = path.join(current, entry.name);
+        if (entry.isDirectory()) walk(target);
+        else if (entry.isFile() && entry.name === "controller.json") {
+          const content = fileSystem.readFileSync(target, "utf8");
+          let controller;
+          try { controller = JSON.parse(content); } catch { continue; }
+          const expectedReference = path.resolve(legacyDirectory, controller?.checkpointPath ?? "invalid");
+          if (expectedReference === path.resolve(target) && validTerminalV2Controller(controller, { repository, repositoryId, paths, fileSystem })) {
+            verified.push({ reference: target, recordDigest: legacyRecordDigest(content), runId: controller.runId,
+              selectedEntry: controller.selectedEntry, repository: controller.repository });
+          }
+        }
+      }
+    };
+    if (fileSystem.existsSync(legacyDirectory)) walk(legacyDirectory);
+  } catch { return []; }
+  return verified;
+}
+
+function applyVerifiedTerminalV2Controllers(inventory, verified, fileSystem = fs) {
+  if (!inventory?.valid || !Array.isArray(inventory.entries) || !Array.isArray(verified) || verified.length === 0) return inventory;
+  const entries = inventory.entries.map((entry) => {
+    const match = verified.find((candidate) => candidate.reference === entry.reference);
+    if (!match) return entry;
+    let currentDigest;
+    try { currentDigest = legacyRecordDigest(fileSystem.readFileSync(entry.reference, "utf8")); } catch { return entry; }
+    return currentDigest === match.recordDigest
+      ? { reference: entry.reference, classification: "compatible-terminal", reason: "v2-controller-terminal-evidence-verified",
+        runId: match.runId, selectedEntry: match.selectedEntry, repository: match.repository }
+      : entry;
+  });
+  const ambiguous = entries.filter((entry) => entry.classification === "ambiguous");
+  const active = entries.filter((entry) => entry.classification === "active-legacy");
+  return Object.freeze({
+    valid: true,
+    entries: Object.freeze(entries),
+    classification: ambiguous.length ? "ambiguous" : active.length ? "active-legacy" : "compatible",
+    ambiguous: Object.freeze(ambiguous),
+    active: Object.freeze(active)
+  });
+}
+
 export function inspectV2Admission({ stateHome, readableRepositoryName, repositoryId, authorization, providerBinding, parentRunId, now = new Date().toISOString(), fileSystem = fs } = {}) {
   const selectedEntry = validateAuthorization(authorization, now);
   if (!selectedEntry || !identifier.test(readableRepositoryName ?? "") || !/^r1-[0-9a-f]{64}$/i.test(repositoryId ?? "") || !binding(providerBinding)) return fail("v2-inspection-input-invalid");
@@ -76,7 +216,7 @@ export function inspectV2Admission({ stateHome, readableRepositoryName, reposito
   } catch { return fail("v2-admission-inspection-unavailable", { paths }); }
 }
 
-function admitV2RunInternal({ authorization, canonicalRemote, readableRepositoryName, historyBinding, provider, owner, repositoryPath, runtimeConfiguration, stateHome, legacyRecords = [], legacyDirectory, parentRunId = crypto.randomUUID(), workUnitId = crypto.randomUUID(), claimId = crypto.randomUUID(), now = new Date().toISOString(), fileSystem = fs } = {}, legacyInventoryExclusions = []) {
+function admitV2RunInternal({ authorization, repository, canonicalRemote, readableRepositoryName, historyBinding, provider, owner, repositoryPath, runtimeConfiguration, stateHome, legacyRecords = [], legacyDirectory, parentRunId = crypto.randomUUID(), workUnitId = crypto.randomUUID(), claimId = crypto.randomUUID(), now = new Date().toISOString(), fileSystem = fs } = {}, legacyInventoryExclusions = []) {
   const selectedEntry = validateAuthorization(authorization, now);
   const canonicalRemoteIdentity = normalizeCanonicalRemote(canonicalRemote);
   const repositoryId = deriveRepositoryId(canonicalRemote);
@@ -90,12 +230,15 @@ function admitV2RunInternal({ authorization, canonicalRemote, readableRepository
   const resolvedStateHome = stateHome ?? defaultStateHome();
   const reconciliation = inventoryLegacyReconciliationReceipts({ stateHome: resolvedStateHome, readableRepositoryName, repositoryId, fileSystem });
   if (!reconciliation.valid) return fail(reconciliation.reason);
+  const terminalV2Controllers = verifiedTerminalV2Controllers({ legacyDirectory, repository, stateHome: resolvedStateHome,
+    readableRepositoryName, repositoryId, fileSystem });
   const suppliedLegacy = inventoryLegacyRecords(legacyRecords, { reconciliationReceipts: reconciliation.receipts, now });
-  const discoveredLegacy = legacyDirectory === undefined
+  const discoveredInventory = legacyDirectory === undefined
     ? inventoryLegacyRecords([], { reconciliationReceipts: reconciliation.receipts, now })
     : inventoryLegacyDirectory(legacyDirectory, {
       fileSystem, reconciliationReceipts: reconciliation.receipts, excludedReferences: legacyInventoryExclusions, now
     });
+  const discoveredLegacy = applyVerifiedTerminalV2Controllers(discoveredInventory, terminalV2Controllers, fileSystem);
   if (!suppliedLegacy.valid || !discoveredLegacy.valid) return fail(!suppliedLegacy.valid ? suppliedLegacy.reason : discoveredLegacy.reason);
   const legacyEntries = [...suppliedLegacy.entries, ...discoveredLegacy.entries];
   const legacy = {
