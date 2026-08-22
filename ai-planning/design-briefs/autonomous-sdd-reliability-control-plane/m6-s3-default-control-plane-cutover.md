@@ -52,6 +52,12 @@ Desired outcome: Thin entrypoints switch to qualified local execution with audit
 - Begin with audit/diagnostic routing, compare legacy discovery and run-v2
   classification, then enable default mutation only after explicit owner
   approval and M6-S2 evidence.
+- Implement the same five-mode state machine used by the planning contract:
+  `contract-only`, `audit/shadow`, `bootstrap-hybrid`, `qualified-opt-in`, and
+  `default`. M6-S3 is the only slice allowed to select `default` for new runs.
+  Every mode names exactly one mutating generation; audit/shadow never writes,
+  and in-flight runs retain their immutable generation binding through a mode
+  or rollback change.
 - Retain legacy-state inventory, read-only recovery, compatibility diagnostics,
   and a tested routing rollback until published removal criteria are satisfied.
 - Regenerate Claude/Codex adapters from canonical assets and verify discovery,
@@ -64,6 +70,9 @@ Desired outcome: Thin entrypoints switch to qualified local execution with audit
 - Ambiguous legacy runs stay audit-only and are never deleted or auto-migrated.
 - A rollback during an admitted run preserves its immutable backend binding;
   only new runs change routing.
+- Cutover refuses when any repository has ambiguous legacy state, an
+  unreconciled active owner, an incomplete activation-bundle capability, stale
+  qualification evidence, or an untested rollback path.
 - Documentation, help/status output, generated wrappers, and runtime manifests
   agree on the active default and recovery path.
 - Removal cannot begin until retained-state and rollback criteria are met.

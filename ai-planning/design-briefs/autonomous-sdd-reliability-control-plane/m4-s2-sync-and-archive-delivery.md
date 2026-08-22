@@ -55,11 +55,25 @@ Desired outcome: Exact Sync and content-preserving Archive run as separately del
   default branch.
 - Shared spec and archive destinations require the active repository claim and
   operation-specific reconciliation after partial external success.
+- Before creating a Sync branch, changing a living spec, or opening a Sync PR,
+  enumerate every active OpenSpec change and build a graph of capability,
+  requirement, and operation overlap. Because `MODIFIED` is a complete
+  requirement replacement, any active replacement that overlaps the proposed
+  living result must be serialized or reconciled under authority covering all
+  affected changes. An unresolved overlap pauses before mutation.
+- Sync and pre-Archive comparison includes each accepted requirement's
+  description and scenarios, not only Markdown structure or scenario titles.
+  The living result must exactly reflect the authorized delta in context, and
+  a repeated Sync must produce no change.
 
 ### Acceptance evidence
 
-- Exact delta-to-living comparison proves no invented, dropped, or duplicated
-  requirements and a second Sync produces no change.
+- Exact delta-to-living comparison proves no invented, dropped, duplicated, or
+  text-corrupted requirement descriptions or scenarios, and a second Sync
+  produces no change.
+- Active-delta fixtures include two complete replacements of one requirement,
+  a newer living scenario absent from an older delta, disjoint capabilities,
+  shared-authority reconciliation, and pre-mutation fail-closed behavior.
 - Ambiguous spec conflicts pause for a material decision.
 - Archive is content-preserving and idempotent; partial move/delivery failures
   resume without duplicate paths or lost history.

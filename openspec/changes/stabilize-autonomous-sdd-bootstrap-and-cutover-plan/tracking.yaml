@@ -1,0 +1,18 @@
+schema_version: 1
+openspec:
+  change: stabilize-autonomous-sdd-bootstrap-and-cutover-plan
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 197
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/197
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - ai-planning/design-briefs/
+      - ai-planning/handoff-docs/
+      - ai-planning/notes/
+      - ai-planning/plans/
+      - openspec/changes/stabilize-autonomous-sdd-bootstrap-and-cutover-plan/

@@ -52,6 +52,13 @@ Desired outcome: Issue, Project, branch, default-branch, run, and exact-owned cl
 - Ineligible or ambiguous resources remain intact with a typed recovery result.
 - Issue, Project, default branch, archive, run terminal state, claim release,
   and owned cleanup must all converge before complete.
+- Finalization is part of the minimum activation bundle, not a later optional
+  convenience. A generation cannot own real admission/claims unless the same
+  qualified generation can terminalize, release, externally converge, clean
+  exact-owned resources, and recover after interruption.
+- Claim release is evidence-bound to terminal lifecycle and cleanup outcomes;
+  neither a merged PR nor an archived OpenSpec directory alone proves a run is
+  safe to release or remove from the active area.
 
 ### Acceptance evidence
 

@@ -55,6 +55,18 @@ Desired outcome: Exact issue, Project, branch, PR, check, merge, closure, and st
   issue, branch, PR, and Project records bind to the selected work unit.
 - Live credential, repository permission, branch policy, and target existence
   are revalidated immediately before every external mutation.
+- When the controller runtime is credential-isolated, it emits one non-secret,
+  authorization-bound host-operation envelope containing the exact operation,
+  repository, target identities, immutable payload/precondition digest,
+  idempotency key, and expiry. An authenticated host may execute only that
+  envelope and returns a non-secret result receipt. The controller revalidates
+  the receipt and live target state before advancing; no credential crosses
+  into controller history.
+- Before any merge whose authorization requires remote branch retention,
+  preflight repository merge strategy and automatic topic-branch deletion
+  policy. After merge, verify the exact reviewed remote ref. If repository
+  policy removed it, restore only that exact clean reviewed head, without force,
+  and record a branch-retention receipt; never infer or recreate another ref.
 
 ### Acceptance evidence
 
@@ -65,6 +77,12 @@ Desired outcome: Exact issue, Project, branch, PR, check, merge, closure, and st
 - Wrong repository, issue, Project, branch, PR, head, or ownership is rejected.
 - Unrelated human issue/PR text and repository settings remain unchanged.
 - No credentials, raw CLI output, or secret-bearing diagnostics enter history.
+- Restricted-to-host fixtures cover successful exact execution, mismatched or
+  expired envelopes, denied host access, ambiguous receipts, and proof that the
+  controller advances only after matching non-secret evidence.
+- Auto-delete fixtures prove retained refs are detected and restored exactly,
+  while unauthorized deletion, force-push, divergent heads, and unreviewed refs
+  remain blocked.
 
 ## 6. Open questions and blocking decisions
 - Select and prove a disposable GitHub repository/account strategy.
