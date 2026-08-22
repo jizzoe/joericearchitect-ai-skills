@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { admitV2Run, inspectV2Admission } from "../autonomous-sdd-admission.mjs";
-import { terminalizeV2Run } from "../autonomous-sdd-controller.mjs";
+import { advanceControllerQueue, advanceControllerRecord, initializeV2Delivery, inspectControllerRecord, registerControllerResource, terminalizeV2Run } from "../autonomous-sdd-controller.mjs";
 import { decodeLegacyRecord, denyLegacyMutation, inventoryLegacyDirectory, inventoryLegacyRecords } from "../autonomous-sdd-legacy.mjs";
 import { legacyRecordDigest, publishLegacyReconciliationReceipt, reconcileLegacyBootstrapRecord } from "../autonomous-sdd-legacy-reconciliation.mjs";
 import { deriveRepositoryId, digestValue } from "../autonomous-sdd-run-contract.mjs";
@@ -117,6 +117,71 @@ test("v2 admission persists an isolated parent, work unit, and generation-one cl
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });
 
+test("controller initialization persists exact pending context before admitting and resumes only its matching v2 run", () => {
+  const stateHome = root();
+  const repositoryPath = root();
+  try {
+    fs.mkdirSync(path.join(repositoryPath, ".git"));
+    fs.mkdirSync(path.join(repositoryPath, "config"));
+    fs.writeFileSync(path.join(repositoryPath, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+    const initialized = initializeV2Delivery({
+      ...fixture(stateHome), repository: "owner/repository", repositoryPath,
+      runGit: () => ".git"
+    });
+    assert.equal(initialized.valid, true);
+    assert.equal(initialized.classification, "initialized");
+    assert.equal(initialized.record.schemaVersion, 5);
+    assert.equal(initialized.record.v2Admission.state, "admitted");
+    assert.equal(initialized.record.v2Admission.parentRunId, initialized.admission.parentRun.parentRunId);
+    assert.equal(initialized.record.v2Admission.workUnitId, initialized.admission.workUnit.workUnitId);
+    assert.equal(initialized.record.v2Admission.claimId, initialized.admission.claim.claimId);
+    assert.equal(inspectControllerRecord(initialized.record, { authorization, repository: "owner/repository", now }).nextPhase, "propose");
+    assert.equal(fs.existsSync(initialized.checkpointPath), true);
+    const resumed = initializeV2Delivery({
+      ...fixture(stateHome), repository: "owner/repository", repositoryPath,
+      runGit: () => ".git"
+    });
+    assert.equal(resumed.valid, true);
+    assert.equal(resumed.classification, "resumed");
+    assert.equal(resumed.record.v2Admission.parentRunId, initialized.record.v2Admission.parentRunId);
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+  }
+});
+
+test("controller initialization preserves pending recovery context when admission cannot start and creates no active claim", () => {
+  const stateHome = root();
+  const repositoryPath = root();
+  try {
+    fs.mkdirSync(path.join(repositoryPath, ".git"));
+    const result = initializeV2Delivery({
+      ...fixture(stateHome), repository: "owner/repository", repositoryPath,
+      runGit: () => ".git", admit: () => ({ valid: false, reason: "injected-admission-stop" })
+    });
+    assert.equal(result.valid, false);
+    assert.equal(result.reason, "injected-admission-stop");
+    assert.equal(fs.existsSync(path.join(stateHome, "repositories")), false);
+    const checkpoint = path.join(repositoryPath, ".git", "sdd-delivery-runs", "runs", `controller-${digestValue(authorization).slice(0, 32)}`, "controller.json");
+    const record = JSON.parse(fs.readFileSync(checkpoint, "utf8"));
+    assert.equal(record.v2Admission.state, "pending");
+    assert.equal(inspectControllerRecord(record, { authorization, repository: "owner/repository", now }).reason, "controller-initialization-pending");
+    assert.equal(advanceControllerRecord(record, "propose", { current: true }).reason, "controller-phase-advance-invalid");
+    assert.equal(advanceControllerQueue({
+      ...record,
+      queueEntries: [record.selectedEntry, "later-change"],
+      queueIndex: 0,
+      steps: record.steps.map((step) => ({ ...step, status: "complete", evidence: { current: true } }))
+    }).reason, "controller-queue-advance-invalid");
+    assert.equal(registerControllerResource(record, {
+      kind: "branch", id: "repair/blocked", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "pending"
+    }).reason, "controller-resource-registration-invalid");
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+  }
+});
+
 test("expired, active legacy, and immutable-conflict inputs preserve the existing admission", () => {
   const stateHome = root();
   try {
@@ -156,24 +221,28 @@ test("terminalization releases the completed claim, while a different later clai
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });
 
-test("the runtime exposes durable v2 admission and refuses construction-only legacy verbs", () => {
+test("the runtime exposes declared v2 initialization and refuses construction-only legacy verbs", () => {
   const module = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../runtime/bin/autonomous-sdd-controller.mjs");
   const refused = spawnSync(process.execPath, [module, "create-controller-record", "--stdin"], { encoding: "utf8", input: "{}" });
   assert.equal(refused.status, 2);
   assert.equal(JSON.parse(refused.stdout).error.code, "operation-not-declared");
   const source = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../runtime/manifest.json"), "utf8");
+  assert.match(source, /"initialize-v2-delivery"/);
   assert.match(source, /"admit-v2-run"/);
   assert.match(source, /"terminalize-v2-run"/);
   assert.doesNotMatch(source, /"create-controller-record"|"advance-controller-record"/);
   const malformed = spawnSync(process.execPath, [module, "terminalize-v2-run", "--stdin"], { encoding: "utf8", input: "{}" });
   assert.equal(malformed.status, 0);
   assert.equal(JSON.parse(malformed.stdout).result.reason, "terminalization-input-invalid");
+  const malformedInitializer = spawnSync(process.execPath, [module, "initialize-v2-delivery", "--stdin"], { encoding: "utf8", input: "{}" });
+  assert.equal(malformedInitializer.status, 0);
+  assert.equal(JSON.parse(malformedInitializer.stdout).result.reason, "controller-initialization-input-invalid");
 });
 
-test("both generated assistant adapters remain thin and delegate v2 admission to canonical policy", () => {
+test("both generated assistant adapters remain thin and delegate v2 initialization to canonical policy", () => {
   const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
   const canonical = fs.readFileSync(path.join(repository, "skills/base/autonomous-sdd-lifecycle/SKILL.md"), "utf8");
-  assert.match(canonical, /admit-v2-run/);
+  assert.match(canonical, /initialize-v2-delivery/);
   assert.match(canonical, /reconcile-legacy-bootstrap-record/);
   for (const adapter of [".agents/skills/autonomous-sdd-lifecycle/SKILL.md", ".claude/skills/autonomous-sdd-lifecycle/SKILL.md"]) {
     const content = fs.readFileSync(path.join(repository, adapter), "utf8");

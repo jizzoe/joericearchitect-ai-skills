@@ -4,7 +4,8 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { archiveTerminalRun, defaultStateHome, publishImmutableRecord, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
-import { buildParentProjection, digestValue, validateBootstrapPreSnapshotWorkUnit, validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
+import { buildParentProjection, deriveRepositoryId, digestValue, normalizeCanonicalRemote, validateBootstrapPreSnapshotWorkUnit, validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
+import { admitV2Run, inspectV2Admission } from "./autonomous-sdd-admission.mjs";
 import { executeWorkspaceCleanup, migrateLegacyWorkspaceResource, planWorkspaceCleanup } from "./sdd-workspace-cleanup.mjs";
 import {
   authContextBindingDigest,
@@ -34,9 +35,27 @@ const validRunId = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9-]{7
 const checkpointForRun = (runId) => `runs/${runId}/controller.json`;
 const digest = (value) => typeof value === "string" && /^[0-9a-f]{64}$/i.test(value);
 const repositoryId = (value) => typeof value === "string" && /^r1-[0-9a-f]{64}$/i.test(value);
+const controllerSchema = (value) => value === 4 || value === 5;
+const controllerReadyForMutation = (record) => controllerSchema(record?.schemaVersion) &&
+  (record.schemaVersion === 4 || record.v2Admission?.state === "admitted");
 
 function exactKeys(value, keys) {
   return value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.includes(key));
+}
+
+function validV2AdmissionBinding(value) {
+  if (!exactKeys(value, ["schemaVersion", "state", "repositoryId", "parentRunId", "workUnitId", "claimId", "providerBinding", "preparedAt", "admittedAt"]) ||
+      value.schemaVersion !== 1 || !["pending", "admitted"].includes(value.state) || !repositoryId(value.repositoryId) ||
+      !validRunId(value.parentRunId) || !validRunId(value.workUnitId) || !validRunId(value.claimId) ||
+      !text(value.providerBinding?.id) || !digest(value.providerBinding?.digest) || !timestamp(value.preparedAt)) return false;
+  return value.state === "pending" ? value.admittedAt === undefined : timestamp(value.admittedAt);
+}
+
+function sameV2AdmissionBinding(left, right) {
+  return validV2AdmissionBinding(left) && validV2AdmissionBinding(right) &&
+    left.repositoryId === right.repositoryId && left.parentRunId === right.parentRunId &&
+    left.workUnitId === right.workUnitId && left.claimId === right.claimId &&
+    left.providerBinding.id === right.providerBinding.id && left.providerBinding.digest === right.providerBinding.digest;
 }
 
 function fullHead(value) {
@@ -382,13 +401,13 @@ export function authorizationDigest(authorization) {
 
 /** Consume the canonical operation gate; callers cannot infer lifecycle policy from a helper name. */
 export function evaluateControllerOperation({ record, operation, stage, targetKind, authorization, claimActive, evidenceCurrent, adapterAvailable, runtimePermitted, now } = {}) {
-  if (!record || record.selectedEntry !== authorization?.target?.entries?.[0]) {
+  if (!controllerReadyForMutation(record) || record.selectedEntry !== authorization?.target?.entries?.[0]) {
     return { allowed: false, classification: "paused", reason: "controller-operation-entry-mismatch", disposition: "human-decision" };
   }
   return evaluateOperationGate({ operation, stage, targetKind, authorization, claimActive, evidenceCurrent, adapterAvailable, runtimePermitted, now });
 }
 
-export function createControllerRecord({ authorization, repository, selectedEntry, runId = crypto.randomUUID() } = {}) {
+export function createControllerRecord({ authorization, repository, selectedEntry, runId = crypto.randomUUID(), v2Admission } = {}) {
   const entries = authorization?.target?.entries;
   const entry = selectedEntry ?? entries?.[0];
   if (!selectedByAuthorization(entry, authorization) || !text(repository) || !validRunId(runId) || authorization?.mode !== "autonomous" || authorization?.authorizationProfile !== "sdd-delivery") {
@@ -397,7 +416,7 @@ export function createControllerRecord({ authorization, repository, selectedEntr
   return {
     valid: true,
     record: {
-      schemaVersion: 4,
+      schemaVersion: v2Admission === undefined ? 4 : 5,
       runId,
       authorizationDigest: authorizationDigest(authorization),
       selectedEntry: entry,
@@ -413,13 +432,108 @@ export function createControllerRecord({ authorization, repository, selectedEntr
       cleanupReceipts: [],
       completedEntries: [],
       currentPhase: "propose",
-      steps: phases.map((id) => ({ id, status: "pending" }))
+      steps: phases.map((id) => ({ id, status: "pending" })),
+      ...(v2Admission === undefined ? {} : { v2Admission: structuredClone(v2Admission) })
     }
   };
 }
 
+function derivedInitializationIds(authorization) {
+  const value = authorizationDigest(authorization);
+  return {
+    controllerRunId: `controller-${value.slice(0, 32)}`,
+    parentRunId: `parent-${value.slice(0, 32)}`,
+    workUnitId: `workunit-${value.slice(0, 32)}`,
+    claimId: `claim-${value.slice(0, 32)}`
+  };
+}
+
+/**
+ * Starts a new v2 delivery only through a recoverable controller-first
+ * protocol. A pending controller record is not lifecycle-eligible; it merely
+ * guarantees that a successfully admitted claim is never untracked.
+ */
+export function initializeV2Delivery({ authorization, repository, canonicalRemote, readableRepositoryName, historyBinding, provider, owner,
+  repositoryPath, runtimeConfiguration, stateHome, legacyRecords, legacyDirectory, now = new Date().toISOString(), runGit,
+  admit = admitV2Run } = {}) {
+  const selectedEntry = authorization?.target?.entries?.[0];
+  const canonicalRemoteIdentity = normalizeCanonicalRemote(canonicalRemote);
+  const derivedRepositoryId = deriveRepositoryId(canonicalRemote);
+  const providerCapability = validateProviderCapabilities(provider);
+  if (!selectedByAuthorization(selectedEntry, authorization) || authorization?.mode !== "autonomous" ||
+      authorization?.authorizationProfile !== "sdd-delivery" || !text(repository) || !text(readableRepositoryName) ||
+      !canonicalRemoteIdentity || !derivedRepositoryId || !providerCapability.valid || !timestamp(now) || !text(repositoryPath)) {
+    return { valid: false, classification: "paused", reason: "controller-initialization-input-invalid" };
+  }
+  const ids = derivedInitializationIds(authorization);
+  const providerBinding = { id: providerCapability.provider.id, digest: digestValue(providerCapability.provider) };
+  const pendingBinding = {
+    schemaVersion: 1,
+    state: "pending",
+    repositoryId: derivedRepositoryId,
+    parentRunId: ids.parentRunId,
+    workUnitId: ids.workUnitId,
+    claimId: ids.claimId,
+    providerBinding,
+    preparedAt: now
+  };
+  const created = createControllerRecord({ authorization, repository, runId: ids.controllerRunId, v2Admission: pendingBinding });
+  if (!created.valid || !validV2AdmissionBinding(pendingBinding)) {
+    return { valid: false, classification: "paused", reason: "controller-initialization-input-invalid" };
+  }
+  const admissionInspection = inspectV2Admission({ stateHome, readableRepositoryName, repositoryId: derivedRepositoryId,
+    authorization, providerBinding, parentRunId: ids.parentRunId, now });
+  if (!admissionInspection.valid) {
+    return { valid: false, classification: "paused", reason: admissionInspection.reason };
+  }
+  const state = resolveControllerStateRoot({ repositoryPath, runGit });
+  if (!state.valid) return { valid: false, classification: "paused", reason: state.reason };
+  const checkpointPath = path.join(state.stateRoot, created.record.checkpointPath);
+  let record = created.record;
+  if (fs.existsSync(checkpointPath)) {
+    const existing = safeJson(fs, checkpointPath);
+    if (existing?.schemaVersion !== 5 || existing.runId !== ids.controllerRunId ||
+        existing.authorizationDigest !== authorizationDigest(authorization) || existing.selectedEntry !== selectedEntry ||
+        existing.repository !== repository || existing.expiresAt !== authorization.expiresAt ||
+        !sameV2AdmissionBinding(existing.v2Admission, pendingBinding)) {
+      return { valid: false, classification: "paused", reason: "controller-initialization-context-conflict", checkpointPath };
+    }
+    record = existing;
+  } else {
+    const persisted = persistControllerRecord({ repositoryPath, record, runGit });
+    if (!persisted.valid) return { valid: false, classification: "paused", reason: persisted.reason };
+  }
+  const admitted = admit({ authorization, canonicalRemote, readableRepositoryName, historyBinding, provider, owner, repositoryPath,
+    runtimeConfiguration, stateHome, legacyRecords, legacyDirectory, parentRunId: ids.parentRunId, workUnitId: ids.workUnitId,
+    claimId: ids.claimId, now });
+  if (!admitted?.valid) {
+    return { valid: false, classification: "paused", reason: admitted?.reason ?? "controller-initialization-admission-unavailable", checkpointPath };
+  }
+  if (admitted.repositoryId !== pendingBinding.repositoryId || admitted.parentRun?.parentRunId !== pendingBinding.parentRunId ||
+      admitted.workUnit?.workUnitId !== pendingBinding.workUnitId || admitted.claim?.claimId !== pendingBinding.claimId ||
+      admitted.workUnit?.approvedChangeId !== selectedEntry || admitted.providerBinding?.id !== providerBinding.id ||
+      admitted.providerBinding?.digest !== providerBinding.digest) {
+    return { valid: false, classification: "paused", reason: "controller-initialization-admission-mismatch", checkpointPath };
+  }
+  const bound = {
+    ...record,
+    v2Admission: { ...record.v2Admission, state: "admitted", admittedAt: record.v2Admission.admittedAt ?? now }
+  };
+  const persisted = persistControllerRecord({ repositoryPath, record: bound, runGit });
+  if (!persisted.valid) {
+    return { valid: false, classification: "paused", reason: "controller-initialization-bind-persist-failed", checkpointPath };
+  }
+  return {
+    valid: true,
+    classification: record.v2Admission.state === "admitted" ? "resumed" : "initialized",
+    record: bound,
+    checkpointPath: persisted.path,
+    admission: admitted
+  };
+}
+
 export function registerControllerIssueIntake(record, binding, { now = new Date().toISOString() } = {}) {
-  if (record?.schemaVersion !== 4 || !timestamp(now) || !validateIssueIntakeBinding(binding) ||
+  if (!controllerReadyForMutation(record) || !timestamp(now) || !validateIssueIntakeBinding(binding) ||
       binding.selectedEntry !== record.selectedEntry) return { valid: false, reason: "controller-issue-intake-registration-invalid" };
   const next = structuredClone(record);
   next.issueIntakeRecords ??= [];
@@ -443,7 +557,7 @@ export function registerControllerIssueIntake(record, binding, { now = new Date(
 }
 
 export function bindControllerIssueIntake(record, { payloadDigest, issue, observedAt, reference } = {}) {
-  if (record?.schemaVersion !== 4 || !text(payloadDigest)) return { valid: false, reason: "controller-issue-intake-delivery-invalid" };
+  if (!controllerReadyForMutation(record) || !text(payloadDigest)) return { valid: false, reason: "controller-issue-intake-delivery-invalid" };
   const next = structuredClone(record);
   if (!Array.isArray(next.issueIntakeRecords) ||
       next.issueIntakeRecords.some((item) => !validIssueIntakeRecord(item, next.selectedEntry))) {
@@ -460,7 +574,7 @@ export function bindControllerIssueIntake(record, { payloadDigest, issue, observ
 }
 
 export function registerControllerAuthContext(record, binding, { now = new Date().toISOString() } = {}) {
-  if (record?.schemaVersion !== 4 || !timestamp(now) || !validateGithubAuthContextBinding(binding) ||
+  if (!controllerReadyForMutation(record) || !timestamp(now) || !validateGithubAuthContextBinding(binding) ||
       binding.selectedEntry !== record.selectedEntry) return { valid: false, reason: "controller-auth-context-registration-invalid" };
   const next = structuredClone(record);
   next.authContextRecords ??= [];
@@ -481,7 +595,7 @@ export function registerControllerAuthContext(record, binding, { now = new Date(
 }
 
 export function bindControllerAuthContext(record, { bindingDigest, evidence } = {}) {
-  if (record?.schemaVersion !== 4 || !text(bindingDigest) || !validateGithubAuthContextEvidence(evidence)) {
+  if (!controllerReadyForMutation(record) || !text(bindingDigest) || !validateGithubAuthContextEvidence(evidence)) {
     return { valid: false, reason: "controller-auth-context-evidence-invalid" };
   }
   const next = structuredClone(record);
@@ -498,7 +612,7 @@ export function bindControllerAuthContext(record, { bindingDigest, evidence } = 
 }
 
 export function registerControllerResource(record, resource, { now = new Date().toISOString() } = {}) {
-  if (record?.schemaVersion !== 4 || !timestamp(now) || !resource || !["worktree", "branch"].includes(resource.kind) ||
+  if (!controllerReadyForMutation(record) || !timestamp(now) || !resource || !["worktree", "branch"].includes(resource.kind) ||
       !text(resource.id) || !text(resource.role) || !fullCommit(resource.registeredHeadCommit) || !text(resource.recoveryReference) ||
       resource.deliveryEvidence !== undefined) return { valid: false, reason: "controller-resource-registration-invalid" };
   const next = structuredClone(record);
@@ -523,7 +637,7 @@ export function registerControllerResource(record, resource, { now = new Date().
 }
 
 export function bindControllerResourceDelivery(record, { kind, id, deliveryEvidence } = {}) {
-  if (record?.schemaVersion !== 4 || !["worktree", "branch"].includes(kind) || !text(id)) return { valid: false, reason: "controller-resource-delivery-invalid" };
+  if (!controllerReadyForMutation(record) || !["worktree", "branch"].includes(kind) || !text(id)) return { valid: false, reason: "controller-resource-delivery-invalid" };
   const next = structuredClone(record);
   const resource = next.resourceRecords?.find((item) => item.kind === kind && item.id === id);
   if (!resource || resource.deliveryEvidence !== undefined) return { valid: false, reason: "controller-resource-delivery-invalid" };
@@ -536,7 +650,7 @@ export function bindControllerResourceDelivery(record, { kind, id, deliveryEvide
 }
 
 export function appendControllerCleanupReceipt(record, receipt, { now = new Date().toISOString() } = {}) {
-  if (record?.schemaVersion !== 4 || !timestamp(now) || !receipt || !["started", "completed", "already-completed", "blocked"].includes(receipt.status) ||
+  if (!controllerReadyForMutation(record) || !timestamp(now) || !receipt || !["started", "completed", "already-completed", "blocked"].includes(receipt.status) ||
       !["worktree", "branch"].includes(receipt.kind) || !text(receipt.id)) return { valid: false, reason: "controller-cleanup-receipt-invalid" };
   const next = structuredClone(record);
   const resource = next.resourceRecords?.find((item) => item.kind === receipt.kind && item.id === receipt.id);
@@ -556,7 +670,7 @@ export function persistControllerCleanupReceipt({ repositoryPath, record, receip
 }
 
 export function advanceControllerQueue(record, { now = new Date().toISOString() } = {}) {
-  if (!Array.isArray(record?.queueEntries) || !Number.isInteger(record.queueIndex) || record.queueEntries[record.queueIndex] !== record.selectedEntry ||
+  if (!controllerReadyForMutation(record) || !Array.isArray(record?.queueEntries) || !Number.isInteger(record.queueIndex) || record.queueEntries[record.queueIndex] !== record.selectedEntry ||
       record.steps?.some((step) => step.status !== "complete" || step.evidence?.current !== true) || !timestamp(now)) return { valid: false, reason: "controller-queue-advance-invalid" };
   const nextIndex = record.queueIndex + 1;
   if (nextIndex >= record.queueEntries.length) return { valid: false, reason: "controller-queue-complete" };
@@ -584,20 +698,25 @@ export function advanceControllerQueue(record, { now = new Date().toISOString() 
 
 export function inspectControllerRecord(record, { authorization, repository, now = new Date().toISOString() } = {}) {
   if (!record || record.schemaVersion === 1 || record.schemaVersion === 2 || record.schemaVersion === 3) return { classification: "paused", reason: "controller-record-legacy", nextPhase: null };
-  if (record.schemaVersion !== 4 || !validRunId(record.runId) || record.checkpointPath !== checkpointForRun(record.runId) || !text(record.selectedEntry) || !text(record.repository) || !text(record.checkpointPath) || !Array.isArray(record.steps) ||
+  if (!controllerSchema(record.schemaVersion) || !validRunId(record.runId) || record.checkpointPath !== checkpointForRun(record.runId) || !text(record.selectedEntry) || !text(record.repository) || !text(record.checkpointPath) || !Array.isArray(record.steps) ||
       !Array.isArray(record.resourceRecords) || (record.issueIntakeRecords !== undefined && !Array.isArray(record.issueIntakeRecords)) ||
       (record.authContextRecords !== undefined && !Array.isArray(record.authContextRecords)) ||
       !Array.isArray(record.cleanupReceipts) || !Array.isArray(record.completedEntries) ||
       record.resourceRecords.some((resource) => !validResource(resource, record)) ||
       (record.issueIntakeRecords ?? []).some((intake) => !validIssueIntakeRecord(intake, record.selectedEntry)) ||
       (record.authContextRecords ?? []).some((authContext) => !validAuthContextRecord(authContext, record.selectedEntry)) ||
-      record.completedEntries.some((entry) => !validCompletedEntry(entry, record.repository))) {
+      record.completedEntries.some((entry) => !validCompletedEntry(entry, record.repository)) ||
+      (record.schemaVersion === 5 && !validV2AdmissionBinding(record.v2Admission)) ||
+      (record.schemaVersion === 4 && record.v2Admission !== undefined)) {
     return { classification: "paused", reason: "controller-record-invalid", nextPhase: null };
   }
   if (!selectedByAuthorization(record.selectedEntry, authorization) || record.repository !== repository || record.authorizationDigest !== authorizationDigest(authorization) || record.expiresAt !== authorization?.expiresAt) {
     return { classification: "paused", reason: "controller-context-conflict", nextPhase: null };
   }
   if (Date.parse(record.expiresAt) <= Date.parse(now)) return { classification: "paused", reason: "controller-context-expired", nextPhase: null };
+  if (record.schemaVersion === 5 && record.v2Admission.state !== "admitted") {
+    return { classification: "paused", reason: "controller-initialization-pending", nextPhase: null };
+  }
   if (JSON.stringify(record.allowedLifecycleChain) !== JSON.stringify(phases) || record.steps.length !== phases.length || record.steps.some((step, index) => step?.id !== phases[index])) {
     return { classification: "paused", reason: "controller-phase-chain-invalid", nextPhase: null };
   }
@@ -615,7 +734,7 @@ export function inspectControllerRecord(record, { authorization, repository, now
 export function advanceControllerRecord(record, phase, evidence) {
   const index = phases.indexOf(phase);
   const existing = record?.steps?.[index];
-  if (index < 0 || evidence?.current !== true || (existing?.status === "complete" && existing.evidence?.current === true)) {
+  if (!controllerReadyForMutation(record) || index < 0 || evidence?.current !== true || (existing?.status === "complete" && existing.evidence?.current === true)) {
     return { valid: false, reason: "controller-phase-advance-invalid" };
   }
   if (record.steps.slice(0, index).some((step) => step.status !== "complete" || step.evidence?.current !== true)) {

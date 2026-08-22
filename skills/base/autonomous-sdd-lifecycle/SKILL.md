@@ -25,11 +25,12 @@ published choices, and perform no selection or mutation.
 1. Inspect durable state: Git, OpenSpec active changes, tasks, issues,
    Projects, pull requests, living specs, archive paths, and current evidence.
 2. Select one change through the authorized queue or dependency-aware policy.
-3. Admit or resume the v2 parent run and selected work unit before a lifecycle
-   action. Invoke `autonomous-sdd-controller admit-v2-run`; it must durably
-   persist the normalized authorization digest, canonical credential-free
-   repository identity, expiry, immutable run identity, provider bindings, and
-   generation-one repository claim in the configured state root. An ambiguous
+3. Initialize or resume the v2 parent run, selected work unit, and matching
+   controller record before a lifecycle action. Invoke
+   `autonomous-sdd-controller initialize-v2-delivery`; it must durably persist
+   the normalized authorization digest, canonical credential-free repository
+   identity, expiry, immutable run identity, provider bindings, generation-one
+   repository claim, and exact controller checkpoint. An ambiguous
    or active legacy record, weaker provider, stale claim, expired request, or
    immutable admission conflict pauses before lifecycle selection. Use
    `inspect-v2-admission` or `recover-v2-run` to recover only the exact durable
@@ -156,10 +157,10 @@ published choices, and perform no selection or mutation.
 
 ## Shared Runtime
 
-For durable v2 admission, invoke the controller through the installed runtime:
+For durable v2 delivery initialization, invoke the controller through the installed runtime:
 
 ```
-ai-skills-runtime run autonomous-sdd-controller admit-v2-run --repository <absolute-target-repository> -- --input <admission.json>
+ai-skills-runtime run autonomous-sdd-controller initialize-v2-delivery --repository <absolute-target-repository> -- --input <initialization.json>
 ```
 
 For normalized topology, gates, outcomes, and review-reuse checks, use the

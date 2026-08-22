@@ -33,9 +33,9 @@ Use `ship-sdd <change-or-ordered-queue> prod|prototype [duration]` only for a
 complete bounded delivery. The target is always explicit; `prod` resolves to a
 four-hour autonomous production-rapid strict-only `sdd-delivery` run, while
 `prototype` resolves to autonomous prototype-rapid with
-`reviewPolicy: same-session-local`. The controller records the normalized
-authorization and selected entry before lifecycle work, then resumes only the
-first incomplete evidenced phase. A bare generated Propose, Apply, Verify,
+`reviewPolicy: same-session-local`. The declared v2 initializer records the
+normalized authorization, selected entry, and matching v2 admission before
+lifecycle work, then resumes only the first incomplete evidenced phase. A bare generated Propose, Apply, Verify,
 Sync, or Archive action remains at its ordinary phase boundary.
 
 The prototype preset keeps focused checks, critical-flow evidence,

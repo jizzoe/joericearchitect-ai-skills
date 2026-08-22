@@ -265,6 +265,7 @@
       "module": "scripts/runtime/bin/autonomous-sdd-controller.mjs",
       "invocation": "subcommand",
       "verbs": [
+        "initialize-v2-delivery",
         "admit-v2-run",
         "terminalize-v2-run",
         "attach-bootstrap-cleanup-migration",

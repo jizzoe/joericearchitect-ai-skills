@@ -125,8 +125,8 @@ current working directory.
 
 | Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
 |---|---|---|---|
-| M2-S1 — Local durable execution backend | `add-autonomous-sdd-local-execution-backend` | Propose-ready after all M1 slices and an M1-S1 decision on the smallest substrate that proves authoritative history, atomic advancement, exact resume/takeover, stale-owner rejection, and one coarse repository claim | [M2-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s1-local-durable-execution-backend.md) |
-| M2-S2 — Deterministic transition engine | `add-autonomous-sdd-transition-engine` | Propose-ready after M2-S1 | [M2-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s2-deterministic-transition-engine.md) |
+| M2-S1 — Local durable execution backend | `add-autonomous-sdd-local-execution-backend` | Propose-ready after all M1 slices and `repair-v2-controller-initialization`; hardens its controller-to-admission pairing into authoritative history, atomic advancement, exact resume/takeover, stale-owner rejection, and one coarse repository claim | [M2-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s1-local-durable-execution-backend.md) |
+| M2-S2 — Deterministic transition engine | `add-autonomous-sdd-transition-engine` | Propose-ready after M2-S1; consumes the durable initialized-run identity before selecting one legal lifecycle transition | [M2-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s2-deterministic-transition-engine.md) |
 | M2-S3 — Run status and recovery | `add-autonomous-sdd-run-status-and-recovery` | Propose-ready after M2-S2 | [M2-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s3-run-status-and-recovery.md) |
 
 **Exit evidence:** a non-mutating simulated-adapter single-change run completes
