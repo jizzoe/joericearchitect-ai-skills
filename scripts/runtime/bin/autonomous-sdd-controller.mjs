@@ -22,6 +22,12 @@ const legacyDirectory = (payload) => {
   const state = resolveControllerStateRoot({ repositoryPath: repositoryPath(payload) });
   return state.valid ? state.stateRoot : null;
 };
+const publicAdmissionPayload = (payload) => {
+  const input = { ...(payload ?? {}) };
+  delete input.excludedLegacyReferences;
+  delete input.legacyInventoryExclusions;
+  return input;
+};
 
 function git(repository, args, options = {}) {
   return execFileSync("git", ["-C", repository, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], ...options }).trim();
@@ -67,7 +73,7 @@ runAsMain({
   invocation: "subcommand",
   operations: {
     "initialize-v2-delivery": (payload) => initializeV2Delivery({ ...payload, repositoryPath: repositoryPath(payload), legacyDirectory: legacyDirectory(payload) }),
-    "admit-v2-run": (payload) => admitV2Run({ ...payload, repositoryPath: repositoryPath(payload), legacyDirectory: legacyDirectory(payload) }),
+    "admit-v2-run": (payload) => admitV2Run({ ...publicAdmissionPayload(payload), repositoryPath: repositoryPath(payload), legacyDirectory: legacyDirectory(payload) }),
     "reconcile-legacy-bootstrap-record": (payload) => {
       const result = reconcileLegacyBootstrapRecord(payload);
       return result.valid ? publishLegacyReconciliationReceipt({ ...payload, receipt: result.receipt }) : result;

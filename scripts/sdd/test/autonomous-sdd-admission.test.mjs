@@ -66,6 +66,26 @@ test("legacy inventory is read-only, deterministic, and blocks dual authority", 
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
 
+test("legacy directory inventory ignores non-controller JSON and keeps unknown controller schemas ambiguous", () => {
+  const directory = root();
+  try {
+    const request = path.join(directory, "initializer-request.json");
+    fs.writeFileSync(request, JSON.stringify({ authorization: { target: "v2-contract" } }));
+    const requestBefore = fs.readFileSync(request, "utf8");
+    assert.equal(inventoryLegacyDirectory(directory).classification, "compatible");
+    assert.equal(fs.readFileSync(request, "utf8"), requestBefore);
+
+    const candidate = path.join(directory, "runs", "unknown", "controller.json");
+    fs.mkdirSync(path.dirname(candidate), { recursive: true });
+    fs.writeFileSync(candidate, JSON.stringify({ schemaVersion: 99, runId: "unknown", selectedEntry: "v2-contract", repository: "owner/repository" }));
+    const candidateBefore = fs.readFileSync(candidate, "utf8");
+    const result = inventoryLegacyDirectory(directory);
+    assert.equal(result.classification, "ambiguous");
+    assert.equal(result.ambiguous[0].reason, "legacy-schema-unknown");
+    assert.equal(fs.readFileSync(candidate, "utf8"), candidateBefore);
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
 test("admission inventories an existing legacy checkpoint directory before writing v2 state", () => {
   const stateHome = root();
   const legacyHome = root();
@@ -126,9 +146,9 @@ test("controller initialization persists exact pending context before admitting 
     fs.writeFileSync(path.join(repositoryPath, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
     const initialized = initializeV2Delivery({
       ...fixture(stateHome), repository: "owner/repository", repositoryPath,
-      runGit: () => ".git"
+      legacyDirectory: path.join(repositoryPath, ".git", "sdd-delivery-runs"), runGit: () => ".git"
     });
-    assert.equal(initialized.valid, true);
+    assert.equal(initialized.valid, true, JSON.stringify(initialized));
     assert.equal(initialized.classification, "initialized");
     assert.equal(initialized.record.schemaVersion, 5);
     assert.equal(initialized.record.v2Admission.state, "admitted");
@@ -139,7 +159,7 @@ test("controller initialization persists exact pending context before admitting 
     assert.equal(fs.existsSync(initialized.checkpointPath), true);
     const resumed = initializeV2Delivery({
       ...fixture(stateHome), repository: "owner/repository", repositoryPath,
-      runGit: () => ".git"
+      legacyDirectory: path.join(repositoryPath, ".git", "sdd-delivery-runs"), runGit: () => ".git"
     });
     assert.equal(resumed.valid, true);
     assert.equal(resumed.classification, "resumed");
@@ -148,6 +168,19 @@ test("controller initialization persists exact pending context before admitting 
     fs.rmSync(stateHome, { recursive: true, force: true });
     fs.rmSync(repositoryPath, { recursive: true, force: true });
   }
+});
+
+test("raw admission cannot use caller-selected exclusions to hide a legacy controller", () => {
+  const stateHome = root();
+  const legacyHome = root();
+  try {
+    const reference = path.join(legacyHome, "runs", "active", "controller.json");
+    fs.mkdirSync(path.dirname(reference), { recursive: true });
+    fs.writeFileSync(reference, JSON.stringify({ schemaVersion: 4, runId: "legacy-active", selectedEntry: "v2-contract", repository: "owner/repository", currentPhase: "apply", steps: [] }));
+    const result = admitV2Run(fixture(stateHome, { legacyDirectory: legacyHome, legacyInventoryExclusions: [reference] }));
+    assert.equal(result.reason, "legacy-authority-active");
+    assert.equal(fs.existsSync(path.join(stateHome, "repositories")), false);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); fs.rmSync(legacyHome, { recursive: true, force: true }); }
 });
 
 test("controller initialization preserves pending recovery context when admission cannot start and creates no active claim", () => {

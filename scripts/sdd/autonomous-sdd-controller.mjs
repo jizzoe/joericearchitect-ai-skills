@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { archiveTerminalRun, defaultStateHome, publishImmutableRecord, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
 import { buildParentProjection, deriveRepositoryId, digestValue, normalizeCanonicalRemote, validateBootstrapPreSnapshotWorkUnit, validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
-import { admitV2Run, inspectV2Admission } from "./autonomous-sdd-admission.mjs";
+import { admitV2RunFromInitializer, inspectV2Admission } from "./autonomous-sdd-admission.mjs";
 import { executeWorkspaceCleanup, migrateLegacyWorkspaceResource, planWorkspaceCleanup } from "./sdd-workspace-cleanup.mjs";
 import {
   authContextBindingDigest,
@@ -455,7 +455,7 @@ function derivedInitializationIds(authorization) {
  */
 export function initializeV2Delivery({ authorization, repository, canonicalRemote, readableRepositoryName, historyBinding, provider, owner,
   repositoryPath, runtimeConfiguration, stateHome, legacyRecords, legacyDirectory, now = new Date().toISOString(), runGit,
-  admit = admitV2Run } = {}) {
+  admit = admitV2RunFromInitializer } = {}) {
   const selectedEntry = authorization?.target?.entries?.[0];
   const canonicalRemoteIdentity = normalizeCanonicalRemote(canonicalRemote);
   const derivedRepositoryId = deriveRepositoryId(canonicalRemote);
@@ -503,9 +503,9 @@ export function initializeV2Delivery({ authorization, repository, canonicalRemot
     const persisted = persistControllerRecord({ repositoryPath, record, runGit });
     if (!persisted.valid) return { valid: false, classification: "paused", reason: persisted.reason };
   }
-  const admitted = admit({ authorization, canonicalRemote, readableRepositoryName, historyBinding, provider, owner, repositoryPath,
-    runtimeConfiguration, stateHome, legacyRecords, legacyDirectory, parentRunId: ids.parentRunId, workUnitId: ids.workUnitId,
-    claimId: ids.claimId, now });
+  const admitted = admit({ authorization, repository, canonicalRemote, readableRepositoryName, historyBinding, provider, owner, repositoryPath,
+    runtimeConfiguration, stateHome, legacyRecords, legacyDirectory, parentRunId: ids.parentRunId,
+    workUnitId: ids.workUnitId, claimId: ids.claimId, now }, { checkpointPath, controllerRecord: record });
   if (!admitted?.valid) {
     return { valid: false, classification: "paused", reason: admitted?.reason ?? "controller-initialization-admission-unavailable", checkpointPath };
   }

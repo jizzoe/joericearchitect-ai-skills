@@ -76,8 +76,7 @@ export function inspectV2Admission({ stateHome, readableRepositoryName, reposito
   } catch { return fail("v2-admission-inspection-unavailable", { paths }); }
 }
 
-/** Persist parent, selected work unit, and initial generation-one claim before any lifecycle phase. */
-export function admitV2Run({ authorization, canonicalRemote, readableRepositoryName, historyBinding, provider, owner, repositoryPath, runtimeConfiguration, stateHome, legacyRecords = [], legacyDirectory, parentRunId = crypto.randomUUID(), workUnitId = crypto.randomUUID(), claimId = crypto.randomUUID(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+function admitV2RunInternal({ authorization, canonicalRemote, readableRepositoryName, historyBinding, provider, owner, repositoryPath, runtimeConfiguration, stateHome, legacyRecords = [], legacyDirectory, parentRunId = crypto.randomUUID(), workUnitId = crypto.randomUUID(), claimId = crypto.randomUUID(), now = new Date().toISOString(), fileSystem = fs } = {}, legacyInventoryExclusions = []) {
   const selectedEntry = validateAuthorization(authorization, now);
   const canonicalRemoteIdentity = normalizeCanonicalRemote(canonicalRemote);
   const repositoryId = deriveRepositoryId(canonicalRemote);
@@ -92,7 +91,11 @@ export function admitV2Run({ authorization, canonicalRemote, readableRepositoryN
   const reconciliation = inventoryLegacyReconciliationReceipts({ stateHome: resolvedStateHome, readableRepositoryName, repositoryId, fileSystem });
   if (!reconciliation.valid) return fail(reconciliation.reason);
   const suppliedLegacy = inventoryLegacyRecords(legacyRecords, { reconciliationReceipts: reconciliation.receipts, now });
-  const discoveredLegacy = legacyDirectory === undefined ? inventoryLegacyRecords([], { reconciliationReceipts: reconciliation.receipts, now }) : inventoryLegacyDirectory(legacyDirectory, { fileSystem, reconciliationReceipts: reconciliation.receipts, now });
+  const discoveredLegacy = legacyDirectory === undefined
+    ? inventoryLegacyRecords([], { reconciliationReceipts: reconciliation.receipts, now })
+    : inventoryLegacyDirectory(legacyDirectory, {
+      fileSystem, reconciliationReceipts: reconciliation.receipts, excludedReferences: legacyInventoryExclusions, now
+    });
   if (!suppliedLegacy.valid || !discoveredLegacy.valid) return fail(!suppliedLegacy.valid ? suppliedLegacy.reason : discoveredLegacy.reason);
   const legacyEntries = [...suppliedLegacy.entries, ...discoveredLegacy.entries];
   const legacy = {
@@ -140,5 +143,46 @@ export function admitV2Run({ authorization, canonicalRemote, readableRepositoryN
   } catch (error) {
     try { fileSystem.rmSync(staging, { recursive: true, force: true }); } catch { /* preserve no partial active admission */ }
     return fail("v2-admission-persist-failed", { detail: error instanceof Error ? error.message : "unknown" });
+  }
+}
+
+/** Persist parent, selected work unit, and initial generation-one claim before any lifecycle phase. */
+export function admitV2Run(input = {}) {
+  return admitV2RunInternal(input, []);
+}
+
+/** Admit only after proving the initializer's exclusion is its exact persisted schema-5 checkpoint. */
+export function admitV2RunFromInitializer(input = {}, { checkpointPath, controllerRecord } = {}) {
+  const fileSystem = input.fileSystem ?? fs;
+  try {
+    const approvedIntentDigest = digestValue(input.authorization);
+    const expectedRunId = `controller-${approvedIntentDigest.slice(0, 32)}`;
+    const providerCapability = validateProviderCapabilities(input.provider);
+    if (!text(input.legacyDirectory) || !text(checkpointPath) || !controllerRecord || typeof controllerRecord !== "object" || Array.isArray(controllerRecord) ||
+        controllerRecord.schemaVersion !== 5 || controllerRecord.runId !== expectedRunId ||
+        controllerRecord.checkpointPath !== path.join("runs", expectedRunId, "controller.json") ||
+        controllerRecord.selectedEntry !== validateAuthorization(input.authorization, input.now) ||
+        controllerRecord.authorizationDigest !== approvedIntentDigest || controllerRecord.repository !== input.repository ||
+        !["pending", "admitted"].includes(controllerRecord.v2Admission?.state) || !providerCapability.valid ||
+        controllerRecord.v2Admission?.repositoryId !== deriveRepositoryId(input.canonicalRemote) ||
+        controllerRecord.v2Admission?.providerBinding?.id !== input.provider?.id ||
+        controllerRecord.v2Admission?.providerBinding?.digest !== digestValue(providerCapability.provider) ||
+        controllerRecord.v2Admission?.parentRunId !== input.parentRunId ||
+        controllerRecord.v2Admission?.workUnitId !== input.workUnitId ||
+        controllerRecord.v2Admission?.claimId !== input.claimId) return fail("initializer-admission-context-invalid");
+    const canonical = (reference) => path.resolve(fileSystem.realpathSync(reference));
+    const root = canonical(input.legacyDirectory);
+    const exactCheckpoint = canonical(checkpointPath);
+    const derivedCheckpoint = canonical(path.resolve(root, controllerRecord.checkpointPath));
+    const relative = path.relative(root, exactCheckpoint);
+    if (!relative || path.isAbsolute(relative) || relative === ".." || relative.startsWith(`..${path.sep}`) ||
+        exactCheckpoint !== derivedCheckpoint || path.basename(exactCheckpoint) !== "controller.json") {
+      return fail("initializer-admission-context-invalid");
+    }
+    const persisted = JSON.parse(fileSystem.readFileSync(exactCheckpoint, "utf8"));
+    if (digestValue(persisted) !== digestValue(controllerRecord)) return fail("initializer-admission-context-invalid");
+    return admitV2RunInternal(input, [exactCheckpoint]);
+  } catch {
+    return fail("initializer-admission-context-invalid");
   }
 }

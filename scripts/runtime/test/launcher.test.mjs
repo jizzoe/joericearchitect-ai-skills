@@ -13,6 +13,7 @@ import {
 } from "../launcher.mjs";
 import { METADATA_SCHEMA_VERSION, runtimePaths, writeJsonAtomically, appendInstalledHistory } from "../runtime-home.mjs";
 import { validateTargetRepository } from "../registry.mjs";
+import { resolveSddDeliveryRequest } from "../../sdd/resolve-sdd-delivery-request.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const temporaryDirectory = (prefix) => fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -65,6 +66,82 @@ test("a declared subcommand helper dispatches with its verb", () => {
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.ok, true);
   assert.equal(payload.operation, "degraded-capability-ledger");
+});
+
+test("the staged controller initializes and resumes in real Git-common state without exposing its internal exclusion", () => {
+  const startedAt = "2026-08-20T12:00:00.000Z";
+  const authorization = resolveSddDeliveryRequest({
+    target: "runtime-initializer-repair", mode: "autonomous", qualityProfile: "prototype-rapid",
+    authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h"
+  }, { goalStartedAt: startedAt }).effectiveAuthorization;
+  const provider = {
+    schemaVersion: 1, id: "native-claim", generationFence: true, explicitTakeover: true,
+    durableWrite: true, directoryMetadataDurability: true,
+    platforms: { windows: "LockFileEx", posix: "advisory-lock" }
+  };
+  const basePayload = (stateHome) => ({
+    authorization, repository: "example/runtime-fixture", canonicalRemote: "git@github.com:example/runtime-fixture.git",
+    readableRepositoryName: "runtime-fixture", historyBinding: { id: "local-history", digest: "a".repeat(64) },
+    provider, owner: { host: "fixture-host", boot: "fixture-boot", pidStart: "fixture-process" },
+    stateHome, now: startedAt
+  });
+  const invoke = (target, verb, payload) => {
+    const plan = prepareDispatch({ helper: "autonomous-sdd-controller", verb, target, environment: devEnvironment() });
+    assert.equal(plan.ok, true, JSON.stringify(plan));
+    const result = spawnSync(process.execPath, [plan.modulePath, verb, "--stdin"], {
+      input: JSON.stringify(payload), encoding: "utf8", cwd: target,
+      env: { ...process.env, RUNTIME_HOME: runtimeRoot, AI_SKILLS_TARGET_REPOSITORY: target }
+    });
+    assert.equal(result.status, 0, result.stderr);
+    return JSON.parse(result.stdout).result;
+  };
+
+  const target = syntheticTargetRepository("initializer-target-");
+  const stateHome = temporaryDirectory("initializer-state-");
+  fs.mkdirSync(path.join(target, "config"));
+  fs.writeFileSync(path.join(target, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+  const initialized = invoke(target, "initialize-v2-delivery", basePayload(stateHome));
+  assert.equal(initialized.valid, true, JSON.stringify(initialized));
+  assert.equal(initialized.classification, "initialized");
+  assert.equal(initialized.record.v2Admission.state, "admitted");
+  assert.equal(initialized.record.v2Admission.parentRunId, initialized.admission.parentRun.parentRunId);
+  assert.equal(initialized.record.v2Admission.workUnitId, initialized.admission.workUnit.workUnitId);
+  assert.equal(initialized.record.v2Admission.claimId, initialized.admission.claim.claimId);
+  const commonDirectory = execFileSync("git", ["-C", target, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).trim();
+  assert.equal(fs.existsSync(path.resolve(target, commonDirectory, "sdd-delivery-runs", initialized.record.checkpointPath)), true);
+  const resumed = invoke(target, "initialize-v2-delivery", basePayload(stateHome));
+  assert.equal(resumed.valid, true, JSON.stringify(resumed));
+  assert.equal(resumed.classification, "resumed");
+  assert.equal(resumed.record.runId, initialized.record.runId);
+
+  const bypassTarget = syntheticTargetRepository("admission-bypass-target-");
+  const bypassState = temporaryDirectory("admission-bypass-state-");
+  fs.mkdirSync(path.join(bypassTarget, "config"));
+  fs.writeFileSync(path.join(bypassTarget, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+  const activeController = path.join(bypassTarget, ".git", "sdd-delivery-runs", "runs", "legacy", "controller.json");
+  fs.mkdirSync(path.dirname(activeController), { recursive: true });
+  fs.writeFileSync(activeController, JSON.stringify({
+    schemaVersion: 4, runId: "legacy-run", selectedEntry: "legacy-entry", repository: "example/runtime-fixture",
+    currentPhase: "apply", steps: []
+  }));
+  const bypass = invoke(bypassTarget, "admit-v2-run", {
+    ...basePayload(bypassState), legacyInventoryExclusions: [activeController]
+  });
+  assert.equal(bypass.valid, false);
+  assert.equal(bypass.reason, "legacy-authority-active");
+  assert.equal(fs.existsSync(path.join(bypassState, "repositories")), false);
+
+  const ambiguousTarget = syntheticTargetRepository("initializer-ambiguous-target-");
+  const ambiguousState = temporaryDirectory("initializer-ambiguous-state-");
+  fs.mkdirSync(path.join(ambiguousTarget, "config"));
+  fs.writeFileSync(path.join(ambiguousTarget, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+  const ambiguousController = path.join(ambiguousTarget, ".git", "sdd-delivery-runs", "runs", "unknown", "controller.json");
+  fs.mkdirSync(path.dirname(ambiguousController), { recursive: true });
+  fs.writeFileSync(ambiguousController, JSON.stringify({ schemaVersion: 99 }));
+  const ambiguous = invoke(ambiguousTarget, "initialize-v2-delivery", basePayload(ambiguousState));
+  assert.equal(ambiguous.valid, false);
+  assert.equal(ambiguous.reason, "legacy-inventory-ambiguous");
+  assert.equal(fs.existsSync(path.join(ambiguousState, "repositories")), false);
 });
 
 test("a former library-only helper answers a JSON request with a machine-readable result", () => {

@@ -56,17 +56,39 @@ export function inventoryLegacyRecords(records = [], { reconciliationReceipts = 
   });
 }
 
-/** Read an existing checkpoint tree without rewriting any content or timestamps. */
-export function inventoryLegacyDirectory(directory, { fileSystem = fs, reconciliationReceipts = [], now = new Date().toISOString() } = {}) {
+/** Read actual legacy controller candidates without rewriting their content or timestamps. */
+export function inventoryLegacyDirectory(directory, {
+  fileSystem = fs, reconciliationReceipts = [], excludedReferences = [], now = new Date().toISOString()
+} = {}) {
   if (!text(directory)) return { valid: false, reason: "legacy-directory-input-invalid" };
+  if (!Array.isArray(excludedReferences)) return { valid: false, reason: "legacy-inventory-exclusion-invalid" };
   try {
+    const canonical = (reference) => {
+      const resolved = path.resolve(reference);
+      return fileSystem.existsSync(resolved) && typeof fileSystem.realpathSync === "function"
+        ? path.resolve(fileSystem.realpathSync(resolved))
+        : resolved;
+    };
+    const root = canonical(directory);
+    const exclusions = new Set();
+    for (const reference of excludedReferences) {
+      if (!text(reference)) return { valid: false, reason: "legacy-inventory-exclusion-invalid" };
+      const resolved = canonical(reference);
+      const relative = path.relative(root, resolved);
+      if (!relative || path.isAbsolute(relative) || relative === ".." || relative.startsWith(`..${path.sep}`) || path.basename(resolved) !== "controller.json") {
+        return { valid: false, reason: "legacy-inventory-exclusion-invalid" };
+      }
+      exclusions.add(resolved);
+    }
     if (!fileSystem.existsSync(directory)) return inventoryLegacyRecords([], { reconciliationReceipts, now });
     const files = [];
     const walk = (current) => {
       for (const entry of fileSystem.readdirSync(current, { withFileTypes: true })) {
         const target = path.join(current, entry.name);
         if (entry.isDirectory()) walk(target);
-        else if (entry.isFile() && entry.name.endsWith(".json")) files.push({ reference: target, content: fileSystem.readFileSync(target, "utf8") });
+        else if (entry.isFile() && entry.name === "controller.json" && !exclusions.has(canonical(target))) {
+          files.push({ reference: target, content: fileSystem.readFileSync(target, "utf8") });
+        }
       }
     };
     walk(directory);
