@@ -16,23 +16,27 @@ repository, expiry, lifecycle chain, phase, and checkpoint location, without
 credentials or standing approval grants. The initialization transition MUST NOT
 leave an active v2 repository claim unless the exact matching controller record
 is durably present and recoverable; an interrupted transition MUST return a
-typed recoverable result and make no lifecycle selection. The controller and
-its terminal cleanup receipts MUST reside in a repository-scoped local state
-location outside every removable lifecycle worktree. Before creating or
-selecting a non-primary lifecycle branch or worktree, the controller MUST
-durably register its exact repository, lifecycle role, identity, full head,
-ownership token, recovery reference, and pending delivery binding. A registered
-resource MUST retain its own delivery evidence as the corresponding lifecycle
-pull request is merged; the controller MUST NOT substitute one global final
-head for distinct resource deliveries.
-Each controller record MUST have an immutable generated run identity and a
-checkpoint location derived from that identity; persistence MUST reject
-replacement by a different recorded run. The controller MUST expose executable
-initialization, registration, delivery-binding, and receipt-coupled cleanup transitions so
-required resource evidence is produced by lifecycle work rather than tests. It
-MUST NOT report a controller or ordered queue entry complete unless at least one
-resource was registered and every registered resource has a current delivery
-binding plus a terminal completed or already-completed cleanup receipt.
+typed recoverable result and make no lifecycle selection. Before admission,
+the initializer MUST derive its exact pending controller checkpoint as an
+internal exclusion from legacy inventory and MUST NOT submit unrelated JSON as
+legacy records. The exclusion MUST NOT be caller-selectable or apply to any
+other legacy controller candidate. The controller and its terminal cleanup
+receipts MUST reside in a repository-scoped local state location outside every
+removable lifecycle worktree. Before creating or selecting a non-primary
+lifecycle branch or worktree, the controller MUST durably register its exact
+repository, lifecycle role, identity, full head, ownership token, recovery
+reference, and pending delivery binding. A registered resource MUST retain its
+own delivery evidence as the corresponding lifecycle pull request is merged;
+the controller MUST NOT substitute one global final head for distinct resource
+deliveries. Each controller record MUST have an immutable generated run
+identity and a checkpoint location derived from that identity; persistence MUST
+reject replacement by a different recorded run. The controller MUST expose
+executable initialization, registration, delivery-binding, and receipt-coupled
+cleanup transitions so required resource evidence is produced by lifecycle
+work rather than tests. It MUST NOT report a controller or ordered queue entry
+complete unless at least one resource was registered and every registered
+resource has a current delivery binding plus a terminal completed or
+already-completed cleanup receipt.
 
 #### Scenario: Complete target-explicit delivery starts
 - **WHEN** a valid autonomous `sdd-delivery` request names one change or queue
@@ -49,6 +53,19 @@ binding plus a terminal completed or already-completed cleanup receipt.
   record can both be verified
 - **THEN** it makes no lifecycle selection and leaves no active repository
   claim without a recoverable matching controller context
+
+#### Scenario: Installed initializer inventories real Git-common state
+- **WHEN** the manifest-declared initializer writes its pending schema-5
+  checkpoint in a real repository's Git common controller directory
+- **THEN** it excludes that exact checkpoint from legacy inventory, admits the
+  matching v2 bundle, returns mutually matching controller, parent-run,
+  work-unit, and claim identities, and resumes the same identities on retry
+
+#### Scenario: Genuine legacy ambiguity remains during initialization
+- **WHEN** the same Git-common directory contains another malformed,
+  unknown-schema, or unreconciled active legacy controller candidate
+- **THEN** initialization pauses before creating the v2 parent run, work unit,
+  or claim and preserves the candidate unchanged
 
 #### Scenario: Lifecycle resource is registered before creation
 - **WHEN** the controller is about to create an implementation, Sync, or Archive
