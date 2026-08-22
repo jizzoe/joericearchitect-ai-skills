@@ -28,7 +28,7 @@ head for distinct resource deliveries.
 Each controller record MUST have an immutable generated run identity and a
 checkpoint location derived from that identity; persistence MUST reject
 replacement by a different recorded run. The controller MUST expose executable
-registration, delivery-binding, and receipt-coupled cleanup transitions so
+initialization, registration, delivery-binding, and receipt-coupled cleanup transitions so
 required resource evidence is produced by lifecycle work rather than tests. It
 MUST NOT report a controller or ordered queue entry complete unless at least one
 resource was registered and every registered resource has a current delivery

@@ -45,8 +45,8 @@ the runtime launcher without requiring a caller to import a module path. A
 helper that exports functions rather than providing a command-line entrypoint
 SHALL gain an executable entrypoint declared in the manifest, either a payload
 wrapper that reads a JSON request and writes a JSON result or an enumerated
-subcommand set. A safety-sensitive controller terminalization operation MUST
-or v2 delivery initialization operation MUST be an explicitly declared
+subcommand set. A safety-sensitive controller terminalization or v2 delivery
+initialization operation MUST be an explicitly declared
 subcommand and MUST accept only a structured request. The initialization
 subcommand MUST return machine-readable matching v2-run and controller-record
 identities before any lifecycle action is eligible. The launcher SHALL NOT
