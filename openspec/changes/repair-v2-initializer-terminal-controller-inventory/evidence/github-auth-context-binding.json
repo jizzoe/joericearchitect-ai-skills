@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "selectedEntry": "repair-v2-initializer-terminal-controller-inventory",
+  "operation": "issue-create-or-reuse",
+  "repository": "jizzoe/joericearchitect-ai-skills",
+  "payloadDigest": "d058c9eb586f40df365e6f3f7f84262e9a126e630e325218463dcf8f779c878a",
+  "commandKind": "repository-read",
+  "probeRepository": "jizzoe/joericearchitect-ai-skills",
+  "expiresAt": "2026-08-22T23:37:13.000Z",
+  "recoveryReference": "rerun the exact read-only probe through the active runtime permission boundary"
+}

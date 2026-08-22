@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "selectedEntry": "repair-v2-initializer-terminal-controller-inventory",
+  "repository": "jizzoe/joericearchitect-ai-skills",
+  "title": "[Repair] Recognize terminal schema-5 controllers during v2 initialization",
+  "labels": ["sdd", "type:bug"],
+  "managedBlock": "<!-- sdd-managed:start -->\nOpenSpec change: `repair-v2-initializer-terminal-controller-inventory`\n\n- Proposal: `openspec/changes/repair-v2-initializer-terminal-controller-inventory/proposal.md`\n- Specifications: `openspec/changes/repair-v2-initializer-terminal-controller-inventory/specs/`\n- Design: `openspec/changes/repair-v2-initializer-terminal-controller-inventory/design.md`\n- Tasks: `openspec/changes/repair-v2-initializer-terminal-controller-inventory/tasks.md`\n- Tracking: `openspec/changes/repair-v2-initializer-terminal-controller-inventory/tracking.yaml`\n<!-- sdd-managed:end -->",
+  "payloadDigest": "d058c9eb586f40df365e6f3f7f84262e9a126e630e325218463dcf8f779c878a",
+  "operation": "issue-create-or-reuse",
+  "expiresAt": "2026-08-22T23:37:13.000Z",
+  "ownershipReference": "bootstrap-repair-v2-initializer-terminal-controller-inventory-20260822",
+  "recoveryReference": "reconcile the exact title and payload digest before create-or-reuse"
+}

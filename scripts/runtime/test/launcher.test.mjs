@@ -114,6 +114,61 @@ test("the staged controller initializes and resumes in real Git-common state wit
   assert.equal(resumed.classification, "resumed");
   assert.equal(resumed.record.runId, initialized.record.runId);
 
+  const checkpoint = path.resolve(target, commonDirectory, "sdd-delivery-runs", initialized.record.checkpointPath);
+  const completedController = structuredClone(initialized.record);
+  completedController.currentPhase = null;
+  completedController.steps = completedController.steps.map((step) => ({ ...step, status: "complete", evidence: { current: true, reference: step.id } }));
+  fs.writeFileSync(checkpoint, `${JSON.stringify(completedController, null, 2)}\n`);
+  const controllerBefore = fs.readFileSync(checkpoint, "utf8");
+  const terminalized = invoke(target, "terminalize-v2-run", {
+    readableRepositoryName: "runtime-fixture",
+    terminalization: {
+      schemaVersion: 1,
+      parentRunId: initialized.admission.parentRun.parentRunId,
+      workUnitId: initialized.admission.workUnit.workUnitId,
+      claimId: initialized.admission.claim.claimId,
+      repositoryId: initialized.admission.repositoryId,
+      approvedChangeId: initialized.admission.workUnit.approvedChangeId,
+      provider,
+      completionEvidence: {
+        current: true,
+        implementation: { merged: true, reference: "implementation-pr", deliveredHeadCommit: "d".repeat(40) },
+        sync: { merged: true, reference: "sync-pr", deliveredHeadCommit: "e".repeat(40) },
+        archive: { merged: true, reference: "archive-pr", deliveredHeadCommit: "f".repeat(40) },
+        issueClosed: true, projectDone: true, cleanupCompleted: true, observedAt: "2026-08-20T12:20:00.000Z"
+      },
+      terminal: {
+        terminalStatus: "complete", terminalReason: "delivered-and-archived", terminalAt: "2026-08-20T12:30:00.000Z",
+        finalHead: "f".repeat(40), attemptCount: 1, correctionCount: 0, cleanupDisposition: "completed",
+        childHistoryReference: "external-delivery-evidence", childHistoryDigest: "d".repeat(64)
+      }
+    },
+    stateHome,
+    now: "2026-08-20T12:31:00.000Z"
+  });
+  assert.equal(terminalized.classification, "terminalized", JSON.stringify(terminalized));
+  const archiveBefore = new Map(fs.readdirSync(terminalized.archivePath).map((name) => [name, fs.readFileSync(path.join(terminalized.archivePath, name), "utf8")]));
+  const nextAuthorization = resolveSddDeliveryRequest({
+    target: "runtime-after-terminal", mode: "autonomous", qualityProfile: "prototype-rapid",
+    authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h"
+  }, { goalStartedAt: startedAt }).effectiveAuthorization;
+  const unmatchedController = path.resolve(target, commonDirectory, "sdd-delivery-runs", "runs", "unmatched", "controller.json");
+  fs.mkdirSync(path.dirname(unmatchedController), { recursive: true });
+  fs.writeFileSync(unmatchedController, `${JSON.stringify({ ...completedController, runId: "controller-unmatched-sibling" })}\n`);
+  const unmatchedSibling = invoke(target, "initialize-v2-delivery", { ...basePayload(stateHome), authorization: nextAuthorization });
+  assert.equal(unmatchedSibling.valid, false);
+  assert.equal(unmatchedSibling.reason, "legacy-inventory-ambiguous");
+  assert.deepEqual(fs.readdirSync(initialized.admission.paths.active), []);
+  fs.rmSync(path.dirname(unmatchedController), { recursive: true });
+  const afterTerminal = invoke(target, "initialize-v2-delivery", { ...basePayload(stateHome), authorization: nextAuthorization });
+  assert.equal(afterTerminal.valid, true, JSON.stringify(afterTerminal));
+  assert.equal(afterTerminal.classification, "initialized");
+  assert.equal(fs.readFileSync(checkpoint, "utf8"), controllerBefore);
+  for (const [name, content] of archiveBefore) assert.equal(fs.readFileSync(path.join(terminalized.archivePath, name), "utf8"), content);
+  const afterTerminalRetry = invoke(target, "initialize-v2-delivery", { ...basePayload(stateHome), authorization: nextAuthorization });
+  assert.equal(afterTerminalRetry.classification, "resumed");
+  assert.equal(afterTerminalRetry.record.runId, afterTerminal.record.runId);
+
   const bypassTarget = syntheticTargetRepository("admission-bypass-target-");
   const bypassState = temporaryDirectory("admission-bypass-state-");
   fs.mkdirSync(path.join(bypassTarget, "config"));

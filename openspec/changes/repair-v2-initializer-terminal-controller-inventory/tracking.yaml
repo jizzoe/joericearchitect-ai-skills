@@ -1,0 +1,16 @@
+schema_version: 1
+openspec:
+  change: repair-v2-initializer-terminal-controller-inventory
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 193
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/193
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - openspec/changes/repair-v2-initializer-terminal-controller-inventory/
+      - scripts/sdd/
+      - scripts/runtime/test/launcher.test.mjs

@@ -51,6 +51,22 @@ const terminalizationFor = (admitted) => ({
   }
 });
 
+function terminalControllerArchiveFixture() {
+  const stateHome = root();
+  const repositoryPath = root();
+  fs.mkdirSync(path.join(repositoryPath, ".git"));
+  fs.mkdirSync(path.join(repositoryPath, "config"));
+  fs.writeFileSync(path.join(repositoryPath, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+  const common = path.join(repositoryPath, ".git", "sdd-delivery-runs");
+  const initialized = initializeV2Delivery({ ...fixture(stateHome), repository: "owner/repository", repositoryPath, legacyDirectory: common, runGit: () => ".git" });
+  const controller = structuredClone(initialized.record);
+  controller.currentPhase = null;
+  controller.steps = controller.steps.map((step) => ({ ...step, status: "complete", evidence: { current: true } }));
+  fs.writeFileSync(initialized.checkpointPath, `${JSON.stringify(controller, null, 2)}\n`);
+  const terminalized = terminalizeV2Run({ readableRepositoryName: "repository", stateHome, terminalization: terminalizationFor(initialized.admission), now: "2026-08-20T12:31:00.000Z" });
+  return { stateHome, repositoryPath, common, initialized, controller, terminalized };
+}
+
 test("legacy inventory is read-only, deterministic, and blocks dual authority", () => {
   const legacy = { schemaVersion: 4, runId: "legacy-run-001", selectedEntry: "v2-contract", repository: "owner/repository", currentPhase: "apply", steps: [] };
   assert.equal(decodeLegacyRecord(legacy).classification, "active-legacy");
@@ -82,6 +98,14 @@ test("legacy directory inventory ignores non-controller JSON and keeps unknown c
     const result = inventoryLegacyDirectory(directory);
     assert.equal(result.classification, "ambiguous");
     assert.equal(result.ambiguous[0].reason, "legacy-schema-unknown");
+    const content = fs.readFileSync(candidate, "utf8");
+    const callerAssertion = inventoryLegacyRecords([{ reference: candidate, content }], {
+      verifiedTerminalV2Controllers: [{
+        reference: candidate, recordDigest: legacyRecordDigest(content), runId: "unknown",
+        selectedEntry: "v2-contract", repository: "owner/repository"
+      }]
+    });
+    assert.equal(callerAssertion.classification, "ambiguous");
     assert.equal(fs.readFileSync(candidate, "utf8"), candidateBefore);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
@@ -167,6 +191,123 @@ test("controller initialization persists exact pending context before admitting 
   } finally {
     fs.rmSync(stateHome, { recursive: true, force: true });
     fs.rmSync(repositoryPath, { recursive: true, force: true });
+  }
+});
+
+test("installed initializer admits after a prior schema-5 controller has exact immutable terminal archive evidence", () => {
+  const stateHome = root();
+  const repositoryPath = root();
+  const nextAuthorization = resolveSddDeliveryRequest({ target: "next-change", mode: "autonomous", qualityProfile: "prototype-rapid", authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h" }, { goalStartedAt: now }).effectiveAuthorization;
+  try {
+    fs.mkdirSync(path.join(repositoryPath, ".git"));
+    fs.mkdirSync(path.join(repositoryPath, "config"));
+    fs.writeFileSync(path.join(repositoryPath, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+    const common = path.join(repositoryPath, ".git", "sdd-delivery-runs");
+    const first = initializeV2Delivery({
+      ...fixture(stateHome), repository: "owner/repository", repositoryPath,
+      legacyDirectory: common, runGit: () => ".git"
+    });
+    assert.equal(first.valid, true, JSON.stringify(first));
+    const terminalController = structuredClone(first.record);
+    terminalController.currentPhase = null;
+    terminalController.steps = terminalController.steps.map((step) => ({ ...step, status: "complete", evidence: { current: true, reference: step.id } }));
+    fs.writeFileSync(first.checkpointPath, `${JSON.stringify(terminalController, null, 2)}\n`);
+    assert.equal(JSON.parse(fs.readFileSync(first.checkpointPath, "utf8")).currentPhase, null);
+    const controllerBefore = fs.readFileSync(first.checkpointPath, "utf8");
+    const terminalized = terminalizeV2Run({ readableRepositoryName: "repository", stateHome, terminalization: terminalizationFor(first.admission), now: "2026-08-20T12:31:00.000Z" });
+    assert.equal(terminalized.classification, "terminalized", JSON.stringify(terminalized));
+    assert.equal(JSON.parse(fs.readFileSync(first.checkpointPath, "utf8")).currentPhase, null);
+    const archiveBefore = new Map(fs.readdirSync(terminalized.archivePath).map((name) => [name, fs.readFileSync(path.join(terminalized.archivePath, name), "utf8")]));
+
+    const next = initializeV2Delivery({
+      ...fixture(stateHome, { authorization: nextAuthorization }), repository: "owner/repository", repositoryPath,
+      legacyDirectory: common, runGit: () => ".git"
+    });
+    assert.equal(next.valid, true, JSON.stringify(next));
+    assert.equal(next.classification, "initialized");
+    assert.notEqual(next.record.runId, terminalController.runId);
+    const retried = initializeV2Delivery({
+      ...fixture(stateHome, { authorization: nextAuthorization }), repository: "owner/repository", repositoryPath,
+      legacyDirectory: common, runGit: () => ".git"
+    });
+    assert.equal(retried.classification, "resumed");
+    assert.equal(retried.record.v2Admission.parentRunId, next.record.v2Admission.parentRunId);
+    assert.equal(fs.readFileSync(first.checkpointPath, "utf8"), controllerBefore);
+    for (const [name, content] of archiveBefore) assert.equal(fs.readFileSync(path.join(terminalized.archivePath, name), "utf8"), content);
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+  }
+});
+
+test("terminal-looking schema-5 controller remains ambiguous when immutable archive identity is mismatched", () => {
+  const stateHome = root();
+  const repositoryPath = root();
+  const nextAuthorization = resolveSddDeliveryRequest({ target: "next-change", mode: "autonomous", qualityProfile: "prototype-rapid", authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h" }, { goalStartedAt: now }).effectiveAuthorization;
+  try {
+    fs.mkdirSync(path.join(repositoryPath, ".git"));
+    fs.mkdirSync(path.join(repositoryPath, "config"));
+    fs.writeFileSync(path.join(repositoryPath, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+    const common = path.join(repositoryPath, ".git", "sdd-delivery-runs");
+    const first = initializeV2Delivery({ ...fixture(stateHome), repository: "owner/repository", repositoryPath, legacyDirectory: common, runGit: () => ".git" });
+    const terminalController = structuredClone(first.record);
+    terminalController.currentPhase = null;
+    terminalController.steps = terminalController.steps.map((step) => ({ ...step, status: "complete", evidence: { current: true } }));
+    fs.writeFileSync(first.checkpointPath, `${JSON.stringify(terminalController)}\n`);
+    const terminalized = terminalizeV2Run({ readableRepositoryName: "repository", stateHome, terminalization: terminalizationFor(first.admission), now: "2026-08-20T12:31:00.000Z" });
+    const receiptPath = path.join(terminalized.archivePath, "terminalization-receipt.json");
+    const receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8"));
+    receipt.approvedChangeId = "different-change";
+    fs.writeFileSync(receiptPath, `${JSON.stringify(receipt)}\n`);
+    const result = initializeV2Delivery({ ...fixture(stateHome, { authorization: nextAuthorization }), repository: "owner/repository", repositoryPath, legacyDirectory: common, runGit: () => ".git" });
+    assert.equal(result.reason, "legacy-inventory-ambiguous");
+    const active = path.join(stateHome, "repositories", "repository--" + deriveRepositoryId("git@github.com:owner/repository.git").slice(3, 15), "active");
+    assert.deepEqual(fs.readdirSync(active), []);
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+  }
+});
+
+test("terminal schema-5 compatibility fails closed for incomplete, escaped, duplicated, or conflicting evidence", () => {
+  const nextAuthorization = resolveSddDeliveryRequest({ target: "next-change", mode: "autonomous", qualityProfile: "prototype-rapid", authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h" }, { goalStartedAt: now }).effectiveAuthorization;
+  const cases = [
+    ["active controller", ({ initialized }) => fs.writeFileSync(initialized.checkpointPath, `${JSON.stringify(initialized.record)}\n`)],
+    ["pending controller", ({ initialized, controller }) => fs.writeFileSync(initialized.checkpointPath, `${JSON.stringify({ ...controller, v2Admission: { ...controller.v2Admission, state: "pending" } })}\n`)],
+    ["missing release", ({ terminalized }) => fs.rmSync(path.join(terminalized.archivePath, "claim-release.json"))],
+    ["malformed projection", ({ terminalized }) => fs.writeFileSync(path.join(terminalized.archivePath, "projection.json"), "not-json")],
+    ["repository conflict", ({ initialized, controller }) => fs.writeFileSync(initialized.checkpointPath, `${JSON.stringify({ ...controller, repository: "other/repository" })}\n`)],
+    ["authorization conflict", ({ initialized, controller }) => fs.writeFileSync(initialized.checkpointPath, `${JSON.stringify({ ...controller, authorizationDigest: "0".repeat(64) })}\n`)],
+    ["provider conflict", ({ initialized, controller }) => fs.writeFileSync(initialized.checkpointPath, `${JSON.stringify({ ...controller, v2Admission: { ...controller.v2Admission, providerBinding: { ...controller.v2Admission.providerBinding, digest: "0".repeat(64) } } })}\n`)],
+    ["identity conflict", ({ initialized, controller }) => fs.writeFileSync(initialized.checkpointPath, `${JSON.stringify({ ...controller, v2Admission: { ...controller.v2Admission, claimId: "different-claim" } })}\n`)],
+    ["digest conflict", ({ terminalized }) => {
+      const manifestPath = path.join(terminalized.archivePath, "archive-manifest.json");
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      fs.writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, projectionDigest: "0".repeat(64) })}\n`);
+    }],
+    ["duplicate archive", ({ terminalized }) => {
+      const duplicate = path.join(path.dirname(path.dirname(terminalized.archivePath)), "21", path.basename(terminalized.archivePath));
+      fs.mkdirSync(path.dirname(duplicate), { recursive: true });
+      fs.cpSync(terminalized.archivePath, duplicate, { recursive: true });
+    }],
+    ["symlinked archive", ({ terminalized }) => {
+      const real = `${terminalized.archivePath}-real`;
+      fs.renameSync(terminalized.archivePath, real);
+      fs.symlinkSync(real, terminalized.archivePath, "dir");
+    }]
+  ];
+  for (const [name, mutate] of cases) {
+    const setup = terminalControllerArchiveFixture();
+    try {
+      mutate(setup);
+      const result = initializeV2Delivery({ ...fixture(setup.stateHome, { authorization: nextAuthorization }), repository: "owner/repository", repositoryPath: setup.repositoryPath, legacyDirectory: setup.common, runGit: () => ".git" });
+      assert.equal(result.reason, "legacy-inventory-ambiguous", name);
+      const active = path.join(setup.stateHome, "repositories", "repository--" + deriveRepositoryId("git@github.com:owner/repository.git").slice(3, 15), "active");
+      assert.deepEqual(fs.readdirSync(active), [], name);
+    } finally {
+      fs.rmSync(setup.stateHome, { recursive: true, force: true });
+      fs.rmSync(setup.repositoryPath, { recursive: true, force: true });
+    }
   }
 });
 
