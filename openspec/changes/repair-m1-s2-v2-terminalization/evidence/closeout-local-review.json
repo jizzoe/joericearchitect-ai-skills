@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "skill": "base-code-review",
+  "status": "completed",
+  "mode": "autonomous",
+  "summary": "Bounded same-session local review found no objective findings in the M1-S2 post-release evidence reconciliation.",
+  "artifacts": [
+    {
+      "kind": "file",
+      "operation": "read",
+      "subject": "openspec/changes/repair-m1-s2-v2-terminalization/tasks.md"
+    },
+    {
+      "kind": "file",
+      "operation": "read",
+      "subject": "openspec/changes/repair-m1-s2-v2-terminalization/evidence/post-release-operational-evidence.md"
+    },
+    {
+      "kind": "file",
+      "operation": "read",
+      "subject": "ai-planning/handoff-docs/autonomous-sdd-blocker-register-and-plain-english-handoff.md"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "focused-suite",
+      "type": "test",
+      "subject": "terminalization, admission, run-contract, and installed-wrapper behavior",
+      "result": "passed",
+      "reference": "63 tests at the reviewed worktree"
+    },
+    {
+      "id": "full-suite",
+      "type": "test",
+      "subject": "repository Node suites",
+      "result": "passed",
+      "reference": "367 tests at the reviewed worktree"
+    },
+    {
+      "id": "openspec-strict",
+      "type": "validation",
+      "subject": "living specs and active change",
+      "result": "passed",
+      "reference": "38 strict validation items"
+    },
+    {
+      "id": "operational-receipts",
+      "type": "review",
+      "subject": "M1-S2 claim release and later M1-S3 admission/terminalization",
+      "result": "passed",
+      "reference": "immutable local-state terminalization receipts and claim-release record"
+    },
+    {
+      "id": "github-lifecycle",
+      "type": "review",
+      "subject": "issue #162 and Project 1 item",
+      "result": "passed",
+      "reference": "issue CLOSED; Project item PVTI_lAHOADpDHM4Bfzvdzg3mCwA Done"
+    }
+  ],
+  "assumptions": [],
+  "openQuestions": [],
+  "nextAction": {
+    "kind": "continue",
+    "description": "Deliver the exact closeout-evidence head, then perform content-preserving Archive and exact cleanup."
+  },
+  "details": {
+    "assurance": "local-review",
+    "worker": {
+      "executionIdentity": "same-session-local-review-worker",
+      "sameSession": true,
+      "readOnly": true,
+      "canMutate": false,
+      "canApprove": false
+    },
+    "reviewedScope": {
+      "targets": [
+        "openspec/changes/repair-m1-s2-v2-terminalization/tasks.md",
+        "openspec/changes/repair-m1-s2-v2-terminalization/evidence/post-release-operational-evidence.md",
+        "ai-planning/handoff-docs/autonomous-sdd-blocker-register-and-plain-english-handoff.md"
+      ],
+      "contextPaths": [
+        "openspec/changes/repair-m1-s2-v2-terminalization/proposal.md",
+        "openspec/changes/repair-m1-s2-v2-terminalization/design.md",
+        "openspec/changes/repair-m1-s2-v2-terminalization/specs/autonomous-sdd-run-contract/spec.md",
+        "openspec/changes/repair-m1-s2-v2-terminalization/specs/autonomous-sdd-v2-terminalization/spec.md",
+        "openspec/changes/repair-m1-s2-v2-terminalization/specs/shared-sdd-runtime-distribution/spec.md"
+      ],
+      "evidenceIds": [
+        "focused-suite",
+        "full-suite",
+        "openspec-strict",
+        "operational-receipts",
+        "github-lifecycle"
+      ]
+    },
+    "findings": [],
+    "coverage": [
+      {
+        "area": "post-release task evidence and identity consistency",
+        "status": "reviewed",
+        "evidenceIds": ["operational-receipts"]
+      },
+      {
+        "area": "OpenSpec completeness and living-spec coherence",
+        "status": "reviewed",
+        "evidenceIds": ["openspec-strict"]
+      },
+      {
+        "area": "issue, Project, recovery, and cleanup readiness",
+        "status": "reviewed",
+        "evidenceIds": ["github-lifecycle"]
+      },
+      {
+        "area": "security, credentials, and portability",
+        "status": "reviewed",
+        "evidenceIds": ["operational-receipts"]
+      }
+    ],
+    "standardsSelection": {
+      "selectedRuleIds": [],
+      "scopedOverrides": [],
+      "notApplicableRuleIds": []
+    },
+    "evidenceGaps": [],
+    "scopeSummary": "Reviewed only the documentation-only closeout reconciliation. No runtime, spec behavior, durable run record, credential, or unrelated repository content changed."
+  }
+}
