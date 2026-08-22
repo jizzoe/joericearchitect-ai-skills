@@ -160,7 +160,7 @@ export function admitV2RunFromInitializer(input = {}, { checkpointPath, controll
     const providerCapability = validateProviderCapabilities(input.provider);
     if (!text(input.legacyDirectory) || !text(checkpointPath) || !controllerRecord || typeof controllerRecord !== "object" || Array.isArray(controllerRecord) ||
         controllerRecord.schemaVersion !== 5 || controllerRecord.runId !== expectedRunId ||
-        controllerRecord.checkpointPath !== path.join("runs", expectedRunId, "controller.json") ||
+        controllerRecord.checkpointPath !== path.posix.join("runs", expectedRunId, "controller.json") ||
         controllerRecord.selectedEntry !== validateAuthorization(input.authorization, input.now) ||
         controllerRecord.authorizationDigest !== approvedIntentDigest || controllerRecord.repository !== input.repository ||
         !["pending", "admitted"].includes(controllerRecord.v2Admission?.state) || !providerCapability.valid ||

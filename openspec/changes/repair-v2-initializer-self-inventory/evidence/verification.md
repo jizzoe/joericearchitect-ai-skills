@@ -40,6 +40,12 @@ Workspace: bridge-owned implementation worktree for
   `fsync` while skipping only the unsupported Windows directory operation;
   focused and full local suites reran successfully, with exact-head Windows CI
   required again at the pull-request delivery gate.
+- `windows-checkpoint-relative-format-v1`, attempt 1/3: the next exact-head
+  Windows run proved the durable forward-slash checkpoint value was compared
+  with platform-native separators. The validator now uses `path.posix.join`
+  for the record contract and native resolved paths for filesystem access;
+  focused and full local suites reran successfully, with exact-head Windows CI
+  required again at the pull-request delivery gate.
 
 No objective or human-decision findings remain. The special pre-v2 bridge is
 the durable authorization/correction boundary for this repair because the

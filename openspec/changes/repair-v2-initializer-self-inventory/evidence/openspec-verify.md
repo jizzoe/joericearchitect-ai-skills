@@ -25,6 +25,8 @@ high, medium, or low unresolved findings remain.
 - Controller persistence keeps file `fsync` and atomic rename on every host,
   retains directory `fsync` where Node supports it, and relies on the already
   validated provider capability on Windows where Node rejects directory opens.
+- Durable checkpoint references retain their portable POSIX separator contract
+  while canonical filesystem access remains platform native.
 
 ## Coherence
 
