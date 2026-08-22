@@ -34,6 +34,12 @@ Workspace: bridge-owned implementation worktree for
 - `initializer-admission-context-object-predicate-missing`, attempt 1/3: fixed
   the undefined predicate in the new validation path; focused and full suites
   reran successfully.
+- `windows-controller-directory-fsync-v1`, attempt 1/3: exact-head Windows CI
+  proved Node cannot open a directory for `fsync`. The correction retains file
+  `fsync`, atomic rename, validated provider durability, and POSIX directory
+  `fsync` while skipping only the unsupported Windows directory operation;
+  focused and full local suites reran successfully, with exact-head Windows CI
+  required again at the pull-request delivery gate.
 
 No objective or human-decision findings remain. The special pre-v2 bridge is
 the durable authorization/correction boundary for this repair because the

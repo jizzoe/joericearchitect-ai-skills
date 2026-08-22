@@ -22,6 +22,9 @@ high, medium, or low unresolved findings remain.
   schema-5 record with its derived contained path and matching authorization,
   repository, provider, parent-run, work-unit, and claim identities.
 - First initialization and exact retry return matching identities.
+- Controller persistence keeps file `fsync` and atomic rename on every host,
+  retains directory `fsync` where Node supports it, and relies on the already
+  validated provider capability on Windows where Node rejects directory opens.
 
 ## Coherence
 

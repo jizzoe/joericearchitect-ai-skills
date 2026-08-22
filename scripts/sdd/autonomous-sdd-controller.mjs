@@ -781,11 +781,16 @@ export function persistControllerRecord({ repositoryPath, record, runGit } = {})
       fs.closeSync(descriptor);
     }
     fs.renameSync(temporary, destination);
-    const directoryDescriptor = fs.openSync(directory, "r");
-    try {
-      fs.fsyncSync(directoryDescriptor);
-    } finally {
-      fs.closeSync(directoryDescriptor);
+    // Node cannot open directories for fsync on Windows. The admitted provider
+    // owns directory-metadata durability there; retain the explicit fsync on
+    // POSIX hosts where Node exposes it.
+    if (process.platform !== "win32") {
+      const directoryDescriptor = fs.openSync(directory, "r");
+      try {
+        fs.fsyncSync(directoryDescriptor);
+      } finally {
+        fs.closeSync(directoryDescriptor);
+      }
     }
     return { valid: true, path: destination };
   } catch {

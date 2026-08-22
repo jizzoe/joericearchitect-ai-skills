@@ -3,7 +3,7 @@
   "skill": "base-code-review",
   "status": "completed",
   "mode": "autonomous",
-  "summary": "Fresh bounded same-session local review found no remaining findings after the direct-admission exclusion boundary and its focused regression were corrected.",
+  "summary": "Fresh bounded same-session local review found no remaining findings after the direct-admission exclusion boundary and Windows directory-fsync portability defects were corrected.",
   "artifacts": [
     { "kind": "file", "operation": "read", "subject": "scripts/sdd/autonomous-sdd-legacy.mjs" },
     { "kind": "file", "operation": "read", "subject": "scripts/sdd/autonomous-sdd-admission.mjs" },
@@ -19,7 +19,7 @@
     { "id": "staged-runtime", "type": "test", "subject": "built runtime launcher against real Git-common state", "result": "passed", "reference": "installed-wrapper critical-flow test after final correction" },
     { "id": "full-node", "type": "test", "subject": "all repository Node suites", "result": "passed", "reference": "367 local Node tests after final correction" },
     { "id": "strict-openspec", "type": "validation", "subject": "all OpenSpec specs and active changes", "result": "passed", "reference": "39 strict validation items" },
-    { "id": "scope-security", "type": "review", "subject": "complete changed scope, caller boundary, path containment, recovery, secrets, portability, and attribution", "result": "passed", "reference": "fresh same-session read-only review after all corrections" }
+    { "id": "scope-security", "type": "review", "subject": "complete changed scope, caller boundary, path containment, recovery, secrets, portability, and attribution", "result": "passed", "reference": "fresh same-session read-only review after all local corrections; exact-head Windows rerun remains a delivery gate" }
   ],
   "assumptions": [],
   "openQuestions": [],
@@ -59,6 +59,6 @@
     ],
     "standardsSelection": { "selectedRuleIds": [], "scopedOverrides": [], "notApplicableRuleIds": [] },
     "evidenceGaps": [],
-    "scopeSummary": "Reviewed only the exact initializer self-inventory repair and every changed root. Raw admission cannot honor caller exclusions; initializer admission can exclude only its byte-matching persisted schema-5 checkpoint with matching authorization, repository, provider, and admission identities; every other genuine controller remains immutable and fail-closed."
+    "scopeSummary": "Reviewed only the exact initializer self-inventory repair and every changed root. Raw admission cannot honor caller exclusions; initializer admission can exclude only its byte-matching persisted schema-5 checkpoint with matching authorization, repository, provider, and admission identities; every other genuine controller remains immutable and fail-closed. Checkpoint persistence retains file fsync and atomic rename on all hosts, POSIX directory fsync, and the validated provider durability boundary where Node cannot open directories on Windows."
   }
 }
