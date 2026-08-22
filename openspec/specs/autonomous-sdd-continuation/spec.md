@@ -9,9 +9,14 @@ delivery without broadening ordinary standalone lifecycle actions.
 The system SHALL accept autonomous continuation only after resolving an explicit
 change or ordered queue, mode, quality profile, authorization profile,
 independent-review policy, and expiry. Before it selects work or mutates state,
-it MUST persist a portable selected-entry record binding authorization digest,
-selected entry, repository, expiry, lifecycle chain, phase, and checkpoint
-location, without credentials or standing approval grants. The controller and
+it MUST invoke one declared initialization transition that durably creates a
+portable selected-entry controller record and its matching v2 run. The
+controller record MUST bind the authorization digest, selected entry,
+repository, expiry, lifecycle chain, phase, and checkpoint location, without
+credentials or standing approval grants. The initialization transition MUST NOT
+leave an active v2 repository claim unless the exact matching controller record
+is durably present and recoverable; an interrupted transition MUST return a
+typed recoverable result and make no lifecycle selection. The controller and
 its terminal cleanup receipts MUST reside in a repository-scoped local state
 location outside every removable lifecycle worktree. Before creating or
 selecting a non-primary lifecycle branch or worktree, the controller MUST
@@ -31,11 +36,19 @@ binding plus a terminal completed or already-completed cleanup receipt.
 
 #### Scenario: Complete target-explicit delivery starts
 - **WHEN** a valid autonomous `sdd-delivery` request names one change or queue
-- **THEN** the controller reports normalized authorization and persists context before lifecycle selection
+- **THEN** the declared initializer reports normalized authorization and
+  persists mutually matching v2-run and controller contexts before lifecycle
+  selection
 
 #### Scenario: Intake is incomplete or invalid
 - **WHEN** a delivery request lacks, conflicts on, or invalidly formats required input
 - **THEN** the controller makes no selection or mutation and returns one consolidated clarification
+
+#### Scenario: Initialization is interrupted before admission completes
+- **WHEN** initialization is interrupted before the v2 run and exact controller
+  record can both be verified
+- **THEN** it makes no lifecycle selection and leaves no active repository
+  claim without a recoverable matching controller context
 
 #### Scenario: Lifecycle resource is registered before creation
 - **WHEN** the controller is about to create an implementation, Sync, or Archive
