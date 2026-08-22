@@ -24,6 +24,12 @@ module path.
   structured request rather than importing or directly executing a workspace
   module
 
+#### Scenario: V2 delivery is initialized through the installed runtime
+- **WHEN** an authorized canonical lifecycle skill begins a new v2 delivery
+- **THEN** it invokes the manifest-declared initialization subcommand and
+  receives matching recoverable v2-run and controller-record identities before
+  lifecycle selection
+
 #### Scenario: A caller requests a module path
 - **WHEN** a caller asks the launcher to resolve, print, or return a filesystem
   path to a runtime module for import
