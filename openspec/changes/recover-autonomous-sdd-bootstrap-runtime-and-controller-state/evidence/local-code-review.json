@@ -26,7 +26,7 @@
   ],
   "assumptions": [],
   "openQuestions": [],
-  "nextAction": { "kind": "continue", "description": "Proceed to deliver the implementation PR, then Sync, Archive, runtime-only installation, exact expired-controller cancellation, owned cleanup, and the planning-only M2-S1 Explore." },
+  "nextAction": { "kind": "continue", "description": "Implementation PR opened at #204; proceed to merge, then Sync, Archive, runtime-only installation, exact expired-controller cancellation, owned cleanup, and the planning-only M2-S1 Explore." },
   "details": {
     "assurance": "local-review",
     "worker": { "executionIdentity": "same-session-local-review-worker", "sameSession": true, "readOnly": true, "canMutate": false, "canApprove": false },
