@@ -4,7 +4,7 @@ export const RUN_CONTRACT_VERSION = 2;
 export const RECORD_KINDS = Object.freeze([
   "repository", "parent-run", "work-unit", "transition-attempt", "resource-claim",
   "evidence", "projection", "archive-manifest", "legacy-classification",
-  "claim-release", "terminalization-receipt"
+  "claim-release", "terminalization-receipt", "cancellation-receipt"
 ]);
 export const PARENT_CHILD_SUMMARY_KEYS = Object.freeze([
   "workUnitId", "ordinal", "approvedChangeId", "terminalStatus", "terminalReason",
@@ -85,10 +85,14 @@ function validParentSummary(value) {
   if (!object(value) || !exactKeys(value, PARENT_CHILD_SUMMARY_KEYS) || !identifier.test(value.workUnitId) ||
       !Number.isInteger(value.ordinal) || value.ordinal < 1 || !identifier.test(value.approvedChangeId) ||
       !text(value.terminalStatus) || !text(value.terminalReason) || !timestamp(value.startedAt) ||
-      !timestamp(value.terminalAt) || !text(value.finalHead) || !Number.isInteger(value.attemptCount) ||
+      !timestamp(value.terminalAt) || !Number.isInteger(value.attemptCount) ||
       value.attemptCount < 0 || !Number.isInteger(value.correctionCount) || value.correctionCount < 0 ||
-      !text(value.claimDisposition) || !text(value.cleanupDisposition) || !text(value.childHistoryReference) ||
-      !digest.test(value.childHistoryDigest) || !digest.test(value.terminalSummaryDigest)) return false;
+      !text(value.claimDisposition) || !text(value.cleanupDisposition) || !digest.test(value.terminalSummaryDigest)) return false;
+  if (value.terminalStatus === "cancelled") {
+    if (value.finalHead !== null || value.childHistoryReference !== null || value.childHistoryDigest !== null) return false;
+  } else if (!text(value.finalHead) || !text(value.childHistoryReference) || !digest.test(value.childHistoryDigest)) {
+    return false;
+  }
   return Date.parse(value.terminalAt) >= Date.parse(value.startedAt);
 }
 
@@ -184,10 +188,14 @@ export function validateLegacyClassification(record) {
 }
 
 export function validateClaimRelease(record) {
-  return exactKeys(record, ["kind", "schemaVersion", "claimId", "repositoryId", "workUnitId", "disposition", "releasedAt", "terminalizationReceiptDigest"]) &&
-    record.kind === "claim-release" && record.schemaVersion === RUN_CONTRACT_VERSION && identifier.test(record.claimId) &&
-    /^r1-[0-9a-f]{64}$/i.test(record.repositoryId) && identifier.test(record.workUnitId) && record.disposition === "released" &&
-    timestamp(record.releasedAt) && digest.test(record.terminalizationReceiptDigest) && !hasSensitiveValue(record);
+  if (!exactKeys(record, ["kind", "schemaVersion", "claimId", "repositoryId", "workUnitId", "disposition", "releasedAt", "terminalizationReceiptDigest", "cancellationReceiptDigest"]) ||
+      record.kind !== "claim-release" || record.schemaVersion !== RUN_CONTRACT_VERSION || !identifier.test(record.claimId) ||
+      !/^r1-[0-9a-f]{64}$/i.test(record.repositoryId) || !identifier.test(record.workUnitId) || record.disposition !== "released" ||
+      !timestamp(record.releasedAt)) return false;
+  const terminalization = record.terminalizationReceiptDigest !== undefined;
+  const cancellation = record.cancellationReceiptDigest !== undefined;
+  if (terminalization === cancellation) return false;
+  return digest.test(terminalization ? record.terminalizationReceiptDigest : record.cancellationReceiptDigest) && !hasSensitiveValue(record);
 }
 
 export function validateTerminalizationReceipt(record) {
@@ -196,6 +204,14 @@ export function validateTerminalizationReceipt(record) {
     identifier.test(record.workUnitId) && identifier.test(record.claimId) && /^r1-[0-9a-f]{64}$/i.test(record.repositoryId) &&
     identifier.test(record.approvedChangeId) && digest.test(record.requestDigest) && digest.test(record.completionEvidenceDigest) &&
     validParentSummary(record.terminalSummary) && timestamp(record.createdAt) && !hasSensitiveValue(record);
+}
+
+export function validateCancellationReceipt(record) {
+  return exactKeys(record, ["kind", "schemaVersion", "controllerRunId", "parentRunId", "workUnitId", "claimId", "repositoryId", "approvedChangeId", "requestDigest", "expiresAt", "createdAt"]) &&
+    record.kind === "cancellation-receipt" && record.schemaVersion === RUN_CONTRACT_VERSION && identifier.test(record.controllerRunId) &&
+    identifier.test(record.parentRunId) && identifier.test(record.workUnitId) && identifier.test(record.claimId) &&
+    /^r1-[0-9a-f]{64}$/i.test(record.repositoryId) && identifier.test(record.approvedChangeId) &&
+    digest.test(record.requestDigest) && timestamp(record.expiresAt) && timestamp(record.createdAt) && !hasSensitiveValue(record);
 }
 
 export function validateDomainRecord(record) {
@@ -211,7 +227,8 @@ export function validateDomainRecord(record) {
     "archive-manifest": validateArchiveManifest,
     "legacy-classification": validateLegacyClassification,
     "claim-release": validateClaimRelease,
-    "terminalization-receipt": validateTerminalizationReceipt
+    "terminalization-receipt": validateTerminalizationReceipt,
+    "cancellation-receipt": validateCancellationReceipt
   };
   const valid = validators[record.kind]?.(record) ?? false;
   return valid ? { valid: true, digest: digestValue(record) } : { valid: false, reason: "invalid-domain-record" };

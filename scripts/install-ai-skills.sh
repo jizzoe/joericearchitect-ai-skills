@@ -15,7 +15,7 @@ usage() {
   cat <<'EOF'
 usage: install-ai-skills.sh (--local <checkout> | --remote <owner/repo> --pin <ref>)
                             [--agent claude] [--agent codex] [--force] [--dry-run]
-                            [--allow-dirty-source]
+                            [--runtime-only] [--allow-dirty-source]
 
   --local <checkout>      Install from a reviewed local checkout.
   --remote <owner/repo>   Install from a pinned remote source. Requires --pin.
@@ -23,6 +23,7 @@ usage: install-ai-skills.sh (--local <checkout> | --remote <owner/repo> --pin <r
   --agent <name>          Repeatable. Defaults to claude and codex.
   --force                 Explicit overwrite intent for existing installations.
   --dry-run               Report the paired receipt without changing anything.
+  --runtime-only          Install, verify, and activate only the runtime; no skills.
   --allow-dirty-source    Documented development override for an unclean checkout.
 
 Bootstrap: obtain this installer with `gh release download <tag>` followed by
@@ -34,6 +35,7 @@ EOF
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 declare -a forwarded=()
 source_mode=""
+runtime_only=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -46,7 +48,8 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] || { printf 'missing-value: %s\n' "$1" >&2; exit 2; }
       [ "$1" = "--remote" ] && source_mode="remote"
       forwarded+=("$1" "$2"); shift 2 ;;
-    --force|--dry-run|--allow-dirty-source)
+    --force|--dry-run|--runtime-only|--allow-dirty-source)
+      [ "$1" = "--runtime-only" ] && runtime_only=1
       forwarded+=("$1"); shift ;;
     *) printf 'unexpected-argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -69,7 +72,7 @@ if [ "${node_major}" -lt 20 ]; then
   exit 1
 fi
 
-if ! command -v gh >/dev/null 2>&1; then
+if [ -z "${runtime_only}" ] && ! command -v gh >/dev/null 2>&1; then
   printf '{"schemaVersion":1,"tool":"install-ai-skills","ok":false,"phase":"preflight","code":"gh-unavailable"}\n'
   exit 1
 fi

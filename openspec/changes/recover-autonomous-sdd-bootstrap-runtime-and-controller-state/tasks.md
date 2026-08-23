@@ -5,10 +5,10 @@
 
 ## 2. Implementation (four capabilities)
 
-- [ ] 2.1 Add runtime-only installation mode with manifest/digest/contract verification, prior-runtime retention, and rollback. Depends on: 1.2. Evidence: focused tests.
-- [ ] 2.2 Complete installed-wrapper cleanup repair (worktree-before-branch, retain remote). Depends on: 1.2. Evidence: installed-wrapper integration tests.
-- [ ] 2.3 Complete host-context issue-intake handoff (current/matching/non-secret contrast evidence). Depends on: 1.2. Evidence: focused tests.
-- [ ] 2.4 Add receipt-backed expired-controller cancellation/retirement operation. Depends on: 1.2. Evidence: controller cancellation fixtures + tests.
+- [x] 2.1 Add runtime-only installation mode with manifest/digest/contract verification, prior-runtime retention, and rollback. Depends on: 1.2. Evidence: focused tests.
+- [x] 2.2 Complete installed-wrapper cleanup repair (worktree-before-branch, retain remote). Depends on: 1.2. Evidence: installed-wrapper integration tests.
+- [x] 2.3 Complete host-context issue-intake handoff (current/matching/non-secret contrast evidence). Depends on: 1.2. Evidence: focused tests.
+- [x] 2.4 Add receipt-backed expired-controller cancellation/retirement operation. Depends on: 1.2. Evidence: controller cancellation fixtures + tests.
 
 ## 3. Verification and delivery
 

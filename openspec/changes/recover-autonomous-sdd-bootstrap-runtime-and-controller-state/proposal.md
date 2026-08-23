@@ -45,8 +45,13 @@ This delivery creates no v2 or legacy claim for itself.
 
 ### Modified Capabilities
 
-None. Cleanup and host-context are implementation fixes against existing
-`sdd-workspace-cleanup` and `github-cli-auth-context-detection` requirements.
+- `autonomous-sdd-run-contract`: cancellation-receipt record, cancelled terminal
+  summary variant, and claim-release cancellation receipt reference.
+- `autonomous-sdd-continuation`: installed controller cleanup executes canonical
+  local operations.
+- `sdd-workspace-cleanup`: controller cleanup stages dependent local resources.
+- `github-cli-auth-context-detection`: exact host contrast is consumable by the
+  matching lifecycle helper.
 
 ## Impact
 

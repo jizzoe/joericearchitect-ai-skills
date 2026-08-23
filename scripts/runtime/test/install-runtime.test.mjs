@@ -100,6 +100,64 @@ test("a reviewed local source installs skills and the matching runtime as one pa
   assert.equal(fs.existsSync(path.join(home, ".profile")), false);
 });
 
+test("runtime-only installs, verifies, and activates the runtime without touching skills", () => {
+  const { home, environment } = isolatedHome("runtime-only-home-");
+  let skillCalls = 0;
+  let skillListCalls = 0;
+  const run = (command, args, options) => {
+    if (command === process.execPath && args[0].endsWith("install-global-skill.mjs") && args.includes("--all")) { skillCalls += 1; return { status: 1, stdout: "{}" }; }
+    if (command === "gh" && args[0] === "skill") { skillListCalls += 1; return { status: 1, stdout: "" }; }
+    return spawnSync(command, args, options);
+  };
+
+  const receipt = installAiSkills({
+    local: checkout, agents: ["claude", "codex"], runtimeOnly: true, environment, platform: "linux",
+    workspace: temporaryDirectory("runtime-only-workspace-"), run
+  });
+
+  assert.equal(receipt.ok, true, JSON.stringify(receipt));
+  assert.equal(receipt.phase, "complete");
+  assert.equal(receipt.mode, "runtime-only");
+  assert.equal(receipt.runtimeOnly, true);
+  assert.equal(receipt.priorSkillPin, null);
+  assert.deepEqual(receipt.skills, []);
+  assert.match(receipt.runtime.digest, /^[0-9a-f]{64}$/);
+  assert.equal(receipt.runtime.contractVersion, 1);
+  assert.equal(skillCalls, 0);
+  assert.equal(skillListCalls, 0);
+
+  const paths = runtimePaths(environment, "linux");
+  assert.equal(fs.existsSync(path.join(receipt.runtime.path, "runtime-manifest.json")), true);
+  assert.equal(readActiveMetadata(paths).activePath, receipt.runtime.path);
+  assert.equal(fs.existsSync(paths.launcherPath), true);
+  assert.deepEqual(fs.readdirSync(home).sort(), [".ai-skills"]);
+});
+
+test("runtime-only retains the prior runtime for offline rollback", () => {
+  const { environment } = isolatedHome("runtime-only-retention-home-");
+  const first = installAiSkills({ local: checkout, agents: ["claude"], environment, platform: "linux", workspace: temporaryDirectory("ro-ws-1-"), run: stubbedRun() });
+  assert.equal(first.ok, true);
+
+  const changed = temporaryDirectory("ro-changed-checkout-");
+  fs.cpSync(checkout, changed, { recursive: true });
+  fs.appendFileSync(path.join(changed, "scripts/runtime/registry.mjs"), "\n// runtime-only revision two\n");
+  execFileSync("git", ["-C", changed, "add", "-A"]);
+  execFileSync("git", ["-C", changed, "-c", "user.email=fixture@example.invalid", "-c", "user.name=Fixture", "commit", "--quiet", "-m", "revision two"]);
+
+  const second = installAiSkills({ local: changed, agents: ["claude"], runtimeOnly: true, environment, platform: "linux", workspace: temporaryDirectory("ro-ws-2-"), run: stubbedRun() });
+  assert.equal(second.ok, true, JSON.stringify(second));
+  assert.equal(second.mode, "runtime-only");
+  assert.equal(second.runtime.priorPath, first.runtime.path);
+
+  const paths = runtimePaths(environment, "linux");
+  assert.equal(readActiveMetadata(paths).activePath, second.runtime.path);
+  assert.equal(fs.existsSync(first.runtime.path), true);
+
+  const rolledBack = activatePrevious({ environment, platform: "linux" });
+  assert.equal(rolledBack.ok, true, JSON.stringify(rolledBack));
+  assert.equal(rolledBack.activated, first.runtime.path);
+});
+
 test("a second install retains the prior runtime and rollback restores it offline", () => {
   const { environment } = isolatedHome("retention-home-");
   const workspace = temporaryDirectory("retention-workspace-");

@@ -10,7 +10,7 @@ import {
   executeControllerLifecycleCleanup, inspectControllerRecord, persistControllerCleanupReceipt,
   persistControllerAuthContext, persistControllerAuthContextEvidence,
   persistControllerIssueIntake, persistControllerIssueIntakeEvidence,
-  initializeV2Delivery, registerControllerLifecycleResource, retainBootstrapCleanupResource, resolveControllerStateRoot, terminalizeV2Run
+  initializeV2Delivery, registerControllerLifecycleResource, retainBootstrapCleanupResource, cancelExpiredV2Run, resolveControllerStateRoot, terminalizeV2Run
 } from "../../sdd/autonomous-sdd-controller.mjs";
 import { admitV2Run, inspectV2Admission } from "../../sdd/autonomous-sdd-admission.mjs";
 import { reconcileLegacyBootstrapRecord, publishLegacyReconciliationReceipt } from "../../sdd/autonomous-sdd-legacy-reconciliation.mjs";
@@ -81,6 +81,7 @@ runAsMain({
     "inspect-v2-admission": (payload) => inspectV2Admission(payload),
     "recover-v2-run": (payload) => inspectV2Admission(payload),
     "terminalize-v2-run": (payload) => terminalizeV2Run(payload),
+    "cancel-v2-run": (payload) => cancelExpiredV2Run(payload),
     "attach-bootstrap-cleanup-migration": (payload) => attachBootstrapCleanupMigration({
       ...payload, readableRepositoryName: payload?.readableRepositoryName ?? path.basename(repositoryPath(payload))
     }),
@@ -118,7 +119,8 @@ runAsMain({
       ...payload, repositoryPath: repositoryPath(payload)
     }),
     "execute-controller-lifecycle-cleanup": (payload) => executeControllerLifecycleCleanup({
-      ...payload, repositoryPath: repositoryPath(payload)
+      ...payload, repositoryPath: repositoryPath(payload),
+      operations: localBootstrapCleanupOperations(repositoryPath(payload))
     })
   }
 });

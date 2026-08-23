@@ -13,6 +13,8 @@ import {
 } from "../lib/issues.mjs";
 import { planAddToProject, planSetProjectStatus } from "../lib/projects.mjs";
 import { parseTrackingYaml, validateTrackingObject } from "../../validation/lib/tracking.mjs";
+import { createIssueIntakeBinding } from "../../sdd/issue-intake-binding.mjs";
+import { createGithubAuthContextBinding, evaluateGithubAuthContextContrast } from "../../sdd/github-cli-auth-context.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../..");
@@ -51,6 +53,19 @@ test("create-or-find plans create operation in dry-run mode", () => {
   assert.equal(result.action, "create");
   assert.deepEqual(result.command.slice(0, 5), ["gh", "issue", "create", "--repo", "example/repo"]);
   assert.ok(result.command.includes("type:feature"));
+});
+
+test("host-bound intake accepts only matching host-contrast evidence", () => {
+  const body = "body\n<!-- sdd-managed:start -->\nchange\n<!-- sdd-managed:end -->";
+  const payload = { repository: "example/repo", title: "[Bug] Host context", body, labels: ["sdd"], managedBlock: "<!-- sdd-managed:start -->\nchange\n<!-- sdd-managed:end -->" };
+  const intakeBinding = createIssueIntakeBinding({ selectedEntry: "host-context-change", payload, expiresAt: "2026-08-20T00:00:00.000Z" }).binding;
+  const authBinding = createGithubAuthContextBinding({ selectedEntry: "host-context-change", operation: "issue-create-or-reuse", repository: "example/repo", payloadDigest: intakeBinding.payloadDigest, expiresAt: "2026-08-20T00:00:00.000Z" }).binding;
+  const authContextEvidence = evaluateGithubAuthContextContrast({ binding: authBinding, restrictedProbe: { commandKind: "github-api-user", contextType: "restricted", state: "authentication-shaped", observedAt: "2026-08-19T20:00:00.000Z" }, hostProbe: { commandKind: "github-api-user", contextType: "host", state: "success", account: "octocat", observedAt: "2026-08-19T20:00:01.000Z" }, hostPermission: "granted", observedAt: "2026-08-19T20:00:01.000Z" }).evidence;
+  const allowed = createOrFindIssue({ ...payload, repo: "example/repo", existingIssues: [], dryRun: true, intakeBinding, authContextEvidence, authContextExecutionContext: "host", selectedEntry: "host-context-change", runtime: { permittedOperations: ["issue-create-or-update"] }, now: "2026-08-19T20:00:02.000Z" });
+  assert.equal(allowed.ok, true);
+  const denied = createOrFindIssue({ ...payload, repo: "example/repo", existingIssues: [], dryRun: true, intakeBinding, authContextEvidence, authContextExecutionContext: "restricted", selectedEntry: "host-context-change", runtime: { permittedOperations: ["issue-create-or-update"] }, now: "2026-08-19T20:00:02.000Z" });
+  assert.equal(denied.ok, false);
+  assert.equal(denied.error, "github-auth-context-credential-unavailable-in-restricted-runtime");
 });
 
 test("managed issue block replacement preserves human content", () => {
