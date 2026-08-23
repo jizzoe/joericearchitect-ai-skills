@@ -395,6 +395,158 @@ export function terminalizeV2Run({ readableRepositoryName, terminalization, stat
   return { valid: true, classification: "terminalized", requestDigest, archivePath: archivedRun.archivePath, receipt: verified.receipt, index: archivedRun.index };
 }
 
+function validCancellationRequest(value) {
+  return exactKeys(value, ["schemaVersion", "controllerRunId", "parentRunId", "workUnitId", "claimId", "repositoryId", "approvedChangeId", "provider"]) &&
+    value.schemaVersion === 1 && validRunId(value.controllerRunId) && validRunId(value.parentRunId) &&
+    validRunId(value.workUnitId) && validRunId(value.claimId) && repositoryId(value.repositoryId) &&
+    validRunId(value.approvedChangeId) && validateProviderCapabilities(value.provider).valid;
+}
+
+function cancelledTerminalSummaryFor({ claim, workUnit, reason, now }) {
+  const summary = {
+    workUnitId: workUnit.workUnitId,
+    ordinal: workUnit.ordinal,
+    approvedChangeId: workUnit.approvedChangeId,
+    terminalStatus: "cancelled",
+    terminalReason: reason,
+    startedAt: claim.acquiredAt,
+    terminalAt: now,
+    finalHead: null,
+    attemptCount: 0,
+    correctionCount: 0,
+    claimDisposition: "released",
+    cleanupDisposition: "cancelled",
+    childHistoryReference: null,
+    childHistoryDigest: null
+  };
+  return { ...summary, terminalSummaryDigest: digestValue(summary) };
+}
+
+function cancellationArchiveMatch({ paths, cancellation, requestDigest, fileSystem = fs }) {
+  try {
+    if (!fileSystem.existsSync(paths.archive)) return null;
+    const years = fileSystem.readdirSync(paths.archive, { withFileTypes: true });
+    for (const year of years) {
+      if (!year.isDirectory() || year.name.startsWith(".")) continue;
+      const yearPath = path.join(paths.archive, year.name);
+      for (const month of fileSystem.readdirSync(yearPath, { withFileTypes: true })) {
+        if (!month.isDirectory() || month.name.startsWith(".")) continue;
+        const monthPath = path.join(yearPath, month.name);
+        for (const day of fileSystem.readdirSync(monthPath, { withFileTypes: true })) {
+          if (!day.isDirectory() || day.name.startsWith(".")) continue;
+          const runPath = path.join(monthPath, day.name, cancellation.parentRunId);
+          if (!fileSystem.existsSync(runPath) || fileSystem.lstatSync(runPath).isSymbolicLink()) continue;
+          const receipt = safeJson(fileSystem, path.join(runPath, "cancellation-receipt.json"));
+          if (!validateDomainRecord(receipt).valid || receipt.kind !== "cancellation-receipt") continue;
+          if (receipt.controllerRunId !== cancellation.controllerRunId || receipt.parentRunId !== cancellation.parentRunId ||
+              receipt.workUnitId !== cancellation.workUnitId || receipt.claimId !== cancellation.claimId ||
+              receipt.repositoryId !== cancellation.repositoryId || receipt.approvedChangeId !== cancellation.approvedChangeId) {
+            return { valid: false, reason: "cancellation-archive-identity-conflict", archivePath: runPath };
+          }
+          if (receipt.requestDigest !== requestDigest) return { valid: false, reason: "cancellation-archive-request-conflict", archivePath: runPath };
+          return { valid: true, archivePath: runPath, receipt };
+        }
+      }
+    }
+    return null;
+  } catch { return { valid: false, reason: "cancellation-archive-inspection-unavailable" }; }
+}
+
+/**
+ * Retires one exact expired, unfinished v2 run without accepting caller-chosen
+ * storage paths or fabricating delivery-terminalization evidence. It records a
+ * cancellation receipt, marks the run cancelled, and releases only the exact
+ * claim it proves is held by that run.
+ */
+export function cancelExpiredV2Run({ readableRepositoryName, cancellation, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+  if (!validCancellationRequest(cancellation) || !timestamp(now) || !text(readableRepositoryName)) {
+    return { valid: false, classification: "paused", reason: "cancellation-input-invalid" };
+  }
+  const providerCapability = validateProviderCapabilities(cancellation.provider);
+  const paths = statePaths({ stateHome, readableName: readableRepositoryName, repositoryId: cancellation.repositoryId });
+  if (!providerCapability.valid || !paths) return { valid: false, classification: "paused", reason: "cancellation-state-unavailable" };
+
+  const requestDigest = digestValue(cancellation);
+  const archived = cancellationArchiveMatch({ paths, cancellation, requestDigest, fileSystem });
+  if (archived?.valid) {
+    return { valid: true, classification: "already-cancelled", requestDigest, archivePath: archived.archivePath, receipt: archived.receipt };
+  }
+  if (archived && !archived.valid) return { ...archived, classification: "paused", requestDigest };
+
+  const activePath = path.join(paths.active, cancellation.parentRunId);
+  try {
+    if (!fileSystem.existsSync(activePath) || fileSystem.lstatSync(activePath).isSymbolicLink()) {
+      return { valid: false, classification: "paused", reason: "cancellation-active-run-unavailable", requestDigest };
+    }
+  } catch { return { valid: false, classification: "paused", reason: "cancellation-active-run-unavailable", requestDigest }; }
+
+  const parentRun = safeJson(fileSystem, path.join(activePath, "parent-run.json"));
+  const workUnit = safeJson(fileSystem, path.join(activePath, "work-unit.json"));
+  const claim = safeJson(fileSystem, path.join(activePath, "resource-claim.json"));
+  if (!validateDomainRecord(parentRun).valid || !validateDomainRecord(workUnit).valid || !validateDomainRecord(claim).valid) {
+    return { valid: false, classification: "paused", reason: "cancellation-active-record-invalid", requestDigest };
+  }
+  if (parentRun.parentRunId !== cancellation.parentRunId || workUnit.parentRunId !== parentRun.parentRunId ||
+      workUnit.workUnitId !== cancellation.workUnitId || workUnit.approvedChangeId !== cancellation.approvedChangeId ||
+      claim.claimId !== cancellation.claimId || claim.workUnitId !== workUnit.workUnitId || claim.repositoryId !== cancellation.repositoryId ||
+      cancellation.controllerRunId !== `controller-${parentRun.approvedIntentDigest.slice(0, 32)}` ||
+      claim.state !== "active" || claim.providerBinding.id !== providerCapability.provider.id ||
+      claim.providerBinding.digest !== digestValue(providerCapability.provider) ||
+      parentRun.claimProviderBinding.id !== claim.providerBinding.id || parentRun.claimProviderBinding.digest !== claim.providerBinding.digest ||
+      workUnit.claimProviderBinding.id !== claim.providerBinding.id || workUnit.claimProviderBinding.digest !== claim.providerBinding.digest) {
+    return { valid: false, classification: "paused", reason: "cancellation-identity-or-claim-mismatch", requestDigest };
+  }
+  if (Date.parse(parentRun.deadline) > Date.parse(now)) {
+    return { valid: false, classification: "paused", reason: "cancellation-run-not-expired", requestDigest };
+  }
+  if (fileSystem.existsSync(path.join(activePath, "terminalization-receipt.json"))) {
+    return { valid: false, classification: "paused", reason: "cancellation-run-delivered", requestDigest };
+  }
+
+  const terminalSummary = cancelledTerminalSummaryFor({ claim, workUnit, reason: "expired-unfinished-controller", now });
+  const projection = buildParentProjection(parentRun, workUnit, terminalSummary, { allowBootstrapPreSnapshot: false });
+  if (!projection.valid) return { valid: false, classification: "paused", reason: "cancellation-projection-invalid", requestDigest };
+
+  const receipt = {
+    kind: "cancellation-receipt",
+    schemaVersion: 2,
+    controllerRunId: cancellation.controllerRunId,
+    parentRunId: parentRun.parentRunId,
+    workUnitId: workUnit.workUnitId,
+    claimId: claim.claimId,
+    repositoryId: claim.repositoryId,
+    approvedChangeId: workUnit.approvedChangeId,
+    requestDigest,
+    expiresAt: parentRun.deadline,
+    createdAt: now
+  };
+  const receiptValidation = validateDomainRecord(receipt);
+  if (!receiptValidation.valid) return { valid: false, classification: "paused", reason: "cancellation-receipt-invalid", requestDigest };
+  const claimRelease = {
+    kind: "claim-release",
+    schemaVersion: 2,
+    claimId: claim.claimId,
+    repositoryId: claim.repositoryId,
+    workUnitId: workUnit.workUnitId,
+    disposition: "released",
+    releasedAt: now,
+    cancellationReceiptDigest: receiptValidation.digest
+  };
+  const projectionRecord = projection.projection;
+  for (const [name, record] of [["cancellation-receipt", receipt], ["claim-release", claimRelease], ["projection", projectionRecord]]) {
+    const published = publishExpectedRecord({ directory: activePath, name, record, provider: providerCapability.provider, fileSystem });
+    if (!published.valid) return { valid: false, classification: "failed", reason: published.reason, requestDigest };
+  }
+
+  const archivedRun = archiveTerminalRun({ paths, parentRun, workUnit, terminalSummary, claim, attempts: [], cleanupPending: false, recoveryPending: false, allowBootstrapPreSnapshot: false, now, fileSystem });
+  if (!archivedRun.valid) return { valid: false, classification: "failed", reason: archivedRun.reason, requestDigest, ...(archivedRun.archivePath ? { archivePath: archivedRun.archivePath } : {}) };
+  const verified = cancellationArchiveMatch({ paths, cancellation, requestDigest, fileSystem });
+  if (!verified?.valid || verified.archivePath !== archivedRun.archivePath) {
+    return { valid: false, classification: "failed", reason: "cancellation-post-archive-verification-failed", requestDigest };
+  }
+  return { valid: true, classification: "cancelled", requestDigest, archivePath: archivedRun.archivePath, receipt: verified.receipt, index: archivedRun.index };
+}
+
 export function authorizationDigest(authorization) {
   return crypto.createHash("sha256").update(JSON.stringify(canonical(authorization))).digest("hex");
 }
@@ -964,31 +1116,47 @@ export function executeControllerLifecycleCleanup({ repositoryPath, record, clea
   if (typeof operations.inspectResource !== "function") {
     return { classification: "paused", reason: "controller-cleanup-fresh-inspection-missing", outcomes: [], record, plan: null };
   }
-  let inspectedResources;
-  try {
-    inspectedResources = (record?.resourceRecords ?? []).map((resource) => {
-      const inspected = operations.inspectResource(resource);
-      if (!inspected || typeof inspected !== "object") return inspected;
-      if (inspected.exists === false) return inspected;
-      const { exists, ...eligibility } = inspected;
-      return eligibility;
-    });
-  } catch {
-    return { classification: "paused", reason: "controller-cleanup-fresh-inspection-failed", outcomes: [], record, plan: null };
-  }
-  const plan = planWorkspaceCleanup({ ...cleanupContext, selectedEntry: record?.selectedEntry, repository: record?.repository, resources: inspectedResources });
-  if (plan.classification !== "planned" || plan.resources.some((resource) => resource.classification !== "eligible")) {
-    return { classification: "paused", reason: "controller-cleanup-resource-ineligible", outcomes: [], record, plan };
-  }
   let currentRecord = record;
-  const result = executeWorkspaceCleanup(plan, {
-    ...operations,
-    persistOutcome: (outcome) => {
-      const persisted = persistControllerCleanupReceipt({ repositoryPath, record: currentRecord, receipt: { kind: outcome.resource?.kind, id: outcome.resource?.id, status: outcome.status }, now, runGit });
-      if (!persisted.valid) return { persisted: false };
-      currentRecord = persisted.record;
-      return { persisted: true, path: persisted.path };
-    }
+  const inspect = (resources) => resources.map((resource) => {
+    const inspected = operations.inspectResource(resource);
+    if (!inspected || typeof inspected !== "object" || inspected.exists === false) return inspected;
+    const { exists, ...eligibility } = inspected;
+    return eligibility;
   });
-  return { ...result, record: currentRecord, plan };
+  const executeStage = (resources) => {
+    let inspectedResources;
+    try { inspectedResources = inspect(resources); }
+    catch { return { valid: false, reason: "controller-cleanup-fresh-inspection-failed", plan: null, outcomes: [] }; }
+    const plan = planWorkspaceCleanup({ ...cleanupContext, selectedEntry: record?.selectedEntry, repository: record?.repository, resources: inspectedResources });
+    if (plan.classification !== "planned" || plan.resources.some((resource) => resource.classification !== "eligible")) {
+      return { valid: false, reason: "controller-cleanup-resource-ineligible", plan, outcomes: [] };
+    }
+    const result = executeWorkspaceCleanup(plan, {
+      ...operations,
+      persistOutcome: (outcome) => {
+        const persisted = persistControllerCleanupReceipt({ repositoryPath, record: currentRecord, receipt: { kind: outcome.resource?.kind, id: outcome.resource?.id, status: outcome.status }, now, runGit });
+        if (!persisted.valid) return { persisted: false };
+        currentRecord = persisted.record;
+        return { persisted: true, path: persisted.path };
+      }
+    });
+    return { valid: result.classification === "completed", result, plan, outcomes: result.outcomes };
+  };
+  const worktrees = record.resourceRecords.filter((resource) => resource.kind === "worktree");
+  const branches = record.resourceRecords.filter((resource) => resource.kind === "branch");
+  const outcomes = [];
+  const plans = {};
+  if (worktrees.length) {
+    const worktreeStage = executeStage(worktrees);
+    plans.worktrees = worktreeStage.plan;
+    outcomes.push(...worktreeStage.outcomes);
+    if (!worktreeStage.valid) return { classification: outcomes.length ? "partial" : "paused", reason: worktreeStage.reason ?? "cleanup-apply-incomplete", outcomes, record: currentRecord, plan: plans };
+  }
+  if (branches.length) {
+    const branchStage = executeStage(branches);
+    plans.branches = branchStage.plan;
+    outcomes.push(...branchStage.outcomes);
+    if (!branchStage.valid) return { classification: outcomes.length ? "partial" : "paused", reason: branchStage.reason ?? "cleanup-apply-incomplete", outcomes, record: currentRecord, plan: plans };
+  }
+  return { classification: "completed", reason: "cleanup-apply-complete", outcomes, record: currentRecord, plan: plans };
 }

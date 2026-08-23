@@ -1,0 +1,15 @@
+schema_version: 1
+openspec:
+  change: recover-autonomous-sdd-bootstrap-runtime-and-controller-state
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 203
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/203
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - openspec/changes/recover-autonomous-sdd-bootstrap-runtime-and-controller-state/
+      - scripts/

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "skill": "base-code-review",
+  "status": "completed",
+  "mode": "autonomous",
+  "summary": "Bounded same-session local review of the four-capability recovery implementation (runtime-only install, installed-wrapper cleanup repair, host-context issue-intake handoff, and receipt-backed expired-controller cancellation) found no remaining objective findings.",
+  "artifacts": [
+    { "kind": "file", "operation": "read", "subject": "scripts/sdd/autonomous-sdd-controller.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/sdd/autonomous-sdd-run-contract.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/runtime/bin/autonomous-sdd-controller.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/runtime/install-runtime.mjs" },
+    { "kind": "file", "operation": "read", "subject": "scripts/runtime/manifest.json" },
+    { "kind": "file", "operation": "read", "subject": "scripts/install-ai-skills.sh" },
+    { "kind": "file", "operation": "read", "subject": "scripts/install-ai-skills.ps1" },
+    { "kind": "file", "operation": "read", "subject": "scripts/github/create-or-find-issue.mjs" }
+  ],
+  "evidence": [
+    { "id": "focused-cancellation", "type": "test", "subject": "expired-controller cancellation scenarios", "result": "passed", "reference": "5 focused Node tests in autonomous-sdd-cancellation.test.mjs" },
+    { "id": "focused-runtime-only", "type": "test", "subject": "runtime-only installation, verification, retention, and offline rollback", "result": "passed", "reference": "2 focused Node tests in install-runtime.test.mjs" },
+    { "id": "focused-cleanup", "type": "test", "subject": "controller cleanup stages worktree before branch", "result": "passed", "reference": "1 focused Node test in autonomous-sdd-controller.test.mjs" },
+    { "id": "focused-host-context", "type": "test", "subject": "host-bound intake accepts only matching host-contrast evidence", "result": "passed", "reference": "1 focused Node test in github-intake.test.mjs" },
+    { "id": "full-sdd-suite", "type": "test", "subject": "SDD, GitHub, and validation Node test suites", "result": "passed", "reference": "292 local Node tests" },
+    { "id": "runtime-suite", "type": "test", "subject": "runtime Node test suite", "result": "passed", "reference": "69 local Node tests" },
+    { "id": "openspec-strict", "type": "validation", "subject": "all OpenSpec specifications and active changes", "result": "passed", "reference": "39 strict validation items" },
+    { "id": "review-source", "type": "review", "subject": "requirements mapping, security/supply-chain, portability, attribution, and recovery", "result": "passed", "reference": "same-session read-only review of the final working-tree head" }
+  ],
+  "assumptions": [],
+  "openQuestions": [],
+  "nextAction": { "kind": "continue", "description": "Implementation PR opened at #204; proceed to merge, then Sync, Archive, runtime-only installation, exact expired-controller cancellation, owned cleanup, and the planning-only M2-S1 Explore." },
+  "details": {
+    "assurance": "local-review",
+    "worker": { "executionIdentity": "same-session-local-review-worker", "sameSession": true, "readOnly": true, "canMutate": false, "canApprove": false },
+    "reviewedScope": {
+      "targets": [
+        "scripts/sdd/autonomous-sdd-controller.mjs",
+        "scripts/sdd/autonomous-sdd-run-contract.mjs",
+        "scripts/runtime/bin/autonomous-sdd-controller.mjs",
+        "scripts/runtime/install-runtime.mjs",
+        "scripts/runtime/manifest.json",
+        "scripts/install-ai-skills.sh",
+        "scripts/install-ai-skills.ps1",
+        "scripts/github/create-or-find-issue.mjs",
+        "scripts/sdd/test/autonomous-sdd-cancellation.test.mjs",
+        "scripts/sdd/test/autonomous-sdd-controller.test.mjs",
+        "scripts/sdd/test/autonomous-sdd-run-contract.test.mjs",
+        "scripts/github/test/github-intake.test.mjs",
+        "scripts/runtime/test/install-runtime.test.mjs"
+      ],
+      "contextPaths": [
+        "openspec/changes/recover-autonomous-sdd-bootstrap-runtime-and-controller-state/proposal.md",
+        "openspec/changes/recover-autonomous-sdd-bootstrap-runtime-and-controller-state/design.md",
+        "openspec/changes/recover-autonomous-sdd-bootstrap-runtime-and-controller-state/tasks.md",
+        "openspec/changes/recover-autonomous-sdd-bootstrap-runtime-and-controller-state/specs/shared-sdd-runtime-distribution/spec.md",
+        "openspec/changes/recover-autonomous-sdd-bootstrap-runtime-and-controller-state/specs/autonomous-sdd-v2-terminalization/spec.md",
+        "openspec/changes/recover-autonomous-sdd-bootstrap-runtime-and-controller-state/specs/autonomous-sdd-run-contract/spec.md",
+        "openspec/changes/recover-autonomous-sdd-bootstrap-runtime-and-controller-state/specs/sdd-workspace-cleanup/spec.md",
+        "openspec/changes/recover-autonomous-sdd-bootstrap-runtime-and-controller-state/specs/github-cli-auth-context-detection/spec.md",
+        "openspec/changes/recover-autonomous-sdd-bootstrap-runtime-and-controller-state/specs/autonomous-sdd-continuation/spec.md"
+      ],
+      "evidenceIds": ["focused-cancellation", "focused-runtime-only", "focused-cleanup", "focused-host-context", "full-sdd-suite", "runtime-suite", "openspec-strict", "review-source"]
+    },
+    "findings": [],
+    "coverage": [
+      { "area": "runtime-only installation and retention", "status": "reviewed", "evidenceIds": ["focused-runtime-only", "runtime-suite", "review-source"] },
+      { "area": "installed-wrapper cleanup staging", "status": "reviewed", "evidenceIds": ["focused-cleanup", "full-sdd-suite", "review-source"] },
+      { "area": "host-context issue-intake handoff", "status": "reviewed", "evidenceIds": ["focused-host-context", "full-sdd-suite", "review-source"] },
+      { "area": "expired-controller cancellation and retirement", "status": "reviewed", "evidenceIds": ["focused-cancellation", "full-sdd-suite", "review-source"] },
+      { "area": "record-contract consistency", "status": "reviewed", "evidenceIds": ["focused-cancellation", "openspec-strict", "review-source"] },
+      { "area": "authorization, portability, and sensitive data", "status": "reviewed", "evidenceIds": ["review-source"] },
+      { "area": "web accessibility", "status": "not-applicable", "evidenceIds": [] }
+    ],
+    "standardsSelection": { "selectedRuleIds": [], "scopedOverrides": [], "notApplicableRuleIds": [] },
+    "evidenceGaps": [],
+    "scopeSummary": "Reviewed only the four-capability recovery implementation. The review verified runtime-only installation skips global-skill and GitHub invocation while retaining the prior runtime; controller cleanup removes worktrees before branches and never mutates remote branches; the issue helper accepts only current, matching, non-secret host-contrast evidence; cancellation retires only the exact expired controller and releases only its claim without fabricating delivery-terminalization evidence; and no reusable asset embeds a real repository credential or user-specific constant."
+  }
+}

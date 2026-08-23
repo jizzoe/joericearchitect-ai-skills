@@ -158,7 +158,7 @@ export function currentSkillPin({ agents, run = spawnSync }) {
 }
 
 export function installAiSkills({
-  local, remote, pin, agents = SUPPORTED_AGENTS, force = false, dryRun = false, allowDirty = false,
+  local, remote, pin, agents = SUPPORTED_AGENTS, force = false, dryRun = false, runtimeOnly = false, allowDirty = false,
   environment = process.env, platform = process.platform, workspace, now = new Date().toISOString(),
   run = spawnSync, git = execFileSync, nodeVersion = process.versions.node
 } = {}) {
@@ -177,7 +177,7 @@ export function installAiSkills({
   if (!source.ok) return failure({ phase: "source", code: source.code, detail: source.detail, recovery: source.recovery });
 
   const priorActive = readActiveMetadata(paths);
-  const priorSkillPin = dryRun ? null : currentSkillPin({ agents, run });
+  const priorSkillPin = (dryRun || runtimeOnly) ? null : currentSkillPin({ agents, run });
 
   let sourcePath = source.path;
   let sourceRevision = source.revision ?? null;
@@ -196,6 +196,7 @@ export function installAiSkills({
     source: { kind: source.kind, reference: redactCredential(source.reference), revision: sourceRevision, pin: source.pin ?? null },
     overwriteIntent: force === true,
     dryRun: dryRun === true,
+    runtimeOnly: runtimeOnly === true,
     priorSkillPin,
     paths: {
       base: paths.base, runtimeRoot: paths.runtimeRoot, binDirectory: paths.binDirectory,
@@ -226,9 +227,9 @@ export function installAiSkills({
 
   if (dryRun) {
     fs.rmSync(stagingOutput, { recursive: true, force: true });
-    const skills = installSkills({ agents, source: { ...source, path: sourcePath }, force, dryRun, repositoryRoot: sourcePath, run });
+    const skills = runtimeOnly ? { ok: true, results: [] } : installSkills({ agents, source: { ...source, path: sourcePath }, force, dryRun, repositoryRoot: sourcePath, run });
     return receipt({
-      ok: skills.ok, phase: "dry-run", mode: "installed", ...base,
+      ok: skills.ok, phase: "dry-run", mode: runtimeOnly ? "runtime-only" : "installed", ...base,
       runtime: { ...identity, path: versionPath, priorPath: previouslyActive(paths)?.path ?? null },
       activation: activationState(paths, environment, platform),
       skills: skills.results,
@@ -237,7 +238,7 @@ export function installAiSkills({
     });
   }
 
-  const skills = installSkills({ agents, source: { ...source, path: sourcePath }, force, dryRun, repositoryRoot: sourcePath, run });
+  const skills = runtimeOnly ? { ok: true, results: [] } : installSkills({ agents, source: { ...source, path: sourcePath }, force, dryRun, repositoryRoot: sourcePath, run });
   if (!skills.ok) {
     fs.rmSync(stagingOutput, { recursive: true, force: true });
     return failure({
@@ -287,7 +288,7 @@ export function installAiSkills({
     .filter((entry, index, all) => all.indexOf(entry) === index);
 
   return receipt({
-    ok: true, phase: "complete", mode: "installed", ...base,
+    ok: true, phase: "complete", mode: runtimeOnly ? "runtime-only" : "installed", ...base,
     runtime: { ...identity, path: versionPath, priorPath: priorActive?.activePath ?? null, retained },
     activation: activationState(paths, environment, platform),
     skills: skills.results,
@@ -306,6 +307,7 @@ export function parseArgs(argv) {
     else if (arg === "--workspace") args.workspace = path.resolve(argv[++index]);
     else if (arg === "--force") args.force = true;
     else if (arg === "--dry-run") args.dryRun = true;
+    else if (arg === "--runtime-only") args.runtimeOnly = true;
     else if (arg === "--allow-dirty-source") args.allowDirty = true;
     else if (arg === "--help" || arg === "-h") args.help = true;
     else throw new Error(`unexpected argument: ${arg}`);
@@ -316,11 +318,13 @@ export function parseArgs(argv) {
 
 const USAGE = `usage: install-runtime.mjs (--local <checkout> | --remote <owner/repo> --pin <ref>)
                           [--agent claude] [--agent codex] [--force] [--dry-run]
-                          [--allow-dirty-source] [--workspace <dir>]
+                          [--runtime-only] [--allow-dirty-source] [--workspace <dir>]
 
 Installs the selected canonical skill packages and the exact matching shared
 runtime. Skill installation is delegated to scripts/skills/install-global-skill.mjs.
-PATH is never modified; the receipt reports what activation requires.
+Pass --runtime-only to install, verify, retain, and activate the runtime without
+invoking or changing global skills. PATH is never modified; the receipt reports
+what activation requires.
 `;
 
 if (isMainModule(import.meta.url)) {

@@ -24,6 +24,7 @@ param(
     [string[]] $Agent,
     [switch] $Force,
     [switch] $DryRun,
+    [switch] $RuntimeOnly,
     [switch] $AllowDirtySource
 )
 
@@ -68,7 +69,7 @@ if ($nodeMajor -lt 20) {
     exit 1
 }
 
-if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+if (-not $RuntimeOnly -and -not (Get-Command gh -ErrorAction SilentlyContinue)) {
     Write-Receipt -Code 'gh-unavailable'
     exit 1
 }
@@ -89,6 +90,7 @@ if ($Pin) { Add-Argument '--pin', $Pin }
 foreach ($selected in ($Agent | Where-Object { $_ })) { Add-Argument '--agent', $selected }
 if ($Force) { Add-Argument '--force' }
 if ($DryRun) { Add-Argument '--dry-run' }
+if ($RuntimeOnly) { Add-Argument '--runtime-only' }
 if ($AllowDirtySource) { Add-Argument '--allow-dirty-source' }
 
 $workspace = Join-Path ([System.IO.Path]::GetTempPath()) ("ai-skills-install-" + [System.Guid]::NewGuid().ToString('N'))

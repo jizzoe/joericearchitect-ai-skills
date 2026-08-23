@@ -569,6 +569,33 @@ test("controller cleanup plans from fresh worktree eligibility and refuses an in
   }
 });
 
+test("controller cleanup stages an attached worktree before its local branch", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "controller-staged-cleanup-"));
+  try {
+    fs.mkdirSync(path.join(root, ".git"));
+    const runGit = () => ".git";
+    const initial = createControllerRecord({ authorization, repository: "owner/repository", runId: "controller-run-0005" }).record;
+    const branch = registerControllerLifecycleResource({ repositoryPath: root, record: initial, resource: { kind: "branch", id: "staged-branch", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "branch-recovery", ownershipToken: "branch-token" }, now: started, runGit });
+    const worktree = registerControllerLifecycleResource({ repositoryPath: root, record: branch.record, resource: { kind: "worktree", id: "staged-worktree", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "worktree-recovery", ownershipToken: "worktree-token" }, now: started, runGit });
+    const deliveredBranch = bindControllerLifecycleDelivery({ repositoryPath: root, record: worktree.record, kind: "branch", id: "staged-branch", deliveryEvidence: { current: true, reference: "pr-branch", headCommit: "a".repeat(40), deliveredHeadCommit: "b".repeat(40), mergedPullRequest: { merged: true, pullRequest: "5", topicHeadCommit: "a".repeat(40), finalHeadCommit: "b".repeat(40) } }, runGit });
+    const delivered = bindControllerLifecycleDelivery({ repositoryPath: root, record: deliveredBranch.record, kind: "worktree", id: "staged-worktree", deliveryEvidence: { current: true, reference: "pr-worktree", headCommit: "a".repeat(40), deliveredHeadCommit: "b".repeat(40), mergedPullRequest: { merged: true, pullRequest: "5", topicHeadCommit: "a".repeat(40), finalHeadCommit: "b".repeat(40) } }, runGit });
+    let removedWorktree = false;
+    const operations = {
+      inspectResource: (resource) => resource.kind === "worktree"
+        ? { ...resource, exists: !removedWorktree, primary: false, locked: false, registered: true, clean: true, controllerCheckpointPresent: false }
+        : { ...resource, exists: true, headCommit: resource.headCommit, referencedElsewhere: !removedWorktree, ancestryMerged: false },
+      removeWorktree: () => { removedWorktree = true; return { committed: true }; },
+      deleteLocalBranch: () => ({ committed: true })
+    };
+    const cleanup = executeControllerLifecycleCleanup({ repositoryPath: root, record: delivered.record, cleanupContext: { archiveVisible: true, issueClosed: true, projectDone: true, deliveryEvidence: { current: true, reference: "archive", headCommit: "b".repeat(40) } }, operations, now: "2026-08-13T12:30:00.000Z", runGit });
+    assert.equal(cleanup.classification, "completed");
+    assert.deepEqual(cleanup.outcomes.map((outcome) => outcome.resource.kind), ["worktree", "branch"]);
+    assert.equal(cleanup.record.cleanupReceipts.at(-1).id, "staged-branch");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("controller state root rejects an unavailable common Git directory", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "controller-state-"));
   try {
