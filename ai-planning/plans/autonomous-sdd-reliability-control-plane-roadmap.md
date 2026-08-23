@@ -2,12 +2,15 @@
 
 Date: 2026-08-16
 
-Last updated: 2026-08-22
+Last updated: 2026-08-23
 
 Status: Accepted dependency and execution-order plan through M1 and the
 bootstrap/cutover stabilization. M1-S1, M1-S2, and M1-S3 are delivered and
-archived. M2-S1 is next after the stabilization lifecycle completes, but every
-later slice still requires its own accepted brief and explicit authorization.
+archived. M2 is re-sequenced to prove a vertical slice before the durable
+backend (2026-08-23 revision), and a first-class M5 cross-repository
+coordination milestone is added. M2-S1 is next after the stabilization
+lifecycle completes, but every slice still requires its own accepted brief and
+explicit authorization.
 
 ## Purpose and authority
 
@@ -60,7 +63,7 @@ direction for review. A brief never grants authorization for another delivery.
   rollback as one minimum vertical activation bundle.
 - Single-change v1 ends at M4-S4. M4-S3 is the first point where the complete
   real lifecycle exists and approved backlog runs can begin; M4-S4 proves that
-  path safely and repeatedly. M5, M6, and M7 remain blocked until that proof.
+  path safely and repeatedly. M5, M6, M7, and M8 remain blocked until that proof.
 - V1 admits at most one active mutating autonomous run per canonical
   repository. Disjoint concurrent runs, fine-grained claims, parallel child
   execution, milestone queues, five-slice delivery, and Temporal are later
@@ -92,7 +95,8 @@ of scope and GitHub remains the only implemented tracker integration. See
 M1 Contract convergence
   delivered state, operation, configuration, role, and handoff contracts
     -> M2 Deterministic local single-change execution
-       builds durable transitions and recovery in contract-only/audit mode
+       proves a vertical slice, then builds durable transitions and recovery
+       in contract-only/audit mode
       -> M3 Independent-review reliability
          supplies the isolated exact-head reviewer gate
         -> M4 Full lifecycle integration
@@ -100,13 +104,15 @@ M1 Contract convergence
            single-change qualification
              M4-S3: enough exists to begin real backlog proof
              M4-S4: proof gate passes; qualified opt-in can begin
-          -> M5 Milestone queues and owner shorthand
-             coordinates dependency-valid child work units
-            -> M6 Five-slice qualification and default cutover
-               proves milestone execution, the complete multi-agent harness,
-               and rollback; M6-S3 alone enables default mode
-              -> M7 Optional Temporal backend
-                 preserves the same contracts on another durable backend
+          -> M5 Cross-repository SDD coordination
+             spans a central planning repository and component repositories
+            -> M6 Milestone queues and owner shorthand
+               coordinates dependency-valid child work units
+              -> M7 Five-slice qualification and default cutover
+                 proves milestone execution, the complete multi-agent harness,
+                 and rollback; M7-S3 alone enables default mode
+                -> M8 Optional Temporal backend
+                   preserves the same contracts on another durable backend
 ```
 
 ## Planned detailed-brief directory
@@ -147,8 +153,8 @@ current working directory.
 
 | Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
 |---|---|---|---|
-| M2-S1 — Local durable execution backend | `add-autonomous-sdd-local-execution-backend` | Next and Propose-ready after this stabilization Archive; hardens controller/admission pairing, history, atomic advancement, exact resume/takeover, stale-owner rejection, and one coarse claim, but stays contract-only/audit and does not activate real lifecycle ownership | [M2-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s1-local-durable-execution-backend.md) |
-| M2-S2 — Deterministic transition engine | `add-autonomous-sdd-transition-engine` | Follows M2-S1; consumes the durable initialized-run identity and selects one legal transition under simulated/non-mutating adapters | [M2-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s2-deterministic-transition-engine.md) |
+| M2-S1 — Prove the vertical slice | `prove-autonomous-sdd-vertical-slice` | Next and Propose-ready after this stabilization Archive; proves one fixture change flows proposal → apply → verify → fresh-review-on-change under simulated/non-mutating adapters, a thin sealed review loop, and a minimal ephemeral store; fixture template is `add-typescript-javascript-review`; delivered by the pre-v2 lifecycle, never by the controller it builds | [M2-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s1-prove-vertical-slice.md) |
+| M2-S2 — Local durable execution backend | `add-autonomous-sdd-local-execution-backend` | Follows M2-S1; hardens controller/admission pairing, history, atomic advancement, exact resume/takeover, stale-owner rejection, and one coarse claim, scoped by the proven slice; stays contract-only/audit and does not activate real lifecycle ownership | [M2-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s2-local-durable-execution-backend.md) |
 | M2-S3 — Run status and recovery | `add-autonomous-sdd-run-status-and-recovery` | Follows M2-S2; completes local recovery/status prerequisites without activating real external mutation | [M2-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s3-run-status-and-recovery.md) |
 
 **Exit evidence:** a non-mutating simulated-adapter single-change run completes
@@ -196,6 +202,14 @@ owner's eligible skills backlog can supply real varied changes during M4-S4,
 but every item still requires its own accepted brief, exact authorization,
 profile, evidence contract, and stop conditions.
 
+The accepted M4-S4 backlog order is: `add-claude-cross-tool-repo-hygiene`,
+`add-generic-git-repository-cleanup`, `add-typescript-javascript-review`,
+`add-react-web-review`, `add-react-native-expo-quality-overlay`,
+`add-java-spring-review`, `add-terraform-static-quality-overlay`,
+`add-repository-status-skill`, `add-git-health-skill`, and
+`deliver-research-and-planning-base-skills`. Each real run must preflight for
+overlapping active deltas before Sync.
+
 **Exit evidence:** two separately counted gates pass: ten consecutive real
 backlog changes complete through closeout, and every approved disposable fault-
 matrix row reaches its expected recovery or typed pause. Disposable scenarios
@@ -206,15 +220,31 @@ unresolved terminal leaks, or untyped stops. M4 exit qualifies single-change
 v1 for explicit opt-in use and is the hard gate for M5. It does not enable
 default routing.
 
-## Milestone 5 — Milestone queues and owner shorthand
+## Milestone 5 — Cross-repository SDD coordination
+
+**Outcome:** one authorized change spans a central planning repository and one
+or more component repositories, with the central change opening first and
+closing last and component changes archiving inside it. This is a first-class
+milestone, not a deferred parallel-execution concern.
+
+| Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
+|---|---|---|---|
+| M5-S1 — Cross-repository coordination | `add-autonomous-sdd-cross-repository-coordination` | Gated after M4-S4 qualifies repeated single-change v1; reuses the linkage-ledger and open-first/close-last sequencing proven by the Invest-in-Growth (HRF) central/component project | [M5-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/cross-repository-coordination.md) |
+
+**Exit evidence:** one central envelope change and one or more component
+changes complete with the central change opening first and closing last; the
+linkage ledger records dispatch and return against exact revisions; end-to-end
+verification names an assigned executor, environment, and evidence location.
+
+## Milestone 6 — Milestone queues and owner shorthand
 
 **Outcome:** one approved milestone becomes dependency-valid isolated child
 work units, and a concise owner request enters or resumes the same engine.
 
 | Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
 |---|---|---|---|
-| M5-S1 — Milestone/slice queue | `add-autonomous-sdd-milestone-slice-adapter` | Explore-ready only after M4-S4 qualifies repeated real single-change delivery and the owner accepts milestone cadence | [M5-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m5-s1-milestone-slice-queue.md) |
-| M5-S2 — Design-brief delivery shorthand | `add-autonomous-design-brief-delivery-shorthand` | Propose-ready after M5-S1, M1-S2, and prototype-profile resolution | [M5-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m5-s2-design-brief-delivery-shorthand.md) |
+| M6-S1 — Milestone/slice queue | `add-autonomous-sdd-milestone-slice-adapter` | Explore-ready only after M4-S4 qualifies repeated real single-change delivery and the owner accepts milestone cadence | [M6-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m6-s1-milestone-slice-queue.md) |
+| M6-S2 — Design-brief delivery shorthand | `add-autonomous-design-brief-delivery-shorthand` | Propose-ready after M6-S1, M1-S2, and prototype-profile resolution | [M6-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m6-s2-design-brief-delivery-shorthand.md) |
 
 **Exit evidence:** five fake slices run in exact dependency order; each child's
 authority, context, role receipts, attempts, evidence, claims, and cleanup are
@@ -222,7 +252,7 @@ isolated; parent projections rebuild from child state; shorthand only resolves
 inputs and invokes the canonical engine; status reports exact milestone, slice,
 role, transition, and stop reason.
 
-## Milestone 6 — Five-slice qualification and default cutover
+## Milestone 7 — Five-slice qualification and default cutover
 
 **Outcome:** the already-qualified single-change engine is extended and proven
 for milestone/child composition, repeated real five-slice delivery, and safe
@@ -230,9 +260,9 @@ default routing with rollback.
 
 | Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
 |---|---|---|---|
-| M6-S1 — Milestone composition and fault qualification | `qualify-autonomous-sdd-composition-reliability` | Propose-ready after M5; extends rather than repeats the M4-S4 single-change suite | [M6-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m6-s1-composition-and-fault-qualification.md) |
-| M6-S2 — Five-slice unattended qualification | `qualify-autonomous-sdd-five-slice-soak` | Propose-ready after M6-S1, owner confirmation or adjustment of the proposed three-run threshold, and a disposable end-to-end environment | [M6-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m6-s2-five-slice-unattended-qualification.md) |
-| M6-S3 — Default control-plane cutover | `enable-autonomous-sdd-control-plane-default` | Conditional on M6-S2 threshold, tested rollback, no competing active owner, and explicit owner approval; sole authority for `default` mode | [M6-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m6-s3-default-control-plane-cutover.md) |
+| M7-S1 — Milestone composition and fault qualification | `qualify-autonomous-sdd-composition-reliability` | Propose-ready after M6; extends rather than repeats the M4-S4 single-change suite | [M7-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m7-s1-composition-and-fault-qualification.md) |
+| M7-S2 — Five-slice unattended qualification | `qualify-autonomous-sdd-five-slice-soak` | Propose-ready after M7-S1, owner confirmation or adjustment of the proposed three-run threshold, and a disposable end-to-end environment | [M7-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m7-s2-five-slice-unattended-qualification.md) |
+| M7-S3 — Default control-plane cutover | `enable-autonomous-sdd-control-plane-default` | Conditional on M7-S2 threshold, tested rollback, no competing active owner, and explicit owner approval; sole authority for `default` mode | [M7-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m7-s3-default-control-plane-cutover.md) |
 
 **Exit evidence:** milestone composition, child isolation, role-handoff,
 restart, dependency-failure, queue-rebuild, review, correction, cleanup,
@@ -246,20 +276,20 @@ parallel execution remains separately gated.
 
 Fine-grained claims and parallel child or role execution become eligible for a
 separate Explore decision only after M4-S4 qualifies serial single-change v1.
-They are not silently included in M5 or M6 and are not required for serial
+They are not silently included in M6 or M7 and are not required for serial
 five-slice qualification. A future slice is added only when measured throughput
 or contention justifies it and the owner accepts its workspace ownership,
 claim, integration-order, review, and recovery design. Temporal cannot be used
 as a shortcut around this gate.
 
-## Milestone 7 — Optional Temporal execution backend
+## Milestone 8 — Optional Temporal execution backend
 
 **Outcome:** Temporal can run the qualified contracts without becoming
 mandatory, changing domain policy, or creating another authority.
 
 | Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
 |---|---|---|---|
-| M7-S1 — Temporal execution backend | `add-autonomous-sdd-temporal-execution-backend` | Conditional/Explore-ready after M6, a current sourced Temporal assessment, deployment/data/versioning/ownership decisions, and explicit owner adoption | [M7-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m7-s1-temporal-execution-backend.md) |
+| M8-S1 — Temporal execution backend | `add-autonomous-sdd-temporal-execution-backend` | Conditional/Explore-ready after M7, a current sourced Temporal assessment, deployment/data/versioning/ownership decisions, and explicit owner adoption | [M8-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m8-s1-temporal-execution-backend.md) |
 
 **Exit evidence:** Temporal passes the same role, handoff, lifecycle,
 fault-injection, exact-prompt, security, and five-unit outcome suites as local
@@ -270,10 +300,11 @@ Temporal runs serialize overlapping work through one claim authority.
 ## Recommended starting point
 
 After `stabilize-autonomous-sdd-bootstrap-and-cutover-plan` completes Archive,
-begin M2-S1 under a new exact authorization, then continue in order through
-M2-S2 and M2-S3. Keep the resulting generation contract-only or audit/shadow;
-do not route real delivery ownership to it before the full activation bundle
-and M4-S4 qualification exist.
+begin M2-S1 (`prove-autonomous-sdd-vertical-slice`, fixture template
+`add-typescript-javascript-review`) under a new exact authorization, then
+continue in order through M2-S2 and M2-S3. Keep the resulting generation
+contract-only or audit/shadow; do not route real delivery ownership to it
+before the full activation bundle and M4-S4 qualification exist.
 
 ## Roadmap integrity checklist
 
@@ -289,5 +320,5 @@ and M4-S4 qualification exist.
 - M4-S3 remains the start of real backlog proof; only M4-S4 exit qualifies
   repeated single-change v1 and unblocks milestone expansion.
 - Contract publication never activates ownership; M4-S4 enables only explicit
-  opt-in, and M6-S3 alone may enable default routing.
+  opt-in, and M7-S3 alone may enable default routing.
 - Temporal remains optional and post-qualification.

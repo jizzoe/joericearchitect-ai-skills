@@ -1,7 +1,7 @@
-# M6-S1 — Composition and Fault Qualification
+# M7-S1 — Composition and Fault Qualification
 
 Date: 2026-08-20
-Status: Draft for owner review; blocked on M5.
+Status: Draft for owner review; blocked on M6.
 Proposed change: `qualify-autonomous-sdd-composition-reliability`
 
 ## 1. Problem and desired outcome
@@ -34,7 +34,7 @@ Desired outcome: Disposable milestone faults prove dependency ordering, isolatio
 - Assumptions: M5 supplies the final parent/child queue contracts to test.
 
 ## 5. Scope, non-goals, constraints, dependencies, and risks
-- Scope: M6-S1 milestone and child fault matrix, dependency order, corruption, rebuild, pause and failure propagation, claims, prompts, and role handoffs.
+- Scope: M7-S1 milestone and child fault matrix, dependency order, corruption, rebuild, pause and failure propagation, claims, prompts, and role handoffs.
 - Non-goals: Replacing real qualification with fake adapters, overlapping parallel runs, or re-counting M4 single-change gates.
 - Constraints: Fake or disposable evidence cannot substitute for the later real
   five-slice soak; no overlapping parallel runs are introduced.
@@ -66,9 +66,9 @@ Desired outcome: Disposable milestone faults prove dependency ordering, isolatio
 - Failures remain visible and cannot be rerun away or counted as M4 evidence.
 
 ## 6. Open questions and blocking decisions
-- Finalize the composition matrix after M5 contracts are implemented.
+- Finalize the composition matrix after M6 contracts are implemented.
 - Set non-safety harness-health thresholds for timing and retries.
 
 ## 7. Recommended next step
-Recommendation pending owner confirmation: After M5, Propose qualify-autonomous-sdd-composition-reliability.
+Recommendation pending owner confirmation: After M6, Propose qualify-autonomous-sdd-composition-reliability.
 Recommended workflow action: OpenSpec Explore. No OpenSpec artifacts were created.

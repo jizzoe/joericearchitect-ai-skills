@@ -1,7 +1,7 @@
-# M7-S1 — Optional Temporal Execution Backend
+# M8-S1 — Optional Temporal Execution Backend
 
 Date: 2026-08-20
-Status: Draft for owner review; optional and blocked until after M6.
+Status: Draft for owner review; optional and blocked until after M7.
 Proposed change: `add-autonomous-sdd-temporal-execution-backend`
 
 ## 1. Problem and desired outcome
@@ -27,21 +27,21 @@ Desired outcome: An optional Temporal adapter runs the qualified contracts witho
 ## 4. Decisions, assumptions, and owner
 - Owner: Initiative owner; Temporal adoption, deployment, data, versioning, and
   operations choices require explicit owner approval.
-- Confirmed decisions: Temporal is optional and deferred until after M6; it
+- Confirmed decisions: Temporal is optional and deferred until after M7; it
   implements the qualified backend-neutral contract and never becomes a second
   SDD policy authority.
 - Approval evidence: The owner explicitly chose future Temporal expandability
   while avoiding setup and learning cost in the first release.
-- Assumptions: A fresh official-source assessment after M6 can evaluate current
+- Assumptions: A fresh official-source assessment after M7 can evaluate current
   Temporal capabilities, costs, and operational fit.
 
 ## 5. Scope, non-goals, constraints, dependencies, and risks
-- Scope: M7-S1 workflow and activity mapping, workers, task queues, retries, heartbeats, signals, queries, versioning, Continue-As-New, payload safety, projections, and shared claims.
+- Scope: M8-S1 workflow and activity mapping, workers, task queues, retries, heartbeats, signals, queries, versioning, Continue-As-New, payload safety, projections, and shared claims.
 - Non-goals: Automatic live migration, credentials or raw repository content in history, domain-policy changes, mandatory Temporal, or bypassing the parallelism gate.
 - Constraints: Preserve domain gates and outcomes; minimize/redact history
   payloads; never store secrets or raw repository content; share claim authority
   with local runs; do not use Temporal to bypass the parallelism decision.
-- Dependencies: All M6 qualification/cutover work, current sourced research,
+- Dependencies: All M7 qualification/cutover work, current sourced research,
   deployment/data/versioning/ownership decisions, and explicit owner adoption.
 - Risks: Workflow replay/versioning errors, history growth, payload leakage,
   operational burden, or dual authority could outweigh the scaling benefit.
@@ -73,11 +73,11 @@ Desired outcome: An optional Temporal adapter runs the qualified contracts witho
   ownership, monitoring, and cost without making Temporal mandatory.
 
 ## 6. Open questions and blocking decisions
-- Perform a fresh official-source Temporal assessment after M6.
+- Perform a fresh official-source Temporal assessment after M7.
 - Decide Cloud versus production self-hosting, data residency, encryption,
   retention, versioning, operations ownership, and cost.
 - Obtain explicit owner adoption; the development server is not production.
 
 ## 7. Recommended next step
-Recommendation pending owner confirmation: After M6 and a fresh sourced assessment plus explicit owner adoption, Explore add-autonomous-sdd-temporal-execution-backend.
+Recommendation pending owner confirmation: After M7 and a fresh sourced assessment plus explicit owner adoption, Explore add-autonomous-sdd-temporal-execution-backend.
 Recommended workflow action: OpenSpec Explore. No OpenSpec artifacts were created.

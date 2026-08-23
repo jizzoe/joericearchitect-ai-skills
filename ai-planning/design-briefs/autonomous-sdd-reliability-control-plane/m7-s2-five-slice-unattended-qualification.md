@@ -1,7 +1,7 @@
-# M6-S2 — Five-Slice Unattended Qualification
+# M7-S2 — Five-Slice Unattended Qualification
 
 Date: 2026-08-20
-Status: Draft for owner review; blocked on M6-S1 and threshold approval.
+Status: Draft for owner review; blocked on M7-S1 and threshold approval.
 Proposed change: `qualify-autonomous-sdd-five-slice-soak`
 
 ## 1. Problem and desired outcome
@@ -35,11 +35,11 @@ Desired outcome: Repeated fresh and resumed five-slice soaks complete through th
   without contaminating production repositories or credentials.
 
 ## 5. Scope, non-goals, constraints, dependencies, and risks
-- Scope: M6-S2 end-to-end environment, run selection, three-run threshold, timing and intervention metrics, retries, leaks, isolation, and convergence.
+- Scope: M7-S2 end-to-end environment, run selection, three-run threshold, timing and intervention metrics, retries, leaks, isolation, and convergence.
 - Non-goals: Rerunning away flakes, lowering gates, default cutover, parallelism, or Temporal.
 - Constraints: At least three consecutive runs are proposed; required gates
   remain unchanged; parallelism and Temporal stay out of scope.
-- Dependencies: M6-S1, approved threshold, selected five-slice workloads, and
+- Dependencies: M7-S1, approved threshold, selected five-slice workloads, and
   a disposable end-to-end environment.
 - Risks: Qualification can be expensive and slow, but relaxing evidence or
   hiding retries would invalidate the default-cutover decision.
@@ -74,5 +74,5 @@ Desired outcome: Repeated fresh and resumed five-slice soaks complete through th
 - Set timing, retry, availability, and context-drift release thresholds.
 
 ## 7. Recommended next step
-Recommendation pending owner confirmation: After M6-S1 and threshold confirmation, Propose qualify-autonomous-sdd-five-slice-soak.
+Recommendation pending owner confirmation: After M7-S1 and threshold confirmation, Propose qualify-autonomous-sdd-five-slice-soak.
 Recommended workflow action: OpenSpec Explore. No OpenSpec artifacts were created.

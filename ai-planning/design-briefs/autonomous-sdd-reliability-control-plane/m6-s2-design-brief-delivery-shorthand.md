@@ -1,7 +1,7 @@
-# M5-S2 — Design-Brief Delivery Shorthand
+# M6-S2 — Design-Brief Delivery Shorthand
 
 Date: 2026-08-20
-Status: Draft for owner review; blocked on M5-S1 and profile resolution.
+Status: Draft for owner review; blocked on M6-S1 and profile resolution.
 Proposed change: `add-autonomous-design-brief-delivery-shorthand`
 
 ## 1. Problem and desired outcome
@@ -34,11 +34,11 @@ Desired outcome: implement design brief name deterministically resolves or resum
   resolved deterministically without conversational inference.
 
 ## 5. Scope, non-goals, constraints, dependencies, and risks
-- Scope: M5-S2 brief discovery, exact selection, defaults and overrides, resume-or-create behavior, normalization, and run ID response.
+- Scope: M6-S2 brief discovery, exact selection, defaults and overrides, resume-or-create behavior, normalization, and run ID response.
 - Non-goals: Standing authority, fuzzy matching, hidden profile changes, second lifecycle policy, or gate bypass.
 - Constraints: No fuzzy selection, hidden defaults, standing authority, profile
   downgrade, or bypass of admission and review gates.
-- Dependencies: M5-S1, M1-S2, and resolution of the prototype-profile policy.
+- Dependencies: M6-S1, M1-S2, and resolution of the prototype-profile policy.
 - Risks: Convenience syntax could conceal material choices or fork lifecycle
   behavior unless it remains a narrow input adapter.
 
@@ -69,5 +69,5 @@ Desired outcome: implement design brief name deterministically resolves or resum
 - Decide whether brief identity is path-only or path plus immutable digest.
 
 ## 7. Recommended next step
-Recommendation pending owner confirmation: After M5-S1 and profile resolution, Propose add-autonomous-design-brief-delivery-shorthand.
+Recommendation pending owner confirmation: After M6-S1 and profile resolution, Propose add-autonomous-design-brief-delivery-shorthand.
 Recommended workflow action: OpenSpec Explore. No OpenSpec artifacts were created.

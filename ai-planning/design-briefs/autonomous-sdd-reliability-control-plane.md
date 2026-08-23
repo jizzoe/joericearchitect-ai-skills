@@ -86,7 +86,7 @@ The control plane uses five explicit modes:
 | `audit/shadow` | The new generation may compare discovery and decisions without writing; the existing released owner remains sole mutator. |
 | `bootstrap-hybrid` | One explicitly authorized N-1/bootstrap owner delivers and archives N; N does not prove its own release complete. |
 | `qualified-opt-in` | After M4-S4, an individually authorized run may bind one qualified generation as its sole mutating owner. |
-| `default` | Only M6-S3 may route new eligible work to the qualified generation by default; in-flight runs retain their immutable owner. |
+| `default` | Only M7-S3 may route new eligible work to the qualified generation by default; in-flight runs retain their immutable owner. |
 
 Exactly one generation owns mutation for a run and repository in every mode.
 Publishing a schema, helper, wrapper, or adapter never changes routing or grants
@@ -381,7 +381,7 @@ Implement the state machine outside the assistant runtime.
 - Confirmed external-boundary ownership: M4-S1 owns exact authenticated-host
   operation envelopes and branch-retention evidence; M4-S2 owns active-delta
   overlap and description/scenario-exact Sync preflight; M4-S3 owns terminal
-  convergence and cleanup; M4-S4 owns qualified opt-in; M6-S3 alone owns
+  convergence and cleanup; M4-S4 owns qualified opt-in; M7-S3 alone owns
   default cutover.
 - Assumption: strict independent review remains mandatory for
   `production-rapid`; reliability improvements must not accept transcripts,
@@ -412,9 +412,10 @@ review, and recovery requirements are strict:
 | M3-S1 through M3-S3 | Sealed review packages and safe evidence metadata | Production assurance and reviewer transport boundary | A false pass or false unavailable result changes delivery eligibility; strict exact-head evidence is required. |
 | M4-S1 through M4-S3 | Repository, GitHub, OpenSpec, branch, and worktree state | Real external and destructive lifecycle transitions | Every mutation must be exact, idempotent, and recoverable without touching unrelated work. |
 | M4-S4 | Durable qualification evidence, approved backlog-change metadata, and safe disposable-fixture metadata | Opt-in execution against real eligible changes plus isolated disruptive fault testing | Every run and failure remains auditable; the two gates remain separately counted, fail closed, and cannot rerun away flakes or broaden an item's authority. |
-| M5-S1 and M5-S2 | Approved roadmap/brief metadata and normalized run inputs | Global queue and shorthand entrypoints | Thin adapters must be reversible and must not duplicate or widen engine authority. |
-| M6-S1 through M6-S3 | Disposable qualification evidence, harness metrics, and safe diagnostics | Default routing for autonomous SDD delivery | Audit-mode rollback and retained failure evidence are required before and after cutover. |
-| M7-S1 | Temporal history, safe workflow metadata, worker handoffs, and backend projections | Optional external durable-execution service and workers | Temporal remains optional, preserves contract parity, shares claim authority, and never exposes credentials or creates a second state authority. |
+| M5-S1 | Central-envelope/component dispatch, linkage-ledger, and exact-revision return evidence | Cross-repository coordination for a single delivery slice | The central change opens first and closes last; component changes archive inside it and return evidence against exact revisions. |
+| M6-S1 and M6-S2 | Approved roadmap/brief metadata and normalized run inputs | Global queue and shorthand entrypoints | Thin adapters must be reversible and must not duplicate or widen engine authority. |
+| M7-S1 through M7-S3 | Disposable qualification evidence, harness metrics, and safe diagnostics | Default routing for autonomous SDD delivery | Audit-mode rollback and retained failure evidence are required before and after cutover. |
+| M8-S1 | Temporal history, safe workflow metadata, worker handoffs, and backend projections | Optional external durable-execution service and workers | Temporal remains optional, preserves contract parity, shares claim authority, and never exposes credentials or creates a second state authority. |
 
 ### Recommended architecture
 
@@ -1009,7 +1010,7 @@ safety criteria before default cutover can be considered.
   ready.
 - **Qualification threshold confirmation:** Confirm or adjust the proposed ten
   consecutive real single-change runs before M4-S4 Propose and the proposed
-  three consecutive real five-slice multi-hour runs before M6-S2 Propose. M4-S4
+  three consecutive real five-slice multi-hour runs before M7-S2 Propose. M4-S4
   also requires an approved scenario-to-environment matrix that keeps
   disruptive fault injection out of real backlog work.
 - **Agent execution identities:** Confirm whether roles may reuse one model or
@@ -1025,7 +1026,7 @@ safety criteria before default cutover can be considered.
 - **Parallelism adoption trigger:** After M4-S4, decide from measured serial
   throughput and contention whether fine-grained claims and parallel child or
   role execution justify a separate roadmap slice. Parallelism cannot be folded
-  silently into M5, M6, or Temporal and is not required to prove serial
+  silently into M6, M7, or Temporal and is not required to prove serial
   five-slice delivery.
 
 These decisions block the exact OpenSpec requirements and schema, but they do
@@ -1052,8 +1053,8 @@ Planned directory: `ai-planning/design-briefs/autonomous-sdd-reliability-control
 | M1-S1 | `establish-autonomous-sdd-run-v2-contract` | [Run and isolated work-unit contract](autonomous-sdd-reliability-control-plane/m1-s1-run-and-work-unit-contract.md) |
 | M1-S2 | `unify-autonomous-sdd-operation-contract` | [Operation, profile, gate, and outcome contract](autonomous-sdd-reliability-control-plane/m1-s2-operation-profile-gate-and-outcome-contract.md) |
 | M1-S3 | `establish-autonomous-sdd-runtime-config-provenance` | [Runtime configuration provenance](autonomous-sdd-reliability-control-plane/m1-s3-runtime-configuration-provenance.md) |
-| M2-S1 | `add-autonomous-sdd-local-execution-backend` | [Local durable execution backend](autonomous-sdd-reliability-control-plane/m2-s1-local-durable-execution-backend.md) |
-| M2-S2 | `add-autonomous-sdd-transition-engine` | [Deterministic transition engine](autonomous-sdd-reliability-control-plane/m2-s2-deterministic-transition-engine.md) |
+| M2-S1 | `prove-autonomous-sdd-vertical-slice` | [Prove the vertical slice](autonomous-sdd-reliability-control-plane/m2-s1-prove-vertical-slice.md) |
+| M2-S2 | `add-autonomous-sdd-local-execution-backend` | [Local durable execution backend](autonomous-sdd-reliability-control-plane/m2-s2-local-durable-execution-backend.md) |
 | M2-S3 | `add-autonomous-sdd-run-status-and-recovery` | [Run status and recovery](autonomous-sdd-reliability-control-plane/m2-s3-run-status-and-recovery.md) |
 | M3-S1 | `harden-strict-review-multistep-artifact-delivery` | [Strict-review artifact delivery](autonomous-sdd-reliability-control-plane/m3-s1-strict-review-artifact-delivery.md) |
 | M3-S2 | `add-autonomous-sdd-review-admission-and-dispatcher` | [Review admission and dispatch](autonomous-sdd-reliability-control-plane/m3-s2-review-admission-and-dispatch.md) |
@@ -1062,12 +1063,13 @@ Planned directory: `ai-planning/design-briefs/autonomous-sdd-reliability-control
 | M4-S2 | `integrate-autonomous-sdd-sync-and-archive` | [Sync and Archive delivery](autonomous-sdd-reliability-control-plane/m4-s2-sync-and-archive-delivery.md) |
 | M4-S3 | `integrate-autonomous-sdd-finalization-and-cleanup` | [Finalization and cleanup](autonomous-sdd-reliability-control-plane/m4-s3-finalization-and-cleanup.md) |
 | M4-S4 | `qualify-autonomous-sdd-single-change-reliability` | [Single-change reliability qualification](autonomous-sdd-reliability-control-plane/m4-s4-single-change-reliability-qualification.md) |
-| M5-S1 | `add-autonomous-sdd-milestone-slice-adapter` | [Milestone/slice queue](autonomous-sdd-reliability-control-plane/m5-s1-milestone-slice-queue.md) |
-| M5-S2 | `add-autonomous-design-brief-delivery-shorthand` | [Design-brief delivery shorthand](autonomous-sdd-reliability-control-plane/m5-s2-design-brief-delivery-shorthand.md) |
-| M6-S1 | `qualify-autonomous-sdd-composition-reliability` | [Composition and fault qualification](autonomous-sdd-reliability-control-plane/m6-s1-composition-and-fault-qualification.md) |
-| M6-S2 | `qualify-autonomous-sdd-five-slice-soak` | [Five-slice unattended qualification](autonomous-sdd-reliability-control-plane/m6-s2-five-slice-unattended-qualification.md) |
-| M6-S3 | `enable-autonomous-sdd-control-plane-default` | [Default control-plane cutover](autonomous-sdd-reliability-control-plane/m6-s3-default-control-plane-cutover.md) |
-| M7-S1 | `add-autonomous-sdd-temporal-execution-backend` | [Optional Temporal execution backend](autonomous-sdd-reliability-control-plane/m7-s1-temporal-execution-backend.md) |
+| M5-S1 | `add-autonomous-sdd-cross-repository-coordination` | [Cross-repository coordination](autonomous-sdd-reliability-control-plane/cross-repository-coordination.md) |
+| M6-S1 | `add-autonomous-sdd-milestone-slice-adapter` | [Milestone/slice queue](autonomous-sdd-reliability-control-plane/m6-s1-milestone-slice-queue.md) |
+| M6-S2 | `add-autonomous-design-brief-delivery-shorthand` | [Design-brief delivery shorthand](autonomous-sdd-reliability-control-plane/m6-s2-design-brief-delivery-shorthand.md) |
+| M7-S1 | `qualify-autonomous-sdd-composition-reliability` | [Composition and fault qualification](autonomous-sdd-reliability-control-plane/m7-s1-composition-and-fault-qualification.md) |
+| M7-S2 | `qualify-autonomous-sdd-five-slice-soak` | [Five-slice unattended qualification](autonomous-sdd-reliability-control-plane/m7-s2-five-slice-unattended-qualification.md) |
+| M7-S3 | `enable-autonomous-sdd-control-plane-default` | [Default control-plane cutover](autonomous-sdd-reliability-control-plane/m7-s3-default-control-plane-cutover.md) |
+| M8-S1 | `add-autonomous-sdd-temporal-execution-backend` | [Optional Temporal execution backend](autonomous-sdd-reliability-control-plane/m8-s1-temporal-execution-backend.md) |
 
 ### M1 — Contract convergence (delivered)
 
@@ -1188,25 +1190,33 @@ Planned directory: `ai-planning/design-briefs/autonomous-sdd-reliability-control
   authorization, inject disruptive faults into real changes, or begin
   milestone-queue work early.
 
-### M5 — Milestone queues and owner shorthand
+### M5 — Cross-repository SDD coordination
 
-- **M5-S1** converts an approved milestone into a parent coordinating immutable
+- **M5-S1** lets one authorized change span a central planning repository and
+  one or more component repositories, with the central change opening first and
+  closing last and component changes archiving inside it. A linkage ledger
+  records dispatch and return against exact revisions, and end-to-end
+  verification names an assigned executor, environment, and evidence location.
+
+### M6 — Milestone queues and owner shorthand
+
+- **M6-S1** converts an approved milestone into a parent coordinating immutable
   dependency-valid child work units. Every child owns authorization/config,
   deadline, budget, brief and target, artifacts/evidence, backend reference,
   claims, lifecycle, result, and cleanup; the parent owns order and projections.
   The adapter never duplicates lifecycle policy or chooses product priority.
   Five-unit fixtures must preserve isolation through restart, pause, expiry,
   corruption, dependency failure, and projection rebuild.
-- **M5-S2** makes `implement design brief <name>` a thin deterministic input
+- **M6-S2** makes `implement design brief <name>` a thin deterministic input
   resolver: display defaults and overrides, resolve an exact brief, resume an
   existing run or enter Propose once, seal profile/review/expiry inputs, and
   return a run ID. It creates no second runner, hidden default, standing
   authority, fuzzy selection, or gate bypass, and Claude/Codex wrappers must
   normalize identically.
 
-### M6 — Five-slice qualification and default cutover
+### M7 — Five-slice qualification and default cutover
 
-- **M6-S1** extends the already-passing single-change suite with milestone and
+- **M7-S1** extends the already-passing single-change suite with milestone and
   child-work-unit composition faults: dependency ordering; parent/child
   corruption and projection rebuild; queue interruption; child pause, expiry,
   and failure propagation; claim isolation; wrong-child evidence; exact prompt
@@ -1214,20 +1224,20 @@ Planned directory: `ai-planning/design-briefs/autonomous-sdd-reliability-control
   and never substitutes fake adapters for real qualification. Fine-grained
   overlapping-run parallelism remains outside this milestone unless separately
   designed and approved.
-- **M6-S2** runs repeated fresh and resumed five-slice multi-hour soaks through
+- **M7-S2** runs repeated fresh and resumed five-slice multi-hour soaks through
   the real engine, strict reviewer, GitHub lifecycle, Sync, Archive, and cleanup.
   It records prompt/owner intervention, timings, retries/corrections, resource
   leaks, role/work-unit isolation, final convergence, history/projection
   agreement, and all failed runs. It cannot rerun away flakes or lower gates.
-- **M6-S3** switches thin entrypoints to qualified run-v2 local execution only
+- **M7-S3** switches thin entrypoints to qualified run-v2 local execution only
   after the owner-approved threshold. It retains legacy audit/recovery,
   compatibility diagnostics, a tested rollback, and removal criteria. It never
   deletes ambiguous legacy state or removes rollback early; generated assistant
   assets require parity and cache-refresh verification.
 
-### M7 — Optional Temporal execution backend
+### M8 — Optional Temporal execution backend
 
-- **M7-S1** maps the proven contracts to a parent Workflow, child Workflows,
+- **M8-S1** maps the proven contracts to a parent Workflow, child Workflows,
   idempotent Activities, stable IDs, task queues, worker capability admission,
   bounded retries/heartbeats, authorized Signals or Updates, status Queries,
   safe Continue-As-New, deterministic replay/versioning, minimized/redacted

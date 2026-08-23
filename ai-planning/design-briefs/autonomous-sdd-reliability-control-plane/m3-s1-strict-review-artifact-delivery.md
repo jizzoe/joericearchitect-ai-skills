@@ -1,11 +1,11 @@
 # M3-S1 — Strict-Review Artifact Delivery
 
 Date: 2026-08-20
-Status: Draft for owner review; blocked on M1 contracts and M2 interfaces.
+Status: Draft for owner review; blocked on M1 contracts and the M2-S1 thin review loop.
 Proposed change: `harden-strict-review-multistep-artifact-delivery`
 
 ## 1. Problem and desired outcome
-Problem: A genuine multi-step strict reviewer can finish without delivering the required terminal artifact.
+Problem: The thin M2-S1 review loop is not yet strict; a genuine multi-step strict reviewer can finish without delivering the required terminal artifact.
 Desired outcome: Every strict review returns one parent-owned schema-valid terminal artifact or exact unavailable evidence.
 
 ## 2. Evidence and key findings
@@ -40,8 +40,9 @@ Desired outcome: Every strict review returns one parent-owned schema-valid termi
 - Non-goals: Admission policy, exact-head correction policy, degraded fallback redesign, or production Apply.
 - Constraints: Reviewer execution is read-only and isolated; capture must
   terminalize deterministically across success, failure, timeout, and crash.
-- Dependencies: M2 interfaces and M1 contracts; reconcile any existing
-  authoritative review change or worktree before Propose.
+- Dependencies: the M2-S1 thin review loop and M1 contracts; upgrade the thin
+  loop to strict host-captured multi-step artifact delivery; reconcile any
+  existing authoritative review change or worktree before Propose.
 - Risks: Accepting a transcript, losing the terminal artifact, or leaving an
   ambiguous capture process would create false assurance.
 

@@ -1,7 +1,7 @@
-# M6-S3 — Default Control-Plane Cutover
+# M7-S3 — Default Control-Plane Cutover
 
 Date: 2026-08-20
-Status: Draft for owner review; conditional on M6-S2 and owner approval.
+Status: Draft for owner review; conditional on M7-S2 and owner approval.
 Proposed change: `enable-autonomous-sdd-control-plane-default`
 
 ## 1. Problem and desired outcome
@@ -33,15 +33,15 @@ Desired outcome: Thin entrypoints switch to qualified local execution with audit
   auditable; ambiguous migration never becomes silent success.
 - Approval evidence: The owner accepted proof-before-default sequencing, not
   immediate replacement.
-- Assumptions: M6-S2 produces objective reliability, intervention, recovery,
+- Assumptions: M7-S2 produces objective reliability, intervention, recovery,
   and leak metrics suitable for a go/no-go decision.
 
 ## 5. Scope, non-goals, constraints, dependencies, and risks
-- Scope: M6-S3 routing switch, audit mode, compatibility diagnostics, rollback, removal criteria, assistant parity, and cache refresh.
+- Scope: M7-S3 routing switch, audit mode, compatibility diagnostics, rollback, removal criteria, assistant parity, and cache refresh.
 - Non-goals: Deleting ambiguous legacy state, weakening gates, removing rollback early, or enabling parallelism.
 - Constraints: Audit and opt-in stages precede default routing; rollback stays
   available until explicit removal criteria pass; all assistant entrypoints agree.
-- Dependencies: Passing M6-S2 evidence and explicit owner cutover approval.
+- Dependencies: Passing M7-S2 evidence and explicit owner cutover approval.
 - Risks: Premature defaulting can strand legacy runs or amplify rare failures;
   indefinite dual routing can create competing authorities and drift.
 
@@ -51,10 +51,10 @@ Desired outcome: Thin entrypoints switch to qualified local execution with audit
   not fork for default mode.
 - Begin with audit/diagnostic routing, compare legacy discovery and run-v2
   classification, then enable default mutation only after explicit owner
-  approval and M6-S2 evidence.
+  approval and M7-S2 evidence.
 - Implement the same five-mode state machine used by the planning contract:
   `contract-only`, `audit/shadow`, `bootstrap-hybrid`, `qualified-opt-in`, and
-  `default`. M6-S3 is the only slice allowed to select `default` for new runs.
+  `default`. M7-S3 is the only slice allowed to select `default` for new runs.
   Every mode names exactly one mutating generation; audit/shadow never writes,
   and in-flight runs retain their immutable generation binding through a mode
   or rollback change.
@@ -78,9 +78,9 @@ Desired outcome: Thin entrypoints switch to qualified local execution with audit
 - Removal cannot begin until retained-state and rollback criteria are met.
 
 ## 6. Open questions and blocking decisions
-- Owner approval is required after reviewing M6-S2 evidence.
+- Owner approval is required after reviewing M7-S2 evidence.
 - Define the observation period and legacy-removal criteria.
 
 ## 7. Recommended next step
-Recommendation pending owner confirmation: After M6-S2 meets its threshold and the owner approves cutover, Propose enable-autonomous-sdd-control-plane-default.
+Recommendation pending owner confirmation: After M7-S2 meets its threshold and the owner approves cutover, Propose enable-autonomous-sdd-control-plane-default.
 Recommended workflow action: OpenSpec Explore. No OpenSpec artifacts were created.

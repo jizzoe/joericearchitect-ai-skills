@@ -1,8 +1,9 @@
-# M2-S1 — Local Durable Execution Backend
+# M2-S2 — Local Durable Execution Backend
 
 Date: 2026-08-20
-Status: Next dependency-valid slice after the bootstrap/cutover stabilization
-Archive; its delivery still requires separate authorization.
+Status: Second M2 slice; follows `prove-autonomous-sdd-vertical-slice` and is
+scoped by the transition set and record shapes that slice proved. Its delivery
+still requires separate authorization.
 Proposed change: `add-autonomous-sdd-local-execution-backend`
 
 ## 1. Problem and desired outcome
@@ -39,12 +40,12 @@ Desired outcome: A deliberately small one-host local backend provides durable hi
   model; crash recovery and operator takeover are required.
 
 ## 5. Scope, non-goals, constraints, dependencies, and risks
-- Scope: M2-S1 local storage, history, projection, ownership, claim, takeover, discovery, and legacy inventory.
+- Scope: M2-S2 local storage, history, projection, ownership, claim, takeover, discovery, and legacy inventory, scoped by the proven M2-S1 vertical slice.
 - Non-goals: Daemons, queues, distributed workers, generalized timers, arbitrary workflows, Temporal, or real lifecycle adapters.
 - Constraints: History lives outside disposable worktrees; advancement is
   atomic and generation-fenced; one coarse claim prevents overlapping mutation;
   the design pauses if the estimated core exceeds the agreed complexity budget.
-- Dependencies: Delivered M1 slices and accepted bootstrap/cutover stabilization.
+- Dependencies: Delivered M1 slices, accepted bootstrap/cutover stabilization, and the M2-S1 vertical slice.
 - Risks: The main risk is accidentally rebuilding Temporal features. A second
   authority, unsafe stale-owner takeover, or optimistic line estimate blocks
   Propose and triggers a build-vs-buy reassessment.
@@ -62,7 +63,7 @@ Desired outcome: A deliberately small one-host local backend provides durable hi
   invoked; the current runner directly selects and invokes fixed adapters.
 - No daemon, automatic restart, general queue/timer service, multi-host worker,
   arbitrary workflow graph, HA, clustering, or search/retention service is added.
-- M2-S1 publishes and proves backend behavior in `contract-only` or
+- M2-S2 publishes and proves backend behavior in `contract-only` or
   `audit/shadow` mode. It does not replace the existing real lifecycle owner,
   even if initialization and claims are executable. Operational activation
   waits for the complete vertical bundle and M4-S4 qualification.
@@ -84,5 +85,5 @@ Desired outcome: A deliberately small one-host local backend provides durable hi
 - Confirm filesystem classes that are supported or rejected at admission.
 
 ## 7. Recommended next step
-After the stabilization change archives, create a fresh authorized M2-S1
-delivery. Then continue to M2-S2 and M2-S3 without activating real ownership.
+After the M2-S1 vertical slice passes, create a fresh authorized M2-S2
+delivery. Then continue to M2-S3 without activating real ownership.

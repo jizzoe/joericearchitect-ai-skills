@@ -1,4 +1,4 @@
-# M5-S1 — Milestone/Slice Queue
+# M6-S1 — Milestone/Slice Queue
 
 Date: 2026-08-20
 Status: Draft for owner review; blocked until M4-S4 qualifies single-change v1.
@@ -37,7 +37,7 @@ Desired outcome: One parent coordinates immutable child work units while every c
   a future measured decision and is not implicit here.
 
 ## 5. Scope, non-goals, constraints, dependencies, and risks
-- Scope: M5-S1 parent queue, immutable child inputs, dependency selection, isolation, projections, pause propagation, and rebuild.
+- Scope: M6-S1 parent queue, immutable child inputs, dependency selection, isolation, projections, pause propagation, and rebuild.
 - Non-goals: Choosing product priority, parallel children, fine-grained claims, or changing the child lifecycle.
 - Constraints: The parent chooses only dependency-valid children, cannot widen
   their grants, and propagates pauses without hiding child evidence.

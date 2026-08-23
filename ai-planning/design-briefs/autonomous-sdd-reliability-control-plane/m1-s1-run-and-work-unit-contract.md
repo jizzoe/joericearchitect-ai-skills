@@ -105,7 +105,7 @@ Desired outcome: One backend-neutral run and isolated work-unit contract owns du
   ```
 
 - Local v1 uses one exclusive native-handle lock for the repository: Windows
-  `LockFileEx`; POSIX advisory locking on macOS/Linux. M2-S1 must select and
+  `LockFileEx`; POSIX advisory locking on macOS/Linux. M2-S2 must select and
   pin an audited Node 20.19 adapter that proves both implementations. It may
   not substitute a timeout-based mkdir lock, a PID file, or a platform-specific
   weaker mode. Every mutation also checks the current ownership generation,
@@ -113,7 +113,7 @@ Desired outcome: One backend-neutral run and isolated work-unit contract owns du
 - Safe publication writes an immutable record to a unique temporary file,
   flushes it with the platform-supported durable-write primitive, atomically
   renames it in the same directory, and durably flushes directory metadata
-  where that platform supports it. M2-S1 must prove the equivalent crash
+  where that platform supports it. M2-S2 must prove the equivalent crash
   boundary on Windows rather than assuming POSIX directory `fsync`. New
   records, rather than in-place history edits, advance state.
 - The active-run area contains only active, paused, or unreconciled runs. Once a
@@ -190,10 +190,10 @@ applicable qualification gate. Exactly one generation owns mutation.
 - Cutover fixtures prove that legacy records remain readable but cannot advance,
   and that no run has both a legacy and v2 official record.
 - The accepted threat model and local-backend complexity tripwire are recorded
-  before M2-S1 can become Propose-ready.
+  before M2-S2 can become Propose-ready.
 
 ## 6. Remaining decisions and implementation guardrails
-- M2-S1 must select the pinned native Node lock adapter only after source,
+- M2-S2 must select the pinned native Node lock adapter only after source,
   license, Node 20.19, Windows, macOS, and Linux compatibility evidence. A
   missing equivalent lock capability blocks implementation; it does not weaken
   one platform.
@@ -207,5 +207,5 @@ applicable qualification gate. Exactly one generation owns mutation.
 ## 7. Recommended next step
 
 M1-S1 is complete. After the bootstrap/cutover planning change is archived,
-resume with M2-S1 under a separate exact authorization while keeping real
+resume with the next M2 slice under a separate exact authorization while keeping real
 operational ownership disabled until the full activation bundle is qualified.

@@ -74,12 +74,12 @@ Desired outcome: Ten consecutive approved real completions and an independently 
 - Passing qualifies opt-in serial single-change v1 and is the hard gate for M5.
 - Passing moves the complete vertical bundle from `contract-only`/`audit/shadow`
   to `qualified-opt-in` only. Each real run still needs exact authorization and
-  one immutable mutating owner; default routing remains forbidden until M6-S3.
+  one immutable mutating owner; default routing remains forbidden until M7-S3.
 
 ## 6. Open questions and blocking decisions
 - Owner must confirm or adjust the ten-run threshold before Propose.
 - Approve the full scenario-to-environment and counter matrix.
-- Identify a varied set of independently approved eligible backlog changes.
+- The eligible backlog queue is fixed by the roadmap (the ten non-SDD skills in the accepted order); each run still requires its own approved brief and exact authorization.
 
 ## 7. Recommended next step
 Recommendation pending owner confirmation: After M4-S3 and explicit threshold and environment approval, Propose qualify-autonomous-sdd-single-change-reliability.

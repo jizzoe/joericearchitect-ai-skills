@@ -1,7 +1,7 @@
 # M2-S3 — Run Status and Recovery
 
 Date: 2026-08-20
-Status: Draft for owner review; blocked on M2-S2.
+Status: Draft for owner review; blocked on M2-S1 and M2-S2.
 Proposed change: `add-autonomous-sdd-run-status-and-recovery`
 
 ## 1. Problem and desired outcome
@@ -39,7 +39,7 @@ Desired outcome: Repository-wide read-only status and safe resume always agree f
 - Non-goals: Mutation, cleanup, claim takeover without permission, or changing lifecycle policy.
 - Constraints: Status is read-only; projection repair never rewrites history;
   takeover requires stale-owner proof and explicit authority.
-- Dependencies: M2-S2, which supplies authoritative transitions and attempt state.
+- Dependencies: M2-S1 (transitions/attempt state) and M2-S2 (durable history/backend).
 - Risks: A misleading projection or wrong-run operation could cause unsafe
   resumption, so identity, binding, and actionable recovery evidence are gates.
 
@@ -70,5 +70,5 @@ Desired outcome: Repository-wide read-only status and safe resume always agree f
 - Define how much evidence detail is summarized versus linked by reference.
 
 ## 7. Recommended next step
-Recommendation pending owner confirmation: After M2-S2 passes, Propose add-autonomous-sdd-run-status-and-recovery.
+Recommendation pending owner confirmation: After M2-S1 and M2-S2 pass, Propose add-autonomous-sdd-run-status-and-recovery.
 Recommended workflow action: OpenSpec Explore. No OpenSpec artifacts were created.

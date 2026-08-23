@@ -30,7 +30,9 @@ Desired outcome: Review and bounded correction bind to exact Apply evidence, pac
 - Owner: Initiative owner; exact-head reuse policy requires owner acceptance.
 - Confirmed decisions: Strict review binds the immutable package and exact code
   head; production-code changes invalidate it; bounded objective correction
-  requires fresh exact-head rereview.
+  requires fresh exact-head rereview. The fresh-review-on-change rule is first
+  proven in M2-S1's thin review loop; M3-S3 upgrades it to strict exact-head
+  binding.
 - Approval evidence: The owner accepted the independent-review role and
   questioned whether it belongs in Verify; the master design now places it
   after Apply and before Verify readiness.
