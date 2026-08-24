@@ -8,8 +8,8 @@ Status: Accepted dependency and execution-order plan through M1 and the
 bootstrap/cutover stabilization. M1-S1, M1-S2, and M1-S3 are delivered and
 archived. M2 is re-sequenced to prove a vertical slice before the durable
 backend (2026-08-23 revision), and a first-class M5 cross-repository
-coordination milestone is added. M2-S1, M2-S2, M2-S3, and M3-S1 are delivered and archived;
-M3-S2 is next. Every slice still requires its own accepted brief and explicit
+coordination milestone is added. M2-S1, M2-S2, M2-S3, M3-S1, and M3-S2 are delivered and archived;
+M3-S3 is next. Every slice still requires its own accepted brief and explicit
 authorization.
 
 ## Purpose and authority
@@ -301,9 +301,10 @@ Temporal runs serialize overlapping work through one claim authority.
 
 M2-S1 (`prove-autonomous-sdd-vertical-slice`), M2-S2
 (`add-autonomous-sdd-local-execution-backend`), M2-S3
-(`add-autonomous-sdd-run-status-and-recovery`), and M3-S1
-(`harden-strict-review-multistep-artifact-delivery`) are delivered and archived.
-Begin M3-S2 (`add-autonomous-sdd-review-admission-and-dispatcher`) under a new
+(`add-autonomous-sdd-run-status-and-recovery`), M3-S1
+(`harden-strict-review-multistep-artifact-delivery`), and M3-S2
+(`add-autonomous-sdd-review-admission-and-dispatcher`) are delivered and archived.
+Begin M3-S3 (`bind-autonomous-review-to-code-head`) under a new
 exact authorization, then continue in order. Keep the resulting generation
 contract-only or audit/shadow; do not route real delivery ownership to it
 before the full activation bundle and M4-S4 qualification exist.
