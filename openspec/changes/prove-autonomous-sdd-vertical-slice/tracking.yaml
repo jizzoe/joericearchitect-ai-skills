@@ -1,0 +1,16 @@
+schema_version: 1
+openspec:
+  change: "prove-autonomous-sdd-vertical-slice"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 207
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/207"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/prove-autonomous-sdd-vertical-slice/"
+      - "scripts/sdd/autonomous-sdd-vertical-slice.mjs"
+      - "scripts/sdd/test/autonomous-sdd-vertical-slice.test.mjs"
