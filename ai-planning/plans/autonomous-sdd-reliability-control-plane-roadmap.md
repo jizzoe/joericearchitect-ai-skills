@@ -2,15 +2,15 @@
 
 Date: 2026-08-16
 
-Last updated: 2026-08-23
+Last updated: 2026-08-24
 
 Status: Accepted dependency and execution-order plan through M1 and the
 bootstrap/cutover stabilization. M1-S1, M1-S2, and M1-S3 are delivered and
 archived. M2 is re-sequenced to prove a vertical slice before the durable
 backend (2026-08-23 revision), and a first-class M5 cross-repository
-coordination milestone is added. M2-S1 is next after the stabilization
-lifecycle completes, but every slice still requires its own accepted brief and
-explicit authorization.
+coordination milestone is added. M2-S1 is delivered and archived; M2-S2 is
+next. Every slice still requires its own accepted brief and explicit
+authorization.
 
 ## Purpose and authority
 
@@ -153,8 +153,8 @@ current working directory.
 
 | Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
 |---|---|---|---|
-| M2-S1 — Prove the vertical slice | `prove-autonomous-sdd-vertical-slice` | Next and Propose-ready after this stabilization Archive; proves one fixture change flows proposal → apply → verify → fresh-review-on-change under simulated/non-mutating adapters, a thin sealed review loop, and a minimal ephemeral store; fixture template is `add-typescript-javascript-review`; delivered by the pre-v2 lifecycle, never by the controller it builds | [M2-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s1-prove-vertical-slice.md) |
-| M2-S2 — Local durable execution backend | `add-autonomous-sdd-local-execution-backend` | Follows M2-S1; hardens controller/admission pairing, history, atomic advancement, exact resume/takeover, stale-owner rejection, and one coarse claim, scoped by the proven slice; stays contract-only/audit and does not activate real lifecycle ownership | [M2-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s2-local-durable-execution-backend.md) |
+| M2-S1 — Prove the vertical slice | `prove-autonomous-sdd-vertical-slice` | Delivered and archived via issue #207 and PRs #208/#209/#210; proves one fixture change flows proposal → apply → verify → fresh-review-on-change under simulated/non-mutating adapters, a thin sealed review loop, and a minimal ephemeral store; fixture template is `add-typescript-javascript-review`; delivered by the pre-v2 lifecycle, never by the controller it builds | [M2-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s1-prove-vertical-slice.md) |
+| M2-S2 — Local durable execution backend | `add-autonomous-sdd-local-execution-backend` | Next; follows delivered M2-S1; hardens controller/admission pairing, history, atomic advancement, exact resume/takeover, stale-owner rejection, and one coarse claim, scoped by the proven slice; stays contract-only/audit and does not activate real lifecycle ownership | [M2-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s2-local-durable-execution-backend.md) |
 | M2-S3 — Run status and recovery | `add-autonomous-sdd-run-status-and-recovery` | Follows M2-S2; completes local recovery/status prerequisites without activating real external mutation | [M2-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m2-s3-run-status-and-recovery.md) |
 
 **Exit evidence:** a non-mutating simulated-adapter single-change run completes
@@ -299,12 +299,11 @@ Temporal runs serialize overlapping work through one claim authority.
 
 ## Recommended starting point
 
-After `stabilize-autonomous-sdd-bootstrap-and-cutover-plan` completes Archive,
-begin M2-S1 (`prove-autonomous-sdd-vertical-slice`, fixture template
-`add-typescript-javascript-review`) under a new exact authorization, then
-continue in order through M2-S2 and M2-S3. Keep the resulting generation
-contract-only or audit/shadow; do not route real delivery ownership to it
-before the full activation bundle and M4-S4 qualification exist.
+M2-S1 (`prove-autonomous-sdd-vertical-slice`) is delivered and archived. Begin
+M2-S2 (`add-autonomous-sdd-local-execution-backend`) under a new exact
+authorization, then continue in order through M2-S3. Keep the resulting
+generation contract-only or audit/shadow; do not route real delivery ownership
+to it before the full activation bundle and M4-S4 qualification exist.
 
 ## Roadmap integrity checklist
 

@@ -94,34 +94,43 @@ function archiveMatchesFor(paths, parentRunId, fileSystem = fs) {
 
 function validTerminalV2Controller(controller, { repository, repositoryId, paths, fileSystem = fs } = {}) {
   if (!controller || controller.schemaVersion !== 5 || !identifier.test(controller.runId ?? "") || !text(repository) || controller.repository !== repository ||
-      controller.currentPhase !== null || !Array.isArray(controller.steps) || controller.steps.length === 0 ||
-      controller.steps.some((step) => step?.status !== "complete" || step?.evidence?.current !== true) ||
+      !Array.isArray(controller.steps) || controller.steps.length !== controllerPhases.length ||
+      controller.steps.some((step, index) => step?.id !== controllerPhases[index]) ||
       controller.v2Admission?.state !== "admitted" || controller.v2Admission.repositoryId !== repositoryId ||
       !identifier.test(controller.v2Admission?.parentRunId ?? "") || !identifier.test(controller.v2Admission?.workUnitId ?? "") ||
       !identifier.test(controller.v2Admission?.claimId ?? "") || !timestamp(controller.v2Admission?.admittedAt) ||
       !sha256.test(controller.authorizationDigest ?? "") || !identifier.test(controller.selectedEntry ?? "") || !timestamp(controller.expiresAt)) return false;
   if (controller.runId !== `controller-${controller.authorizationDigest.slice(0, 32)}`) return false;
   if (controller.checkpointPath !== path.posix.join("runs", controller.runId, "controller.json") ||
-      JSON.stringify(controller.allowedLifecycleChain) !== JSON.stringify(controllerPhases) ||
-      controller.steps.length !== controllerPhases.length || controller.steps.some((step, index) => step.id !== controllerPhases[index])) return false;
+      JSON.stringify(controller.allowedLifecycleChain) !== JSON.stringify(controllerPhases)) return false;
   const admission = controller.v2Admission;
   const archives = archiveMatchesFor(paths, admission.parentRunId, fileSystem);
   if (archives.length !== 1 || fileSystem.existsSync(path.join(paths.active, admission.parentRunId))) return false;
   const archive = archives[0];
   const records = Object.fromEntries([
-    "parent-run", "work-unit", "resource-claim", "terminalization-receipt", "claim-release", "projection", "archive-manifest"
+    "parent-run", "work-unit", "resource-claim", "terminalization-receipt", "cancellation-receipt", "claim-release", "projection", "archive-manifest"
   ].map((name) => [name, safeJson(path.join(archive, `${name}.json`), fileSystem)]));
-  const validations = Object.fromEntries(Object.entries(records).map(([name, record]) => [name, validateDomainRecord(record)]));
+  const present = Object.fromEntries(Object.entries(records).filter(([, record]) => record != null));
+  const validations = Object.fromEntries(Object.entries(present).map(([name, record]) => [name, validateDomainRecord(record)]));
   if (Object.values(validations).some((validation) => !validation.valid)) return false;
-  const parent = records["parent-run"];
-  const workUnit = records["work-unit"];
-  const claim = records["resource-claim"];
-  const receipt = records["terminalization-receipt"];
-  const release = records["claim-release"];
-  const projection = records.projection;
-  const manifest = records["archive-manifest"];
-  const summary = receipt.terminalSummary;
+  const parent = present["parent-run"];
+  const workUnit = present["work-unit"];
+  const claim = present["resource-claim"];
+  const terminalizationReceipt = present["terminalization-receipt"];
+  const cancellationReceipt = present["cancellation-receipt"];
+  const release = present["claim-release"];
+  const projection = present.projection;
+  const manifest = present["archive-manifest"];
+  const terminalized = terminalizationReceipt != null;
+  const cancelled = cancellationReceipt != null;
+  if (terminalized === cancelled) return false;
+  if (terminalized && (controller.currentPhase !== null || controller.steps.some((step) => step?.status !== "complete" || step?.evidence?.current !== true))) return false;
+  if (cancelled && (cancellationReceipt.controllerRunId !== controller.runId || cancellationReceipt.expiresAt !== controller.expiresAt)) return false;
+  const receipt = terminalized ? terminalizationReceipt : cancellationReceipt;
+  const summary = terminalized ? terminalizationReceipt.terminalSummary : projection.children[0];
   const sameProvider = (bindingValue) => bindingValue?.id === admission.providerBinding?.id && bindingValue?.digest === admission.providerBinding?.digest;
+  const receiptDigest = validations[terminalized ? "terminalization-receipt" : "cancellation-receipt"].digest;
+  const releaseReceiptDigest = terminalized ? release.terminalizationReceiptDigest : release.cancellationReceiptDigest;
   const checks = {
     authorization: controller.authorizationDigest === parent.approvedIntentDigest && controller.authorizationDigest === workUnit.authorizationDigest,
     deadline: controller.expiresAt === parent.deadline,
@@ -130,12 +139,14 @@ function validTerminalV2Controller(controller, { repository, repositoryId, paths
     claim: admission.claimId === claim.claimId && claim.workUnitId === workUnit.workUnitId && claim.repositoryId === repositoryId && claim.state === "active",
     change: workUnit.approvedChangeId === controller.selectedEntry && receipt.approvedChangeId === controller.selectedEntry,
     receipt: receipt.parentRunId === parent.parentRunId && receipt.workUnitId === workUnit.workUnitId && receipt.claimId === claim.claimId && receipt.repositoryId === repositoryId,
-    release: release.claimId === claim.claimId && release.workUnitId === workUnit.workUnitId && release.repositoryId === repositoryId && release.disposition === "released" && release.terminalizationReceiptDigest === validations["terminalization-receipt"].digest,
+    release: release.claimId === claim.claimId && release.workUnitId === workUnit.workUnitId && release.repositoryId === repositoryId && release.disposition === "released" && releaseReceiptDigest === receiptDigest,
     provider: sameProvider(parent.claimProviderBinding) && sameProvider(workUnit.claimProviderBinding) && sameProvider(claim.providerBinding),
     projection: projection.parentRunId === parent.parentRunId && projection.children.length === 1 && digestValue(projection.children[0]) === digestValue(summary),
     manifest: manifest.parentRunId === parent.parentRunId && manifest.projectionDigest === validations.projection.digest &&
       manifest.reason === summary.terminalReason && manifest.archivedAt === receipt.createdAt && manifest.archivedAt === release.releasedAt,
-    summary: summary.workUnitId === workUnit.workUnitId && summary.approvedChangeId === controller.selectedEntry && summary.terminalStatus === "complete" && summary.claimDisposition === "released" && summary.cleanupDisposition === "completed" && summary.terminalSummaryDigest === terminalSummaryDigest(summary)
+    summary: summary.workUnitId === workUnit.workUnitId && summary.approvedChangeId === controller.selectedEntry &&
+      summary.claimDisposition === "released" && summary.terminalSummaryDigest === terminalSummaryDigest(summary) &&
+      (terminalized ? summary.terminalStatus === "complete" && summary.cleanupDisposition === "completed" : summary.terminalStatus === "cancelled" && summary.cleanupDisposition === "cancelled")
   };
   return Object.values(checks).every(Boolean);
 }

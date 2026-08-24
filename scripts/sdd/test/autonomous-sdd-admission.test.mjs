@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { admitV2Run, inspectV2Admission } from "../autonomous-sdd-admission.mjs";
-import { advanceControllerQueue, advanceControllerRecord, initializeV2Delivery, inspectControllerRecord, registerControllerResource, terminalizeV2Run } from "../autonomous-sdd-controller.mjs";
+import { advanceControllerQueue, advanceControllerRecord, cancelExpiredV2Run, initializeV2Delivery, inspectControllerRecord, registerControllerResource, terminalizeV2Run } from "../autonomous-sdd-controller.mjs";
 import { decodeLegacyRecord, denyLegacyMutation, inventoryLegacyDirectory, inventoryLegacyRecords } from "../autonomous-sdd-legacy.mjs";
 import { legacyRecordDigest, publishLegacyReconciliationReceipt, reconcileLegacyBootstrapRecord } from "../autonomous-sdd-legacy-reconciliation.mjs";
 import { deriveRepositoryId, digestValue } from "../autonomous-sdd-run-contract.mjs";
@@ -234,6 +234,48 @@ test("installed initializer admits after a prior schema-5 controller has exact i
     assert.equal(retried.record.v2Admission.parentRunId, next.record.v2Admission.parentRunId);
     assert.equal(fs.readFileSync(first.checkpointPath, "utf8"), controllerBefore);
     for (const [name, content] of archiveBefore) assert.equal(fs.readFileSync(path.join(terminalized.archivePath, name), "utf8"), content);
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+  }
+});
+
+test("installed initializer admits after a prior schema-5 controller was cancelled and retired", () => {
+  const stateHome = root();
+  const repositoryPath = root();
+  const nextAuthorization = resolveSddDeliveryRequest({ target: "next-change", mode: "autonomous", qualityProfile: "prototype-rapid", authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h" }, { goalStartedAt: now }).effectiveAuthorization;
+  try {
+    fs.mkdirSync(path.join(repositoryPath, ".git"));
+    fs.mkdirSync(path.join(repositoryPath, "config"));
+    fs.writeFileSync(path.join(repositoryPath, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+    const common = path.join(repositoryPath, ".git", "sdd-delivery-runs");
+    const first = initializeV2Delivery({
+      ...fixture(stateHome), repository: "owner/repository", repositoryPath,
+      legacyDirectory: common, runGit: () => ".git"
+    });
+    assert.equal(first.valid, true, JSON.stringify(first));
+    const cancellation = {
+      schemaVersion: 1,
+      controllerRunId: first.record.runId,
+      parentRunId: first.admission.parentRun.parentRunId,
+      workUnitId: first.admission.workUnit.workUnitId,
+      claimId: first.admission.claim.claimId,
+      repositoryId: first.admission.repositoryId,
+      approvedChangeId: first.admission.workUnit.approvedChangeId,
+      provider
+    };
+    const cancelled = cancelExpiredV2Run({ readableRepositoryName: "repository", cancellation, stateHome, now: "2026-08-20T17:00:00.000Z" });
+    assert.equal(cancelled.classification, "cancelled", JSON.stringify(cancelled));
+    const controllerBefore = fs.readFileSync(first.checkpointPath, "utf8");
+
+    const next = initializeV2Delivery({
+      ...fixture(stateHome, { authorization: nextAuthorization }), repository: "owner/repository", repositoryPath,
+      legacyDirectory: common, runGit: () => ".git"
+    });
+    assert.equal(next.valid, true, JSON.stringify(next));
+    assert.equal(next.classification, "initialized");
+    assert.notEqual(next.record.runId, first.record.runId);
+    assert.equal(fs.readFileSync(first.checkpointPath, "utf8"), controllerBefore);
   } finally {
     fs.rmSync(stateHome, { recursive: true, force: true });
     fs.rmSync(repositoryPath, { recursive: true, force: true });
