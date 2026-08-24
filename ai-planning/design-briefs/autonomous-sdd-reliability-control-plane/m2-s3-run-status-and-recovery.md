@@ -1,7 +1,8 @@
 # M2-S3 — Run Status and Recovery
 
 Date: 2026-08-20
-Status: Draft for owner review; blocked on M2-S1 and M2-S2.
+Status: Delivered and archived. Issue #215; implementation PR #216, Sync PR
+#217, Archive PR #218.
 Proposed change: `add-autonomous-sdd-run-status-and-recovery`
 
 ## 1. Problem and desired outcome
