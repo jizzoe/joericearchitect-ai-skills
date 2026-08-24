@@ -248,7 +248,7 @@ export function executeTransition({ transition, store, adapters, ownerToken, clo
 // Thin sealed review loop reusing the existing review-reuse contract. The
 // reviewer never fixes; findings are returned and routed to a fresh implementer
 // correction.
-export function thinReviewLoop({ store, profile, previousBindings = {}, currentBindings = {}, clock = defaultClock } = {}) {
+export function thinReviewLoop({ store, profile, previousBindings = {}, currentBindings = {}, clock = defaultClock, strictDelivery } = {}) {
   const reviewOperation = profile === "production-rapid" ? "strict-review" : "local-review";
   const attempt = store.appendAttempt({ operation: "review", state: "prepared" });
 
@@ -270,6 +270,28 @@ export function thinReviewLoop({ store, profile, previousBindings = {}, currentB
   if (reuse.valid && reuse.reusable) {
     store.setAttempt(attempt.id, { state: "committed", outcome: "review-reused" });
     return freeze({ state: "reused", reviewOperation, attemptId: attempt.id });
+  }
+
+  // M3-S1: the production review step routes through the strict host-captured
+  // transport and requires a parent-owned schema-valid terminal artifact. A
+  // transcript or claimed success is never acceptance evidence.
+  if (profile === "production-rapid" && typeof strictDelivery === "function") {
+    const delivery = strictDelivery({ launchId: `review-${attempt.id}`, attemptId: attempt.id, currentBindings });
+    if (!delivery || delivery.allowed !== true) {
+      store.setAttempt(attempt.id, {
+        state: "committed",
+        outcome: "review-unavailable",
+        evidenceRef: digestOperationContract({ reviewOperation, code: delivery?.code ?? "strict-review-unavailable" }),
+      });
+      return freeze({ state: "paused", reviewOperation, attemptId: attempt.id, reason: delivery?.code ?? "strict-review-unavailable", disposition: "human-decision" });
+    }
+    const findings = delivery.result?.findings ?? [];
+    store.setAttempt(attempt.id, {
+      state: "committed",
+      outcome: "review-fresh",
+      evidenceRef: digestOperationContract({ reviewOperation, findings, terminalArtifactKey: delivery.key }),
+    });
+    return freeze({ state: "fresh", reviewOperation, attemptId: attempt.id, findings, requiresFix: findings.length > 0, terminalArtifactKey: delivery.key });
   }
 
   const findings = currentBindings.findings ?? [];

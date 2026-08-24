@@ -1,0 +1,17 @@
+schema_version: 1
+openspec:
+  change: "harden-strict-review-multistep-artifact-delivery"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 219
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/219"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/harden-strict-review-multistep-artifact-delivery/"
+      - "scripts/sdd/autonomous-sdd-strict-review-delivery.mjs"
+      - "scripts/sdd/test/autonomous-sdd-strict-review-delivery.test.mjs"
+      - "scripts/sdd/autonomous-sdd-vertical-slice.mjs"
