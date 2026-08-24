@@ -1,0 +1,16 @@
+schema_version: 1
+openspec:
+  change: "add-autonomous-sdd-local-execution-backend"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 211
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/211"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/add-autonomous-sdd-local-execution-backend/"
+      - "scripts/sdd/autonomous-sdd-admission.mjs"
+      - "scripts/sdd/test/autonomous-sdd-admission.test.mjs"
