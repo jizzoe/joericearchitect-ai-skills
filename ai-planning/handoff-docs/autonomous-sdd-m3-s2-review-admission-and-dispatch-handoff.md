@@ -18,7 +18,9 @@ satisfied:
 - M3-S1 (`harden-strict-review-multistep-artifact-delivery`) — issue #219, PRs
   #220/#221/#222 (implementation / Sync / Archive).
 - M1-S3 (`establish-autonomous-sdd-runtime-config-provenance`) — delivered and
-  archived; this is M3-S2's other hard dependency and is already satisfied.
+  archived (2026-08-21). It supplies `scripts/sdd/runtime-configuration.mjs`,
+  the canonical product-owned runtime configuration source that review
+  admission must consume (never `config/ai-skills.json` guessing).
 - M2 (M2-S1, M2-S2, M2-S3) — delivered and archived (see prior handoffs).
 
 All squash-merged to `main`. M3-S1 changes archived under
@@ -41,6 +43,15 @@ New/changed implementation under `scripts/sdd/`:
   cleanup-or-recovery, and the `deliverStrictReviewArtifact` entry point.
 - `autonomous-sdd-vertical-slice.mjs` — production review step wired through the
   strict delivery via an optional `strictDelivery` callback.
+
+The strict host-captured transport already exists under `scripts/sdd/`:
+`review-launcher-host.mjs`, `review-launcher-recovery.mjs`,
+`platform-review-adapters.mjs`, `review-adapter-contract.mjs`,
+`independent-review-contract.mjs`. M3-S2 adds admission plus one typed
+dispatcher over this transport; it does not reimplement capture.
+
+Note: `autonomous-sdd-admission.mjs` is the M2-S2 vertical-slice admission (a
+different concept from M3-S2 review admission); do not conflate them.
 
 Verification: M3-S1 focused 16/16, full SDD suite 250 tests (249 pass + 1
 conditionally-skipped with no active change, 0 failures),
@@ -87,14 +98,15 @@ parent transport, repository/view, multi-step artifact path, inspection
 capability, runtime permission, deadline budget, and cleanup destination) before
 Apply can become eligible; a single dispatcher owns launch, receipt consumption,
 transport recovery, classification, allowed degraded eligibility, and terminal
-evidence. No skill launches its own competing review path, and no degraded
-fallback satisfies a strict-only gate.
+evidence. The dispatcher never asks the owner to relay commands and never
+converts an unavailable strict result into success. No skill launches its own
+competing review path, and no degraded fallback satisfies a strict-only gate.
 
 Scope: readiness checks, dispatcher, receipt recovery, fallback eligibility,
 deadline, permissions, and cleanup destination.
 
 Non-goals: changing strict review assurance, owner command relay, or exact-head
-correction semantics.
+correction semantics (M3-S3).
 
 Constraints: one dispatcher owns review invocation; admission is evidence, not
 standing permission; strict-only fails closed.
@@ -128,11 +140,16 @@ Apply; those stay gated behind the full activation bundle and M4-S4.
 4. Reconcile the existing review adapter/launcher/admission modules by source
    mapping (confirm the review-admission boundary vs. the M2-S2 controller
    admission).
-5. Obtain explicit owner authorization, then start a fresh M3-S2 delivery
+5. Verify the roadmap's "Recommended starting point" and the M3-S2 row are
+   current (they already point at M3-S2 after the M3-S1 hygiene commit; adjust
+   only if stale). If a change to a living ordering scenario is needed, handle
+   it as its own OpenSpec change; otherwise treat it as a docs edit.
+6. Obtain explicit owner authorization, then start a fresh M3-S2 delivery
    (`add-autonomous-sdd-review-admission-and-dispatcher`) in the pre-v2/
    interactive lane.
-6. Implement, verify, and deliver M3-S2, then refresh the roadmap's "Recommended
-   starting point" to point at M3-S3 and continue in order.
+7. Implement, verify, deliver, Sync, and Archive M3-S2, then refresh the
+   roadmap's "Recommended starting point" to point at M3-S3
+   (`bind-autonomous-review-to-code-head`) and continue in order.
 
 ## Guardrails
 
@@ -141,9 +158,11 @@ Apply; those stay gated behind the full activation bundle and M4-S4.
 - Keep the result contract-only/audit; do not activate real ownership or
   production Apply before the full activation bundle and M4-S4 qualification
   exist.
-- No skill may launch its own competing review path; no degraded fallback may
-  satisfy a strict-only production gate.
-- Do not accept transcripts or claimed success as review evidence.
+- Admission success is evidence, not standing permission; no skill may launch
+  its own competing review path, and no degraded fallback may satisfy a
+  strict-only production gate.
+- Do not accept transcripts or claimed success as review evidence; the
+  host-captured terminal artifact is the only acceptance evidence.
 - Do not hand-edit controller, claim, or archive files.
 - Do not force-push or delete remote branches (GitHub auto-deletes merged head
   branches; retire local delivery branches only via exact-owned cleanup).
