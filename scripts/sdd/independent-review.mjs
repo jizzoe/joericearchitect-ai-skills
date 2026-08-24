@@ -6,6 +6,7 @@ import { validateReviewPackage, validateReviewResult } from "./independent-revie
 import { validateFindingDispositions } from "./review-findings.mjs";
 import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
 import { validateReviewReuse } from "./autonomous-sdd-operation-contract.mjs";
+import { reviewExactHeadReuse } from "./autonomous-sdd-exact-head-review.mjs";
 // Pure evaluator for an independently executed, read-only review channel.
 
 function nonEmpty(value) { return typeof value === "string" && value.trim().length > 0; }
@@ -48,6 +49,13 @@ export function canonicalGitCommit(commit, repositoryPath) {
 // its repository-specific review transport separate from that portable rule.
 export function validateCloseoutReviewReuse(input = {}) {
   return validateReviewReuse(input);
+}
+
+// M3-S3: exact-head closeout reuse adds reviewer identity and assurance level
+// to the six-field base set. This adapter keeps the review transport separate
+// from the portable reuse rule.
+export function validateExactHeadReviewReuse(input = {}) {
+  return reviewExactHeadReuse(input);
 }
 
 function reviewerIsUsable(reviewer, implementerSession) {
