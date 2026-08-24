@@ -17,5 +17,5 @@
 
 - [x] 3.1 Run the focused status suite and the full SDD suite; run
   `openspec validate --all --strict`. Depends on: 1.3, 2.4.
-- [ ] 3.2 Record completion evidence and mark the M2-S3 brief delivered; keep the
+- [x] 3.2 Record completion evidence and mark the M2-S3 brief delivered; keep the
   result contract-only/audit. Depends on: 3.1.
