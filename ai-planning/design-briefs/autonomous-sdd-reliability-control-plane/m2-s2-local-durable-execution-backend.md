@@ -83,6 +83,10 @@ Desired outcome: A deliberately small one-host local backend provides durable hi
 - Select the smallest storage and locking substrate compatible with Node 20.19.
 - Define same-host liveness, stale-owner proof, and explicit takeover procedure.
 - Confirm filesystem classes that are supported or rejected at admission.
+- Recognize a `cancellation-receipt` (or otherwise retire a cancelled
+  controller's schema-5 checkpoint) as terminal during initialization, so the
+  2026-08-23 bootstrap recovery's retired controller (`controller-cf2ecbc…`,
+  checkpoint left at `propose`) does not pause future v2 admission.
 
 ## 7. Recommended next step
 After the M2-S1 vertical slice passes, create a fresh authorized M2-S2
