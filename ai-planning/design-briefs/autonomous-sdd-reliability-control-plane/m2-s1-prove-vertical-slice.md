@@ -1,8 +1,8 @@
 # M2-S1 — Prove the Vertical Slice
 
 Date: 2026-08-23
-Status: Next dependency-valid slice after the bootstrap/cutover stabilization
-Archive; its delivery still requires separate authorization.
+Status: Delivered and archived. Issue #207; implementation PR #208, Sync PR
+#209.
 Proposed change: `prove-autonomous-sdd-vertical-slice`
 
 ## 1. Problem and desired outcome
