@@ -54,6 +54,6 @@
 - [x] 6.1 Run the focused vertical-slice suite, `openspec validate
   prove-autonomous-sdd-vertical-slice --strict`, and `openspec validate --all
   --strict`. Depends on: 5.2, 5.3.
-- [ ] 6.2 Record completion evidence and update the M2-S1 brief status to
+- [x] 6.2 Record completion evidence and update the M2-S1 brief status to
   delivered; keep the result contract-only/audit and do not activate real
   ownership. Depends on: 6.1.
