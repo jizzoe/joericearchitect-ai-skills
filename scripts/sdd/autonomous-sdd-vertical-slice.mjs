@@ -248,7 +248,7 @@ export function executeTransition({ transition, store, adapters, ownerToken, clo
 // Thin sealed review loop reusing the existing review-reuse contract. The
 // reviewer never fixes; findings are returned and routed to a fresh implementer
 // correction.
-export function thinReviewLoop({ store, profile, previousBindings = {}, currentBindings = {}, clock = defaultClock, strictDelivery } = {}) {
+export function thinReviewLoop({ store, profile, previousBindings = {}, currentBindings = {}, clock = defaultClock, strictDelivery, reviewDispatch } = {}) {
   const reviewOperation = profile === "production-rapid" ? "strict-review" : "local-review";
   const attempt = store.appendAttempt({ operation: "review", state: "prepared" });
 
@@ -270,6 +270,28 @@ export function thinReviewLoop({ store, profile, previousBindings = {}, currentB
   if (reuse.valid && reuse.reusable) {
     store.setAttempt(attempt.id, { state: "committed", outcome: "review-reused" });
     return freeze({ state: "reused", reviewOperation, attemptId: attempt.id });
+  }
+
+  // M3-S2: the production review step routes through review admission plus the
+  // single-owner dispatcher when one is supplied; it owns launch through
+  // terminal evidence and never accepts a transcript or claimed success.
+  if (profile === "production-rapid" && typeof reviewDispatch === "function") {
+    const dispatch = reviewDispatch({ launchId: `review-${attempt.id}`, attemptId: attempt.id, currentBindings });
+    if (!dispatch || dispatch.allowed !== true) {
+      store.setAttempt(attempt.id, {
+        state: "committed",
+        outcome: "review-unavailable",
+        evidenceRef: digestOperationContract({ reviewOperation, code: dispatch?.code ?? "strict-review-unavailable" }),
+      });
+      return freeze({ state: "paused", reviewOperation, attemptId: attempt.id, reason: dispatch?.code ?? "strict-review-unavailable", disposition: "human-decision" });
+    }
+    const findings = dispatch.result?.findings ?? [];
+    store.setAttempt(attempt.id, {
+      state: "committed",
+      outcome: "review-fresh",
+      evidenceRef: digestOperationContract({ reviewOperation, findings, terminalArtifactKey: dispatch.key }),
+    });
+    return freeze({ state: "fresh", reviewOperation, attemptId: attempt.id, findings, requiresFix: findings.length > 0, terminalArtifactKey: dispatch.key });
   }
 
   // M3-S1: the production review step routes through the strict host-captured
