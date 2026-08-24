@@ -8,8 +8,8 @@ Status: Accepted dependency and execution-order plan through M1 and the
 bootstrap/cutover stabilization. M1-S1, M1-S2, and M1-S3 are delivered and
 archived. M2 is re-sequenced to prove a vertical slice before the durable
 backend (2026-08-23 revision), and a first-class M5 cross-repository
-coordination milestone is added. M2-S1, M2-S2, and M2-S3 are delivered and archived;
-M3-S1 is next. Every slice still requires its own accepted brief and explicit
+coordination milestone is added. M2-S1, M2-S2, M2-S3, and M3-S1 are delivered and archived;
+M3-S2 is next. Every slice still requires its own accepted brief and explicit
 authorization.
 
 ## Purpose and authority
@@ -171,7 +171,7 @@ owner transport or redundant review of unchanged code.
 
 | Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
 |---|---|---|---|
-| M3-S1 — Strict-review artifact delivery | `harden-strict-review-multistep-artifact-delivery` | Propose-ready after M2 interfaces and M1 contracts; authoritative existing review work reconciled by source mapping (2026-08-24) | [M3-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m3-s1-strict-review-artifact-delivery.md) |
+| M3-S1 — Strict-review artifact delivery | `harden-strict-review-multistep-artifact-delivery` | Delivered and archived via issue #219 and implementation/Sync/Archive PRs #220/#221/#222 | [M3-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m3-s1-strict-review-artifact-delivery.md) |
 | M3-S2 — Review admission and dispatch | `add-autonomous-sdd-review-admission-and-dispatcher` | Propose-ready after M3-S1 and M1-S3 | [M3-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m3-s2-review-admission-and-dispatch.md) |
 | M3-S3 — Exact-head review and correction | `bind-autonomous-review-to-code-head` | Explore-ready after M3-S2 and owner decision on review reuse | [M3-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m3-s3-exact-head-review-and-correction.md) |
 
@@ -300,10 +300,11 @@ Temporal runs serialize overlapping work through one claim authority.
 ## Recommended starting point
 
 M2-S1 (`prove-autonomous-sdd-vertical-slice`), M2-S2
-(`add-autonomous-sdd-local-execution-backend`), and M2-S3
-(`add-autonomous-sdd-run-status-and-recovery`) are delivered and archived. Begin
-M3-S1 (`harden-strict-review-multistep-artifact-delivery`) under a new exact
-authorization, then continue in order. Keep the resulting generation
+(`add-autonomous-sdd-local-execution-backend`), M2-S3
+(`add-autonomous-sdd-run-status-and-recovery`), and M3-S1
+(`harden-strict-review-multistep-artifact-delivery`) are delivered and archived.
+Begin M3-S2 (`add-autonomous-sdd-review-admission-and-dispatcher`) under a new
+exact authorization, then continue in order. Keep the resulting generation
 contract-only or audit/shadow; do not route real delivery ownership to it
 before the full activation bundle and M4-S4 qualification exist.
 

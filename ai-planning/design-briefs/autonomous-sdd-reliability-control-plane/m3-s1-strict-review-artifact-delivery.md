@@ -1,7 +1,8 @@
 # M3-S1 — Strict-Review Artifact Delivery
 
 Date: 2026-08-20
-Status: Draft for owner review; blocked on M1 contracts and the M2-S1 thin review loop.
+Status: Delivered and archived. Issue #219; implementation PR #220, Sync PR
+#221, Archive PR #222.
 Proposed change: `harden-strict-review-multistep-artifact-delivery`
 
 ## 1. Problem and desired outcome
