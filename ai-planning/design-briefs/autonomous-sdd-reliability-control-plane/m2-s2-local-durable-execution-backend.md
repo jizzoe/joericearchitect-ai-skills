@@ -1,9 +1,8 @@
 # M2-S2 — Local Durable Execution Backend
 
 Date: 2026-08-20
-Status: Second M2 slice; follows `prove-autonomous-sdd-vertical-slice` and is
-scoped by the transition set and record shapes that slice proved. Its delivery
-still requires separate authorization.
+Status: Delivered and archived. Issue #211; implementation PR #212, Sync PR
+#213, Archive PR #214.
 Proposed change: `add-autonomous-sdd-local-execution-backend`
 
 ## 1. Problem and desired outcome

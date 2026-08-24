@@ -22,5 +22,5 @@
 
 - [x] 3.1 Run the focused admission suite and the full SDD suite; run
   `openspec validate --all --strict`. Depends on: 1.2, 2.2.
-- [ ] 3.2 Record completion evidence and mark the M2-S2 brief delivered; keep the
+- [x] 3.2 Record completion evidence and mark the M2-S2 brief delivered; keep the
   result contract-only/audit and do not activate real ownership. Depends on: 3.1.
