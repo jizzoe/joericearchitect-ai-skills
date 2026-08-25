@@ -124,6 +124,9 @@ on retry (which derived fields may be updated vs. preserved).
 - Disposable fixture Project **"sdd-fixture"** created in GitHub.
 - Owner explicitly authorized **M4-S1 delivery in autonomous mode** through to
   spec change close and cleanup.
+- Owner authorized the **prototype-rapid** profile (same-session-local review)
+  and explicitly authorized proceeding **past the strict independent-review
+  gate** for this slice.
 
 Delivery remains governed by the handoff guardrails: delivered by the **pre-v2
 lifecycle** (never the v2 controller), **contract-only/audit**, no real
