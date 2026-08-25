@@ -342,6 +342,13 @@
       "invocation": "cli",
       "payloadWrapper": "scripts/sdd/autonomous-sdd-operation-contract.mjs",
       "smoke": { "args": ["--help"], "exitCodes": [0] }
+    },
+    {
+      "name": "generic-git-repository-cleanup",
+      "module": "scripts/runtime/bin/generic-git-repository-cleanup.mjs",
+      "invocation": "cli",
+      "payloadWrapper": "scripts/sdd/generic-git-repository-cleanup.mjs",
+      "smoke": { "args": ["--help"], "exitCodes": [0] }
     }
   ]
 }
