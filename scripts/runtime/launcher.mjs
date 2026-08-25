@@ -25,6 +25,9 @@ import { digestFiles } from "./build-runtime.mjs";
 
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 
+// The gh CLI names Claude Code `claude-code`; the runtime's internal id is `claude`.
+const ghAgentId = (agent) => (agent === "claude" ? "claude-code" : agent);
+
 export function unavailable(code, detail, extra = {}) {
   return { ok: false, classification: "unavailable", code, ...(detail === undefined ? {} : { detail }), ...extra };
 }
@@ -181,7 +184,7 @@ export function doctor({ environment = process.env, platform = process.platform,
   };
 
   for (const agent of agents) {
-    const listed = run("gh", ["skill", "list", "--agent", agent, "--json"], { encoding: "utf8" });
+    const listed = run("gh", ["skill", "list", "--agent", ghAgentId(agent), "--json", "skillName,version,pinned"], { encoding: "utf8" });
     if (listed.status !== 0) {
       record.agents.push({ agent, available: false, reason: "gh-skill-list-unavailable" });
       continue;
@@ -194,7 +197,7 @@ export function doctor({ environment = process.env, platform = process.platform,
       record.agents.push({ agent, available: false, reason: "gh-skill-list-unparsable" });
       continue;
     }
-    const revisions = [...new Set(skills.map((skill) => skill?.revision ?? skill?.pin ?? null).filter(Boolean))];
+    const revisions = [...new Set(skills.map((skill) => skill?.version ?? null).filter(Boolean))];
     record.agents.push({ agent, available: true, skillCount: skills.length, revisions });
   }
 
