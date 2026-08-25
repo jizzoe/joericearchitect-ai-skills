@@ -8,8 +8,8 @@ Status: Accepted dependency and execution-order plan through M1 and the
 bootstrap/cutover stabilization. M1-S1, M1-S2, and M1-S3 are delivered and
 archived. M2 is re-sequenced to prove a vertical slice before the durable
 backend (2026-08-23 revision), and a first-class M5 cross-repository
-coordination milestone is added. M2-S1, M2-S2, M2-S3, M3-S1, M3-S2, M3-S3, and M4-S1 are delivered and
-archived; M4-S2 is next. Every slice still requires its own accepted brief and
+coordination milestone is added. M2-S1, M2-S2, M2-S3, M3-S1, M3-S2, M3-S3, M4-S1, and M4-S2 are delivered and
+archived; M4-S3 is next. Every slice still requires its own accepted brief and
 explicit authorization.
 
 ## Purpose and authority
@@ -192,7 +192,7 @@ backlog changes.
 | Slice | Proposed change | Hard dependencies/readiness | Planned detailed brief |
 |---|---|---|---|
 | M4-S1 — GitHub intake and implementation delivery | `integrate-autonomous-sdd-github-delivery` | Delivered and archived via issue #231 and PR #232; includes the exact restricted-controller/authenticated-host request-and-receipt envelope plus merge-policy and retained-branch preflight/restoration evidence | [M4-S1 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s1-github-intake-and-implementation-delivery.md) |
-| M4-S2 — Sync and Archive delivery | `integrate-autonomous-sdd-sync-and-archive` | After M4-S1; must graph all active overlapping deltas before mutation and compare accepted requirement descriptions plus scenarios exactly | [M4-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s2-sync-and-archive-delivery.md) |
+| M4-S2 — Sync and Archive delivery | `integrate-autonomous-sdd-sync-and-archive` | Delivered and archived via issue #233 and PR #234; graphs all active overlapping deltas before mutation and compares accepted requirement descriptions plus scenarios exactly | [M4-S2 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s2-sync-and-archive-delivery.md) |
 | M4-S3 — Finalization and cleanup | `integrate-autonomous-sdd-finalization-and-cleanup` | After M4-S2 and M2-S1; completes terminal convergence, release, and exact receipt-backed cleanup as part of the activation bundle | [M4-S3 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s3-finalization-and-cleanup.md) |
 | M4-S4 — Single-change reliability qualification | `qualify-autonomous-sdd-single-change-reliability` | After M4-S3, approved thresholds/matrix/environments, and individually approved eligible changes; it is the only gate that may enable qualified-opt-in ownership | [M4-S4 brief](../design-briefs/autonomous-sdd-reliability-control-plane/m4-s4-single-change-reliability-qualification.md) |
 
@@ -304,9 +304,10 @@ M2-S1 (`prove-autonomous-sdd-vertical-slice`), M2-S2
 (`add-autonomous-sdd-run-status-and-recovery`), M3-S1
 (`harden-strict-review-multistep-artifact-delivery`), M3-S2
 (`add-autonomous-sdd-review-admission-and-dispatcher`), M3-S3
-(`bind-autonomous-review-to-code-head`), and M4-S1
-(`integrate-autonomous-sdd-github-delivery`) are delivered and archived.
-Begin M4-S2 (`integrate-autonomous-sdd-sync-and-archive`) under a new
+(`bind-autonomous-review-to-code-head`), M4-S1
+(`integrate-autonomous-sdd-github-delivery`), and M4-S2
+(`integrate-autonomous-sdd-sync-and-archive`) are delivered and archived.
+Begin M4-S3 (`integrate-autonomous-sdd-finalization-and-cleanup`) under a new
 exact authorization, then continue in order. Keep the resulting generation
 contract-only or audit/shadow; do not route real delivery ownership to it
 before the full activation bundle and M4-S4 qualification exist.
