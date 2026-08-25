@@ -2,9 +2,7 @@
 
 Defines how the reusable SDD executable runtime is built, installed, resolved,
 and verified with globally distributed Claude Code and Codex skill packages.
-
 ## Requirements
-
 ### Requirement: A complete shared runtime is built from reviewed source
 The repository SHALL provide a deterministic runtime-distribution builder that
 stages the declared shared SDD helper roots, their local dependency closure,
@@ -274,3 +272,25 @@ rollback without network access or GitHub CLI.
 #### Scenario: Runtime-only installation fails verification
 - **WHEN** manifest, digest, or contract verification fails during runtime-only installation
 - **THEN** the installer retains the prior runtime, reports the failed phase, and does not claim completion
+
+### Requirement: GitHub CLI agent identity and fields are mapped at the boundary
+The runtime SHALL translate its internal agent identifier (`claude`) to the
+GitHub CLI agent identifier (`claude-code`) at every `gh skill list` and
+`gh skill install` call boundary; `codex` SHALL map unchanged. Skill listings
+SHALL request the explicit `--json` field list `skillName,version,pinned`, and
+installed skill revision and prior-skill-pin detection SHALL read the `version`
+field.
+
+#### Scenario: Diagnostic detects each installed agent
+- **WHEN** the runtime diagnostic lists installed skills for the `claude` agent
+- **THEN** it invokes `gh skill list --agent claude-code --json skillName,version,pinned`
+  and reports that agent available with its installed skill count and revisions
+
+#### Scenario: Installer delegates with the GitHub CLI agent identifier
+- **WHEN** the installer delegates `gh skill install` for the `claude` agent
+- **THEN** it passes `--agent claude-code` rather than the internal `claude` id
+
+#### Scenario: Prior skill pin is read from the version field
+- **WHEN** the installer reads the prior skill pin from a skill listing
+- **THEN** it reads the `version` field from a `--json skillName,version,pinned` listing
+
