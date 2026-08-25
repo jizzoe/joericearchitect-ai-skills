@@ -41,6 +41,12 @@ function stubbedRun(overrides = {}) {
       if (overrides.skillFailure) return { status: 1, stdout: JSON.stringify({ ok: false, tool: "install-global-skill" }) };
       if (overrides.skillUnparsable) return { status: 0, stdout: "not json" };
       const agent = args[args.indexOf("--agent") + 1];
+      // The installer maps its internal `claude` id to the `gh` CLI `claude-code`
+      // id. Only assert when the delegation passes `--agent` (the build smoke
+      // invocation of this entrypoint omits it).
+      if (args.includes("--agent")) {
+        assert.ok(["claude-code", "codex"].includes(agent), `install delegation uses the gh agent id, got ${agent}`);
+      }
       return {
         status: 0,
         stdout: JSON.stringify({
@@ -52,6 +58,10 @@ function stubbedRun(overrides = {}) {
       };
     }
     if (command === "gh" && args[0] === "skill" && args[1] === "list") {
+      const agent = args[args.indexOf("--agent") + 1];
+      assert.ok(["claude-code", "codex"].includes(agent), `gh skill list uses the gh agent id, got ${agent}`);
+      const jsonFields = args[args.indexOf("--json") + 1];
+      assert.ok(typeof jsonFields === "string" && jsonFields.split(",").includes("version"), `gh skill list requests the version field, got ${jsonFields}`);
       return overrides.priorPin
         ? { status: 0, stdout: JSON.stringify([{ skillName: "example", version: overrides.priorPin, pinned: true }]) }
         : { status: 1, stdout: "" };

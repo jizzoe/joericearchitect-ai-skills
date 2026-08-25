@@ -26,6 +26,8 @@ Each entry: run #, slice, phase, symptom, classification
 
 | 7 | 1 | add-claude-cross-tool-repo-hygiene | Review | Claude reviewer has NO auth provisioning: `buildClaudeReviewInvocation` runs claude with `isolatedReviewerEnvironment` (fresh HOME) + `--setting-sources ""`, so the user's `~/.claude.json` OAuth is invisible and no `ANTHROPIC_API_KEY`/service credential is injected — result `Not logged in · Please run /login` even when the host user is logged in (`claude auth status` → `loggedIn:true`). Contrast: codex's `prepareCodexReviewerEnvironment` copies `~/.codex/auth.json` into the isolated `CODEX_HOME`. Claude needs an equivalent auth-provisioning step | gap | resolved |
 
+| 8 | — | repair-runtime-gh-agent-mapping | Review | Post-fix strict-review re-run found the `install-runtime.test.mjs` stub accepts any `gh skill list` args and echoes the delegated install agent without asserting the mapped `claude-code` id or the `--json skillName,version,pinned` vector | defect | resolved |
+
 ## Resolutions
 
 - **#2 / #3** — Resolved. Added a `ghAgentId` mapping (`claude` → `claude-code`)
@@ -45,6 +47,13 @@ Each entry: run #, slice, phase, symptom, classification
   `~/.claude.json` or injects `ANTHROPIC_API_KEY`/`CLAUDE_CODE_OAUTH_TOKEN`).
   Verified: 309/309 SDD tests pass; Codex completes a full strict review under
   `--sandbox read-only` and Claude accepts the draft-07 schema.
+
+- **#8** — Resolved. Strengthened the `install-runtime.test.mjs` stub to assert
+  the `gh skill list` agent id (`claude-code`/`codex`) and `--json` field list,
+  and the delegated install `--agent` id (conditionally, since the build smoke
+  invocation omits `--agent`). 69/69 runtime tests pass. The strict reviewer
+  surfaced this on a post-fix re-run, confirming the machinery now detects real
+  coverage gaps.
 
 ## Promoted-to-GitHub
 
