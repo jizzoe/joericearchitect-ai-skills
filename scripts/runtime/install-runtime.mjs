@@ -26,6 +26,9 @@ export const SUPPORTED_AGENTS = ["claude", "codex"];
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const commit = /^[0-9a-f]{40}$/;
 
+// The gh CLI names Claude Code `claude-code`; the runtime's internal id is `claude`.
+const ghAgentId = (agent) => (agent === "claude" ? "claude-code" : agent);
+
 function receipt(fields) {
   return { schemaVersion: RECEIPT_SCHEMA_VERSION, tool: "install-ai-skills", ...fields };
 }
@@ -128,7 +131,7 @@ export function installSkills({ agents, source, force, dryRun, repositoryRoot, r
     const args = [
       path.join(repositoryRoot, "scripts/skills/install-global-skill.mjs"),
       ...(source.kind === "local" ? ["--local", source.path] : ["--remote", source.reference, "--pin", source.pin]),
-      "--all", "--agent", agent, "--result"
+      "--all", "--agent", ghAgentId(agent), "--result"
     ];
     if (force) args.push("--force");
     if (dryRun) args.push("--dry-run");
@@ -143,12 +146,12 @@ export function installSkills({ agents, source, force, dryRun, repositoryRoot, r
 
 export function currentSkillPin({ agents, run = spawnSync }) {
   for (const agent of agents) {
-    const listed = run("gh", ["skill", "list", "--agent", agent, "--json"], { encoding: "utf8" });
+    const listed = run("gh", ["skill", "list", "--agent", ghAgentId(agent), "--json", "skillName,version,pinned"], { encoding: "utf8" });
     if (listed.status !== 0) continue;
     try {
       const parsed = JSON.parse(listed.stdout ?? "[]");
       const skills = Array.isArray(parsed) ? parsed : parsed?.skills ?? [];
-      const pin = skills.map((skill) => skill?.pin ?? skill?.revision).find(text);
+      const pin = skills.map((skill) => skill?.version).find(text);
       if (pin) return pin;
     } catch {
       // A listing this installer cannot parse simply yields no recorded pin.

@@ -71,7 +71,7 @@ test("one runtime serves two agents holding different skill revisions in one con
       const agent = args[args.indexOf("--agent") + 1];
       return {
         status: 0,
-        stdout: JSON.stringify([{ name: "example", revision: agent === "claude" ? "revision-a" : "revision-b" }])
+        stdout: JSON.stringify([{ skillName: "example", version: agent === "claude-code" ? "revision-a" : "revision-b", pinned: true }])
       };
     }
   });

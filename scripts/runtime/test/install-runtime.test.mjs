@@ -53,7 +53,7 @@ function stubbedRun(overrides = {}) {
     }
     if (command === "gh" && args[0] === "skill" && args[1] === "list") {
       return overrides.priorPin
-        ? { status: 0, stdout: JSON.stringify([{ name: "example", pin: overrides.priorPin }]) }
+        ? { status: 0, stdout: JSON.stringify([{ skillName: "example", version: overrides.priorPin, pinned: true }]) }
         : { status: 1, stdout: "" };
     }
     return spawnSync(command, args, options);

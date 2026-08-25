@@ -378,8 +378,11 @@ test("doctor reports revision skew as informational and content failure as an er
   const skewed = doctor({
     environment: devEnvironment(),
     run: (command, args) => {
+      assert.equal(command, "gh");
       const agent = args[args.indexOf("--agent") + 1];
-      return { status: 0, stdout: JSON.stringify([{ name: "example", revision: agent === "claude" ? "aaa" : "bbb" }]) };
+      assert.ok(["claude-code", "codex"].includes(agent), `unexpected gh agent id: ${agent}`);
+      assert.match(args[args.indexOf("--json") + 1] ?? "", /version/);
+      return { status: 0, stdout: JSON.stringify([{ skillName: "example", version: agent === "claude-code" ? "aaa" : "bbb", pinned: true }]) };
     }
   });
   assert.equal(skewed.ok, true);
