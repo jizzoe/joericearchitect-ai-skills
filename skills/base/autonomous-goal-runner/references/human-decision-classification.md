@@ -12,6 +12,9 @@ Pause when progress requires:
 - a missing or conflicting requirement, observable behavior, compatibility
   rule, architecture choice, data ownership rule, license obligation, security
   posture, or governance decision
+- an unresolved open question from Explore whose recommendation the owner has
+  not approved or answered; present it (jargon + plain English + options +
+  tradeoffs + recommendation) and pause before Propose
 - credential creation, rotation, scope changes, disclosure risk, or missing
   owner-controlled access
 - destructive action such as repository deletion, hard reset, force-push of a

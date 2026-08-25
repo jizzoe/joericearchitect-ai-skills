@@ -73,9 +73,15 @@ published choices, and perform no selection or mutation.
    for a GitHub mutation. Unknown, stale, expired, or mismatched evidence
    pauses the affected operation.
 4. Run OpenSpec Explore or Propose only when required by the first incomplete
-   evidenced controller checkpoint. Generated phases retain their ordinary
-   boundary without a valid controller context; a valid context returns control
-   to this skill for the next authorized checkpoint.
+   evidenced controller checkpoint. Explore may produce recommendations for open
+   questions, but Propose MUST NOT proceed until every open question is
+   owner-approved or owner-answered and durably recorded. Present each open
+   question in official terminology plus a plain-English explanation, with
+   options, tradeoffs, and a recommendation (see
+   `../autonomous-goal-runner/references/open-question-resolution.md`).
+   Generated phases retain their ordinary boundary without a valid controller
+   context; a valid context returns control to this skill for the next
+   authorized checkpoint.
 5. Before Apply, run planning review for scope, non-goals, issue linkage,
    requirements, scenarios, design decisions, dependencies, security,
    recovery, attribution, portability, stable task IDs, task dependencies, and
