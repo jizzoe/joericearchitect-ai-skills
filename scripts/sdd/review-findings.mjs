@@ -34,8 +34,10 @@ export function validateFindingDispositions({ findings, dispositions, correction
     } else if (correctionAttemptsByFailureSignature && Object.prototype.hasOwnProperty.call(correctionAttemptsByFailureSignature, signature)) {
       signatureAttempts = correctionAttemptsByFailureSignature[signature];
     }
-    const attempts = Number.isInteger(signatureAttempts) && signatureAttempts >= 0 ? signatureAttempts : 0;
-    if (disposition.kind === "objective-fix" && attempts >= 3) return pause("correction-limit-exhausted", signature);
+    if (disposition.kind === "objective-fix") {
+      if (!Number.isInteger(signatureAttempts) || signatureAttempts < 0) return pause("correction-state-invalid", signature);
+      if (signatureAttempts >= 3) return pause("correction-limit-exhausted", signature);
+    }
     if (disposition.kind === "objective-fix") return correction(signature);
   }
   return { allowed: true, classification: "ready", issues: [] };

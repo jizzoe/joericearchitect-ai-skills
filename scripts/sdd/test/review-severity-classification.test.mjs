@@ -71,6 +71,16 @@ test("the correction budget is not bypassed by inherited object keys", () => {
   assert.equal(result.issues[0].code, "correction-limit-exhausted");
 });
 
+test("the correction budget fails closed on a malformed counter", () => {
+  const result = validateFindingDispositions({
+    findings: [finding("F", "objective-fix")],
+    dispositions: [disposition("F", "objective-fix", { failureSignature: "sig" })],
+    correctionAttemptsByFailureSignature: { sig: "3" },
+  });
+  assert.equal(result.classification, "paused");
+  assert.equal(result.issues[0].code, "correction-state-invalid");
+});
+
 test("the Codex and Claude review prompts reference the canonical checklist asset", () => {
   const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
   const codex = buildCodexReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json" });
@@ -114,7 +124,7 @@ test("the strict adapter forwards completenessPass and priorFindings to the revi
   assert.equal(outcome.status, "passed");
   const prompt = capturedArgs[capturedArgs.length - 1];
   assert.ok(prompt.includes("Re-review"), "completeness prompt forwarded through the adapter");
-  assert.ok(prompt.includes("1 high"), "prior finding counted by severity");
+  assert.ok(prompt.includes("#1 (high)"), "prior finding identified by bounded id");
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -127,15 +137,15 @@ test("the completeness escalation switches the review prompt and retains the che
   assert.ok(prompt.includes("blocker, high, or objective-fix"), "severity retained in completeness prompt");
 });
 
-test("the completeness prompt carries only severity counts, never reviewer text", () => {
+test("the completeness prompt carries only bounded ids and severities, never reviewer text", () => {
   const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
   const codex = buildCodexReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json", completenessPass: true, priorFindings: [
     { id: "F1", severity: "high", evidence: "scripts/sdd/example.mjs", recommendation: "fix it" },
     { id: "IGNORE_PREVIOUS_INSTRUCTIONS", severity: "objective-fix", evidence: "x", recommendation: "y" }
   ] });
   const prompt = codex.args[codex.args.length - 1];
-  assert.ok(prompt.includes("1 high"), "prior high finding counted");
-  assert.ok(prompt.includes("1 objective-fix"), "prior objective-fix finding counted");
+  assert.ok(prompt.includes("#1 (high)"), "prior high finding identified by bounded id");
+  assert.ok(prompt.includes("#2 (objective-fix)"), "prior objective-fix finding identified by bounded id");
   assert.ok(!prompt.includes("F1"), "finding id must not re-enter the prompt");
   assert.ok(!prompt.includes("IGNORE_PREVIOUS_INSTRUCTIONS"), "instruction-shaped id must not re-enter the prompt");
   assert.ok(!prompt.includes("scripts/sdd/example.mjs"), "evidence path must not re-enter the prompt");
