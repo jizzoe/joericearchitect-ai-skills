@@ -71,10 +71,20 @@ test("the Codex and Claude review prompts consume the shared checklist and sever
   assert.ok(claudePrompt.includes("blocker, high, or objective-fix"), "severity in Claude prompt");
 });
 
-test("the completeness escalation switches the review prompt", () => {
+test("the completeness escalation switches the review prompt and retains the checklist", () => {
   const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
   const codex = buildCodexReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json", completenessPass: true });
   const prompt = codex.args[codex.args.length - 1];
   assert.ok(prompt.includes("Re-review"), "completeness prompt used");
+  assert.ok(prompt.includes("correctness and spec compliance"), "checklist retained in completeness prompt");
+  assert.ok(prompt.includes("blocker, high, or objective-fix"), "severity retained in completeness prompt");
+});
+
+test("the completeness prompt carries a sanitized summary of prior findings", () => {
+  const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
+  const codex = buildCodexReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json", completenessPass: true, priorFindings: [{ id: "F1", severity: "high", evidence: "scripts/sdd/example.mjs", recommendation: "fix it" }] });
+  const prompt = codex.args[codex.args.length - 1];
+  assert.ok(prompt.includes("high on scripts/sdd/example.mjs"), "prior finding carried");
+  assert.ok(!prompt.includes("fix it"), "finding prose must not re-enter the prompt");
 });
 

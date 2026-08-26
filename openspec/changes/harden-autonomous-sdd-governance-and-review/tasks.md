@@ -35,3 +35,12 @@
   delta scenario to implementation and test evidence. Depends on: 2.2, 3.1.
 - [x] 4.2 Run `openspec validate --all --strict`, run the focused test suite, and
   inspect the final diff for scope and secrets. Depends on: 4.1.
+
+## 5. Option A scope decision (owner-approved 2026-08-25)
+
+- [x] 5.1 Ship the severity model, shared checklist, and completeness-pass prompt
+  hook; move the implementer self-review pre-flight and the completeness-pass
+  escalation triggering out of the normative spec to runner-followed prose,
+  deferred to a follow-up controller change. Depends on: 3.1.
+- [x] 5.2 Fix the completeness prompt to retain the shared checklist and carry a
+  sanitized summary of prior findings. Depends on: 2.1, 5.1.

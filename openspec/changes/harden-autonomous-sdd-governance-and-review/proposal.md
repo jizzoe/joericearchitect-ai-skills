@@ -19,12 +19,13 @@ M4-S4 run #2 exposed two governance gaps in the autonomous SDD runner:
   approves each recommendation or supplies an answer, durably recorded. Each
   question is presented in official terminology plus a plain-English
   explanation, with options, tradeoffs, and a recommendation.
-- **Comprehensive review loops.** The implementer self-reviews with a shared
-  canonical checklist before independent review; the reviewer applies the same
-  checklist plus a material-only freeform pass and tags every finding
-  `material` or `advisory`. Only material findings drive a correction loop. A
-  completeness second pass is used only as an escalation; the three-fixes-per-
-  signature budget still ends in a fail-closed pause.
+- **Severity-tagged review loop.** The reviewer applies a shared canonical
+  checklist plus a material-only freeform pass and tags every finding `material`
+  or `advisory`. Only material findings drive a correction loop, and the
+  three-fixes-per-signature budget still ends in a fail-closed pause. The
+  implementer self-review pre-flight and the completeness-pass escalation
+  triggering are documented as runner-followed prose and deferred to a
+  follow-up controller change.
 
 ## Capabilities
 
@@ -32,7 +33,7 @@ M4-S4 run #2 exposed two governance gaps in the autonomous SDD runner:
 
 - `bounded-autonomous-execution`: Require owner-approved open-question
   resolutions before Propose, and require a shared-checklist, severity-tagged,
-  escalation-bounded review loop.
+  budget-bounded review loop.
 
 ## Impact
 

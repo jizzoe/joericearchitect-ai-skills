@@ -963,12 +963,28 @@ function capabilities({ adapter, attestationRef, probeReference }) {
   };
 }
 
-const REVIEW_CHECKLIST_PROMPT = " Apply the shared review checklist and report findings in every category: correctness and spec compliance, edge cases and error handling, security and secret handling, concurrency and idempotency, portability and attribution. Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.";
-const COMPLETENESS_PROMPT = " Re-review the same committed diff for anything the prior review missed. Do not repeat prior findings. Be exhaustive across every checklist category and flag any other material issue. Tag each finding severity as before.";
+const CHECKLIST_CATEGORIES = "correctness and spec compliance, edge cases and error handling, security and secret handling, concurrency and idempotency, portability and attribution";
 
-export function buildCodexReviewInvocation({ executable = "codex", view, schemaPath, resultPath, authenticationEnvironment = {}, completenessPass = false }) {
+const REVIEW_CHECKLIST_PROMPT = ` Apply the shared review checklist and report findings in every category: ${CHECKLIST_CATEGORIES}. Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.`;
+
+// The completeness second pass re-uses the full checklist and, when prior
+// findings are supplied, names them so the reviewer avoids repeating them while
+// re-verifying none regressed. Only a bounded, sanitized summary (severity +
+// evidence path) is carried; finding prose never re-enters the prompt.
+function completenessReviewPrompt(priorFindings = []) {
+  const prior = (Array.isArray(priorFindings) ? priorFindings : [])
+    .map((finding) => `${finding?.severity ?? "unspecified"} on ${finding?.evidence ?? "unknown"}`)
+    .filter(Boolean)
+    .join("; ");
+  const priorSummary = prior
+    ? ` Do not repeat these prior findings, but re-verify none regressed: ${prior}.`
+    : "";
+  return ` Apply the shared review checklist and report findings in every category: ${CHECKLIST_CATEGORIES}. Re-review the same committed diff for anything the prior review missed, and be exhaustive across every category.${priorSummary} Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.`;
+}
+
+export function buildCodexReviewInvocation({ executable = "codex", view, schemaPath, resultPath, authenticationEnvironment = {}, completenessPass = false, priorFindings = [] }) {
   const workingDirectory = view.launchPath ?? view.reviewPath;
-  const extra = completenessPass ? COMPLETENESS_PROMPT : REVIEW_CHECKLIST_PROMPT;
+  const extra = completenessPass ? completenessReviewPrompt(priorFindings) : REVIEW_CHECKLIST_PROMPT;
   return {
     executable,
     // Archive views intentionally contain no .git directory. This bypasses
@@ -1031,8 +1047,8 @@ export function createClaudeReviewSettings(view) {
   };
 }
 
-export function buildClaudeReviewInvocation({ executable = "claude", view, settingsPath, schema, reviewerHomePath, authenticationEnvironment = {}, completenessPass = false }) {
-  const extra = completenessPass ? COMPLETENESS_PROMPT : REVIEW_CHECKLIST_PROMPT;
+export function buildClaudeReviewInvocation({ executable = "claude", view, settingsPath, schema, reviewerHomePath, authenticationEnvironment = {}, completenessPass = false, priorFindings = [] }) {
+  const extra = completenessPass ? completenessReviewPrompt(priorFindings) : REVIEW_CHECKLIST_PROMPT;
   return {
     executable,
     args: ["--print", "--safe-mode", "--no-session-persistence", "--setting-sources", "", "--settings", settingsPath,

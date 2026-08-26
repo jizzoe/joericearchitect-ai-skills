@@ -47,16 +47,20 @@ missing governance guardrails.
 - **Correction budget.** Three materially-different fixes per failure signature,
   then a fail-closed pause to the owner.
 
-### The review loop (final contract)
+### The review loop (shipped vs deferred)
 
-For each round: (1) implementer self-reviews with the shared checklist and fixes
-what it finds, verifying prior fixes and checking for regressions in later
-rounds; (2) the reviewer applies the shared checklist plus a material-only
-freeform pass, tagging every finding `material` or `advisory`; (3) zero material
-findings ends the loop (advisory findings recorded, non-blocking); (4) material
-findings return to the implementer, with a fail-closed pause after three
-materially-different fixes per signature and the completeness pass escalating in
-after two consecutive material-finding rounds.
+**Shipped now (code-tested):** the reviewer applies the shared checklist plus a
+material-only freeform pass, tagging every finding `material` or `advisory`;
+only material findings drive the loop; advisory findings are recorded and
+non-blocking; and the budget is three materially-different fixes per failure
+signature before a fail-closed pause. The completeness-pass prompt hook is wired
+and retains the checklist and carries a sanitized summary of prior findings.
+
+**Deferred to a follow-up controller change (runner-followed prose only):** the
+implementer self-review pre-flight before invoking the reviewer, and the
+completeness-pass escalation *triggering* (flipping the pass on after two
+consecutive material-finding rounds). These are runner-orchestration behaviors,
+not review-adapter code paths, so the normative spec does not assert them.
 
 ## Risks / Trade-offs
 
