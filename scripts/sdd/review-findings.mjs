@@ -4,8 +4,8 @@ const compatibleDispositions = Object.freeze({
   blocker: new Set(["objective-fix", "human-decision"]),
   high: new Set(["objective-fix", "human-decision"]),
   "objective-fix": new Set(["objective-fix", "human-decision"]),
-  warning: new Set(["warning", "human-decision"]),
-  "false-positive": new Set(["false-positive", "human-decision"])
+  warning: new Set(["warning"]),
+  "false-positive": new Set(["false-positive"])
 });
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const pause = (code, detail) => ({ allowed: false, classification: "paused", issues: [{ code, ...(detail ? { detail } : {}) }] });

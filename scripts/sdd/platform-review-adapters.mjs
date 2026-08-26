@@ -973,9 +973,12 @@ const REVIEW_CHECKLIST_PROMPT = ` Apply the shared review checklist defined in \
 // hostile filename emits can inject instructions.
 function completenessReviewPrompt(priorFindings = []) {
   const severities = ["blocker", "high", "objective-fix", "warning", "false-positive"];
-  const findings = (Array.isArray(priorFindings) ? priorFindings : []).filter((finding) => severities.includes(finding?.severity));
+  const maximumPriorFindings = 20;
+  const eligible = (Array.isArray(priorFindings) ? priorFindings : []).filter((finding) => severities.includes(finding?.severity));
+  const findings = eligible.slice(0, maximumPriorFindings);
+  const remainder = eligible.length > maximumPriorFindings ? ` and ${eligible.length - maximumPriorFindings} more` : "";
   const priorSummary = findings.length
-    ? ` Do not repeat the prior finding(s) ${findings.map((finding, index) => `#${index + 1} (${finding.severity})`).join(", ")}; re-verify none regressed.`
+    ? ` Do not repeat the prior finding(s) ${findings.map((finding, index) => `#${index + 1} (${finding.severity})`).join(", ")}${remainder}; re-verify none regressed.`
     : "";
   return ` Apply the shared review checklist defined in \`${CHECKLIST_REFERENCE}\`. Re-review the same committed diff for anything the prior review missed, and be exhaustive across every category.${priorSummary} Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.`;
 }

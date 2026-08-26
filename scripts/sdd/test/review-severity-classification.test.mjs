@@ -40,6 +40,17 @@ test("an advisory severity does not block", () => {
   }
 });
 
+test("advisory severities reject a human-decision disposition", () => {
+  for (const severity of ADVISORY) {
+    const result = validateFindingDispositions({
+      findings: [finding("F", severity)],
+      dispositions: [disposition("F", "human-decision")],
+    });
+    assert.equal(result.allowed, false);
+    assert.equal(result.issues[0].code, "independent-review-disposition-incompatible");
+  }
+});
+
 test("a material severity cannot be dispositioned as advisory", () => {
   const result = validateFindingDispositions({
     findings: [finding("F", "high")],
@@ -126,6 +137,15 @@ test("the strict adapter forwards completenessPass and priorFindings to the revi
   assert.ok(prompt.includes("Re-review"), "completeness prompt forwarded through the adapter");
   assert.ok(prompt.includes("#1 (high)"), "prior finding identified by bounded id");
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("the completeness prompt bounds the number of prior findings", () => {
+  const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
+  const many = Array.from({ length: 25 }, (_, i) => ({ id: `F${i}`, severity: "high" }));
+  const prompt = buildCodexReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json", completenessPass: true, priorFindings: many }).args.at(-1);
+  assert.ok(prompt.includes("#20 (high)"), "first 20 findings included");
+  assert.ok(prompt.includes("and 5 more"), "remainder summarized");
+  assert.ok(!prompt.includes("#21 (high)"), "findings beyond the cap excluded");
 });
 
 test("the completeness escalation switches the review prompt and retains the checklist", () => {

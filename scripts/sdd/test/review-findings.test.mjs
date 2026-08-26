@@ -9,9 +9,10 @@ test("every finding requires a durable evidence-backed disposition", () => {
   assert.equal(required.classification, "objective-fix");
   assert.equal(required.issues[0].code, "independent-review-objective-fix-required");
 });
-test("disposition rather than severity determines whether human judgment is required", () => {
+test("a material finding's human-decision disposition requires human judgment", () => {
   assert.equal(validateFindingDispositions({ findings: [{ ...finding, severity: "high" }], dispositions: [{ findingId: "f-1", kind: "objective-fix", evidence: "bounded deterministic failure" }] }).classification, "objective-fix");
-  assert.equal(validateFindingDispositions({ findings: [{ ...finding, severity: "warning" }], dispositions: [{ findingId: "f-1", kind: "human-decision", evidence: "product behavior choice" }] }).issues[0].code, "independent-review-human-decision");
+  assert.equal(validateFindingDispositions({ findings: [{ ...finding, severity: "high" }], dispositions: [{ findingId: "f-1", kind: "human-decision", evidence: "product behavior choice" }] }).issues[0].code, "independent-review-human-decision");
+  assert.equal(validateFindingDispositions({ findings: [{ ...finding, severity: "warning" }], dispositions: [{ findingId: "f-1", kind: "human-decision", evidence: "product behavior choice" }] }).issues[0].code, "independent-review-disposition-incompatible");
   assert.equal(validateFindingDispositions({ findings: [finding], dispositions: [{ findingId: "f-1", kind: "objective-fix", evidence: "test failure" }], correctionAttempts: 3 }).allowed, false);
   assert.deepEqual(nextReviewState({ priorHead: "a", currentHead: "b", findings: [], dispositions: [] }), { state: "rereview-required", reason: "head-changed" });
   assert.deepEqual(nextReviewState({ priorHead: "a", currentHead: "a", findings: [finding], dispositions: [{ findingId: "f-1", kind: "objective-fix", evidence: "test failure" }] }), { state: "correction-required", reason: "independent-review-objective-fix-required" });
