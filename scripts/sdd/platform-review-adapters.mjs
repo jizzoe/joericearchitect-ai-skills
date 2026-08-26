@@ -383,7 +383,7 @@ function strictArtifactReceiptDiagnostics(inspected) {
  * command. No repository-controlled executable or shell text is run outside
  * the managed parent sandbox.
  */
-export function buildCodexParentStrictReviewToolRequest({ reviewPackage, repositoryPath, reviewer, implementerSession, attestationRef, executable = "codex" } = {}, {
+export function buildCodexParentStrictReviewToolRequest({ reviewPackage, repositoryPath, reviewer, implementerSession, attestationRef, executable = "codex", completenessPass = false, priorFindings = [] } = {}, {
   createView = createArchivedReviewView,
   removeView = removeArchivedReviewView,
   rebuildPackage = buildReviewPackage,
@@ -439,7 +439,7 @@ export function buildCodexParentStrictReviewToolRequest({ reviewPackage, reposit
     const schemaEntry = fs.lstatSync(schemaPath);
     if (!schemaEntry.isFile() || schemaEntry.isSymbolicLink()) throw new Error("schema-invalid");
     const resultPath = path.join(view.temporaryRoot, "strict-independent-review-findings.json");
-    const invocation = buildCodexReviewInvocation({ executable: executableIdentity.realPath, view, schemaPath, resultPath, authenticationEnvironment: preparedEnvironment.environment });
+    const invocation = buildCodexReviewInvocation({ executable: executableIdentity.realPath, view, schemaPath, resultPath, authenticationEnvironment: preparedEnvironment.environment, completenessPass, priorFindings });
     const arguments_ = Object.freeze(["-i", ...environmentArguments(invocation.environment), invocation.executable, ...invocation.args]);
     const startedAt = clock();
     const expiresAt = new Date(Date.parse(startedAt) + 15 * 60 * 1000).toISOString();
@@ -1201,12 +1201,12 @@ export function invokeReviewProcess(invocation, view, run, parentEnvironment = p
   });
 }
 
-export function runCodexReviewAdapter({ reviewPackage, view, schemaPath, resultPath, reviewer, attestationRef, executable, run = spawnSync, prepareEnvironment = prepareCodexReviewerEnvironment }) {
+export function runCodexReviewAdapter({ reviewPackage, view, schemaPath, resultPath, reviewer, attestationRef, executable, completenessPass = false, priorFindings = [], run = spawnSync, prepareEnvironment = prepareCodexReviewerEnvironment }) {
   const probe = probeCodexReviewAdapter({ executable, attestationRef });
   if (!probe.available) return { ...unavailableOutcome(probe.diagnostic), result: unavailable(probe.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
   const preparedEnvironment = prepareEnvironment(view);
   if (!preparedEnvironment.available) return { ...unavailableOutcome(preparedEnvironment.diagnostic), result: unavailable(preparedEnvironment.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
-  const invocation = buildCodexReviewInvocation({ executable, view, schemaPath, resultPath, authenticationEnvironment: preparedEnvironment.environment });
+  const invocation = buildCodexReviewInvocation({ executable, view, schemaPath, resultPath, authenticationEnvironment: preparedEnvironment.environment, completenessPass, priorFindings });
   const execution = invokeReviewProcess(invocation, view, run);
   let result = null;
   try { result = fs.existsSync(resultPath) ? parseJsonResult(fs.readFileSync(resultPath, "utf8")) : null; } catch { result = null; }
@@ -1336,7 +1336,7 @@ export function runClaudeDegradedReviewAdapter({ reviewPackage, view, schemaPath
   return { status: result.status, result, execution: { status: 0, signal: null, emittedResult: true } };
 }
 
-export function runClaudeReviewAdapter({ reviewPackage, view, settingsPath, schema, reviewer, attestationRef, executable, run = spawnSync, prepareEnvironment = prepareClaudeReviewerEnvironment }) {
+export function runClaudeReviewAdapter({ reviewPackage, view, settingsPath, schema, reviewer, attestationRef, executable, completenessPass = false, priorFindings = [], run = spawnSync, prepareEnvironment = prepareClaudeReviewerEnvironment }) {
   const probe = probeClaudeReviewAdapter({ executable, attestationRef });
   if (!probe.available) return { ...unavailableOutcome(probe.diagnostic), result: unavailable(probe.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }) };
   let prepared;
@@ -1350,7 +1350,7 @@ export function runClaudeReviewAdapter({ reviewPackage, view, settingsPath, sche
   if (!prepared?.available) {
     return { ...unavailableOutcome(prepared?.diagnostic), result: unavailable(prepared?.code, { reviewPackage, adapter: "claude", reviewer, attestationRef }) };
   }
-  const invocation = buildClaudeReviewInvocation({ executable, view, settingsPath, schema, reviewerHomePath: prepared.homePath, authenticationEnvironment: prepared.authenticationEnvironment });
+  const invocation = buildClaudeReviewInvocation({ executable, view, settingsPath, schema, reviewerHomePath: prepared.homePath, authenticationEnvironment: prepared.authenticationEnvironment, completenessPass, priorFindings });
   const execution = invokeReviewProcess(invocation, view, run);
   const result = parseJsonResult(execution.stdout);
   if (execution.status !== 0 || !result) {

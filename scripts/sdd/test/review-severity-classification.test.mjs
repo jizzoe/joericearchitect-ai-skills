@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateFindingDispositions } from "../review-findings.mjs";
-import { buildCodexReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildClaudeDegradedReviewInvocation } from "../platform-review-adapters.mjs";
+import { buildCodexReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildClaudeDegradedReviewInvocation, runCodexReviewAdapter } from "../platform-review-adapters.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const MATERIAL = ["blocker", "high", "objective-fix"];
@@ -89,6 +89,20 @@ test("the degraded review builders also consume the shared checklist and severit
   const claudePrompt = claude.args[claude.args.length - 1];
   assert.ok(claudePrompt.includes("correctness and spec compliance"), "checklist in degraded Claude prompt");
   assert.ok(claudePrompt.includes("blocker, high, or objective-fix"), "severity in degraded Claude prompt");
+});
+
+test("the strict adapter forwards completenessPass and priorFindings to the reviewer", () => {
+  const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
+  const resultPath = "/tmp/forward-result.json";
+  fs.writeFileSync(resultPath, JSON.stringify({ status: "passed", findings: [] }));
+  let capturedArgs = null;
+  const run = (executable, args) => { capturedArgs = args; return { status: 0, signal: null, stdout: "", stderr: "" }; };
+  const prepareEnvironment = () => ({ available: true, code: "ready", environment: {} });
+  const outcome = runCodexReviewAdapter({ reviewPackage: {}, view, schemaPath: "/tmp/s.json", resultPath, executable: "codex", reviewer: { type: "codex", identity: "codex-reviewer" }, attestationRef: "attestations/codex-read-only-v1.json", completenessPass: true, priorFindings: [{ id: "F1", severity: "high" }], run, prepareEnvironment });
+  assert.equal(outcome.status, "passed");
+  const prompt = capturedArgs[capturedArgs.length - 1];
+  assert.ok(prompt.includes("Re-review"), "completeness prompt forwarded through the adapter");
+  fs.rmSync(resultPath, { force: true });
 });
 
 test("the completeness escalation switches the review prompt and retains the checklist", () => {
