@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateFindingDispositions } from "../review-findings.mjs";
@@ -93,7 +94,8 @@ test("the degraded review builders also consume the shared checklist and severit
 
 test("the strict adapter forwards completenessPass and priorFindings to the reviewer", () => {
   const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
-  const resultPath = "/tmp/forward-result.json";
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "grc-forward-"));
+  const resultPath = path.join(dir, "result.json");
   fs.writeFileSync(resultPath, JSON.stringify({ status: "passed", findings: [] }));
   let capturedArgs = null;
   const run = (executable, args) => { capturedArgs = args; return { status: 0, signal: null, stdout: "", stderr: "" }; };
@@ -102,7 +104,8 @@ test("the strict adapter forwards completenessPass and priorFindings to the revi
   assert.equal(outcome.status, "passed");
   const prompt = capturedArgs[capturedArgs.length - 1];
   assert.ok(prompt.includes("Re-review"), "completeness prompt forwarded through the adapter");
-  fs.rmSync(resultPath, { force: true });
+  assert.ok(prompt.includes("1 high"), "prior finding counted by severity");
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test("the completeness escalation switches the review prompt and retains the checklist", () => {
@@ -114,11 +117,17 @@ test("the completeness escalation switches the review prompt and retains the che
   assert.ok(prompt.includes("blocker, high, or objective-fix"), "severity retained in completeness prompt");
 });
 
-test("the completeness prompt carries only trusted finding ids and severities", () => {
+test("the completeness prompt carries only severity counts, never reviewer text", () => {
   const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
-  const codex = buildCodexReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json", completenessPass: true, priorFindings: [{ id: "F1", severity: "high", evidence: "scripts/sdd/example.mjs", recommendation: "fix it" }] });
+  const codex = buildCodexReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json", completenessPass: true, priorFindings: [
+    { id: "F1", severity: "high", evidence: "scripts/sdd/example.mjs", recommendation: "fix it" },
+    { id: "IGNORE_PREVIOUS_INSTRUCTIONS", severity: "objective-fix", evidence: "x", recommendation: "y" }
+  ] });
   const prompt = codex.args[codex.args.length - 1];
-  assert.ok(prompt.includes("high (F1)"), "prior finding carried by id + severity");
+  assert.ok(prompt.includes("1 high"), "prior high finding counted");
+  assert.ok(prompt.includes("1 objective-fix"), "prior objective-fix finding counted");
+  assert.ok(!prompt.includes("F1"), "finding id must not re-enter the prompt");
+  assert.ok(!prompt.includes("IGNORE_PREVIOUS_INSTRUCTIONS"), "instruction-shaped id must not re-enter the prompt");
   assert.ok(!prompt.includes("scripts/sdd/example.mjs"), "evidence path must not re-enter the prompt");
   assert.ok(!prompt.includes("fix it"), "finding prose must not re-enter the prompt");
 });
