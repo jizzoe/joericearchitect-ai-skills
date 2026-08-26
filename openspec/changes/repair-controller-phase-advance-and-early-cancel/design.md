@@ -25,12 +25,12 @@ newly admitted but structurally blocked claim held until deadline.
 ### Phase evidence is controller-owned and first-incomplete only
 
 Add a canonical transition that accepts the full durable record, the resolved
-authorization/repository context, an exact named phase, and a small evidence
-object (`current: true` plus a non-secret reference). It will first inspect the
-record, require the named phase to equal the first incomplete phase, derive the
-updated record through the existing phase rules, and persist it with the
-existing immutable checkpoint guard. Repeated identical evidence is idempotent;
-different evidence for a completed phase is a conflict.
+authorization/repository context, an exact named phase, and an exact evidence
+object (`current`, matching `phase`, a non-secret `reference`, and one or more
+relative artifact paths with SHA-256 digests). It validates every artifact as a
+regular, non-symlinked, non-\`.git\` file beneath the target repository before it
+derives and persists the update. Repeated identical evidence is idempotent; different
+evidence for a completed phase is a conflict.
 
 This is selected over exposing a generic record writer because every phase
 advance must retain existing order, expiry, and context checks.
@@ -63,10 +63,11 @@ constants, or external mutation is embedded in reusable code.
 
 - **Early retirement could release an active run incorrectly** → require an
   exact separate signed owner binding, verified with dispatcher-owned trust
-  material, plus no delivery evidence and an unavailable
-  transition check.
-- **Evidence references could be forged** → treat them as references only;
-  validate phase, record, authorization, and repository independently.
+  material, an active directory containing only exact admission records, and
+  an unavailable transition check.
+- **Evidence references could be forged** → require exact evidence shape and
+  verify each phase-bound artifact's path and SHA-256 digest beneath the target
+  repository.
 - **Archive/controller disagreement could recur** → add regression coverage
   proving subsequent inventory classifies the retired controller as terminal.
 

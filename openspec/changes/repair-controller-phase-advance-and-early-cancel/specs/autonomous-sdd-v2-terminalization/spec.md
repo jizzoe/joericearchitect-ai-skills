@@ -6,9 +6,10 @@ an admitted, undelivered exact run that cannot progress because a required
 installed controller transition is unavailable. It MUST require a separate,
 unexpired owner authorization bound to the controller run, parent run, work
 unit, claim, repository, selected change, blocking reason, and recovery
-reference. On success it MUST preserve immutable cancellation history, release
-only the matching active claim, and report the run as retired rather than
-delivered or complete.
+reference; and refuse retirement when the active run contains any durable
+delivery or progress artifact beyond its exact admission records. On success it
+MUST preserve immutable cancellation history, release only the matching active
+claim, and report the run as retired rather than delivered or complete.
 
 #### Scenario: Exact blocked run retires safely
 - **WHEN** a current owner authorization exactly matches an admitted blocked

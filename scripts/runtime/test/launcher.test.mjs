@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -98,6 +99,12 @@ test("the staged controller initializes and resumes in real Git-common state wit
 
   const target = syntheticTargetRepository("initializer-target-");
   const stateHome = temporaryDirectory("initializer-state-");
+  const proposalContents = "runtime proposal evidence";
+  fs.writeFileSync(path.join(target, "proposal.md"), proposalContents);
+  const proposalEvidence = {
+    current: true, phase: "propose", reference: "runtime-proposal",
+    artifacts: [{ path: "proposal.md", sha256: crypto.createHash("sha256").update(proposalContents).digest("hex") }]
+  };
   fs.mkdirSync(path.join(target, "config"));
   fs.writeFileSync(path.join(target, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
   const initialized = invoke(target, "initialize-v2-delivery", basePayload(stateHome));
@@ -114,7 +121,7 @@ test("the staged controller initializes and resumes in real Git-common state wit
     authorization,
     repository: "example/runtime-fixture",
     phase: "propose",
-    evidence: { current: true, reference: "runtime-proposal" },
+    evidence: proposalEvidence,
     now: startedAt
   });
   assert.equal(advanced.classification, "advanced", JSON.stringify(advanced));
@@ -123,7 +130,7 @@ test("the staged controller initializes and resumes in real Git-common state wit
     authorization,
     repository: "example/runtime-fixture",
     phase: "propose",
-    evidence: { current: true, reference: "runtime-proposal" },
+    evidence: proposalEvidence,
     now: startedAt
   });
   assert.equal(retry.classification, "already-advanced", JSON.stringify(retry));

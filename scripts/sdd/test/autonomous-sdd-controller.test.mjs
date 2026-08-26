@@ -42,6 +42,9 @@ import { createRepositoryClaim, ensureStateLayout, statePaths } from "../autonom
 const started = "2026-08-13T12:00:00.000Z";
 const authorization = resolveSddDeliveryRequest({ target: "complete-delivery", mode: "autonomous", qualityProfile: "production-rapid", authorizationProfile: "sdd-delivery", independentReviewPolicy: "strict-only", expiration: "12h" }, { goalStartedAt: started }).effectiveAuthorization;
 const created = createControllerRecord({ authorization, repository: "owner/repository", runId: "controller-run-0001" });
+const phaseEvidence = (phase, reference, artifactPath = "phase-artifact.md", contents = "phase artifact") => ({
+  current: true, phase, reference, artifacts: [{ path: artifactPath, sha256: crypto.createHash("sha256").update(contents).digest("hex") }]
+});
 
 const intakePayload = {
   repository: "owner/repository",
@@ -331,7 +334,7 @@ test("controller rejects expired, stale, and conflicting context", () => {
   const stale = structuredClone(created.record);
   stale.steps[0] = { id: "propose", status: "complete", evidence: { current: false } };
   assert.deepEqual(inspectControllerRecord(stale, { authorization, repository: "owner/repository", now: started }), { classification: "continue", reason: "controller-phase-stale", nextPhase: "propose" });
-  const refreshed = advanceControllerRecord(stale, "propose", { current: true, reference: "fresh-proposal" });
+  const refreshed = advanceControllerRecord(stale, "propose", phaseEvidence("propose", "fresh-proposal"));
   assert.equal(refreshed.valid, true);
   assert.equal(inspectControllerRecord(refreshed.record, { authorization, repository: "owner/repository", now: started }).nextPhase, "planning-review");
   const forgedSelection = structuredClone(created.record);
@@ -447,7 +450,7 @@ test("controller cannot complete cleanup without a registered terminal receipt",
   assert.equal(executeControllerLifecycleCleanup({ record: created.record }).reason, "controller-cleanup-resources-missing");
   const incomplete = structuredClone(created.record);
   incomplete.steps = incomplete.steps.map((step, index) => index < 7 ? { ...step, status: "complete", evidence: { current: true } } : step);
-  assert.equal(advanceControllerRecord(incomplete, "cleanup", { current: true, reference: "cleanup" }).reason, "controller-cleanup-incomplete");
+  assert.equal(advanceControllerRecord(incomplete, "cleanup", phaseEvidence("cleanup", "cleanup")).reason, "controller-cleanup-incomplete");
   incomplete.steps[7] = { ...incomplete.steps[7], status: "complete", evidence: { current: true } };
   assert.equal(inspectControllerRecord(incomplete, { authorization, repository: "owner/repository", now: started }).reason, "controller-cleanup-incomplete");
 
@@ -455,7 +458,7 @@ test("controller cannot complete cleanup without a registered terminal receipt",
   const delivered = bindControllerResourceDelivery(registered.record, { kind: "branch", id: "receipt-branch", deliveryEvidence: { current: true, reference: "pr-receipt", headCommit: "a".repeat(40), deliveredHeadCommit: "b".repeat(40), mergedPullRequest: { merged: true, pullRequest: "5", topicHeadCommit: "a".repeat(40), finalHeadCommit: "b".repeat(40) } } });
   const receipted = appendControllerCleanupReceipt(delivered.record, { kind: "branch", id: "receipt-branch", status: "completed" }, { now: "2026-08-13T12:30:00.000Z" }).record;
   receipted.steps = receipted.steps.map((step, index) => index < 7 ? { ...step, status: "complete", evidence: { current: true } } : step);
-  const completed = advanceControllerRecord(receipted, "cleanup", { current: true, reference: "cleanup" });
+  const completed = advanceControllerRecord(receipted, "cleanup", phaseEvidence("cleanup", "cleanup"));
   assert.equal(completed.valid, true);
   assert.equal(inspectControllerRecord(completed.record, { authorization, repository: "owner/repository", now: started }).classification, "complete");
 });
@@ -479,8 +482,8 @@ test("controller persists only in the git common-directory state root and advanc
     fs.writeFileSync(persisted.path, `${JSON.stringify(conflictingOnDisk)}\n`);
     assert.equal(persistControllerRecord({ repositoryPath: root, record: created.record, runGit }).reason, "controller-record-run-conflict");
     fs.rmSync(outside, { recursive: true, force: true });
-    assert.equal(advanceControllerRecord(created.record, "planning-review", { current: true }).reason, "controller-phase-advance-out-of-order");
-    const advanced = advanceControllerRecord(created.record, "propose", { current: true, reference: "proposal" });
+    assert.equal(advanceControllerRecord(created.record, "planning-review", phaseEvidence("planning-review", "planning-review")).reason, "controller-phase-advance-out-of-order");
+    const advanced = advanceControllerRecord(created.record, "propose", phaseEvidence("propose", "proposal"));
     assert.equal(advanced.valid, true);
     assert.equal(advanced.record.currentPhase, "planning-review");
   } finally {
@@ -494,24 +497,29 @@ test("executable phase advancement persists only the first incomplete phase", ()
     fs.mkdirSync(path.join(root, ".git"));
     const runGit = () => ".git";
     assert.equal(persistControllerRecord({ repositoryPath: root, record: created.record, runGit }).valid, true);
+    fs.writeFileSync(path.join(root, "proposal.md"), "proposal evidence");
+    const proposalEvidence = phaseEvidence("propose", "proposal", "proposal.md", "proposal evidence");
+    assert.equal(advanceControllerRecord(created.record, "propose", { ...proposalEvidence, extra: "rejected" }).reason, "controller-phase-advance-invalid");
+    assert.equal(advanceControllerRecord(created.record, "propose", phaseEvidence("propose", "metadata", ".git/phase.md")).reason, "controller-phase-advance-invalid");
+    assert.equal(advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { ...proposalEvidence, artifacts: [{ ...proposalEvidence.artifacts[0], sha256: "f".repeat(64) }] }, now: started, runGit }).reason, "controller-phase-evidence-artifacts-invalid");
     const checkpoint = path.join(root, ".git", "sdd-delivery-runs", created.record.checkpointPath);
     const staleLock = path.join(path.dirname(checkpoint), `.${path.basename(checkpoint)}.lock`);
     fs.writeFileSync(staleLock, `${JSON.stringify({ schemaVersion: 1, pid: 2147483647, createdAt: started, ownerFile: "dead-owner" })}\n`);
-    const advanced = advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: started, runGit });
+    const advanced = advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: proposalEvidence, now: started, runGit });
     assert.equal(advanced.classification, "advanced");
     assert.equal(fs.existsSync(staleLock), false);
     assert.equal(JSON.parse(fs.readFileSync(advanced.path, "utf8")).currentPhase, "planning-review");
     assert.equal(persistControllerRecord({ repositoryPath: root, record: advanced.record, expectedRecordDigest: "a".repeat(64), runGit }).reason, "controller-record-stale");
-    const retried = advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: started, runGit });
+    const retried = advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: proposalEvidence, now: started, runGit });
     assert.equal(retried.classification, "already-advanced");
-    const conflictingRetry = advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "different-proposal" }, now: started, runGit });
+    const conflictingRetry = advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: phaseEvidence("propose", "different-proposal", "proposal.md", "proposal evidence"), now: started, runGit });
     assert.equal(conflictingRetry.reason, "controller-phase-advance-evidence-conflict");
-    const skipped = advanceControllerLifecyclePhase({ repositoryPath: root, record: advanced.record, authorization, repository: "owner/repository", phase: "verify", evidence: { current: true, reference: "skip" }, now: started, runGit });
+    const skipped = advanceControllerLifecyclePhase({ repositoryPath: root, record: advanced.record, authorization, repository: "owner/repository", phase: "verify", evidence: phaseEvidence("verify", "skip", "proposal.md", "proposal evidence"), now: started, runGit });
     assert.equal(skipped.valid, false);
     assert.equal(skipped.classification, "paused");
     const stale = { ...created.record, authorizationDigest: "f".repeat(64) };
-    assert.equal(advanceControllerLifecyclePhase({ repositoryPath: root, record: stale, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: started, runGit }).reason, "controller-context-conflict");
-    assert.equal(advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: authorization.expiresAt, runGit }).reason, "controller-context-expired");
+    assert.equal(advanceControllerLifecyclePhase({ repositoryPath: root, record: stale, authorization, repository: "owner/repository", phase: "propose", evidence: proposalEvidence, now: started, runGit }).reason, "controller-context-conflict");
+    assert.equal(advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: proposalEvidence, now: authorization.expiresAt, runGit }).reason, "controller-context-expired");
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -521,7 +529,7 @@ test("controller persistence requires a durable predecessor digest for every upd
     fs.mkdirSync(path.join(root, ".git"));
     const runGit = () => ".git";
     assert.equal(persistControllerRecord({ repositoryPath: root, record: created.record, runGit }).valid, true);
-    const changed = advanceControllerRecord(created.record, "propose", { current: true, reference: "proposal" });
+    const changed = advanceControllerRecord(created.record, "propose", phaseEvidence("propose", "proposal"));
     assert.equal(changed.valid, true);
     assert.equal(persistControllerRecord({ repositoryPath: root, record: changed.record, runGit }).reason, "controller-record-expected-digest-required");
     assert.equal(persistControllerRecord({ repositoryPath: root, record: changed.record, expectedRecordDigest: "a".repeat(64), runGit }).reason, "controller-record-stale");

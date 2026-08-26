@@ -158,6 +158,21 @@ test("early retirement refuses a run with delivery evidence", () => {
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });
 
+test("early retirement fails closed on any durable progress artifact", () => {
+  const stateHome = root();
+  try {
+    const admitted = admitV2Run(fixture(stateHome));
+    const activePath = path.join(admitted.paths.active, admitted.parentRun.parentRunId);
+    fs.writeFileSync(path.join(activePath, "transition-attempt.json"), "{}\n");
+    const result = retireBlockedV2Run({
+      readableRepositoryName: "repository", retirement: retirementFor(admitted), transitionAvailable: () => false, ...trustedOwner,
+      stateHome, now: "2026-08-20T13:00:00.000Z"
+    });
+    assert.equal(result.reason, "early-retirement-progress-evidence-present");
+    assert.equal(fs.existsSync(activePath), true);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
+});
+
 test("cancellation rejects a mismatched claim without releasing it", () => {
   const stateHome = root();
   try {

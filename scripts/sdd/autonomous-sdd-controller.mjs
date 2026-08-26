@@ -33,6 +33,7 @@ const selectedByAuthorization = (selectedEntry, authorization) =>
   text(selectedEntry) && Array.isArray(authorization?.target?.entries) && authorization.target.entries.includes(selectedEntry);
 const validRunId = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9-]{7,127}$/i.test(value);
 const validTransitionName = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9-]{2,127}$/i.test(value);
+const safeEvidencePath = (value) => typeof value === "string" && value.length > 0 && !path.isAbsolute(value) && !/[\\\0\r\n]/.test(value) && value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== ".." && segment !== ".git");
 const checkpointForRun = (runId) => `runs/${runId}/controller.json`;
 const digest = (value) => typeof value === "string" && /^[0-9a-f]{64}$/i.test(value);
 const repositoryId = (value) => typeof value === "string" && /^r1-[0-9a-f]{64}$/i.test(value);
@@ -459,6 +460,14 @@ function validEarlyRetirementAuthorization(value) {
     validOwnerAuthorization(value.ownerAuthorization) && timestamp(value.expiresAt);
 }
 
+function activeRunHasProgressArtifacts(activePath, fileSystem = fs) {
+  const admissionRecords = new Set(["parent-run.json", "work-unit.json", "resource-claim.json", "operation-contract.json"]);
+  try {
+    const entries = fileSystem.readdirSync(activePath, { withFileTypes: true });
+    return entries.some((entry) => !entry.isFile() || entry.isSymbolicLink() || !admissionRecords.has(entry.name));
+  } catch { return true; }
+}
+
 function cancelledTerminalSummaryFor({ claim, workUnit, reason, now }) {
   const summary = {
     workUnitId: workUnit.workUnitId,
@@ -515,8 +524,8 @@ function cancellationArchiveMatch({ paths, cancellation, requestDigest, fileSyst
  * cancellation receipt, marks the run cancelled, and releases only the exact
  * claim it proves is held by that run.
  */
-function cancelV2Run({ readableRepositoryName, cancellation, request, requireExpired, terminalReason, classification, alreadyClassification, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
-  if (!validCancellationRequest(cancellation) || !request || typeof requireExpired !== "boolean" || !text(terminalReason) || !text(classification) || !text(alreadyClassification) || !timestamp(now) || !text(readableRepositoryName)) {
+function cancelV2Run({ readableRepositoryName, cancellation, request, requireExpired, rejectProgressArtifacts = false, terminalReason, classification, alreadyClassification, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+  if (!validCancellationRequest(cancellation) || !request || typeof requireExpired !== "boolean" || typeof rejectProgressArtifacts !== "boolean" || !text(terminalReason) || !text(classification) || !text(alreadyClassification) || !timestamp(now) || !text(readableRepositoryName)) {
     return { valid: false, classification: "paused", reason: "cancellation-input-invalid" };
   }
   const providerCapability = validateProviderCapabilities(cancellation.provider);
@@ -558,6 +567,9 @@ function cancelV2Run({ readableRepositoryName, cancellation, request, requireExp
   }
   if (fileSystem.existsSync(path.join(activePath, "terminalization-receipt.json"))) {
     return { valid: false, classification: "paused", reason: "cancellation-run-delivered", requestDigest };
+  }
+  if (rejectProgressArtifacts && activeRunHasProgressArtifacts(activePath, fileSystem)) {
+    return { valid: false, classification: "paused", reason: "early-retirement-progress-evidence-present", requestDigest };
   }
 
   const terminalSummary = cancelledTerminalSummaryFor({ claim, workUnit, reason: terminalReason, now });
@@ -650,6 +662,7 @@ export function retireBlockedV2Run({ readableRepositoryName, retirement, transit
     cancellation,
     request: retirement,
     requireExpired: false,
+    rejectProgressArtifacts: true,
     terminalReason: "owner-authorized-blocked-controller",
     classification: "retired",
     alreadyClassification: "already-retired",
@@ -992,10 +1005,34 @@ export function inspectControllerRecord(record, { authorization, repository, now
     : { classification: "complete", reason: "controller-all-phases-complete", nextPhase: null };
 }
 
+function validPhaseEvidence(evidence, phase) {
+  return exactKeys(evidence, ["current", "phase", "reference", "artifacts"]) && evidence.current === true && evidence.phase === phase &&
+    typeof evidence.reference === "string" && /^[a-z0-9][a-z0-9._:/-]{2,255}$/i.test(evidence.reference) &&
+    Array.isArray(evidence.artifacts) && evidence.artifacts.length > 0 && evidence.artifacts.every((artifact) =>
+      exactKeys(artifact, ["path", "sha256"]) && safeEvidencePath(artifact.path) && digest(artifact.sha256));
+}
+
+function evidenceArtifactsMatchRepository(evidence, repositoryPath) {
+  if (!text(repositoryPath)) return false;
+  let root;
+  try { root = fs.realpathSync(repositoryPath); } catch { return false; }
+  return evidence.artifacts.every((artifact) => {
+    let destination;
+    try {
+      const contained = safeContainedDestination(root, artifact.path);
+      destination = contained?.destination;
+      if (!contained || !contained.inspectComponents()) return false;
+      const entry = fs.lstatSync(destination);
+      if (!entry.isFile() || entry.isSymbolicLink()) return false;
+      return crypto.createHash("sha256").update(fs.readFileSync(destination)).digest("hex") === artifact.sha256;
+    } catch { return false; }
+  });
+}
+
 export function advanceControllerRecord(record, phase, evidence) {
   const index = phases.indexOf(phase);
   const existing = record?.steps?.[index];
-  if (!controllerReadyForMutation(record) || index < 0 || evidence?.current !== true || (existing?.status === "complete" && existing.evidence?.current === true)) {
+  if (!controllerReadyForMutation(record) || index < 0 || !validPhaseEvidence(evidence, phase) || (existing?.status === "complete" && existing.evidence?.current === true)) {
     return { valid: false, reason: "controller-phase-advance-invalid" };
   }
   if (record.steps.slice(0, index).some((step) => step.status !== "complete" || step.evidence?.current !== true)) {
@@ -1020,6 +1057,9 @@ export function advanceControllerLifecyclePhase({ repositoryPath, record, author
   const durable = persisted.record;
   if (!sameControllerContext(durable, record)) {
     return { valid: false, classification: "paused", reason: "controller-phase-advance-record-conflict" };
+  }
+  if (!validPhaseEvidence(evidence, phase) || !evidenceArtifactsMatchRepository(evidence, repositoryPath)) {
+    return { valid: false, classification: "paused", reason: "controller-phase-evidence-artifacts-invalid" };
   }
   const completed = durable.steps?.[phases.indexOf(phase)];
   if (completed?.status === "complete") {
