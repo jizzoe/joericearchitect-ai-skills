@@ -48,6 +48,8 @@ M4-S4 run #2 exposed two governance gaps in the autonomous SDD runner:
   trusted finding ids + severities).
 - `scripts/sdd/independent-review-contract.mjs` (bidirectional status↔findings
   consistency: `passed` requires no material finding, `failed` requires one).
+- `scripts/sdd/review-findings.mjs` (correction budget reads only own, finite,
+  non-negative integer counters so inherited object keys cannot bypass it).
 - `scripts/sdd/test/review-severity-classification.test.mjs` and
   `scripts/sdd/test/independent-review-contract.test.mjs` (regression coverage).
 - Living spec `bounded-autonomous-execution` (two new requirements).

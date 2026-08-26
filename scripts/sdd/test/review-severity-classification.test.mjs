@@ -60,35 +60,45 @@ test("the per-signature correction budget fails closed after three attempts", ()
   assert.equal(result.issues[0].code, "correction-limit-exhausted");
 });
 
-test("the Codex and Claude review prompts consume the shared checklist and severity instructions", () => {
+test("the correction budget is not bypassed by inherited object keys", () => {
+  const result = validateFindingDispositions({
+    findings: [finding("F", "objective-fix")],
+    dispositions: [disposition("F", "objective-fix", { failureSignature: "toString" })],
+    correctionAttempts: 3,
+    correctionAttemptsByFailureSignature: {},
+  });
+  assert.equal(result.classification, "paused");
+  assert.equal(result.issues[0].code, "correction-limit-exhausted");
+});
+
+test("the Codex and Claude review prompts reference the canonical checklist asset", () => {
   const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
   const codex = buildCodexReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json" });
   const codexPrompt = codex.args[codex.args.length - 1];
-  assert.ok(codexPrompt.includes("correctness and spec compliance"), "checklist in Codex prompt");
-  assert.ok(codexPrompt.includes("failure recovery"), "failure recovery in Codex prompt");
-  assert.ok(codexPrompt.includes("untrusted input"), "untrusted input in Codex prompt");
-  assert.ok(codexPrompt.includes("durable-state precedence"), "durable-state precedence in Codex prompt");
-  assert.ok(codexPrompt.includes("no product constants"), "portability/attribution in Codex prompt");
+  assert.ok(codexPrompt.includes("review-matrix.md"), "canonical checklist referenced in Codex prompt");
   assert.ok(codexPrompt.includes("blocker, high, or objective-fix"), "severity in Codex prompt");
   const claude = buildClaudeReviewInvocation({ view, settingsPath: "/tmp/s.json", schema: {}, reviewerHomePath: "/tmp/home" });
   const claudePrompt = claude.args[claude.args.length - 1];
-  assert.ok(claudePrompt.includes("correctness and spec compliance"), "checklist in Claude prompt");
-  assert.ok(claudePrompt.includes("failure recovery"), "failure recovery in Claude prompt");
-  assert.ok(claudePrompt.includes("untrusted input"), "untrusted input in Claude prompt");
-  assert.ok(claudePrompt.includes("durable-state precedence"), "durable-state precedence in Claude prompt");
-  assert.ok(claudePrompt.includes("no product constants"), "portability/attribution in Claude prompt");
+  assert.ok(claudePrompt.includes("review-matrix.md"), "canonical checklist referenced in Claude prompt");
   assert.ok(claudePrompt.includes("blocker, high, or objective-fix"), "severity in Claude prompt");
+});
+
+test("the canonical checklist asset carries the full shared dimensions", () => {
+  const matrix = fs.readFileSync(path.join(root, "skills", "base", "autonomous-goal-runner", "references", "review-matrix.md"), "utf8");
+  for (const dimension of ["correctness and spec compliance", "failure recovery", "untrusted input", "durable-state precedence", "no product constants"]) {
+    assert.ok(matrix.includes(dimension), `${dimension} present in the canonical checklist`);
+  }
 });
 
 test("the degraded review builders also consume the shared checklist and severity instructions", () => {
   const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
   const codex = buildCodexDegradedReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json" });
   const codexPrompt = codex.args[codex.args.length - 1];
-  assert.ok(codexPrompt.includes("correctness and spec compliance"), "checklist in degraded Codex prompt");
+  assert.ok(codexPrompt.includes("review-matrix.md"), "checklist in degraded Codex prompt");
   assert.ok(codexPrompt.includes("blocker, high, or objective-fix"), "severity in degraded Codex prompt");
   const claude = buildClaudeDegradedReviewInvocation({ view, schema: {}, reviewerHomePath: "/tmp/home" });
   const claudePrompt = claude.args[claude.args.length - 1];
-  assert.ok(claudePrompt.includes("correctness and spec compliance"), "checklist in degraded Claude prompt");
+  assert.ok(claudePrompt.includes("review-matrix.md"), "checklist in degraded Claude prompt");
   assert.ok(claudePrompt.includes("blocker, high, or objective-fix"), "severity in degraded Claude prompt");
 });
 
@@ -113,7 +123,7 @@ test("the completeness escalation switches the review prompt and retains the che
   const codex = buildCodexReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json", completenessPass: true });
   const prompt = codex.args[codex.args.length - 1];
   assert.ok(prompt.includes("Re-review"), "completeness prompt used");
-  assert.ok(prompt.includes("correctness and spec compliance"), "checklist retained in completeness prompt");
+  assert.ok(prompt.includes("review-matrix.md"), "checklist retained in completeness prompt");
   assert.ok(prompt.includes("blocker, high, or objective-fix"), "severity retained in completeness prompt");
 });
 

@@ -55,3 +55,7 @@
   `review-matrix.md` dimensions (failure recovery, untrusted input, durable-state
   precedence, no product constants) and carry only trusted finding ids +
   severities in the completeness pass. Depends on: 2.1.
+- [x] 6.3 Reference the canonical `review-matrix.md` asset as the single source
+  of the review checklist (rather than a duplicated prompt constant), and harden
+  the correction-budget counter against inherited object keys. Depends on: 6.1,
+  6.2.

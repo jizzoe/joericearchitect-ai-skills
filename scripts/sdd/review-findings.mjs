@@ -28,8 +28,14 @@ export function validateFindingDispositions({ findings, dispositions, correction
     if (!compatibleDispositions[finding.severity].has(disposition.kind)) return pause("independent-review-disposition-incompatible", finding.id);
     if (disposition.kind === "human-decision") return pause("independent-review-human-decision", finding.id);
     const signature = disposition.failureSignature ?? finding.id;
-    const signatureAttempts = correctionAttemptsByFailureSignature?.[signature] ?? correctionAttempts;
-    if (disposition.kind === "objective-fix" && Number(signatureAttempts) >= 3) return pause("correction-limit-exhausted", signature);
+    let signatureAttempts = correctionAttempts;
+    if (correctionAttemptsByFailureSignature instanceof Map) {
+      if (correctionAttemptsByFailureSignature.has(signature)) signatureAttempts = correctionAttemptsByFailureSignature.get(signature);
+    } else if (correctionAttemptsByFailureSignature && Object.prototype.hasOwnProperty.call(correctionAttemptsByFailureSignature, signature)) {
+      signatureAttempts = correctionAttemptsByFailureSignature[signature];
+    }
+    const attempts = Number.isInteger(signatureAttempts) && signatureAttempts >= 0 ? signatureAttempts : 0;
+    if (disposition.kind === "objective-fix" && attempts >= 3) return pause("correction-limit-exhausted", signature);
     if (disposition.kind === "objective-fix") return correction(signature);
   }
   return { allowed: true, classification: "ready", issues: [] };

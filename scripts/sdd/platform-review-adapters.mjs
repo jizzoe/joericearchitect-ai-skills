@@ -963,12 +963,12 @@ function capabilities({ adapter, attestationRef, probeReference }) {
   };
 }
 
-const CHECKLIST_CATEGORIES = "correctness and spec compliance, edge cases/error handling/failure recovery, security/secret handling/untrusted input, concurrency/idempotency/durable-state precedence, portability/attribution (no product constants, license/source noted)";
+const CHECKLIST_REFERENCE = "skills/base/autonomous-goal-runner/references/review-matrix.md";
 
-const REVIEW_CHECKLIST_PROMPT = ` Apply the shared review checklist and report findings in every category: ${CHECKLIST_CATEGORIES}. Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.`;
+const REVIEW_CHECKLIST_PROMPT = ` Apply the shared review checklist defined in \`${CHECKLIST_REFERENCE}\` and report findings in every category. Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.`;
 
-// The completeness second pass re-uses the full checklist and summarizes prior
-// findings by enum-bounded severity count only. No reviewer-supplied ids,
+// The completeness second pass re-uses the canonical checklist and summarizes
+// prior findings by enum-bounded severity count only. No reviewer-supplied ids,
 // evidence paths, or prose ever re-enter the prompt, so nothing a reviewer or a
 // hostile filename emits can inject instructions.
 function completenessReviewPrompt(priorFindings = []) {
@@ -981,7 +981,7 @@ function completenessReviewPrompt(priorFindings = []) {
   const priorSummary = parts.length
     ? ` Do not repeat the prior ${parts.join(", ")} finding(s), and re-verify none regressed.`
     : "";
-  return ` Apply the shared review checklist and report findings in every category: ${CHECKLIST_CATEGORIES}. Re-review the same committed diff for anything the prior review missed, and be exhaustive across every category.${priorSummary} Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.`;
+  return ` Apply the shared review checklist defined in \`${CHECKLIST_REFERENCE}\`. Re-review the same committed diff for anything the prior review missed, and be exhaustive across every category.${priorSummary} Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.`;
 }
 
 export function buildCodexReviewInvocation({ executable = "codex", view, schemaPath, resultPath, authenticationEnvironment = {}, completenessPass = false, priorFindings = [] }) {
