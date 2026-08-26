@@ -22,36 +22,41 @@ dirty work.
 
 **Non-Goals:**
 
-- Deleting remote branches, rewriting history, force-removing worktrees,
-  resetting, stashing, or running `git clean`.
+- Deleting remote branches whose changes are not proven merged to the remote
+  default branch, rewriting history, force-removing worktrees, resetting,
+  stashing, or running `git clean`.
 - Making `git status` empty by discarding or auto-committing work.
 - Committing inside an active OpenSpec change, crossing repository boundaries,
   or creating pull requests.
 
 ## Decisions
 
-### Open-question resolutions (Explore)
+### Open-question resolutions (owner-approved 2026-08-25)
 
 - **Non-OpenSpec active-work contract.** v1 discovers active work from OpenSpec
   first (`openspec/changes/<name>`), and accepts a repository-local explicit
   adapter/configuration for repositories that do not use OpenSpec. It never
   infers active work from heuristic branch names, and reports the absence of
-  comparable active-change evidence when none exists.
+  comparable active-change evidence when none exists. *(owner-approved)*
 - **Local branch with an existing remote counterpart.** A confirmed clean,
-  ancestry-merged local branch is a local-retire candidate; remote deletion is a
-  separate, later opt-in scope and is not performed in v1.
+  ancestry-merged local branch is a local-retire candidate. When the remote
+  counterpart still exists, v1 additionally retires the remote branch only after
+  confirming its changes are merged into the remote default branch; otherwise
+  the remote branch is left intact and reported as unresolved. *(owner-approved)*
 - **Secret and large/binary detectors.** v1 defines a conservative baseline
   (fixed secret/credential patterns plus large/binary detection). Detected or
   uncertain sensitive content is surfaced as unresolved and blocked from commit
   eligibility; repository validation/security adapters are required before
-  broadening.
-- **Direct commits on the default branch.** v1 reports default-branch working
-  tree changes and requires an explicit repository-policy decision before
-  proposing a direct commit/push; by default commit candidates target a topic
-  branch.
+  broadening. *(owner-approved)*
+- **Direct commits on the default branch.** v1 never commits or pushes
+  OpenSpec/spec-change content (spec deltas and their code/files) directly onto
+  the default branch; such content always reaches the default branch by merging
+  from a branch or worktree. Non-spec-change files (e.g., design briefs,
+  research docs) are not blocked from committing directly to the default branch.
+  *(owner-approved)*
 - **Receipt storage.** The receipt is written to a configurable, privacy-safe
   external or Git metadata location outside the worktree so it never becomes an
-  uncommitted cleanup candidate.
+  uncommitted cleanup candidate. *(owner-approved)*
 
 ### Audit schema
 
