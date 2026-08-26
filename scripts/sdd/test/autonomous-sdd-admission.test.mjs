@@ -446,6 +446,8 @@ test("the runtime exposes declared v2 initialization and refuses construction-on
   assert.match(source, /"initialize-v2-delivery"/);
   assert.match(source, /"admit-v2-run"/);
   assert.match(source, /"terminalize-v2-run"/);
+  assert.match(source, /"advance-controller-lifecycle-phase"/);
+  assert.match(source, /"retire-blocked-v2-run"/);
   assert.doesNotMatch(source, /"create-controller-record"|"advance-controller-record"/);
   const malformed = spawnSync(process.execPath, [module, "terminalize-v2-run", "--stdin"], { encoding: "utf8", input: "{}" });
   assert.equal(malformed.status, 0);

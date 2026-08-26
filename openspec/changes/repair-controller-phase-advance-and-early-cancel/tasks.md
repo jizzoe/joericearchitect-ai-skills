@@ -13,6 +13,6 @@
 ## 3. Evidence and recovery
 
 - [x] 3.1 Update canonical lifecycle guidance to name the executable phase transition and constrained early-retirement recovery path; confirm wrappers stay thin.
-- [ ] 3.2 Run focused controller, cancellation, admission, and runtime suites; run the runtime build/install distribution check and `openspec validate --all --strict`. Depends on 1.3, 2.3, 3.1.
-- [ ] 3.3 Perform bounded local security/recovery review, resolve objective findings, and record portability and attribution evidence before delivery. Depends on 3.2.
+- [x] 3.2 Run focused controller, cancellation, admission, and runtime suites; run the runtime build/install distribution check and `openspec validate --all --strict`. Depends on 1.3, 2.3, 3.1.
+- [x] 3.3 Perform bounded local security/recovery review, resolve objective findings, and record portability and attribution evidence before delivery. Depends on 3.2.
 - [ ] 3.4 Deliver this repair only through a separately authorized bootstrap flow, then install its runtime and resume the existing exact controller run through the new phase-evidence transition; do not create a competing claim or edit its checkpoint directly. Depends on 3.3.

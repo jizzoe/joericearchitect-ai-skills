@@ -32,6 +32,7 @@ const canonical = (value) => {
 const selectedByAuthorization = (selectedEntry, authorization) =>
   text(selectedEntry) && Array.isArray(authorization?.target?.entries) && authorization.target.entries.includes(selectedEntry);
 const validRunId = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9-]{7,127}$/i.test(value);
+const validTransitionName = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9-]{2,127}$/i.test(value);
 const checkpointForRun = (runId) => `runs/${runId}/controller.json`;
 const digest = (value) => typeof value === "string" && /^[0-9a-f]{64}$/i.test(value);
 const repositoryId = (value) => typeof value === "string" && /^r1-[0-9a-f]{64}$/i.test(value);
@@ -402,6 +403,62 @@ function validCancellationRequest(value) {
     validRunId(value.approvedChangeId) && validateProviderCapabilities(value.provider).valid;
 }
 
+function validOwnerAuthorization(value) {
+  return exactKeys(value, ["approved", "owner", "reviewedAt", "reference", "signatureAlgorithm", "signature"]) &&
+    value.approved === true && text(value.owner) && timestamp(value.reviewedAt) && text(value.reference) &&
+    value.signatureAlgorithm === "ed25519" && text(value.signature);
+}
+
+export function earlyRetirementAuthorizationPayload(retirement) {
+  const ownerAuthorization = retirement?.ownerAuthorization ?? {};
+  return canonical({
+    schemaVersion: retirement?.schemaVersion,
+    controllerRunId: retirement?.controllerRunId,
+    parentRunId: retirement?.parentRunId,
+    workUnitId: retirement?.workUnitId,
+    claimId: retirement?.claimId,
+    repositoryId: retirement?.repositoryId,
+    approvedChangeId: retirement?.approvedChangeId,
+    provider: retirement?.provider,
+    blockedReason: retirement?.blockedReason,
+    requiredTransition: retirement?.requiredTransition,
+    recoveryReference: retirement?.recoveryReference,
+    expiresAt: retirement?.expiresAt,
+    ownerAuthorization: {
+      approved: ownerAuthorization.approved,
+      owner: ownerAuthorization.owner,
+      reviewedAt: ownerAuthorization.reviewedAt,
+      reference: ownerAuthorization.reference,
+      signatureAlgorithm: ownerAuthorization.signatureAlgorithm
+    }
+  });
+}
+
+function validSignedEarlyRetirementAuthorization(retirement, { trustedOwner, trustedOwnerPublicKey } = {}) {
+  const authorization = retirement?.ownerAuthorization;
+  if (!validOwnerAuthorization(authorization) || !text(trustedOwner) || authorization.owner !== trustedOwner || !trustedOwnerPublicKey) return false;
+  try {
+    return crypto.verify(null, Buffer.from(JSON.stringify(earlyRetirementAuthorizationPayload(retirement))), trustedOwnerPublicKey,
+      Buffer.from(authorization.signature, "base64"));
+  } catch { return false; }
+}
+
+function validEarlyRetirementAuthorization(value) {
+  return exactKeys(value, ["schemaVersion", "controllerRunId", "parentRunId", "workUnitId", "claimId", "repositoryId", "approvedChangeId", "provider", "blockedReason", "requiredTransition", "recoveryReference", "ownerAuthorization", "expiresAt"]) &&
+    value.schemaVersion === 1 && validCancellationRequest({
+      schemaVersion: 1,
+      controllerRunId: value.controllerRunId,
+      parentRunId: value.parentRunId,
+      workUnitId: value.workUnitId,
+      claimId: value.claimId,
+      repositoryId: value.repositoryId,
+      approvedChangeId: value.approvedChangeId,
+      provider: value.provider
+    }) && value.blockedReason === "required-controller-transition-unavailable" &&
+    validTransitionName(value.requiredTransition) && text(value.recoveryReference) &&
+    validOwnerAuthorization(value.ownerAuthorization) && timestamp(value.expiresAt);
+}
+
 function cancelledTerminalSummaryFor({ claim, workUnit, reason, now }) {
   const summary = {
     workUnitId: workUnit.workUnitId,
@@ -458,18 +515,18 @@ function cancellationArchiveMatch({ paths, cancellation, requestDigest, fileSyst
  * cancellation receipt, marks the run cancelled, and releases only the exact
  * claim it proves is held by that run.
  */
-export function cancelExpiredV2Run({ readableRepositoryName, cancellation, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
-  if (!validCancellationRequest(cancellation) || !timestamp(now) || !text(readableRepositoryName)) {
+function cancelV2Run({ readableRepositoryName, cancellation, request, requireExpired, terminalReason, classification, alreadyClassification, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+  if (!validCancellationRequest(cancellation) || !request || typeof requireExpired !== "boolean" || !text(terminalReason) || !text(classification) || !text(alreadyClassification) || !timestamp(now) || !text(readableRepositoryName)) {
     return { valid: false, classification: "paused", reason: "cancellation-input-invalid" };
   }
   const providerCapability = validateProviderCapabilities(cancellation.provider);
   const paths = statePaths({ stateHome, readableName: readableRepositoryName, repositoryId: cancellation.repositoryId });
   if (!providerCapability.valid || !paths) return { valid: false, classification: "paused", reason: "cancellation-state-unavailable" };
 
-  const requestDigest = digestValue(cancellation);
+  const requestDigest = digestValue(request);
   const archived = cancellationArchiveMatch({ paths, cancellation, requestDigest, fileSystem });
   if (archived?.valid) {
-    return { valid: true, classification: "already-cancelled", requestDigest, archivePath: archived.archivePath, receipt: archived.receipt };
+    return { valid: true, classification: alreadyClassification, requestDigest, archivePath: archived.archivePath, receipt: archived.receipt };
   }
   if (archived && !archived.valid) return { ...archived, classification: "paused", requestDigest };
 
@@ -496,14 +553,14 @@ export function cancelExpiredV2Run({ readableRepositoryName, cancellation, state
       workUnit.claimProviderBinding.id !== claim.providerBinding.id || workUnit.claimProviderBinding.digest !== claim.providerBinding.digest) {
     return { valid: false, classification: "paused", reason: "cancellation-identity-or-claim-mismatch", requestDigest };
   }
-  if (Date.parse(parentRun.deadline) > Date.parse(now)) {
+  if (requireExpired && Date.parse(parentRun.deadline) > Date.parse(now)) {
     return { valid: false, classification: "paused", reason: "cancellation-run-not-expired", requestDigest };
   }
   if (fileSystem.existsSync(path.join(activePath, "terminalization-receipt.json"))) {
     return { valid: false, classification: "paused", reason: "cancellation-run-delivered", requestDigest };
   }
 
-  const terminalSummary = cancelledTerminalSummaryFor({ claim, workUnit, reason: "expired-unfinished-controller", now });
+  const terminalSummary = cancelledTerminalSummaryFor({ claim, workUnit, reason: terminalReason, now });
   const projection = buildParentProjection(parentRun, workUnit, terminalSummary, { allowBootstrapPreSnapshot: false });
   if (!projection.valid) return { valid: false, classification: "paused", reason: "cancellation-projection-invalid", requestDigest };
 
@@ -544,7 +601,62 @@ export function cancelExpiredV2Run({ readableRepositoryName, cancellation, state
   if (!verified?.valid || verified.archivePath !== archivedRun.archivePath) {
     return { valid: false, classification: "failed", reason: "cancellation-post-archive-verification-failed", requestDigest };
   }
-  return { valid: true, classification: "cancelled", requestDigest, archivePath: archivedRun.archivePath, receipt: verified.receipt, index: archivedRun.index };
+  return { valid: true, classification, requestDigest, archivePath: archivedRun.archivePath, receipt: verified.receipt, index: archivedRun.index };
+}
+
+export function cancelExpiredV2Run({ readableRepositoryName, cancellation, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+  return cancelV2Run({
+    readableRepositoryName,
+    cancellation,
+    request: cancellation,
+    requireExpired: true,
+    terminalReason: "expired-unfinished-controller",
+    classification: "cancelled",
+    alreadyClassification: "already-cancelled",
+    stateHome,
+    now,
+    fileSystem
+  });
+}
+
+/**
+ * Retires one exact admitted run only when a separate current owner binding
+ * proves it is blocked on a controller transition missing from this installed
+ * runtime. The availability predicate is supplied by the runtime dispatcher,
+ * never by the untrusted payload.
+ */
+export function retireBlockedV2Run({ readableRepositoryName, retirement, transitionAvailable, trustedOwner, trustedOwnerPublicKey, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+  if (!validEarlyRetirementAuthorization(retirement) || !validSignedEarlyRetirementAuthorization(retirement, { trustedOwner, trustedOwnerPublicKey }) || typeof transitionAvailable !== "function" || !timestamp(now) || !text(readableRepositoryName)) {
+    return { valid: false, classification: "paused", reason: "early-retirement-input-invalid" };
+  }
+  if (Date.parse(retirement.expiresAt) <= Date.parse(now)) {
+    return { valid: false, classification: "paused", reason: "early-retirement-authorization-expired" };
+  }
+  if (transitionAvailable(retirement.requiredTransition)) {
+    return { valid: false, classification: "paused", reason: "early-retirement-transition-available" };
+  }
+  const cancellation = {
+    schemaVersion: 1,
+    controllerRunId: retirement.controllerRunId,
+    parentRunId: retirement.parentRunId,
+    workUnitId: retirement.workUnitId,
+    claimId: retirement.claimId,
+    repositoryId: retirement.repositoryId,
+    approvedChangeId: retirement.approvedChangeId,
+    provider: retirement.provider
+  };
+  return cancelV2Run({
+    readableRepositoryName,
+    cancellation,
+    request: retirement,
+    requireExpired: false,
+    terminalReason: "owner-authorized-blocked-controller",
+    classification: "retired",
+    alreadyClassification: "already-retired",
+    stateHome,
+    now,
+    fileSystem
+  });
 }
 
 export function authorizationDigest(authorization) {
@@ -901,8 +1013,64 @@ export function advanceControllerRecord(record, phase, evidence) {
   return { valid: true, record: next };
 }
 
-export function persistControllerRecord({ repositoryPath, record, runGit } = {}) {
+export function advanceControllerLifecyclePhase({ repositoryPath, record, authorization, repository, phase, evidence, now, runGit } = {}) {
+  const supplied = inspectControllerRecord(record, { authorization, repository, now });
+  if (supplied.classification !== "continue" || supplied.nextPhase !== phase) {
+    return { valid: false, classification: "paused", reason: supplied.reason ?? "controller-phase-advance-invalid" };
+  }
+  const persisted = readPersistedControllerRecord({ repositoryPath, record, runGit });
+  if (!persisted.valid) return { valid: false, classification: "paused", reason: persisted.reason };
+  const durable = persisted.record;
+  if (!sameControllerContext(durable, record)) {
+    return { valid: false, classification: "paused", reason: "controller-phase-advance-record-conflict" };
+  }
+  const completed = durable.steps?.[phases.indexOf(phase)];
+  if (completed?.status === "complete") {
+    return JSON.stringify(canonical(completed.evidence)) === JSON.stringify(canonical(evidence))
+      ? { valid: true, classification: "already-advanced", record: durable, nextPhase: durable.currentPhase, path: persisted.path }
+      : { valid: false, classification: "paused", reason: "controller-phase-advance-evidence-conflict" };
+  }
+  const inspected = inspectControllerRecord(durable, { authorization, repository, now });
+  if (inspected.classification !== "continue" || inspected.nextPhase !== phase) {
+    return { valid: false, classification: "paused", reason: inspected.reason ?? "controller-phase-advance-invalid" };
+  }
+  const advanced = advanceControllerRecord(durable, phase, evidence);
+  if (!advanced.valid) return { valid: false, classification: "paused", reason: advanced.reason };
+  const written = persistControllerRecord({ repositoryPath, record: advanced.record, expectedRecordDigest: digestValue(durable), runGit });
+  return written.valid
+    ? { valid: true, classification: "advanced", record: advanced.record, nextPhase: advanced.record.currentPhase, path: written.path }
+    : { valid: false, classification: "paused", reason: written.reason };
+}
+
+function sameControllerContext(left, right) {
+  return left?.schemaVersion === right?.schemaVersion && left?.runId === right?.runId &&
+    left?.checkpointPath === right?.checkpointPath && left?.repository === right?.repository &&
+    left?.selectedEntry === right?.selectedEntry && left?.authorizationDigest === right?.authorizationDigest &&
+    left?.expiresAt === right?.expiresAt;
+}
+
+function readPersistedControllerRecord({ repositoryPath, record, runGit } = {}) {
   if (!text(repositoryPath) || !validRunId(record?.runId) || record?.checkpointPath !== checkpointForRun(record.runId) || path.isAbsolute(record.checkpointPath)) {
+    return { valid: false, reason: "controller-record-path-invalid" };
+  }
+  const state = resolveControllerStateRoot({ repositoryPath, runGit });
+  if (!state.valid) return state;
+  const containment = safeContainedDestination(state.stateRoot, record.checkpointPath);
+  if (!containment) return { valid: false, reason: "controller-record-path-escape" };
+  try {
+    if (!containment.inspectComponents() || !fs.existsSync(containment.destination) || fs.lstatSync(containment.destination).isSymbolicLink()) {
+      return { valid: false, reason: "controller-record-unavailable" };
+    }
+    const durable = safeJson(fs, containment.destination);
+    return durable && validRunId(durable.runId)
+      ? { valid: true, record: durable, path: containment.destination }
+      : { valid: false, reason: "controller-record-invalid" };
+  } catch { return { valid: false, reason: "controller-record-unavailable" }; }
+}
+
+export function persistControllerRecord({ repositoryPath, record, expectedRecordDigest, runGit } = {}) {
+  if (!text(repositoryPath) || !validRunId(record?.runId) || record?.checkpointPath !== checkpointForRun(record.runId) || path.isAbsolute(record.checkpointPath) ||
+      (expectedRecordDigest !== undefined && !digest(expectedRecordDigest))) {
     return { valid: false, reason: "controller-record-path-invalid" };
   }
   const state = resolveControllerStateRoot({ repositoryPath, runGit });
@@ -918,12 +1086,16 @@ export function persistControllerRecord({ repositoryPath, record, runGit } = {})
   const { root, destination, inspectComponents } = containment;
   const directory = path.dirname(destination);
   const temporary = path.join(directory, `.${path.basename(destination)}.${process.pid}.${crypto.randomUUID()}.tmp`);
+  const lock = path.join(directory, `.${path.basename(destination)}.lock`);
+  let lockDescriptor;
   try {
     fs.mkdirSync(directory, { recursive: true });
     if (!inspectComponents() || fs.realpathSync(directory) === root || !fs.realpathSync(directory).startsWith(`${root}${path.sep}`)) return { valid: false, reason: "controller-record-path-symlink" };
+    if (expectedRecordDigest !== undefined) lockDescriptor = fs.openSync(lock, "wx", 0o600);
     if (fs.existsSync(destination)) {
       const existing = JSON.parse(fs.readFileSync(destination, "utf8"));
       if (existing?.runId !== record.runId) return { valid: false, reason: "controller-record-run-conflict" };
+      if (expectedRecordDigest !== undefined && digestValue(existing) !== expectedRecordDigest) return { valid: false, reason: "controller-record-stale" };
     }
     const descriptor = fs.openSync(temporary, "wx", 0o600);
     try {
@@ -948,6 +1120,11 @@ export function persistControllerRecord({ repositoryPath, record, runGit } = {})
   } catch {
     try { fs.unlinkSync(temporary); } catch {}
     return { valid: false, reason: "controller-record-persist-failed" };
+  } finally {
+    if (lockDescriptor !== undefined) {
+      try { fs.closeSync(lockDescriptor); } catch {}
+      try { fs.unlinkSync(lock); } catch {}
+    }
   }
 }
 

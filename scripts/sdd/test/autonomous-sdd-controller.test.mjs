@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   advanceControllerQueue,
+  advanceControllerLifecyclePhase,
   advanceControllerRecord,
   appendControllerCleanupReceipt,
   attachBootstrapCleanupMigration,
@@ -485,6 +486,29 @@ test("controller persists only in the git common-directory state root and advanc
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("executable phase advancement persists only the first incomplete phase", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "controller-phase-"));
+  try {
+    fs.mkdirSync(path.join(root, ".git"));
+    const runGit = () => ".git";
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: created.record, runGit }).valid, true);
+    const advanced = advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: started, runGit });
+    assert.equal(advanced.classification, "advanced");
+    assert.equal(JSON.parse(fs.readFileSync(advanced.path, "utf8")).currentPhase, "planning-review");
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: advanced.record, expectedRecordDigest: "a".repeat(64), runGit }).reason, "controller-record-stale");
+    const retried = advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: started, runGit });
+    assert.equal(retried.classification, "already-advanced");
+    const conflictingRetry = advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "different-proposal" }, now: started, runGit });
+    assert.equal(conflictingRetry.reason, "controller-phase-advance-evidence-conflict");
+    const skipped = advanceControllerLifecyclePhase({ repositoryPath: root, record: advanced.record, authorization, repository: "owner/repository", phase: "verify", evidence: { current: true, reference: "skip" }, now: started, runGit });
+    assert.equal(skipped.valid, false);
+    assert.equal(skipped.classification, "paused");
+    const stale = { ...created.record, authorizationDigest: "f".repeat(64) };
+    assert.equal(advanceControllerLifecyclePhase({ repositoryPath: root, record: stale, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: started, runGit }).reason, "controller-context-conflict");
+    assert.equal(advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: authorization.expiresAt, runGit }).reason, "controller-context-expired");
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
 test("controller registers independently delivered lifecycle resources and durable cleanup receipts", () => {

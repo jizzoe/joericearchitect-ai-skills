@@ -5,12 +5,12 @@ import path from "node:path";
 import { runAsMain } from "../payload-wrapper.mjs";
 import { workspaceIoFromEnvironment } from "../workspace-io.mjs";
 import {
-  bindControllerLifecycleDelivery,
+  advanceControllerLifecyclePhase, bindControllerLifecycleDelivery,
   attachBootstrapCleanupMigration, executeBootstrapCleanupAttachment,
   executeControllerLifecycleCleanup, inspectControllerRecord, persistControllerCleanupReceipt,
   persistControllerAuthContext, persistControllerAuthContextEvidence,
   persistControllerIssueIntake, persistControllerIssueIntakeEvidence,
-  initializeV2Delivery, registerControllerLifecycleResource, retainBootstrapCleanupResource, cancelExpiredV2Run, resolveControllerStateRoot, terminalizeV2Run
+  initializeV2Delivery, registerControllerLifecycleResource, retainBootstrapCleanupResource, cancelExpiredV2Run, resolveControllerStateRoot, retireBlockedV2Run, terminalizeV2Run
 } from "../../sdd/autonomous-sdd-controller.mjs";
 import { admitV2Run, inspectV2Admission } from "../../sdd/autonomous-sdd-admission.mjs";
 import { reconcileLegacyBootstrapRecord, publishLegacyReconciliationReceipt } from "../../sdd/autonomous-sdd-legacy-reconciliation.mjs";
@@ -68,59 +68,70 @@ function localBootstrapCleanupOperations(repository) {
   };
 }
 
+const controllerOperations = {
+  "initialize-v2-delivery": (payload) => initializeV2Delivery({ ...payload, repositoryPath: repositoryPath(payload), legacyDirectory: legacyDirectory(payload) }),
+  "admit-v2-run": (payload) => admitV2Run({ ...publicAdmissionPayload(payload), repositoryPath: repositoryPath(payload), legacyDirectory: legacyDirectory(payload) }),
+  "reconcile-legacy-bootstrap-record": (payload) => {
+    const result = reconcileLegacyBootstrapRecord(payload);
+    return result.valid ? publishLegacyReconciliationReceipt({ ...payload, receipt: result.receipt }) : result;
+  },
+  "inspect-v2-admission": (payload) => inspectV2Admission(payload),
+  "recover-v2-run": (payload) => inspectV2Admission(payload),
+  "terminalize-v2-run": (payload) => terminalizeV2Run(payload),
+  "cancel-v2-run": (payload) => cancelExpiredV2Run(payload),
+  "retire-blocked-v2-run": (payload) => retireBlockedV2Run({
+    ...payload,
+    trustedOwner: process.env.AI_SKILLS_TRUSTED_OWNER,
+    trustedOwnerPublicKey: process.env.AI_SKILLS_TRUSTED_OWNER_PUBLIC_KEY,
+    transitionAvailable: (transition) => Object.hasOwn(controllerOperations, transition)
+  }),
+  "attach-bootstrap-cleanup-migration": (payload) => attachBootstrapCleanupMigration({
+    ...payload, readableRepositoryName: payload?.readableRepositoryName ?? path.basename(repositoryPath(payload))
+  }),
+  "retain-bootstrap-cleanup-resource": (payload) => retainBootstrapCleanupResource({
+    ...payload, readableRepositoryName: payload?.readableRepositoryName ?? path.basename(repositoryPath(payload))
+  }),
+  "execute-bootstrap-cleanup-attachment": (payload) => executeBootstrapCleanupAttachment({
+    ...payload, readableRepositoryName: payload?.readableRepositoryName ?? path.basename(repositoryPath(payload)),
+    operations: localBootstrapCleanupOperations(repositoryPath(payload))
+  }),
+  "inspect-controller-record": (payload) => inspectControllerRecord(payload?.record, {
+    authorization: payload?.authorization,
+    repository: payload?.repository ?? repositoryPath(payload),
+    ...(payload?.now ? { now: payload.now } : {})
+  }),
+  "advance-controller-lifecycle-phase": (payload) => advanceControllerLifecyclePhase({
+    ...payload, repositoryPath: repositoryPath(payload), repository: payload?.repository ?? repositoryPath(payload)
+  }),
+  "register-controller-lifecycle-resource": (payload) => registerControllerLifecycleResource({
+    ...payload, repositoryPath: repositoryPath(payload)
+  }),
+  "persist-controller-issue-intake": (payload) => persistControllerIssueIntake({
+    ...payload, repositoryPath: repositoryPath(payload)
+  }),
+  "persist-controller-issue-intake-evidence": (payload) => persistControllerIssueIntakeEvidence({
+    ...payload, repositoryPath: repositoryPath(payload)
+  }),
+  "persist-controller-auth-context": (payload) => persistControllerAuthContext({
+    ...payload, repositoryPath: repositoryPath(payload)
+  }),
+  "persist-controller-auth-context-evidence": (payload) => persistControllerAuthContextEvidence({
+    ...payload, repositoryPath: repositoryPath(payload)
+  }),
+  "bind-controller-lifecycle-delivery": (payload) => bindControllerLifecycleDelivery({
+    ...payload, repositoryPath: repositoryPath(payload)
+  }),
+  "persist-controller-cleanup-receipt": (payload) => persistControllerCleanupReceipt({
+    ...payload, repositoryPath: repositoryPath(payload)
+  }),
+  "execute-controller-lifecycle-cleanup": (payload) => executeControllerLifecycleCleanup({
+    ...payload, repositoryPath: repositoryPath(payload),
+    operations: localBootstrapCleanupOperations(repositoryPath(payload))
+  })
+};
+
 runAsMain({
   helper: "autonomous-sdd-controller",
   invocation: "subcommand",
-  operations: {
-    "initialize-v2-delivery": (payload) => initializeV2Delivery({ ...payload, repositoryPath: repositoryPath(payload), legacyDirectory: legacyDirectory(payload) }),
-    "admit-v2-run": (payload) => admitV2Run({ ...publicAdmissionPayload(payload), repositoryPath: repositoryPath(payload), legacyDirectory: legacyDirectory(payload) }),
-    "reconcile-legacy-bootstrap-record": (payload) => {
-      const result = reconcileLegacyBootstrapRecord(payload);
-      return result.valid ? publishLegacyReconciliationReceipt({ ...payload, receipt: result.receipt }) : result;
-    },
-    "inspect-v2-admission": (payload) => inspectV2Admission(payload),
-    "recover-v2-run": (payload) => inspectV2Admission(payload),
-    "terminalize-v2-run": (payload) => terminalizeV2Run(payload),
-    "cancel-v2-run": (payload) => cancelExpiredV2Run(payload),
-    "attach-bootstrap-cleanup-migration": (payload) => attachBootstrapCleanupMigration({
-      ...payload, readableRepositoryName: payload?.readableRepositoryName ?? path.basename(repositoryPath(payload))
-    }),
-    "retain-bootstrap-cleanup-resource": (payload) => retainBootstrapCleanupResource({
-      ...payload, readableRepositoryName: payload?.readableRepositoryName ?? path.basename(repositoryPath(payload))
-    }),
-    "execute-bootstrap-cleanup-attachment": (payload) => executeBootstrapCleanupAttachment({
-      ...payload, readableRepositoryName: payload?.readableRepositoryName ?? path.basename(repositoryPath(payload)),
-      operations: localBootstrapCleanupOperations(repositoryPath(payload))
-    }),
-    "inspect-controller-record": (payload) => inspectControllerRecord(payload?.record, {
-      authorization: payload?.authorization,
-      repository: payload?.repository ?? repositoryPath(payload),
-      ...(payload?.now ? { now: payload.now } : {})
-    }),
-    "register-controller-lifecycle-resource": (payload) => registerControllerLifecycleResource({
-      ...payload, repositoryPath: repositoryPath(payload)
-    }),
-    "persist-controller-issue-intake": (payload) => persistControllerIssueIntake({
-      ...payload, repositoryPath: repositoryPath(payload)
-    }),
-    "persist-controller-issue-intake-evidence": (payload) => persistControllerIssueIntakeEvidence({
-      ...payload, repositoryPath: repositoryPath(payload)
-    }),
-    "persist-controller-auth-context": (payload) => persistControllerAuthContext({
-      ...payload, repositoryPath: repositoryPath(payload)
-    }),
-    "persist-controller-auth-context-evidence": (payload) => persistControllerAuthContextEvidence({
-      ...payload, repositoryPath: repositoryPath(payload)
-    }),
-    "bind-controller-lifecycle-delivery": (payload) => bindControllerLifecycleDelivery({
-      ...payload, repositoryPath: repositoryPath(payload)
-    }),
-    "persist-controller-cleanup-receipt": (payload) => persistControllerCleanupReceipt({
-      ...payload, repositoryPath: repositoryPath(payload)
-    }),
-    "execute-controller-lifecycle-cleanup": (payload) => executeControllerLifecycleCleanup({
-      ...payload, repositoryPath: repositoryPath(payload),
-      operations: localBootstrapCleanupOperations(repositoryPath(payload))
-    })
-  }
+  operations: controllerOperations
 });
