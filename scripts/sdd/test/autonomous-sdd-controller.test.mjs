@@ -494,8 +494,12 @@ test("executable phase advancement persists only the first incomplete phase", ()
     fs.mkdirSync(path.join(root, ".git"));
     const runGit = () => ".git";
     assert.equal(persistControllerRecord({ repositoryPath: root, record: created.record, runGit }).valid, true);
+    const checkpoint = path.join(root, ".git", "sdd-delivery-runs", created.record.checkpointPath);
+    const staleLock = path.join(path.dirname(checkpoint), `.${path.basename(checkpoint)}.lock`);
+    fs.writeFileSync(staleLock, `${JSON.stringify({ schemaVersion: 1, pid: 2147483647, createdAt: started, ownerFile: "dead-owner" })}\n`);
     const advanced = advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: started, runGit });
     assert.equal(advanced.classification, "advanced");
+    assert.equal(fs.existsSync(staleLock), false);
     assert.equal(JSON.parse(fs.readFileSync(advanced.path, "utf8")).currentPhase, "planning-review");
     assert.equal(persistControllerRecord({ repositoryPath: root, record: advanced.record, expectedRecordDigest: "a".repeat(64), runGit }).reason, "controller-record-stale");
     const retried = advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: started, runGit });
@@ -508,6 +512,20 @@ test("executable phase advancement persists only the first incomplete phase", ()
     const stale = { ...created.record, authorizationDigest: "f".repeat(64) };
     assert.equal(advanceControllerLifecyclePhase({ repositoryPath: root, record: stale, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: started, runGit }).reason, "controller-context-conflict");
     assert.equal(advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { current: true, reference: "proposal" }, now: authorization.expiresAt, runGit }).reason, "controller-context-expired");
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test("controller persistence requires a durable predecessor digest for every update", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "controller-cas-"));
+  try {
+    fs.mkdirSync(path.join(root, ".git"));
+    const runGit = () => ".git";
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: created.record, runGit }).valid, true);
+    const changed = advanceControllerRecord(created.record, "propose", { current: true, reference: "proposal" });
+    assert.equal(changed.valid, true);
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: changed.record, runGit }).reason, "controller-record-expected-digest-required");
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: changed.record, expectedRecordDigest: "a".repeat(64), runGit }).reason, "controller-record-stale");
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root, ".git", "sdd-delivery-runs", created.record.checkpointPath), "utf8")).currentPhase, "propose");
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -543,6 +561,7 @@ test("cleanup receipts persist outside the registered target worktree", () => {
       kind: "worktree", id: "target-worktree",
       deliveryEvidence: { current: true, reference: "pr-2", headCommit: "a".repeat(40), deliveredHeadCommit: "b".repeat(40), mergedPullRequest: { merged: true, pullRequest: "2", topicHeadCommit: "a".repeat(40), finalHeadCommit: "b".repeat(40) } }
     });
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: delivered.record, runGit: () => ".git" }).valid, true);
     const persisted = persistControllerCleanupReceipt({ repositoryPath: root, record: delivered.record, receipt: { kind: "worktree", id: "target-worktree", status: "started" }, now: "2026-08-13T12:30:00.000Z", runGit: () => ".git" });
     assert.equal(persisted.valid, true);
     assert.equal(persisted.path.includes("target-worktree"), false);
@@ -558,6 +577,7 @@ test("executable controller transitions persist lifecycle resources and cleanup 
     fs.mkdirSync(path.join(root, ".git"));
     const runGit = () => ".git";
     const initial = createControllerRecord({ authorization, repository: "owner/repository", runId: "controller-run-0003" }).record;
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: initial, runGit }).valid, true);
     const registered = registerControllerLifecycleResource({ repositoryPath: root, record: initial, resource: { kind: "branch", id: "transition-branch", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "transition-recovery", ownershipToken: "transition-token" }, now: started, runGit });
     assert.equal(registered.valid, true);
     const delivered = bindControllerLifecycleDelivery({ repositoryPath: root, record: registered.record, kind: "branch", id: "transition-branch", deliveryEvidence: { current: true, reference: "pr-transition", headCommit: "b".repeat(40), deliveredHeadCommit: "c".repeat(40), mergedPullRequest: { merged: true, pullRequest: "3", topicHeadCommit: "b".repeat(40), finalHeadCommit: "c".repeat(40) } }, runGit });
@@ -576,6 +596,7 @@ test("controller cleanup plans from fresh worktree eligibility and refuses an in
     fs.mkdirSync(path.join(root, ".git"));
     const runGit = () => ".git";
     const initial = createControllerRecord({ authorization, repository: "owner/repository", runId: "controller-run-0004" }).record;
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: initial, runGit }).valid, true);
     const registered = registerControllerLifecycleResource({ repositoryPath: root, record: initial, resource: { kind: "worktree", id: "transition-worktree", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "worktree-recovery", ownershipToken: "worktree-token" }, now: started, runGit });
     const delivered = bindControllerLifecycleDelivery({ repositoryPath: root, record: registered.record, kind: "worktree", id: "transition-worktree", deliveryEvidence: { current: true, reference: "pr-worktree", headCommit: "b".repeat(40), deliveredHeadCommit: "c".repeat(40), mergedPullRequest: { merged: true, pullRequest: "4", topicHeadCommit: "b".repeat(40), finalHeadCommit: "c".repeat(40) } }, runGit });
     const cleanupContext = { archiveVisible: true, issueClosed: true, projectDone: true, deliveryEvidence: { current: true, reference: "archive", headCommit: "c".repeat(40) } };
@@ -583,9 +604,9 @@ test("controller cleanup plans from fresh worktree eligibility and refuses an in
     const cleanup = executeControllerLifecycleCleanup({ repositoryPath: root, record: delivered.record, cleanupContext, operations: { inspectResource: eligible, removeWorktree: () => ({ committed: true }) }, now: "2026-08-13T12:30:00.000Z", runGit });
     assert.equal(cleanup.classification, "completed");
     assert.equal(cleanup.record.cleanupReceipts.at(-1).status, "completed");
-    const refused = executeControllerLifecycleCleanup({ repositoryPath: root, record: delivered.record, cleanupContext, operations: { inspectResource: (resource) => ({ ...resource, exists: true }) }, runGit });
+    const refused = executeControllerLifecycleCleanup({ repositoryPath: root, record: cleanup.record, cleanupContext, operations: { inspectResource: (resource) => ({ ...resource, exists: true }) }, runGit });
     assert.equal(refused.reason, "controller-cleanup-resource-ineligible");
-    const absent = executeControllerLifecycleCleanup({ repositoryPath: root, record: delivered.record, cleanupContext, operations: { inspectResource: (resource) => ({ ...resource, exists: false }), removeWorktree: () => ({ committed: true }) }, runGit });
+    const absent = executeControllerLifecycleCleanup({ repositoryPath: root, record: cleanup.record, cleanupContext, operations: { inspectResource: (resource) => ({ ...resource, exists: false }), removeWorktree: () => ({ committed: true }) }, runGit });
     assert.equal(absent.classification, "completed");
     assert.equal(absent.record.cleanupReceipts.at(-1).status, "already-completed");
   } finally {
@@ -599,6 +620,7 @@ test("controller cleanup stages an attached worktree before its local branch", (
     fs.mkdirSync(path.join(root, ".git"));
     const runGit = () => ".git";
     const initial = createControllerRecord({ authorization, repository: "owner/repository", runId: "controller-run-0005" }).record;
+    assert.equal(persistControllerRecord({ repositoryPath: root, record: initial, runGit }).valid, true);
     const branch = registerControllerLifecycleResource({ repositoryPath: root, record: initial, resource: { kind: "branch", id: "staged-branch", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "branch-recovery", ownershipToken: "branch-token" }, now: started, runGit });
     const worktree = registerControllerLifecycleResource({ repositoryPath: root, record: branch.record, resource: { kind: "worktree", id: "staged-worktree", role: "implementation", registeredHeadCommit: "a".repeat(40), recoveryReference: "worktree-recovery", ownershipToken: "worktree-token" }, now: started, runGit });
     const deliveredBranch = bindControllerLifecycleDelivery({ repositoryPath: root, record: worktree.record, kind: "branch", id: "staged-branch", deliveryEvidence: { current: true, reference: "pr-branch", headCommit: "a".repeat(40), deliveredHeadCommit: "b".repeat(40), mergedPullRequest: { merged: true, pullRequest: "5", topicHeadCommit: "a".repeat(40), finalHeadCommit: "b".repeat(40) } }, runGit });

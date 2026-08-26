@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { parseEntrypointArgs, readRequest, runHelperEntrypoint } from "../payload-wrapper.mjs";
 import { createWorkspaceIo, workspaceIoFromEnvironment } from "../workspace-io.mjs";
@@ -150,4 +150,17 @@ test("every declared payload and subcommand entrypoint answers --help", () => {
     // The help text names operations, never a filesystem module path.
     assert.doesNotMatch(result.stdout, /\.mjs/);
   }
+});
+
+test("runAsMain flushes a large JSON response when stdout is piped", () => {
+  const wrapper = path.join(repositoryRoot, "scripts/runtime/payload-wrapper.mjs");
+  const program = [
+    `import { runAsMain } from ${JSON.stringify(pathToFileURL(wrapper).href)};`,
+    'runAsMain({ helper: "large-output", invocation: "payload", argv: ["--stdin"], operations: { emit: () => ({ value: "x".repeat(70000) }) } });'
+  ].join("\n");
+  const result = spawnSync(process.execPath, ["--input-type=module", "--eval", program], {
+    encoding: "utf8", input: JSON.stringify({ operation: "emit", payload: {} })
+  });
+  assert.equal(result.status, 0);
+  assert.equal(JSON.parse(result.stdout).result.value.length, 70000);
 });

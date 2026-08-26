@@ -117,5 +117,8 @@ export function runHelperEntrypoint({ helper, invocation, operations, argv = pro
 }
 
 export function runAsMain(options) {
-  process.exit(runHelperEntrypoint(options));
+  // Do not force-exit immediately after writing a response. stdout is
+  // asynchronous when piped, so process.exit() can truncate a valid large
+  // payload before the downstream declared helper receives it.
+  process.exitCode = runHelperEntrypoint(options);
 }

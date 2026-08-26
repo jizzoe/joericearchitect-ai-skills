@@ -783,7 +783,7 @@ export function initializeV2Delivery({ authorization, repository, canonicalRemot
     ...record,
     v2Admission: { ...record.v2Admission, state: "admitted", admittedAt: record.v2Admission.admittedAt ?? now }
   };
-  const persisted = persistControllerRecord({ repositoryPath, record: bound, runGit });
+  const persisted = persistControllerRecord({ repositoryPath, record: bound, expectedRecordDigest: digestValue(record), runGit });
   if (!persisted.valid) {
     return { valid: false, classification: "paused", reason: "controller-initialization-bind-persist-failed", checkpointPath };
   }
@@ -925,12 +925,9 @@ export function appendControllerCleanupReceipt(record, receipt, { now = new Date
 }
 
 export function persistControllerCleanupReceipt({ repositoryPath, record, receipt, now, runGit } = {}) {
-  const appended = appendControllerCleanupReceipt(record, receipt, { now });
-  if (!appended.valid) return appended;
-  const persisted = persistControllerRecord({ repositoryPath, record: appended.record, runGit });
-  return persisted.valid
-    ? { valid: true, record: appended.record, receipt: appended.receipt, path: persisted.path }
-    : persisted;
+  return mutatePersistedControllerRecord({ repositoryPath, record, runGit,
+    mutate: (durable) => appendControllerCleanupReceipt(durable, receipt, { now })
+  });
 }
 
 export function advanceControllerQueue(record, { now = new Date().toISOString() } = {}) {
@@ -1030,6 +1027,9 @@ export function advanceControllerLifecyclePhase({ repositoryPath, record, author
       ? { valid: true, classification: "already-advanced", record: durable, nextPhase: durable.currentPhase, path: persisted.path }
       : { valid: false, classification: "paused", reason: "controller-phase-advance-evidence-conflict" };
   }
+  if (digestValue(durable) !== digestValue(record)) {
+    return { valid: false, classification: "paused", reason: "controller-record-stale" };
+  }
   const inspected = inspectControllerRecord(durable, { authorization, repository, now });
   if (inspected.classification !== "continue" || inspected.nextPhase !== phase) {
     return { valid: false, classification: "paused", reason: inspected.reason ?? "controller-phase-advance-invalid" };
@@ -1040,6 +1040,24 @@ export function advanceControllerLifecyclePhase({ repositoryPath, record, author
   return written.valid
     ? { valid: true, classification: "advanced", record: advanced.record, nextPhase: advanced.record.currentPhase, path: written.path }
     : { valid: false, classification: "paused", reason: written.reason };
+}
+
+/**
+ * All installed controller mutation wrappers derive from the durable exact
+ * predecessor and persist it with a compare-and-swap digest. This prevents an
+ * older caller-provided record from erasing a concurrently completed phase.
+ */
+function mutatePersistedControllerRecord({ repositoryPath, record, runGit, mutate } = {}) {
+  if (typeof mutate !== "function") return { valid: false, reason: "controller-record-mutation-invalid" };
+  const persisted = readPersistedControllerRecord({ repositoryPath, record, runGit });
+  if (!persisted.valid) return persisted;
+  if (!sameControllerContext(persisted.record, record) || digestValue(persisted.record) !== digestValue(record)) {
+    return { valid: false, reason: "controller-record-stale" };
+  }
+  const changed = mutate(persisted.record);
+  if (!changed?.valid) return changed;
+  const written = persistControllerRecord({ repositoryPath, record: changed.record, expectedRecordDigest: digestValue(persisted.record), runGit });
+  return written.valid ? { ...changed, path: written.path } : written;
 }
 
 function sameControllerContext(left, right) {
@@ -1055,7 +1073,8 @@ function readPersistedControllerRecord({ repositoryPath, record, runGit } = {}) 
   }
   const state = resolveControllerStateRoot({ repositoryPath, runGit });
   if (!state.valid) return state;
-  const containment = safeContainedDestination(state.stateRoot, record.checkpointPath);
+  let containment;
+  try { containment = safeContainedDestination(state.stateRoot, record.checkpointPath); } catch { return { valid: false, reason: "controller-record-unavailable" }; }
   if (!containment) return { valid: false, reason: "controller-record-path-escape" };
   try {
     if (!containment.inspectComponents() || !fs.existsSync(containment.destination) || fs.lstatSync(containment.destination).isSymbolicLink()) {
@@ -1087,14 +1106,16 @@ export function persistControllerRecord({ repositoryPath, record, expectedRecord
   const directory = path.dirname(destination);
   const temporary = path.join(directory, `.${path.basename(destination)}.${process.pid}.${crypto.randomUUID()}.tmp`);
   const lock = path.join(directory, `.${path.basename(destination)}.lock`);
-  let lockDescriptor;
+  let lockHandle;
   try {
     fs.mkdirSync(directory, { recursive: true });
     if (!inspectComponents() || fs.realpathSync(directory) === root || !fs.realpathSync(directory).startsWith(`${root}${path.sep}`)) return { valid: false, reason: "controller-record-path-symlink" };
-    if (expectedRecordDigest !== undefined) lockDescriptor = fs.openSync(lock, "wx", 0o600);
+    lockHandle = acquireControllerRecordLock(lock);
+    if (lockHandle === undefined) return { valid: false, reason: "controller-record-lock-unavailable" };
     if (fs.existsSync(destination)) {
       const existing = JSON.parse(fs.readFileSync(destination, "utf8"));
       if (existing?.runId !== record.runId) return { valid: false, reason: "controller-record-run-conflict" };
+      if (expectedRecordDigest === undefined && digestValue(existing) !== digestValue(record)) return { valid: false, reason: "controller-record-expected-digest-required" };
       if (expectedRecordDigest !== undefined && digestValue(existing) !== expectedRecordDigest) return { valid: false, reason: "controller-record-stale" };
     }
     const descriptor = fs.openSync(temporary, "wx", 0o600);
@@ -1121,53 +1142,100 @@ export function persistControllerRecord({ repositoryPath, record, expectedRecord
     try { fs.unlinkSync(temporary); } catch {}
     return { valid: false, reason: "controller-record-persist-failed" };
   } finally {
-    if (lockDescriptor !== undefined) {
-      try { fs.closeSync(lockDescriptor); } catch {}
+    if (lockHandle !== undefined) {
+      try { fs.closeSync(lockHandle.descriptor); } catch {}
       try { fs.unlinkSync(lock); } catch {}
+      try { fs.unlinkSync(lockHandle.ownerPath); } catch {}
     }
   }
 }
 
+function controllerLockOwner(ownerPath) {
+  return { schemaVersion: 1, pid: process.pid, createdAt: new Date().toISOString(), ownerFile: path.basename(ownerPath) };
+}
+
+function deadControllerLockOwner(owner) {
+  if (owner?.schemaVersion !== 1 || !Number.isInteger(owner.pid) || owner.pid <= 0 || !timestamp(owner.createdAt) || !text(owner.ownerFile)) return false;
+  try {
+    process.kill(owner.pid, 0);
+    return false;
+  } catch (error) {
+    return error?.code === "ESRCH";
+  }
+}
+
+function acquireControllerRecordLock(lock) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const ownerPath = `${lock}.${process.pid}.${crypto.randomUUID()}.owner`;
+    let descriptor;
+    try {
+      // Write and sync the owner record before atomically linking it into the
+      // contended lock name. A crash can leave only an ignored owner file, not
+      // an empty lock that would block recovery forever.
+      descriptor = fs.openSync(ownerPath, "wx", 0o600);
+      try {
+        fs.writeFileSync(descriptor, `${JSON.stringify(controllerLockOwner(ownerPath))}\n`);
+        fs.fsyncSync(descriptor);
+      } catch {
+        try { fs.closeSync(descriptor); } catch {}
+        try { fs.unlinkSync(ownerPath); } catch {}
+        return undefined;
+      }
+      fs.linkSync(ownerPath, lock);
+      return { descriptor, ownerPath };
+    } catch (error) {
+      if (descriptor !== undefined) {
+        try { fs.closeSync(descriptor); } catch {}
+        try { fs.unlinkSync(ownerPath); } catch {}
+      }
+      if (error?.code !== "EEXIST" || attempt > 0) return undefined;
+      let owner;
+      try {
+        const entry = fs.lstatSync(lock);
+        if (!entry.isFile() || entry.isSymbolicLink()) return undefined;
+        owner = safeJson(fs, lock);
+      } catch { return undefined; }
+      if (!deadControllerLockOwner(owner)) return undefined;
+      try { fs.unlinkSync(lock); } catch { return undefined; }
+    }
+  }
+  return undefined;
+}
+
 export function registerControllerLifecycleResource({ repositoryPath, record, resource, now, runGit } = {}) {
-  const registered = registerControllerResource(record, resource, { now });
-  if (!registered.valid) return registered;
-  const persisted = persistControllerRecord({ repositoryPath, record: registered.record, runGit });
-  return persisted.valid ? { valid: true, record: registered.record, resource: registered.resource, path: persisted.path } : persisted;
+  return mutatePersistedControllerRecord({ repositoryPath, record, runGit,
+    mutate: (durable) => registerControllerResource(durable, resource, { now })
+  });
 }
 
 export function persistControllerIssueIntake({ repositoryPath, record, binding, now, runGit } = {}) {
-  const registered = registerControllerIssueIntake(record, binding, { now });
-  if (!registered.valid) return registered;
-  const persisted = persistControllerRecord({ repositoryPath, record: registered.record, runGit });
-  return persisted.valid ? { valid: true, record: registered.record, intake: registered.intake, path: persisted.path } : persisted;
+  return mutatePersistedControllerRecord({ repositoryPath, record, runGit,
+    mutate: (durable) => registerControllerIssueIntake(durable, binding, { now })
+  });
 }
 
 export function persistControllerIssueIntakeEvidence({ repositoryPath, record, payloadDigest, issue, observedAt, reference, runGit } = {}) {
-  const bound = bindControllerIssueIntake(record, { payloadDigest, issue, observedAt, reference });
-  if (!bound.valid) return bound;
-  const persisted = persistControllerRecord({ repositoryPath, record: bound.record, runGit });
-  return persisted.valid ? { valid: true, record: bound.record, intake: bound.intake, path: persisted.path } : persisted;
+  return mutatePersistedControllerRecord({ repositoryPath, record, runGit,
+    mutate: (durable) => bindControllerIssueIntake(durable, { payloadDigest, issue, observedAt, reference })
+  });
 }
 
 export function persistControllerAuthContext({ repositoryPath, record, binding, now, runGit } = {}) {
-  const registered = registerControllerAuthContext(record, binding, { now });
-  if (!registered.valid) return registered;
-  const persisted = persistControllerRecord({ repositoryPath, record: registered.record, runGit });
-  return persisted.valid ? { valid: true, record: registered.record, authContext: registered.authContext, path: persisted.path } : persisted;
+  return mutatePersistedControllerRecord({ repositoryPath, record, runGit,
+    mutate: (durable) => registerControllerAuthContext(durable, binding, { now })
+  });
 }
 
 export function persistControllerAuthContextEvidence({ repositoryPath, record, bindingDigest, evidence, runGit } = {}) {
-  const bound = bindControllerAuthContext(record, { bindingDigest, evidence });
-  if (!bound.valid) return bound;
-  const persisted = persistControllerRecord({ repositoryPath, record: bound.record, runGit });
-  return persisted.valid ? { valid: true, record: bound.record, authContext: bound.authContext, path: persisted.path } : persisted;
+  return mutatePersistedControllerRecord({ repositoryPath, record, runGit,
+    mutate: (durable) => bindControllerAuthContext(durable, { bindingDigest, evidence })
+  });
 }
 
 export function bindControllerLifecycleDelivery({ repositoryPath, record, kind, id, deliveryEvidence, runGit } = {}) {
-  const bound = bindControllerResourceDelivery(record, { kind, id, deliveryEvidence });
-  if (!bound.valid) return bound;
-  const persisted = persistControllerRecord({ repositoryPath, record: bound.record, runGit });
-  return persisted.valid ? { valid: true, record: bound.record, path: persisted.path } : persisted;
+  return mutatePersistedControllerRecord({ repositoryPath, record, runGit,
+    mutate: (durable) => bindControllerResourceDelivery(durable, { kind, id, deliveryEvidence })
+  });
 }
 
 /** Attaches one independently signed legacy migration to one exact active bootstrap run. */
