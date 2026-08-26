@@ -8,6 +8,6 @@
   "runtime": {
     "schemaVersion": 1,
     "evidenceRoot": "docs/evidence",
-    "reviewAdapter": "claude-detached-restricted-v1"
+    "reviewAdapter": "codex-detached-read-only-v1"
   }
 }
