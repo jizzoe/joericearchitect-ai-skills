@@ -95,5 +95,6 @@ export function validateReviewResult(value, { expectedPackage, configuredReviewe
   if (!value.findings.every((finding) => text(finding?.id) && ["blocker", "high", "objective-fix", "warning", "false-positive"].includes(finding.severity) && safeFindingEvidencePath(finding.evidence) && text(finding.recommendation))) return failure("independent-review-result-finding-invalid");
   if (Date.parse(value.completedAt) < Date.parse(value.startedAt)) return failure("independent-review-result-chronology-invalid");
   if (value.status === "passed" && value.findings.some((finding) => unresolvedSeverities.has(finding.severity))) return failure("independent-review-result-status-finding-inconsistent");
+  if (value.status === "failed" && !value.findings.some((finding) => unresolvedSeverities.has(finding.severity))) return failure("independent-review-result-status-finding-inconsistent");
   return { valid: true, issues: [] };
 }

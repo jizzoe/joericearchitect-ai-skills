@@ -963,21 +963,25 @@ function capabilities({ adapter, attestationRef, probeReference }) {
   };
 }
 
-const CHECKLIST_CATEGORIES = "correctness and spec compliance, edge cases and error handling, security and secret handling, concurrency and idempotency, portability and attribution";
+const CHECKLIST_CATEGORIES = "correctness and spec compliance, edge cases/error handling/failure recovery, security/secret handling/untrusted input, concurrency/idempotency/durable-state precedence, portability/attribution (no product constants, license/source noted)";
 
 const REVIEW_CHECKLIST_PROMPT = ` Apply the shared review checklist and report findings in every category: ${CHECKLIST_CATEGORIES}. Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.`;
 
 // The completeness second pass re-uses the full checklist and, when prior
-// findings are supplied, names them so the reviewer avoids repeating them while
-// re-verifying none regressed. Only a bounded, sanitized summary (severity +
-// evidence path) is carried; finding prose never re-enters the prompt.
+// findings are supplied, references them by trusted finding id and enum-bounded
+// severity only. Reviewer-controlled evidence paths and prose never re-enter
+// the prompt, so a hostile filename cannot inject instructions.
 function completenessReviewPrompt(priorFindings = []) {
   const prior = (Array.isArray(priorFindings) ? priorFindings : [])
-    .map((finding) => `${finding?.severity ?? "unspecified"} on ${finding?.evidence ?? "unknown"}`)
+    .map((finding) => {
+      const severity = ["blocker", "high", "objective-fix", "warning", "false-positive"].includes(finding?.severity) ? finding.severity : null;
+      const id = typeof finding?.id === "string" && /^[a-z0-9][a-z0-9._-]{0,63}$/i.test(finding.id) ? finding.id : null;
+      return severity && id ? `${severity} (${id})` : null;
+    })
     .filter(Boolean)
     .join("; ");
   const priorSummary = prior
-    ? ` Do not repeat these prior findings, but re-verify none regressed: ${prior}.`
+    ? ` Do not repeat these prior finding ids, but re-verify none regressed: ${prior}.`
     : "";
   return ` Apply the shared review checklist and report findings in every category: ${CHECKLIST_CATEGORIES}. Re-review the same committed diff for anything the prior review missed, and be exhaustive across every category.${priorSummary} Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.`;
 }

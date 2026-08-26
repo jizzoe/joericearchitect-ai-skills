@@ -44,3 +44,14 @@
   deferred to a follow-up controller change. Depends on: 3.1.
 - [x] 5.2 Fix the completeness prompt to retain the shared checklist and carry a
   sanitized summary of prior findings. Depends on: 2.1, 5.1.
+
+## 6. Strict-review findings fixes (2026-08-26)
+
+- [x] 6.1 Enforce bidirectional status↔findings consistency in
+  `independent-review-contract.mjs` (`failed` requires a material finding;
+  `passed` requires none), with regression tests for both directions. Depends on:
+  3.1.
+- [x] 6.2 Align the review prompt's checklist with the canonical
+  `review-matrix.md` dimensions (failure recovery, untrusted input, durable-state
+  precedence, no product constants) and carry only trusted finding ids +
+  severities in the completeness pass. Depends on: 2.1.

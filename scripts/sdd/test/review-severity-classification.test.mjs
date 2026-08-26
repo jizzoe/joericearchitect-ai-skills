@@ -64,10 +64,18 @@ test("the Codex and Claude review prompts consume the shared checklist and sever
   const codex = buildCodexReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json" });
   const codexPrompt = codex.args[codex.args.length - 1];
   assert.ok(codexPrompt.includes("correctness and spec compliance"), "checklist in Codex prompt");
+  assert.ok(codexPrompt.includes("failure recovery"), "failure recovery in Codex prompt");
+  assert.ok(codexPrompt.includes("untrusted input"), "untrusted input in Codex prompt");
+  assert.ok(codexPrompt.includes("durable-state precedence"), "durable-state precedence in Codex prompt");
+  assert.ok(codexPrompt.includes("no product constants"), "portability/attribution in Codex prompt");
   assert.ok(codexPrompt.includes("blocker, high, or objective-fix"), "severity in Codex prompt");
   const claude = buildClaudeReviewInvocation({ view, settingsPath: "/tmp/s.json", schema: {}, reviewerHomePath: "/tmp/home" });
   const claudePrompt = claude.args[claude.args.length - 1];
   assert.ok(claudePrompt.includes("correctness and spec compliance"), "checklist in Claude prompt");
+  assert.ok(claudePrompt.includes("failure recovery"), "failure recovery in Claude prompt");
+  assert.ok(claudePrompt.includes("untrusted input"), "untrusted input in Claude prompt");
+  assert.ok(claudePrompt.includes("durable-state precedence"), "durable-state precedence in Claude prompt");
+  assert.ok(claudePrompt.includes("no product constants"), "portability/attribution in Claude prompt");
   assert.ok(claudePrompt.includes("blocker, high, or objective-fix"), "severity in Claude prompt");
 });
 
@@ -80,11 +88,12 @@ test("the completeness escalation switches the review prompt and retains the che
   assert.ok(prompt.includes("blocker, high, or objective-fix"), "severity retained in completeness prompt");
 });
 
-test("the completeness prompt carries a sanitized summary of prior findings", () => {
+test("the completeness prompt carries only trusted finding ids and severities", () => {
   const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
   const codex = buildCodexReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json", completenessPass: true, priorFindings: [{ id: "F1", severity: "high", evidence: "scripts/sdd/example.mjs", recommendation: "fix it" }] });
   const prompt = codex.args[codex.args.length - 1];
-  assert.ok(prompt.includes("high on scripts/sdd/example.mjs"), "prior finding carried");
+  assert.ok(prompt.includes("high (F1)"), "prior finding carried by id + severity");
+  assert.ok(!prompt.includes("scripts/sdd/example.mjs"), "evidence path must not re-enter the prompt");
   assert.ok(!prompt.includes("fix it"), "finding prose must not re-enter the prompt");
 });
 

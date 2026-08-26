@@ -37,6 +37,16 @@ test("passed review results cannot contain unresolved findings", () => {
   assert.equal(validateReviewResult({ ...result, status: "passed", findings: [{ ...finding, severity: "warning" }] }, { expectedPackage: pack }).valid, true);
 });
 
+test("failed review results must contain a material finding", () => {
+  const pack = fixture("valid-package.json"); pack.manifestDigest = packageDigest(pack);
+  const result = fixture("valid-result.json"); result.manifestDigest = pack.manifestDigest;
+  const advisory = { id: "advisory", severity: "warning", evidence: "scripts/sdd/independent-review-contract.mjs", recommendation: "optional nit" };
+  const material = { id: "material", severity: "high", evidence: "scripts/sdd/independent-review-contract.mjs", recommendation: "must fix" };
+  assert.equal(validateReviewResult({ ...result, status: "failed", findings: [advisory] }, { expectedPackage: pack }).issues[0].code, "independent-review-result-status-finding-inconsistent");
+  assert.equal(validateReviewResult({ ...result, status: "failed", findings: [] }, { expectedPackage: pack }).issues[0].code, "independent-review-result-status-finding-inconsistent");
+  assert.equal(validateReviewResult({ ...result, status: "failed", findings: [material] }, { expectedPackage: pack }).valid, true);
+});
+
 test("strict unavailable results cannot claim successful isolation controls", () => {
   const reviewPackage = fixture("valid-package.json"); reviewPackage.manifestDigest = packageDigest(reviewPackage);
   const result = fixture("valid-result.json");

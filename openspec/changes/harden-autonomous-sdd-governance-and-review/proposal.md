@@ -43,6 +43,13 @@ M4-S4 run #2 exposed two governance gaps in the autonomous SDD runner:
 - New `skills/base/autonomous-goal-runner/references/open-question-resolution.md`.
 - `skills/base/autonomous-goal-runner/references/review-matrix.md` (shared
   checklist, severity classes, escalation).
+- `scripts/sdd/platform-review-adapters.mjs` (shared checklist + severity prompt,
+  and a completeness-pass hook that retains the checklist and carries only
+  trusted finding ids + severities).
+- `scripts/sdd/independent-review-contract.mjs` (bidirectional status↔findings
+  consistency: `passed` requires no material finding, `failed` requires one).
+- `scripts/sdd/test/review-severity-classification.test.mjs` and
+  `scripts/sdd/test/independent-review-contract.test.mjs` (regression coverage).
 - Living spec `bounded-autonomous-execution` (two new requirements).
 - Primary issue: to be linked at intake (see `tracking.yaml`).
 
