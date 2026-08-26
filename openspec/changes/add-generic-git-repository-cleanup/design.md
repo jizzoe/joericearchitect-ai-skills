@@ -69,9 +69,13 @@ and smallest recovery action.
 
 - Retire eligibility requires delivery to the discovered default branch, no
   active-change claim, and (for worktrees) non-primary, unlocked, registered,
-  and clean state.
+  and clean state. A retire-eligible local branch whose remote counterpart's
+  changes are proven merged to the remote default branch also becomes a
+  remote-retire candidate; otherwise the remote branch is left intact and
+  reported as unresolved.
 - Commit eligibility requires out-of-scope, non-conflicted, non-submodule,
-  no-secret, common-purpose grouping.
+  no-secret, common-purpose grouping. Spec-governed files route through a topic
+  branch; non-spec files may commit directly to the default branch.
 - The apply confirmation names the selected targets, mutation class
   (retire-only, commit-only, or both), commit message(s), target branch, push
   remote, expected validation, and recovery notes.
@@ -82,9 +86,11 @@ and smallest recovery action.
   remote, and protection state.
 - Git operations are expressed as small, exact command adapters: worktree
   removal before local branch deletion, `git branch -d` when ancestry permits,
-  `git branch -D` only with exact squash/rebase evidence, commit of only
-  selected paths, and push only after a successful commit and a current
-  push-target check.
+  `git branch -D` only with exact squash/rebase evidence, `git push --delete`
+  only after the remote counterpart's changes are proven merged to the remote
+  default branch, commit of only selected paths (on the default branch for
+  non-spec files, or on a topic branch for spec-governed files), and push only
+  after a successful commit and a current push-target check.
 
 ## Risks / Trade-offs
 

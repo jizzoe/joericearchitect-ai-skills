@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   auditGenericGitRepository, planGenericCleanupApply, discoverDefaultBranch,
-  verifyPlanFreshness, buildCleanupReceipt, writeCleanupReceipt
+  verifyPlanFreshness, buildCleanupReceipt, writeCleanupReceipt, isSpecGovernedPath
 } from "../generic-git-repository-cleanup.mjs";
 
 const H = (c) => c.repeat(40);
@@ -220,4 +220,116 @@ test("verifyPlanFreshness authorizes a single step via stepIndex", () => {
   const result = verifyPlanFreshness({ repositoryPath: "/repo", run, plan, stepIndex: 0 });
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.equal(result.verifiedPlan[0].kind, "worktree-remove");
+});
+
+test("isSpecGovernedPath classifies governed roots and non-spec planning/research", () => {
+  assert.equal(isSpecGovernedPath("openspec/changes/foo/design.md"), true);
+  assert.equal(isSpecGovernedPath("skills/base/foo/SKILL.md"), true);
+  assert.equal(isSpecGovernedPath("scripts/sdd/foo.mjs"), true);
+  assert.equal(isSpecGovernedPath("docs/sdd-workflow.md"), true);
+  assert.equal(isSpecGovernedPath("docs/research/security/notes.md"), false);
+  assert.equal(isSpecGovernedPath("ai-planning/design-briefs/foo.md"), false);
+});
+
+test("audit marks non-spec files direct-to-default and spec-governed files as topic-branch", () => {
+  const repo = tmpRepo({ after: () => {} });
+  fs.mkdirSync(path.join(repo, "ai-planning"), { recursive: true });
+  fs.mkdirSync(path.join(repo, "skills"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "ai-planning", "brief.md"), "brief");
+  fs.writeFileSync(path.join(repo, "skills", "foo.md"), "skill");
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
+    ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? ai-planning/brief.md\n?? skills/foo.md\n" }]
+  ]);
+  const result = auditGenericGitRepository({ repositoryPath: repo, run });
+  const nonSpec = result.audit.commitCandidates.find((c) => c.files.includes("ai-planning/brief.md"));
+  const spec = result.audit.commitCandidates.find((c) => c.files.includes("skills/foo.md"));
+  assert.equal(nonSpec.directToDefault, true);
+  assert.equal(nonSpec.targetBranch, "main");
+  assert.equal(spec.directToDefault, false);
+  assert.ok(spec.targetBranch.startsWith("topic/"));
+});
+
+test("plan-apply commits non-spec files directly on the default branch without a topic branch", () => {
+  const audit = {
+    remote: "origin",
+    defaultBranch: "main",
+    retireEligible: [],
+    commitCandidates: [{ kind: "commit", id: "working-tree:ai-planning", files: ["ai-planning/brief.md"], message: "docs: brief", targetBranch: "main", directToDefault: true, push: false }],
+    unresolved: []
+  };
+  const result = planGenericCleanupApply({ audit, selection: { retire: [], commitCandidates: [{ id: "working-tree:ai-planning", files: ["ai-planning/brief.md"], message: "docs: brief" }], push: false } });
+  assert.equal(result.ok, true);
+  assert.equal(result.plan.some((s) => s.kind === "create-topic-branch"), false);
+  assert.equal(result.plan[0].kind, "stage-paths");
+  assert.equal(result.plan[1].kind, "commit-paths");
+});
+
+test("plan-apply emits remote-branch-delete for a branch whose remote counterpart is merged to the remote default", () => {
+  const audit = {
+    remote: "origin",
+    defaultBranch: "main",
+    retireEligible: [{ kind: "branch", id: "feature-merged", classification: "retire-eligible", evidence: { remoteCounterpart: { exists: true, mergedToRemoteDefault: true } } }],
+    commitCandidates: [],
+    unresolved: []
+  };
+  const result = planGenericCleanupApply({ audit, selection: { retire: ["branch:feature-merged"], commitCandidates: [], push: false } });
+  assert.equal(result.ok, true);
+  assert.ok(result.plan.some((s) => s.kind === "remote-branch-delete" && s.target === "feature-merged"));
+});
+
+test("plan-apply omits remote-branch-delete when the remote counterpart is not merged", () => {
+  const audit = {
+    remote: "origin",
+    defaultBranch: "main",
+    retireEligible: [{ kind: "branch", id: "feature-merged", classification: "retire-eligible", evidence: { remoteCounterpart: { exists: true, mergedToRemoteDefault: false } } }],
+    commitCandidates: [],
+    unresolved: []
+  };
+  const result = planGenericCleanupApply({ audit, selection: { retire: ["branch:feature-merged"], commitCandidates: [] } });
+  assert.equal(result.ok, true);
+  assert.equal(result.plan.some((s) => s.kind === "remote-branch-delete"), false);
+});
+
+test("verifyPlanFreshness drifts a remote-branch-delete whose remote counterpart is not merged", () => {
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
+    ["rev-parse --show-toplevel", { ok: true, stdout: "/repo\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\nfeature-merged\t${H("b")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: "worktree /repo\nbranch refs/heads/main\n" }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
+    ["merge-base --is-ancestor feature-merged refs/remotes/origin/main", { ok: true, stdout: "" }],
+    ["merge-base --is-ancestor refs/remotes/origin/feature-merged refs/remotes/origin/main", { ok: false, status: 1, stdout: "" }]
+  ]);
+  const plan = [{ kind: "branch-delete", target: "feature-merged" }, { kind: "remote-branch-delete", target: "feature-merged" }];
+  const result = verifyPlanFreshness({ repositoryPath: "/repo", run, plan });
+  assert.equal(result.ok, false);
+  assert.equal(result.drifted.some((d) => d.reason === "remote-counterpart-not-merged"), true);
+});
+
+test("verifyPlanFreshness drifts a direct-to-default commit when HEAD is not on the default branch", (t) => {
+  const repo = tmpRepo(t);
+  fs.mkdirSync(path.join(repo, "ai-planning"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "ai-planning", "brief.md"), "brief");
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "feature\n" }],
+    ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\nfeature\t${H("b")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/feature\n` }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? ai-planning/brief.md\n" }],
+    ["diff --cached --name-only", { ok: true, stdout: "ai-planning/brief.md\n" }]
+  ]);
+  const plan = [
+    { kind: "stage-paths", files: ["ai-planning/brief.md"], target: "ai-planning/brief.md" },
+    { kind: "commit-paths", files: ["ai-planning/brief.md"], target: "ai-planning/brief.md", directToDefault: true, message: "docs: brief" }
+  ];
+  const result = verifyPlanFreshness({ repositoryPath: repo, run, plan });
+  assert.equal(result.ok, false);
+  assert.equal(result.drifted.some((d) => d.reason === "commit-target-not-default-branch"), true);
 });

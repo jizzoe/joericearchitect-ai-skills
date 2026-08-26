@@ -49,3 +49,16 @@
   Depends on: 4.2.
 - [ ] 5.2 Run `openspec validate --all --strict`, inspect the final diff for
   scope and secrets, and record local delivery evidence. Depends on: 5.1.
+
+## 6. Owner-approved resolution deltas (2026-08-25)
+
+- [ ] 6.1 Implement conditional remote-branch deletion: a retire-eligible local
+  branch's remote counterpart is deleted only after its changes are proven
+  merged to the remote default branch; otherwise the remote branch is left
+  intact and reported. Depends on: 2.1, 2.3.
+- [ ] 6.2 Implement the spec/non-spec direct-commit split: spec-governed content
+  (OpenSpec changes/specs and governed skills/scripts/schemas/workflow docs)
+  routes through a topic branch, while non-spec files (design briefs, research,
+  notes) may commit directly to the default branch. Depends on: 2.2, 2.3.
+- [ ] 6.3 Add regression coverage for remote-merge gating and the spec/non-spec
+  split. Depends on: 6.1, 6.2.

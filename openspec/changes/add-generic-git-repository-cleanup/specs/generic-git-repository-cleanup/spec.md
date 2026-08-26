@@ -50,6 +50,21 @@ status.
 - **WHEN** a file matches a detected secret or credential pattern, or its safety is uncertain
 - **THEN** it is listed unresolved and blocked from commit eligibility
 
+### Requirement: Spec-governed content is never committed directly to the default branch
+OpenSpec changes, living specs, and the governed reusable assets (skills,
+scripts, schemas, and workflow docs) SHALL NOT be committed or pushed directly
+onto the configured default branch; such content SHALL reach the default branch
+only by merging from a branch or worktree. Non-spec-change files (e.g., design
+briefs, research, notes) MAY be committed directly to the default branch.
+
+#### Scenario: Non-spec files may commit directly to the default branch
+- **WHEN** working-tree changes are non-spec files (design briefs, research, notes) outside active change scope
+- **THEN** they may be grouped into a commit candidate targeting the default branch directly, without a topic branch
+
+#### Scenario: Spec-governed files route through a topic branch
+- **WHEN** working-tree changes touch spec-governed content outside active change scope
+- **THEN** they are grouped into a commit candidate targeting a topic branch, never a direct default-branch commit
+
 ### Requirement: Unresolved entries surface the evidence gap
 Every unresolved or blocked entry SHALL include the specific evidence gap, why no
 safe default is available, and the smallest user decision or recovery action that
@@ -100,15 +115,21 @@ explicit user choice.
 - **WHEN** the repository default branch is not main
 - **THEN** the audit uses the discovered default branch rather than assuming main
 
-### Requirement: Apply never deletes remote state or rewrites history
-The capability SHALL NOT delete remote branches, rewrite history, force-remove a
-worktree, reset, check out over, stash, or use `git clean` to remove content. A
-confirmed clean, ancestry-merged local branch MAY be a local-retire candidate,
-but remote deletion remains an explicitly separate, later opt-in scope.
+### Requirement: Apply deletes remote branches only on proven remote merge
+The capability SHALL NOT rewrite history, force-remove a worktree, reset, check
+out over, stash, or use `git clean` to remove content. A confirmed clean,
+ancestry-merged local branch MAY be a local-retire candidate. When a remote
+counterpart exists, apply SHALL delete it only after confirming the remote
+branch's changes are merged into the remote default branch; otherwise the remote
+branch SHALL be left intact and reported as unresolved.
 
-#### Scenario: Remote branch stays untouched
-- **WHEN** a local branch has a matching remote counterpart
-- **THEN** apply retires only the local branch and never deletes or force-pushes the remote
+#### Scenario: Remote branch deleted only when merged to the remote default
+- **WHEN** a retire-eligible local branch has a remote counterpart whose changes are proven merged into the remote default branch
+- **THEN** apply may delete the remote branch after the local branch
+
+#### Scenario: Unmerged remote branch is left intact
+- **WHEN** a retire-eligible local branch has a remote counterpart whose changes are not proven merged into the remote default branch
+- **THEN** apply retires only the local branch and leaves the remote branch intact, reporting it as unresolved
 
 ### Requirement: Receipt is durable and non-sensitive
 A durable, non-sensitive audit/apply receipt SHALL record which entries were

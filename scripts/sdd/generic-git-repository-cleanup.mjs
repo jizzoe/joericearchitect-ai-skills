@@ -17,6 +17,22 @@ const SECRET_PATTERNS = [
 const LARGE_FILE_BYTES = 512 * 1024;
 const BINARY_CONTROL = /[\x00-\x08\x0B\x0C\x0E-\x1F]/;
 
+// Conservative default set of spec-governed roots. Content under these roots is
+// OpenSpec change/spec material or a governed reusable asset an OpenSpec change
+// modifies; it must reach the default branch by merging from a branch/worktree,
+// never by a direct commit onto the default branch. `docs/research/` is
+// planning/research, not a governed workflow asset. A repository may override
+// this baseline through local configuration.
+const SPEC_GOVERNED_ROOTS = ["openspec", "skills", ".claude", ".agents", "scripts", "schemas", "docs", "config", "quality"];
+
+export function isSpecGovernedPath(relativePath, governedRoots = SPEC_GOVERNED_ROOTS) {
+  const normalized = (relativePath ?? "").replace(/\\/g, "/").replace(/^\.\//, "");
+  if (!text(normalized)) return false;
+  const first = normalized.split("/")[0];
+  if (first === "docs" && normalized.startsWith("docs/research/")) return false;
+  return governedRoots.includes(first);
+}
+
 function defaultGitRunner(repositoryPath) {
   return (args, options = {}) => {
     const result = spawnSync("git", ["-C", options.cwd ?? repositoryPath, ...args], { encoding: "utf8" });
@@ -213,7 +229,10 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
     }
     const merged = isAncestor({ run, branch: branch.id, target: `refs/remotes/${remote}/${defaultBranch}` });
     if (merged) {
-      retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-and-inactive", evidence: { ancestryMerged: true, referencedByWorktree: false, activeChangeClaim: false } }));
+      const remoteRef = `refs/remotes/${remote}/${branch.id}`;
+      const remoteExists = text(remote) && run(["rev-parse", "--verify", remoteRef]).ok;
+      const remoteMerged = remoteExists ? isAncestor({ run, branch: remoteRef, target: `refs/remotes/${remote}/${defaultBranch}` }) : false;
+      retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-and-inactive", evidence: { ancestryMerged: true, referencedByWorktree: false, activeChangeClaim: false, remoteCounterpart: remoteExists ? { exists: true, mergedToRemoteDefault: remoteMerged } : { exists: false } } }));
     } else {
       unresolvedList.push(unresolved("branch", branch.id, "delivery-unproven", "not proven merged to the configured default branch (squash/rebase needs exact PR evidence)", "provide exact merged-PR/default-branch evidence or review manually"));
     }
@@ -244,7 +263,8 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       }
     }
     if (deletions.length > 0) {
-      commitCandidates.push(entry("commit", "working-tree:deleted", { classification: "commit-candidate", files: deletions, purpose: "out-of-scope deletions", targetBranch: `topic/${current || "working-tree"}-deletions-cleanup`, push: false, message: "chore: remove out-of-scope deleted paths" }));
+      const specGoverned = deletions.some((p) => isSpecGovernedPath(p));
+      commitCandidates.push(entry("commit", "working-tree:deleted", { classification: "commit-candidate", files: deletions, purpose: "out-of-scope deletions", specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-deletions-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: "chore: remove out-of-scope deleted paths" }));
     }
   }
   const fileChecks = toRead.map((s) => ({ status: s, file: readFileAt({ repositoryPath, relativePath: s.path }) }));
@@ -267,7 +287,8 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   }
   for (const [key, g] of groups) {
     const [group, statusClass] = key.split(":");
-    commitCandidates.push(entry("commit", `working-tree:${group}:${statusClass}`, { classification: "commit-candidate", files: g.files, purpose: `out-of-scope ${statusClass} ${group} changes`, targetBranch: `topic/${current || "working-tree"}-${group}-${statusClass}-cleanup`, push: false, message: `chore: capture out-of-scope ${statusClass} ${group} changes` }));
+    const specGoverned = g.files.some((p) => isSpecGovernedPath(p));
+    commitCandidates.push(entry("commit", `working-tree:${group}:${statusClass}`, { classification: "commit-candidate", files: g.files, purpose: `out-of-scope ${statusClass} ${group} changes`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${group}-${statusClass}-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: capture out-of-scope ${statusClass} ${group} changes` }));
   }
 
   return { ok: true, audit: { remote, defaultBranch, retireEligible, commitCandidates, unresolved: unresolvedList } };
@@ -299,6 +320,13 @@ export function planGenericCleanupApply({ audit, selection } = {}) {
   retireSteps.sort((a, b) => (a.kind === b.kind ? 0 : (a.kind === "worktree" ? -1 : 1)));
   for (const s of retireSteps) {
     plan.push({ order: plan.length, command: s.command, target: s.id, kind: s.stepKind });
+    if (s.kind === "branch") {
+      const branchEntry = audit.retireEligible.find((e) => e.kind === "branch" && e.id === s.id);
+      if (branchEntry?.evidence?.remoteCounterpart?.mergedToRemoteDefault && text(audit.remote)) {
+        plan.push({ order: plan.length, command: ["git", "push", audit.remote, "--delete", "--", s.id], target: s.id, kind: "remote-branch-delete" });
+        confirmation.retire.push(`remote:${s.id}`);
+      }
+    }
   }
 
   const knownCommit = audit.commitCandidates.filter((c) => c.kind === "commit");
@@ -307,18 +335,26 @@ export function planGenericCleanupApply({ audit, selection } = {}) {
     if (!candidate) return { ok: false, reason: `selection-not-commit-candidate:${c.id ?? "unknown"}` };
     const targetBranch = candidate.targetBranch;
     const message = candidate.message;
-    plan.push({ order: plan.length, command: ["git", "switch", "-c", targetBranch], target: targetBranch, kind: "create-topic-branch" });
+    const directToDefault = candidate.directToDefault === true;
+    if (!directToDefault) {
+      plan.push({ order: plan.length, command: ["git", "switch", "-c", targetBranch], target: targetBranch, kind: "create-topic-branch" });
+    }
     plan.push({ order: plan.length, command: ["git", "add", "--", ...candidate.files], target: candidate.files.join(", "), files: candidate.files, kind: "stage-paths" });
-    plan.push({ order: plan.length, command: ["git", "commit", "-m", message], target: candidate.files.join(", "), files: candidate.files, message, kind: "commit-paths" });
-    if (push) plan.push({ order: plan.length, command: ["git", "push", audit.remote ?? "origin", "--", targetBranch], target: targetBranch, kind: "push-topic-branch" });
-    confirmation.commit.push({ id: candidate.id, files: candidate.files, message, targetBranch, push });
+    plan.push({ order: plan.length, command: ["git", "commit", "-m", message], target: candidate.files.join(", "), files: candidate.files, message, directToDefault, kind: "commit-paths" });
+    if (push) {
+      plan.push(directToDefault
+        ? { order: plan.length, command: ["git", "push", audit.remote ?? "origin", "--", targetBranch], target: targetBranch, kind: "push-default-branch" }
+        : { order: plan.length, command: ["git", "push", audit.remote ?? "origin", "--", targetBranch], target: targetBranch, kind: "push-topic-branch" });
+    }
+    confirmation.commit.push({ id: candidate.id, files: candidate.files, message, targetBranch, directToDefault, push });
   }
 
   const recoveryNotes = [
     "Reinspect branch, worktree, index, remote, and protection state immediately before each mutation.",
     "A commit failure reports the exact recovery state and never retries or rewrites without a new user instruction.",
     "Push only after a successful local commit and a separate current push-target check.",
-    "Remote branches are never deleted; remote deletion is a separate, later opt-in scope."
+    "A remote branch is deleted only after its changes are proven merged to the remote default branch; otherwise it is left intact.",
+    "Spec-governed content is never committed or pushed directly to the default branch; non-spec files may commit directly to the default branch."
   ];
 
   return { ok: true, plan, confirmation, recoveryNotes };
@@ -340,7 +376,7 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
   const currentWorktrees = new Set((worktreesNow ?? []).map((wt) => wt.id));
   const verifiedPlan = [];
   const drifted = [];
-  const knownKinds = new Set(["worktree-remove", "branch-delete", "create-topic-branch", "stage-paths", "commit-paths", "push-topic-branch"]);
+  const knownKinds = new Set(["worktree-remove", "branch-delete", "remote-branch-delete", "create-topic-branch", "stage-paths", "commit-paths", "push-topic-branch", "push-default-branch"]);
 
   for (const step of steps) {
     if (!knownKinds.has(step.kind)) { drifted.push({ step, reason: "unknown-step-kind" }); continue; }
@@ -353,6 +389,13 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       const pending = (entry.dependsOn ?? []).filter((d) => d.startsWith("worktree:") && currentWorktrees.has(d.slice("worktree:".length)));
       if (pending.length > 0) { drifted.push({ step, reason: "dependency-worktree-still-present", detail: pending }); continue; }
       verifiedPlan.push({ kind: "branch-delete", target: step.target, command: ["git", "branch", "-d", "--", step.target] });
+    } else if (step.kind === "remote-branch-delete") {
+      if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }
+      if (step.target === audit.defaultBranch) { drifted.push({ step, reason: "remote-delete-target-is-default-branch" }); continue; }
+      const remoteRef = `refs/remotes/${audit.remote}/${step.target}`;
+      if (!run(["rev-parse", "--verify", remoteRef]).ok) { drifted.push({ step, reason: "remote-counterpart-missing" }); continue; }
+      if (!isAncestor({ run, branch: remoteRef, target: `refs/remotes/${audit.remote}/${audit.defaultBranch}` })) { drifted.push({ step, reason: "remote-counterpart-not-merged" }); continue; }
+      verifiedPlan.push({ kind: "remote-branch-delete", target: step.target, command: ["git", "push", audit.remote, "--delete", "--", step.target] });
     } else if (step.kind === "create-topic-branch") {
       if (!run(["check-ref-format", "--branch", step.target]).ok) { drifted.push({ step, reason: "invalid-branch-name" }); continue; }
       const exists = run(["rev-parse", "--verify", `refs/heads/${step.target}`]);
@@ -371,7 +414,12 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
         const missing = files.filter((f) => !stagedFiles.includes(f));
         if (unrelated.length > 0 || missing.length > 0) { drifted.push({ step, reason: "staged-set-mismatch", detail: { unrelated, missing } }); continue; }
         const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
-        if (head.ok && head.stdout.trim() === audit.defaultBranch) { drifted.push({ step, reason: "commit-target-is-default-branch" }); continue; }
+        const headName = head.ok ? head.stdout.trim() : null;
+        if (step.directToDefault) {
+          if (headName !== audit.defaultBranch) { drifted.push({ step, reason: "commit-target-not-default-branch" }); continue; }
+        } else if (headName === audit.defaultBranch) {
+          drifted.push({ step, reason: "commit-target-is-default-branch" }); continue;
+        }
         verifiedPlan.push({ kind: "commit-paths", target: files.join(", "), command: ["git", "commit", "-m", text(step.message) ? step.message : "chore: capture out-of-scope changes"] });
       }
     } else if (step.kind === "push-topic-branch") {
@@ -381,6 +429,12 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
       if (head.ok && head.stdout.trim() !== step.target) { drifted.push({ step, reason: "head-not-on-topic-branch" }); continue; }
       verifiedPlan.push({ kind: "push-topic-branch", target: step.target, command: ["git", "push", audit.remote, "--", step.target] });
+    } else if (step.kind === "push-default-branch") {
+      if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }
+      if (step.target !== audit.defaultBranch) { drifted.push({ step, reason: "push-target-is-not-default-branch" }); continue; }
+      const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
+      if (!head.ok || head.stdout.trim() !== audit.defaultBranch) { drifted.push({ step, reason: "head-not-on-default-branch" }); continue; }
+      verifiedPlan.push({ kind: "push-default-branch", target: step.target, command: ["git", "push", audit.remote, "--", step.target] });
     }
   }
 

@@ -35,8 +35,9 @@ lifecycle action is active.
   thin Claude and Codex discovery adapters, a runtime helper and its focused
   tests, and fixtures for squash-merge delivery and dirty/ambiguous resources.
 - Primary issue: https://github.com/jizzoe/joericearchitect-ai-skills/issues/243.
-- No remote branches are deleted, no history is rewritten, and no `git clean`,
-  reset, stash, or checkout-over is used.
+- Remote branches are deleted only after their changes are proven merged to the
+  remote default branch; no history is rewritten and no `git clean`, reset,
+  stash, or checkout-over is used.
 
 ## Reuse Plan
 
