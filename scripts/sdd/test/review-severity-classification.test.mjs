@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateFindingDispositions } from "../review-findings.mjs";
-import { buildCodexReviewInvocation, buildClaudeReviewInvocation } from "../platform-review-adapters.mjs";
+import { buildCodexReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildClaudeDegradedReviewInvocation } from "../platform-review-adapters.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const MATERIAL = ["blocker", "high", "objective-fix"];
@@ -77,6 +77,18 @@ test("the Codex and Claude review prompts consume the shared checklist and sever
   assert.ok(claudePrompt.includes("durable-state precedence"), "durable-state precedence in Claude prompt");
   assert.ok(claudePrompt.includes("no product constants"), "portability/attribution in Claude prompt");
   assert.ok(claudePrompt.includes("blocker, high, or objective-fix"), "severity in Claude prompt");
+});
+
+test("the degraded review builders also consume the shared checklist and severity instructions", () => {
+  const view = { launchPath: "/tmp/view", reviewPath: "/tmp/view/repository" };
+  const codex = buildCodexDegradedReviewInvocation({ view, schemaPath: "/tmp/s.json", resultPath: "/tmp/r.json" });
+  const codexPrompt = codex.args[codex.args.length - 1];
+  assert.ok(codexPrompt.includes("correctness and spec compliance"), "checklist in degraded Codex prompt");
+  assert.ok(codexPrompt.includes("blocker, high, or objective-fix"), "severity in degraded Codex prompt");
+  const claude = buildClaudeDegradedReviewInvocation({ view, schema: {}, reviewerHomePath: "/tmp/home" });
+  const claudePrompt = claude.args[claude.args.length - 1];
+  assert.ok(claudePrompt.includes("correctness and spec compliance"), "checklist in degraded Claude prompt");
+  assert.ok(claudePrompt.includes("blocker, high, or objective-fix"), "severity in degraded Claude prompt");
 });
 
 test("the completeness escalation switches the review prompt and retains the checklist", () => {
