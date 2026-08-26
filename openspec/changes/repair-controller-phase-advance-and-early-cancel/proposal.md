@@ -44,8 +44,8 @@ None.
   tests.
 - This is assistant-neutral: Claude and Codex use the same declared helper and
   thin wrappers, with repository identity and exact run IDs supplied as inputs.
-- A GitHub issue has not been created during this planning-only recovery step;
-  issue intake remains a later lifecycle action.
+- GitHub issue #245 tracks the separately authorized bootstrap delivery; its
+  linkage is recorded in `tracking.yaml`.
 - Reuse plan: retain canonical controller behavior in `scripts/sdd/`, preserve
   product values in typed request records, and avoid credentials or raw
   external evidence in checkpoints.

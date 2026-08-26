@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: repair-controller-phase-advance-and-early-cancel
+github:
+  repository: jizzoe/joericearchitect-ai-skills
+  issue: 245
+  issue_url: https://github.com/jizzoe/joericearchitect-ai-skills/issues/245
+  project_owner: jizzoe
+  project_number: 1
+implementation_repositories:
+  - repository: jizzoe/joericearchitect-ai-skills
+    default_branch: main
+    paths:
+      - openspec/changes/repair-controller-phase-advance-and-early-cancel/
