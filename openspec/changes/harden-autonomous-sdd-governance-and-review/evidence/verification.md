@@ -3,7 +3,7 @@
 - `openspec validate harden-autonomous-sdd-governance-and-review --strict` →
   valid.
 - `openspec validate --all --strict` → 48 passed, 0 failed.
-- `node --test` over `scripts/**/*.test.mjs` → 487 passed, 0 failed.
+- `node --test` over `scripts/**/*.test.mjs` → 495 passed, 0 failed.
 - `node scripts/sdd/check-adapter-drift.mjs .` → valid, no issues.
 
 Diff scope: the two design briefs, the lifecycle skill, the

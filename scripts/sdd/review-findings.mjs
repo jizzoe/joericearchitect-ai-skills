@@ -20,6 +20,7 @@ export function validateFindingDispositions({ findings, dispositions, correction
     dispositionIds.add(disposition.findingId);
   }
   if (dispositions.length !== findings.length) return pause("independent-review-disposition-count-mismatch");
+  let correctionSignature = null;
   for (const finding of findings) {
     if (ids.has(finding.id)) return pause("independent-review-finding-duplicate", finding.id);
     ids.add(finding.id);
@@ -27,19 +28,20 @@ export function validateFindingDispositions({ findings, dispositions, correction
     if (!disposition || !allowed.has(disposition.kind) || !text(disposition.evidence)) return pause("independent-review-disposition-missing", finding.id);
     if (!compatibleDispositions[finding.severity].has(disposition.kind)) return pause("independent-review-disposition-incompatible", finding.id);
     if (disposition.kind === "human-decision") return pause("independent-review-human-decision", finding.id);
-    const signature = disposition.failureSignature ?? finding.id;
-    let signatureAttempts = correctionAttempts;
-    if (correctionAttemptsByFailureSignature instanceof Map) {
-      if (correctionAttemptsByFailureSignature.has(signature)) signatureAttempts = correctionAttemptsByFailureSignature.get(signature);
-    } else if (correctionAttemptsByFailureSignature && Object.prototype.hasOwnProperty.call(correctionAttemptsByFailureSignature, signature)) {
-      signatureAttempts = correctionAttemptsByFailureSignature[signature];
-    }
     if (disposition.kind === "objective-fix") {
+      const signature = disposition.failureSignature ?? finding.id;
+      let signatureAttempts = correctionAttempts;
+      if (correctionAttemptsByFailureSignature instanceof Map) {
+        if (correctionAttemptsByFailureSignature.has(signature)) signatureAttempts = correctionAttemptsByFailureSignature.get(signature);
+      } else if (correctionAttemptsByFailureSignature && Object.prototype.hasOwnProperty.call(correctionAttemptsByFailureSignature, signature)) {
+        signatureAttempts = correctionAttemptsByFailureSignature[signature];
+      }
       if (!Number.isInteger(signatureAttempts) || signatureAttempts < 0) return pause("correction-state-invalid", signature);
       if (signatureAttempts >= 3) return pause("correction-limit-exhausted", signature);
+      if (correctionSignature === null) correctionSignature = signature;
     }
-    if (disposition.kind === "objective-fix") return correction(signature);
   }
+  if (correctionSignature !== null) return correction(correctionSignature);
   return { allowed: true, classification: "ready", issues: [] };
 }
 

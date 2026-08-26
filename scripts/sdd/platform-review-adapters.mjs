@@ -963,7 +963,7 @@ function capabilities({ adapter, attestationRef, probeReference }) {
   };
 }
 
-const CHECKLIST_REFERENCE = "skills/base/autonomous-goal-runner/references/review-matrix.md";
+const CHECKLIST_REFERENCE = "repository/skills/base/autonomous-goal-runner/references/review-matrix.md";
 
 const REVIEW_CHECKLIST_PROMPT = ` Apply the shared review checklist defined in \`${CHECKLIST_REFERENCE}\` and report findings in every category. Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.`;
 
@@ -971,6 +971,14 @@ const REVIEW_CHECKLIST_PROMPT = ` Apply the shared review checklist defined in \
 // prior findings by enum-bounded severity count only. No reviewer-supplied ids,
 // evidence paths, or prose ever re-enter the prompt, so nothing a reviewer or a
 // hostile filename emits can inject instructions.
+// A bounded, injection-safe, content-derived fingerprint of a prior finding.
+// Hashing the severity, evidence path, and recommendation yields fixed-length
+// hex that uniquely identifies the finding across rounds without carrying any
+// reviewer-controlled text into the prompt.
+function findingFingerprint(finding) {
+  return createHash("sha256").update(`${finding?.severity ?? ""}\u0000${finding?.evidence ?? ""}\u0000${finding?.recommendation ?? ""}`).digest("hex").slice(0, 12);
+}
+
 function completenessReviewPrompt(priorFindings = []) {
   const severities = ["blocker", "high", "objective-fix", "warning", "false-positive"];
   const maximumPriorFindings = 20;
@@ -978,7 +986,7 @@ function completenessReviewPrompt(priorFindings = []) {
   const findings = eligible.slice(0, maximumPriorFindings);
   const remainder = eligible.length > maximumPriorFindings ? ` and ${eligible.length - maximumPriorFindings} more` : "";
   const priorSummary = findings.length
-    ? ` Do not repeat the prior finding(s) ${findings.map((finding, index) => `#${index + 1} (${finding.severity})`).join(", ")}${remainder}; re-verify none regressed.`
+    ? ` Do not repeat the prior finding(s) ${findings.map((finding) => `${findingFingerprint(finding)} (${finding.severity})`).join(", ")}${remainder}; re-verify none regressed.`
     : "";
   return ` Apply the shared review checklist defined in \`${CHECKLIST_REFERENCE}\`. Re-review the same committed diff for anything the prior review missed, and be exhaustive across every category.${priorSummary} Tag each finding severity as blocker, high, or objective-fix when material, and warning or false-positive when advisory; only material findings block. Then flag any other material issue the categories missed.`;
 }
