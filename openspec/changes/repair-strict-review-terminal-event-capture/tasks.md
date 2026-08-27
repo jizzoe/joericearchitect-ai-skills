@@ -42,7 +42,7 @@
 - [x] 3.3 Route Codex and Claude prompts to the bounded capsule index and remove one-line package injection and line-only package-read guidance.
   - Depends on: 3.1, 3.2.
   - Evidence: strict/degraded invocation fixtures for both assistants reference only the capsule representation and preserve exact package/result bindings.
-- [ ] 3.4 Complete multibyte, newline, large-package, portability, and cleanup coverage for capsule creation and inspection.
+- [x] 3.4 Complete multibyte, newline, large-package, portability, and cleanup coverage for capsule creation and inspection.
   - Depends on: 3.1, 3.2, 3.3.
   - Evidence: replay of the prior large package plus UTF-8 boundary fixtures proves no chunk exceeds its byte limit and exact reconstruction remains stable.
 

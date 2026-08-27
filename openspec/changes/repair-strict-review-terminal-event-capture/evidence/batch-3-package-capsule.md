@@ -23,6 +23,9 @@ Implementation base: `0fe7f9eea53fe815253dbcbe88b03d493dc5c3fe`.
 - The validated local review result is `/private/tmp/repair-strict-review-batch-3-local-review.json`; `validate-implementation-quality` reported `valid: true` with no issues.
 - Capsule tests cover deterministic output, exact reconstruction, a prior-size 140 KiB multibyte long-line patch, a 100 KiB single JSON value, total bounds, legacy and pre-existing paths, directory identity replacement, every required index/chunk tamper class, and read-only cleanup.
 - Parent, recovery, and lifecycle tests prove both archive and actual Git worktree cleanup remain exact-owned after capsule injection.
+- Exact implementation head `9bd768dfb109895c2ff38a40bd76e641f2001595` passed the GitHub runtime matrix on both supported hosts:
+  - [Ubuntu job 98403876419](https://github.com/jizzoe/joericearchitect-ai-skills/actions/runs/33037659862/job/98403876419): success.
+  - [Windows job 98403876276](https://github.com/jizzoe/joericearchitect-ai-skills/actions/runs/33037659862/job/98403876276): success.
 
 ## Review and corrections
 
@@ -35,6 +38,6 @@ The bounded review corrected four coherence issues before the fresh rereview:
 
 A fresh rereview after these corrections found no remaining objective Batch 3 source finding.
 
-## Pending portability evidence
+## Portability evidence
 
-The runtime matrix now selects the capsule module, schema, and focused capsule tests on Ubuntu and Windows. Task 3.4 remains open until that exact implementation head passes both jobs; local fixtures are not used to claim cross-platform completion.
+The runtime matrix selected the capsule module, schema, and focused capsule tests on Ubuntu and Windows. Both jobs passed against the exact implementation head above, so task 3.4 is complete without relying on local fixtures as cross-platform evidence.
