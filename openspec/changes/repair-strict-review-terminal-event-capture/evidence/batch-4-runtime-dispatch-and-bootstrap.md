@@ -31,6 +31,11 @@
 
 - Batch 4A runtime distribution: 56 focused tests passed; isolated runtime
   build/install/content verification found no active-worktree import path.
+- Two clean candidate builds from source revision
+  `6cb473ae7527f239da96b9decf35a3ad12f69c05` produced the same 138-file
+  content digest
+  `37ce61402f0325bb5e38e9093966b5164457402c9ecd0fb03c8ee2e14d1640c8`.
+  Candidate-runtime doctor reverified that content before dispatch.
 - Batch 4B durable dispatch: 98 focused tests passed after adding explicit
   runtime-helper binding and deep-freezing the nested adapter definition.
 - Batch 4C bootstrap/protocol/configuration: 71 focused tests passed for
@@ -56,11 +61,9 @@
 
 ## Remaining delivery gates
 
-Task 4.1 remains open until the final candidate head is rebuilt and installed
-into an isolated target with its exact digest recorded. Task 4.4 remains open
-until that final head and its one canonical package produce the durable exact
-bootstrap record. Task 4.5 remains open until the read-only PR #246 and paused
-controller baseline comparison is repeated immediately before runtime
-installation. The real installed-Codex acceptance probe, complete regressions,
-OpenSpec Verify, exact-head CI, and N-1 Claude independent review remain Batch 5
-gates and are not claimed here.
+Task 4.4 remains open until the final review head and its one canonical package
+produce the durable exact bootstrap record. Task 4.5 remains open until the
+read-only PR #246 and paused-controller baseline comparison is repeated
+immediately before runtime installation. The real installed-Codex acceptance
+probe, OpenSpec Verify, exact-head CI, and N-1 Claude independent review remain
+Batch 5 gates and are not claimed here.

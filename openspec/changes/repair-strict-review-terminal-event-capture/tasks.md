@@ -48,13 +48,13 @@
 
 ## 4. Runtime, protocol, dispatch, and dependency sequencing
 
-- [ ] 4.1 Include the capture and capsule entrypoints in verified runtime distribution and prove candidate build/install contents and digest.
+- [x] 4.1 Include the capture and capsule entrypoints in verified runtime distribution and prove candidate build/install contents and digest.
   - Depends on: 2.1, 2.2, 3.2.
   - Evidence: runtime build, manifest/smoke, install, content-verification, and portability tests with no importable active-workspace path.
-- [ ] 4.2 Add an allowlisted resolver that consumes the durable work-unit `reviewAdapter` snapshot and binds request construction, launcher recovery, runtime receipt, and result acceptance to the same adapter.
+- [x] 4.2 Add an allowlisted resolver that consumes the durable work-unit `reviewAdapter` snapshot and binds request construction, launcher recovery, runtime receipt, and result acceptance to the same adapter.
   - Depends on: 2.5, 4.1.
   - Evidence: dispatch tests prove Claude/Codex selection, reject absent/unknown/mismatched/directly substituted launchers, and preserve the selection through strict and authorized-degraded paths.
-- [ ] 4.3 Update the canonical independent-review protocol and verify thin Claude/Codex wrappers remain thin.
+- [x] 4.3 Update the canonical independent-review protocol and verify thin Claude/Codex wrappers remain thin.
   - Depends on: 2.3, 3.3, 4.2.
   - Evidence: protocol diff and canonical/thin-wrapper drift checks distinguish JSONL and capsule transport input from the accepted host-owned artifact and durable adapter binding.
 - [ ] 4.4 Temporarily select `claude-detached-restricted-v1`, create the exact owner-authorized bootstrap binding to the N-1 runtime, and preserve product configuration provenance.
