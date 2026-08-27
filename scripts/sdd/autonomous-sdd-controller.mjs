@@ -468,6 +468,30 @@ function activeRunHasProgressArtifacts(activePath, fileSystem = fs) {
   } catch { return true; }
 }
 
+function controllerHasProgressArtifacts(repositoryPath, retirement, runGit) {
+  const persisted = readPersistedControllerRecord({
+    repositoryPath,
+    record: {
+      runId: retirement.controllerRunId,
+      checkpointPath: checkpointForRun(retirement.controllerRunId)
+    },
+    runGit
+  });
+  if (!persisted.valid) return true;
+  const record = persisted.record;
+  return record.schemaVersion !== 5 || record.runId !== retirement.controllerRunId ||
+    record.selectedEntry !== retirement.approvedChangeId || record.currentPhase !== "propose" ||
+    record.v2Admission?.state !== "admitted" || record.v2Admission?.repositoryId !== retirement.repositoryId ||
+    record.v2Admission?.parentRunId !== retirement.parentRunId || record.v2Admission?.workUnitId !== retirement.workUnitId ||
+    record.v2Admission?.claimId !== retirement.claimId || !Array.isArray(record.steps) || record.steps.length !== phases.length ||
+    record.steps.some((step, index) => step?.id !== phases[index] || step.status !== "pending" || step.evidence !== undefined) ||
+    !Array.isArray(record.resourceRecords) || record.resourceRecords.length !== 0 ||
+    !Array.isArray(record.issueIntakeRecords) || record.issueIntakeRecords.length !== 0 ||
+    !Array.isArray(record.authContextRecords) || record.authContextRecords.length !== 0 ||
+    !Array.isArray(record.cleanupReceipts) || record.cleanupReceipts.length !== 0 ||
+    !Array.isArray(record.completedEntries) || record.completedEntries.length !== 0;
+}
+
 function cancelledTerminalSummaryFor({ claim, workUnit, reason, now }) {
   const summary = {
     workUnitId: workUnit.workUnitId,
@@ -524,8 +548,10 @@ function cancellationArchiveMatch({ paths, cancellation, requestDigest, fileSyst
  * cancellation receipt, marks the run cancelled, and releases only the exact
  * claim it proves is held by that run.
  */
-function cancelV2Run({ readableRepositoryName, cancellation, request, requireExpired, rejectProgressArtifacts = false, terminalReason, classification, alreadyClassification, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
-  if (!validCancellationRequest(cancellation) || !request || typeof requireExpired !== "boolean" || typeof rejectProgressArtifacts !== "boolean" || !text(terminalReason) || !text(classification) || !text(alreadyClassification) || !timestamp(now) || !text(readableRepositoryName)) {
+function cancelV2Run({ readableRepositoryName, repositoryPath, cancellation, request, retirement, requireExpired, rejectProgressArtifacts = false, rejectControllerProgress = false, terminalReason, classification, alreadyClassification, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs, runGit } = {}) {
+  if (!validCancellationRequest(cancellation) || !request || typeof requireExpired !== "boolean" || typeof rejectProgressArtifacts !== "boolean" ||
+      typeof rejectControllerProgress !== "boolean" || (rejectControllerProgress && !retirement) || !text(terminalReason) ||
+      !text(classification) || !text(alreadyClassification) || !timestamp(now) || !text(readableRepositoryName)) {
     return { valid: false, classification: "paused", reason: "cancellation-input-invalid" };
   }
   const providerCapability = validateProviderCapabilities(cancellation.provider);
@@ -569,6 +595,9 @@ function cancelV2Run({ readableRepositoryName, cancellation, request, requireExp
     return { valid: false, classification: "paused", reason: "cancellation-run-delivered", requestDigest };
   }
   if (rejectProgressArtifacts && activeRunHasProgressArtifacts(activePath, fileSystem)) {
+    return { valid: false, classification: "paused", reason: "early-retirement-progress-evidence-present", requestDigest };
+  }
+  if (rejectControllerProgress && controllerHasProgressArtifacts(repositoryPath, retirement, runGit)) {
     return { valid: false, classification: "paused", reason: "early-retirement-progress-evidence-present", requestDigest };
   }
 
@@ -637,7 +666,7 @@ export function cancelExpiredV2Run({ readableRepositoryName, cancellation, state
  * runtime. The availability predicate is supplied by the runtime dispatcher,
  * never by the untrusted payload.
  */
-export function retireBlockedV2Run({ readableRepositoryName, retirement, transitionAvailable, trustedOwner, trustedOwnerPublicKey, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs } = {}) {
+export function retireBlockedV2Run({ readableRepositoryName, repositoryPath, retirement, transitionAvailable, trustedOwner, trustedOwnerPublicKey, stateHome = defaultStateHome(), now = new Date().toISOString(), fileSystem = fs, runGit } = {}) {
   if (!validEarlyRetirementAuthorization(retirement) || !validSignedEarlyRetirementAuthorization(retirement, { trustedOwner, trustedOwnerPublicKey }) || typeof transitionAvailable !== "function" || !timestamp(now) || !text(readableRepositoryName)) {
     return { valid: false, classification: "paused", reason: "early-retirement-input-invalid" };
   }
@@ -659,16 +688,20 @@ export function retireBlockedV2Run({ readableRepositoryName, retirement, transit
   };
   return cancelV2Run({
     readableRepositoryName,
+    repositoryPath,
     cancellation,
     request: retirement,
+    retirement,
     requireExpired: false,
     rejectProgressArtifacts: true,
+    rejectControllerProgress: true,
     terminalReason: "owner-authorized-blocked-controller",
     classification: "retired",
     alreadyClassification: "already-retired",
     stateHome,
     now,
-    fileSystem
+    fileSystem,
+    runGit
   });
 }
 

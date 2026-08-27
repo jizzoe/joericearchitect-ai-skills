@@ -81,6 +81,7 @@ const controllerOperations = {
   "cancel-v2-run": (payload) => cancelExpiredV2Run(payload),
   "retire-blocked-v2-run": (payload) => retireBlockedV2Run({
     ...payload,
+    repositoryPath: repositoryPath(payload),
     trustedOwner: process.env.AI_SKILLS_TRUSTED_OWNER,
     trustedOwnerPublicKey: process.env.AI_SKILLS_TRUSTED_OWNER_PUBLIC_KEY,
     transitionAvailable: (transition) => Object.hasOwn(controllerOperations, transition)

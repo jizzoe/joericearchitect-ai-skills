@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { admitV2Run } from "../autonomous-sdd-admission.mjs";
-import { cancelExpiredV2Run, earlyRetirementAuthorizationPayload, retireBlockedV2Run } from "../autonomous-sdd-controller.mjs";
+import { cancelExpiredV2Run, createControllerRecord, earlyRetirementAuthorizationPayload, retireBlockedV2Run } from "../autonomous-sdd-controller.mjs";
 import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
 
 const root = () => fs.mkdtempSync(path.join(os.tmpdir(), "autonomous-sdd-cancellation-"));
@@ -45,6 +45,31 @@ const retirementFor = (admitted, overrides = {}) => {
     retirement.ownerAuthorization.signature = crypto.sign(null, Buffer.from(JSON.stringify(earlyRetirementAuthorizationPayload(retirement))), ownerKeys.privateKey).toString("base64");
   }
   return retirement;
+};
+const controllerFixture = (stateHome, admitted, mutate = (record) => record) => {
+  const repositoryPath = path.join(stateHome, "repository");
+  const v2Admission = {
+    schemaVersion: 1,
+    state: "admitted",
+    repositoryId: admitted.repositoryId,
+    parentRunId: admitted.parentRun.parentRunId,
+    workUnitId: admitted.workUnit.workUnitId,
+    claimId: admitted.claim.claimId,
+    providerBinding: admitted.providerBinding,
+    preparedAt: started,
+    admittedAt: started
+  };
+  const record = createControllerRecord({
+    authorization,
+    repository: "owner/repository",
+    runId: cancellationFor(admitted).controllerRunId,
+    v2Admission
+  }).record;
+  const persisted = mutate(structuredClone(record));
+  const destination = path.join(repositoryPath, ".git", "sdd-delivery-runs", persisted.checkpointPath);
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.writeFileSync(destination, `${JSON.stringify(persisted, null, 2)}\n`);
+  return { repositoryPath, runGit: () => ".git" };
 };
 
 test("cancellation retires an exact expired unfinished run and releases only its claim", () => {
@@ -118,13 +143,14 @@ test("separately authorized early retirement archives one exact blocked undelive
   const stateHome = root();
   try {
     const admitted = admitV2Run(fixture(stateHome));
+    const controller = controllerFixture(stateHome, admitted);
     const retirement = retirementFor(admitted);
-    const retired = retireBlockedV2Run({ readableRepositoryName: "repository", retirement, transitionAvailable: () => false, ...trustedOwner, stateHome, now: "2026-08-20T13:00:00.000Z" });
+    const retired = retireBlockedV2Run({ readableRepositoryName: "repository", retirement, transitionAvailable: () => false, ...trustedOwner, ...controller, stateHome, now: "2026-08-20T13:00:00.000Z" });
     assert.equal(retired.valid, true);
     assert.equal(retired.classification, "retired");
     assert.equal(JSON.parse(fs.readFileSync(path.join(retired.archivePath, "archive-manifest.json"), "utf8")).reason, "owner-authorized-blocked-controller");
     assert.equal(JSON.parse(fs.readFileSync(path.join(retired.archivePath, "projection.json"), "utf8")).children[0].terminalStatus, "cancelled");
-    const retry = retireBlockedV2Run({ readableRepositoryName: "repository", retirement, transitionAvailable: () => false, ...trustedOwner, stateHome, now: "2026-08-20T13:00:00.000Z" });
+    const retry = retireBlockedV2Run({ readableRepositoryName: "repository", retirement, transitionAvailable: () => false, ...trustedOwner, ...controller, stateHome, now: "2026-08-20T13:00:00.000Z" });
     assert.equal(retry.classification, "already-retired");
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });
@@ -133,12 +159,13 @@ test("early retirement rejects unavailable authority, identity conflicts, and a 
   const stateHome = root();
   try {
     const admitted = admitV2Run(fixture(stateHome));
+    const controller = controllerFixture(stateHome, admitted);
     const base = retirementFor(admitted);
-    assert.equal(retireBlockedV2Run({ readableRepositoryName: "repository", transitionAvailable: () => false, ...trustedOwner, stateHome, now: "2026-08-20T13:00:00.000Z" }).reason, "early-retirement-input-invalid");
-    assert.equal(retireBlockedV2Run({ readableRepositoryName: "repository", retirement: { ...base, ownerAuthorization: { ...base.ownerAuthorization, signature: "invalid" } }, transitionAvailable: () => false, ...trustedOwner, stateHome, now: "2026-08-20T13:00:00.000Z" }).reason, "early-retirement-input-invalid");
-    assert.equal(retireBlockedV2Run({ readableRepositoryName: "repository", retirement: retirementFor(admitted, { expiresAt: "2026-08-20T12:00:00.000Z" }), transitionAvailable: () => false, ...trustedOwner, stateHome, now: "2026-08-20T13:00:00.000Z" }).reason, "early-retirement-authorization-expired");
-    assert.equal(retireBlockedV2Run({ readableRepositoryName: "repository", retirement: retirementFor(admitted, { claimId: "claim-other-001" }), transitionAvailable: () => false, ...trustedOwner, stateHome, now: "2026-08-20T13:00:00.000Z" }).reason, "cancellation-identity-or-claim-mismatch");
-    assert.equal(retireBlockedV2Run({ readableRepositoryName: "repository", retirement: base, transitionAvailable: () => true, ...trustedOwner, stateHome, now: "2026-08-20T13:00:00.000Z" }).reason, "early-retirement-transition-available");
+    assert.equal(retireBlockedV2Run({ readableRepositoryName: "repository", transitionAvailable: () => false, ...trustedOwner, ...controller, stateHome, now: "2026-08-20T13:00:00.000Z" }).reason, "early-retirement-input-invalid");
+    assert.equal(retireBlockedV2Run({ readableRepositoryName: "repository", retirement: { ...base, ownerAuthorization: { ...base.ownerAuthorization, signature: "invalid" } }, transitionAvailable: () => false, ...trustedOwner, ...controller, stateHome, now: "2026-08-20T13:00:00.000Z" }).reason, "early-retirement-input-invalid");
+    assert.equal(retireBlockedV2Run({ readableRepositoryName: "repository", retirement: retirementFor(admitted, { expiresAt: "2026-08-20T12:00:00.000Z" }), transitionAvailable: () => false, ...trustedOwner, ...controller, stateHome, now: "2026-08-20T13:00:00.000Z" }).reason, "early-retirement-authorization-expired");
+    assert.equal(retireBlockedV2Run({ readableRepositoryName: "repository", retirement: retirementFor(admitted, { claimId: "claim-other-001" }), transitionAvailable: () => false, ...trustedOwner, ...controller, stateHome, now: "2026-08-20T13:00:00.000Z" }).reason, "cancellation-identity-or-claim-mismatch");
+    assert.equal(retireBlockedV2Run({ readableRepositoryName: "repository", retirement: base, transitionAvailable: () => true, ...trustedOwner, ...controller, stateHome, now: "2026-08-20T13:00:00.000Z" }).reason, "early-retirement-transition-available");
     assert.equal(fs.existsSync(path.join(admitted.paths.active, admitted.parentRun.parentRunId)), true);
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });
@@ -147,11 +174,12 @@ test("early retirement refuses a run with delivery evidence", () => {
   const stateHome = root();
   try {
     const admitted = admitV2Run(fixture(stateHome));
+    const controller = controllerFixture(stateHome, admitted);
     const activePath = path.join(admitted.paths.active, admitted.parentRun.parentRunId);
     fs.writeFileSync(path.join(activePath, "terminalization-receipt.json"), "{}\n");
     const result = retireBlockedV2Run({
       readableRepositoryName: "repository", retirement: retirementFor(admitted), transitionAvailable: () => false, ...trustedOwner,
-      stateHome, now: "2026-08-20T13:00:00.000Z"
+      ...controller, stateHome, now: "2026-08-20T13:00:00.000Z"
     });
     assert.equal(result.reason, "cancellation-run-delivered");
     assert.equal(fs.existsSync(activePath), true);
@@ -162,14 +190,33 @@ test("early retirement fails closed on any durable progress artifact", () => {
   const stateHome = root();
   try {
     const admitted = admitV2Run(fixture(stateHome));
+    const controller = controllerFixture(stateHome, admitted);
     const activePath = path.join(admitted.paths.active, admitted.parentRun.parentRunId);
     fs.writeFileSync(path.join(activePath, "transition-attempt.json"), "{}\n");
     const result = retireBlockedV2Run({
       readableRepositoryName: "repository", retirement: retirementFor(admitted), transitionAvailable: () => false, ...trustedOwner,
-      stateHome, now: "2026-08-20T13:00:00.000Z"
+      ...controller, stateHome, now: "2026-08-20T13:00:00.000Z"
     });
     assert.equal(result.reason, "early-retirement-progress-evidence-present");
     assert.equal(fs.existsSync(activePath), true);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
+});
+
+test("early retirement fails closed on Git-common controller progress", () => {
+  const stateHome = root();
+  try {
+    const admitted = admitV2Run(fixture(stateHome));
+    const controller = controllerFixture(stateHome, admitted, (record) => {
+      record.steps[0] = { id: "propose", status: "complete", evidence: { current: true } };
+      record.currentPhase = "planning-review";
+      return record;
+    });
+    const result = retireBlockedV2Run({
+      readableRepositoryName: "repository", retirement: retirementFor(admitted), transitionAvailable: () => false, ...trustedOwner,
+      ...controller, stateHome, now: "2026-08-20T13:00:00.000Z"
+    });
+    assert.equal(result.reason, "early-retirement-progress-evidence-present");
+    assert.equal(fs.existsSync(path.join(admitted.paths.active, admitted.parentRun.parentRunId)), true);
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });
 
