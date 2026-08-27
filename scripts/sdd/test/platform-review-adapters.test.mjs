@@ -5,6 +5,10 @@ import test from "node:test";
 import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexParentStrictReviewToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, consumeCodexParentStrictReviewToolResult, createClaudeReviewSettings, degradedCapabilityLedger, diagnoseClaudeExecutionFailure, diagnoseCodexExecutionFailure, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, pinnedExecutableUnchanged, prepareClaudeReviewerEnvironment, prepareCodexReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, resolveTrustedReviewerExecutable, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, sealCodexDegradedReviewPayload, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
+import { resolveReviewAdapterDispatch } from "../review-adapter-dispatch.mjs";
+
+const codexConfigurationSnapshot = { schemaVersion: 1, sources: ["config/ai-skills.json:runtime"], values: { reviewAdapter: "codex-detached-read-only-v1" } };
+const codexAdapterBinding = resolveReviewAdapterDispatch(codexConfigurationSnapshot).binding;
 
 const packageFixture = () => {
   const value = JSON.parse(fs.readFileSync(new URL("../../../evals/skills/independent-review/fixtures/valid-package.json", import.meta.url), "utf8"));
@@ -293,8 +297,8 @@ test("Codex parent transport builds only the fixed escalated host tool request a
   const prepared = {
     allowed: true,
     code: "review-launcher-external-host-required",
-    hostRequest: { launchId: "launch", requestDigest: digest, request: { reviewPackage, strictResult, transition: "merge-pr", reviewer: { type: "codex-degraded", identity: "degraded-reviewer", attestation: { ref: "degraded-attestation" } }, attestationRef: "degraded-attestation", launcher: { executable: "/opt/tools/codex" }, authorization: { implementerSession: "implementer", degradedIndependentReview: degradedAuthorization } } },
-    expectedRecovery: { hostScript: "scripts/sdd/review-launcher-host.mjs", launcherId: "codex-review-launcher", launcherKind: "codex-detached-read-only-v1", expiresAt: "2099-01-01T00:00:00.000Z" }
+    hostRequest: { launchId: "launch", requestDigest: digest, request: { reviewPackage, strictResult, transition: "merge-pr", reviewer: { type: "codex-degraded", identity: "degraded-reviewer", adapter: "codex", attestation: { ref: "degraded-attestation" } }, attestationRef: "degraded-attestation", launcher: { kind: "codex-detached-read-only-v1", executable: "/opt/tools/codex" }, configurationSnapshot: codexConfigurationSnapshot, reviewAdapterBinding: codexAdapterBinding, authorization: { implementerSession: "implementer", degradedIndependentReview: degradedAuthorization } } },
+    expectedRecovery: { hostScript: "scripts/sdd/review-launcher-host.mjs", reviewAdapter: "codex-detached-read-only-v1", adapterBindingDigest: codexAdapterBinding.bindingDigest, runtimeHelper: "platform-review-adapters", launcherId: "codex-review-launcher", launcherKind: "codex-detached-read-only-v1", expiresAt: "2099-01-01T00:00:00.000Z" }
   };
   const temporary = fs.mkdtempSync("/tmp/codex-parent-transport-");
   const launchPath = `${temporary}/review-session`;
@@ -433,6 +437,19 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
   const executableIdentity = identityFor(executablePath);
   const strictView = { kind: "archived-review-view-v1", launchPath, reviewPath, temporaryRoot: temporary, headCommit: reviewPackage.headCommit, ownershipToken: "fixture" };
   try {
+    let mismatchedViewCreated = false;
+    const mismatchedSelection = buildCodexParentStrictReviewToolRequest({
+      reviewPackage,
+      repositoryPath: process.cwd(),
+      reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
+      implementerSession: "implementer-session",
+      attestationRef: "attestations/codex-read-only-v1.json",
+      configurationSnapshot: { schemaVersion: 1, sources: ["config/ai-skills.json:runtime"], values: { reviewAdapter: "claude-detached-restricted-v1" } }
+    }, {
+      createView: () => { mismatchedViewCreated = true; return { available: true, view: strictView }; }
+    });
+    assert.equal(mismatchedSelection.code, "review-adapter-launcher-mismatch");
+    assert.equal(mismatchedViewCreated, false);
     const callerSelectedExecutable = `${temporary}/codex`;
     fs.copyFileSync("/bin/echo", callerSelectedExecutable);
     fs.chmodSync(callerSelectedExecutable, 0o755);
@@ -442,6 +459,7 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
       implementerSession: "implementer-session",
       attestationRef: "attestations/codex-read-only-v1.json",
+      configurationSnapshot: codexConfigurationSnapshot,
       executable: callerSelectedExecutable
     });
     assert.equal(rejectedExecutable.code, "independent-reviewer-codex-executable-identity-unavailable");
@@ -451,7 +469,8 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       repositoryPath: process.cwd(),
       reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
       implementerSession: "implementer-session",
-      attestationRef: "attestations/codex-read-only-v1.json"
+      attestationRef: "attestations/codex-read-only-v1.json",
+      configurationSnapshot: codexConfigurationSnapshot
     }, {
       pinExecutable: (_executable, _expectedName, { preflight }) => {
         preflight.failure = "managed-mutation-proof-unavailable";
@@ -467,7 +486,8 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       repositoryPath: process.cwd(),
       reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
       implementerSession: "implementer-session",
-      attestationRef: "attestations/codex-read-only-v1.json"
+      attestationRef: "attestations/codex-read-only-v1.json",
+      configurationSnapshot: codexConfigurationSnapshot
     }, {
       createView: () => ({ available: true, view: strictView }),
       removeView: () => ({ removed: true }),
@@ -486,7 +506,8 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       repositoryPath: process.cwd(),
       reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
       implementerSession: "implementer-session",
-      attestationRef: "attestations/codex-read-only-v1.json"
+      attestationRef: "attestations/codex-read-only-v1.json",
+      configurationSnapshot: codexConfigurationSnapshot
     }, {
       createView: () => ({ available: true, view: strictView }),
       rebuildPackage: () => ({ valid: true, package: reviewPackage }),
@@ -534,6 +555,20 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       clock: () => "2026-08-15T04:01:00.000Z"
     });
     assert.equal(tamperedArtifactDelivery.code, "independent-reviewer-parent-strict-tool-receipt-invalid");
+    const tamperedAdapterSelection = consumeCodexParentStrictReviewToolResult({
+      toolRequest: {
+        ...toolRequest,
+        runtimeState: {
+          ...toolRequest.runtimeState,
+          configurationSnapshot: { schemaVersion: 1, sources: ["config/ai-skills.json:runtime"], values: { reviewAdapter: "claude-detached-restricted-v1" } }
+        }
+      },
+      toolResult: { exit_code: 0, output: "{}" }
+    }, {
+      removeView: () => ({ removed: true }),
+      clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(tamperedAdapterSelection.code, "independent-reviewer-parent-strict-tool-receipt-invalid");
     const tamperedExpiration = consumeCodexParentStrictReviewToolResult({
       toolRequest: { ...toolRequest, runtimeState: { ...toolRequest.runtimeState, expiresAt: "2026-08-16T04:00:00.000Z" } },
       toolResult: { exit_code: 0, output: "{}" }
@@ -672,7 +707,8 @@ test("Codex strict preflight reserves boundary-unavailable for the managed mutat
     repositoryPath: process.cwd(),
     reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
     implementerSession: "implementer-session",
-    attestationRef: "attestations/codex-read-only-v1.json"
+    attestationRef: "attestations/codex-read-only-v1.json",
+    configurationSnapshot: codexConfigurationSnapshot
   });
   for (const failure of ["executable-identity-unavailable", "candidate-missing", "platform-trust-unavailable", "identity-unstable", undefined]) {
     const outcome = buildCodexParentStrictReviewToolRequest(request(), {

@@ -207,7 +207,7 @@ test("the repository's own manifest and helper inventory build a complete runtim
   for (const helper of ["check-operation-authorization", "github-cli-auth-context", "platform-review-adapters", "autonomous-sdd-controller",
     "independent-review-contract", "research-planning-skill-runtime", "sdd-lifecycle-hygiene",
     "sdd-workspace-cleanup", "create-or-find-issue", "select-next-work", "validate-pr-contract",
-    "codex-review-event-capture", "review-package-capsule"]) {
+    "codex-review-event-capture", "review-package-capsule", "review-adapter-dispatch"]) {
     assert.ok(declared.has(helper), `missing declared helper: ${helper}`);
   }
   for (const entry of result.manifest.entrypoints) {

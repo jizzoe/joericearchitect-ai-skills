@@ -4,31 +4,69 @@ import test from "node:test";
 import { executeAuthorizedIndependentReview, executeIndependentReview, probeDegradedIndependentReviewAdapter, probeIndependentReviewAdapter } from "../execute-independent-review.mjs";
 import { packageDigest } from "../independent-review-contract.mjs";
 import { validateIndependentReviewV1 } from "../independent-review.mjs";
+import { resolveReviewAdapterDispatch } from "../review-adapter-dispatch.mjs";
 const file = (name) => JSON.parse(fs.readFileSync(new URL(`../../../evals/skills/independent-review/fixtures/${name}`, import.meta.url), "utf8"));
 const adapter = { adapter: "fixture", attestationRef: "fixture-attestation", probeReference: "fixture-probe", runtimeEnforced: true, freshContext: true, readOnlyView: true, nonInteractive: true, denied: { workspaceWrite: true, gitWrite: true, githubMutation: true, credentialAccess: true, authenticatedNetwork: true, externalSend: true, deployment: true, release: true, delegatedMutation: true } };
+const configurationSnapshot = { schemaVersion: 1, sources: ["config/ai-skills.json:runtime"], values: { reviewAdapter: "codex-detached-read-only-v1" } };
+const adapterBinding = resolveReviewAdapterDispatch(configurationSnapshot).binding;
+const runtimeReceipt = { reviewAdapter: "codex-detached-read-only-v1", runtimeHelper: "platform-review-adapters", source: "codex-exec-tool" };
+const strictCapabilities = { ...adapter, adapter: "codex" };
+const degradedCapabilities = { freshContext: true, nonInteractive: true, detachedView: true, sealedPackageOnly: true, disabledMutationTools: true, credentialScrubbed: true };
+const implementations = ({ strict = async () => null, degraded = async () => null, strictBoundary = strictCapabilities, degradedBoundary = degradedCapabilities } = {}) => ({
+  "codex-detached-read-only-v1": {
+    reviewAdapter: "codex-detached-read-only-v1",
+    binding: adapterBinding,
+    strictCapabilities: strictBoundary,
+    degradedCapabilities: degradedBoundary,
+    strict: async (...args) => {
+      const value = await strict(...args);
+      return value?.result ? { ...value, runtimeReceipt } : { result: value, runtimeReceipt };
+    },
+    degraded: async (...args) => {
+      const value = await degraded(...args);
+      return value?.result ? { ...value, runtimeReceipt } : { result: value, runtimeReceipt };
+    }
+  }
+});
 test("capability probe fails closed and executor accepts only a validated immutable result", async () => {
   assert.equal(probeIndependentReviewAdapter({ ...adapter, denied: { ...adapter.denied, gitWrite: false } }).available, false);
   const reviewPackage = file("valid-package.json"); reviewPackage.manifestDigest = packageDigest(reviewPackage);
-  const result = file("valid-result.json"); result.manifestDigest = reviewPackage.manifestDigest;
-  const out = await executeIndependentReview({ package: reviewPackage, adapter, configuredReviewer: { type: "fixture", identity: "fresh-reviewer", attestation: { ref: "fixture-attestation" } }, implementerSession: "implementer", invoke: async () => result });
+  const result = file("valid-result.json"); result.manifestDigest = reviewPackage.manifestDigest; result.reviewer.adapter = "codex";
+  const configuredReviewer = { type: "fixture", identity: "fresh-reviewer", adapter: "codex", attestation: { ref: "fixture-attestation" } };
+  const out = await executeIndependentReview({ package: reviewPackage, configurationSnapshot, adapterImplementations: implementations({ strict: async () => result }), configuredReviewer, implementerSession: "implementer" });
   assert.equal(out.status, "passed");
   const unavailable = { ...result, status: "unavailable", unavailableCode: "fixture-runtime-unavailable", attestation: { ...result.attestation, nonInteractive: false, isolatedContext: false, freshContext: false, readOnly: false } };
   const diagnostic = { schemaVersion: 1, stage: "reviewer-execution", operation: "fixture-strict-review", code: unavailable.unavailableCode, category: "runtime-unavailable", subject: "reviewer-executable", exitCode: 1, safeMessage: "Fixture runtime is unavailable." };
-  const diagnosticOut = await executeIndependentReview({ package: reviewPackage, adapter, configuredReviewer: { type: "fixture", identity: "fresh-reviewer", attestation: { ref: "fixture-attestation" } }, implementerSession: "implementer", invoke: async () => ({ status: "unavailable", result: unavailable, diagnostic }) });
+  const diagnosticOut = await executeIndependentReview({ package: reviewPackage, configurationSnapshot, adapterImplementations: implementations({ strict: async () => ({ status: "unavailable", result: unavailable, diagnostic }) }), configuredReviewer, implementerSession: "implementer" });
   assert.deepEqual(diagnosticOut.diagnostic, diagnostic);
-  assert.equal((await executeIndependentReview({ package: reviewPackage, adapter: {}, invoke: async () => result })).status, "unavailable");
+  assert.equal((await executeIndependentReview({ package: reviewPackage, configurationSnapshot, adapterImplementations: implementations({ strict: async () => result, strictBoundary: {} }), configuredReviewer, implementerSession: "implementer" })).status, "unavailable");
+  const missingReceipt = await executeIndependentReview({
+    package: reviewPackage,
+    configurationSnapshot,
+    adapterImplementations: {
+      "codex-detached-read-only-v1": {
+        reviewAdapter: "codex-detached-read-only-v1",
+        binding: adapterBinding,
+        strictCapabilities,
+        strict: async () => ({ result })
+      }
+    },
+    configuredReviewer,
+    implementerSession: "implementer"
+  });
+  assert.equal(missingReceipt.code, "review-adapter-runtime-receipt-mismatch");
 });
 
 test("degraded execution is strict-first and requires the explicit sealed-package authorization", async () => {
   const reviewPackage = file("valid-package.json"); reviewPackage.manifestDigest = packageDigest(reviewPackage);
-  const strictReviewer = { type: "strict", identity: "strict-reviewer", attestation: { ref: "strict-attestation" } };
-  const degradedReviewer = { type: "degraded", identity: "degraded-reviewer", attestation: { ref: "degraded-attestation" } };
+  const strictReviewer = { type: "strict", identity: "strict-reviewer", adapter: "codex", attestation: { ref: "strict-attestation" } };
+  const degradedReviewer = { type: "degraded", identity: "degraded-reviewer", adapter: "codex", attestation: { ref: "degraded-attestation" } };
   const authorization = { expiresAt: "2026-08-14T00:00:00.000Z", degradedIndependentReview: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic exact fallback", fallbackBoundary: "fresh-separated-reviewer-only", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest } };
   const strictUnavailable = {
     schemaVersion: 1,
     reviewRecordId: `strict-unavailable-${reviewPackage.manifestDigest.slice(0, 12)}`,
     executionId: `strict-unavailable-${reviewPackage.headCommit.slice(0, 12)}`,
-    reviewer: { type: "strict", identity: "strict-reviewer", adapter: "strict" },
+    reviewer: { type: "strict", identity: "strict-reviewer", adapter: "codex" },
     attestation: { ref: "strict-attestation", nonInteractive: false, isolatedContext: false, freshContext: false, readOnly: false },
     assuranceLevel: "strict-isolated",
     baseCommit: reviewPackage.baseCommit,
@@ -41,9 +79,10 @@ test("degraded execution is strict-first and requires the explicit sealed-packag
     unavailableCode: "independent-reviewer-not-isolated-read-only"
   };
   const degraded = file("valid-result.json");
-  Object.assign(degraded, { reviewRecordId: "degraded-record", executionId: "degraded-execution", reviewer: { type: "degraded", identity: "degraded-reviewer", adapter: "degraded" }, attestation: { ref: "degraded-attestation", nonInteractive: true, isolatedContext: false, freshContext: true, readOnly: false }, assuranceLevel: "authorized-degraded", manifestDigest: reviewPackage.manifestDigest, capabilityLedger: { enforced: ["githubMutation", "deployment", "release", "externalSend", "delegatedMutation"], unavailable: ["workspaceWrite", "gitWrite", "credentialAccess", "authenticatedNetwork", "authenticatedParentLaunchEvidence", "hostPinnedReviewerExecutableIdentity"], instructionConstrained: [] }, strictUnavailable: { reviewRecordId: strictUnavailable.reviewRecordId, executionId: strictUnavailable.executionId, adapter: "strict", status: "unavailable", unavailableCode: strictUnavailable.unavailableCode, baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest }, degradedAuthorization: { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic exact fallback", fallbackBoundary: "fresh-separated-reviewer-only" } });
+  Object.assign(degraded, { reviewRecordId: "degraded-record", executionId: "degraded-execution", reviewer: { type: "degraded", identity: "degraded-reviewer", adapter: "codex" }, attestation: { ref: "degraded-attestation", nonInteractive: true, isolatedContext: false, freshContext: true, readOnly: false }, assuranceLevel: "authorized-degraded", manifestDigest: reviewPackage.manifestDigest, capabilityLedger: { enforced: ["githubMutation", "deployment", "release", "externalSend", "delegatedMutation"], unavailable: ["workspaceWrite", "gitWrite", "credentialAccess", "authenticatedNetwork", "authenticatedParentLaunchEvidence", "hostPinnedReviewerExecutableIdentity"], instructionConstrained: [] }, strictUnavailable: { reviewRecordId: strictUnavailable.reviewRecordId, executionId: strictUnavailable.executionId, adapter: "codex", status: "unavailable", unavailableCode: strictUnavailable.unavailableCode, baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest }, degradedAuthorization: { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic exact fallback", fallbackBoundary: "fresh-separated-reviewer-only" } });
   const calls = [];
-  const common = { package: reviewPackage, strictAdapter: {}, degradedAdapter: { freshContext: true, nonInteractive: true, detachedView: true, sealedPackageOnly: true, disabledMutationTools: true, credentialScrubbed: true }, configuredReviewer: strictReviewer, degradedReviewer, implementerSession: "implementer", authorization, selectedEntry: "change", now: "2026-08-13T00:00:00.000Z", clock: () => "2026-08-13T00:00:01.000Z", invokeStrict: async () => { calls.push("strict"); return degraded; }, invokeDegraded: async (received) => { calls.push("degraded"); assert.notEqual(received, reviewPackage); return degraded; } };
+  const degradedOperation = async (received) => { calls.push("degraded"); assert.notEqual(received, reviewPackage); return degraded; };
+  const common = { package: reviewPackage, configurationSnapshot, adapterImplementations: implementations({ strictBoundary: {}, strict: async () => { calls.push("strict"); return degraded; }, degraded: degradedOperation }), configuredReviewer: strictReviewer, degradedReviewer, implementerSession: "implementer", authorization, selectedEntry: "change", now: "2026-08-13T00:00:00.000Z", clock: () => "2026-08-13T00:00:01.000Z" };
   const pending = await executeAuthorizedIndependentReview(common);
   assert.equal(pending.code, "strict-unavailable-evidence-not-durable");
   assert.equal(pending.requiresPersistence, true);
@@ -73,14 +112,14 @@ test("degraded execution is strict-first and requires the explicit sealed-packag
     { ...degraded.strictUnavailable, executionId: "different-execution" },
     { ...degraded.strictUnavailable, adapter: "different-adapter" }
   ]) {
-    const badStrictSummary = await executeAuthorizedIndependentReview({ ...common, durableStrictUnavailable: durable, invokeDegraded: async () => ({ ...degraded, strictUnavailable: strictUnavailableSummary }) });
+    const badStrictSummary = await executeAuthorizedIndependentReview({ ...common, durableStrictUnavailable: durable, adapterImplementations: implementations({ strictBoundary: {}, degraded: async () => ({ ...degraded, strictUnavailable: strictUnavailableSummary }) }) });
     assert.equal(badStrictSummary.code, "independent-review-strict-unavailable-not-durable");
   }
   for (const degradedAuthorization of [
     { ...degraded.degradedAuthorization, riskReason: "different risk" },
     { ...degraded.degradedAuthorization, expiresAt: "2026-08-14T00:00:01.000Z" }
   ]) {
-    const badAuthorization = await executeAuthorizedIndependentReview({ ...common, durableStrictUnavailable: durable, invokeDegraded: async () => ({ ...degraded, degradedAuthorization }) });
+    const badAuthorization = await executeAuthorizedIndependentReview({ ...common, durableStrictUnavailable: durable, adapterImplementations: implementations({ strictBoundary: {}, degraded: async () => ({ ...degraded, degradedAuthorization }) }) });
     assert.equal(badAuthorization.code, "independent-review-degraded-authorization-mismatch");
   }
   assert.equal(probeDegradedIndependentReviewAdapter({}).available, false);
@@ -88,11 +127,11 @@ test("degraded execution is strict-first and requires the explicit sealed-packag
 
 test("degraded execution resumes from the durable adapter-emitted strict result", async () => {
   const reviewPackage = file("valid-package.json"); reviewPackage.manifestDigest = packageDigest(reviewPackage);
-  const configuredReviewer = { type: "strict", identity: "strict-reviewer", attestation: { ref: "strict-attestation" } };
-  const degradedReviewer = { type: "degraded", identity: "degraded-reviewer", attestation: { ref: "degraded-attestation" } };
+  const configuredReviewer = { type: "strict", identity: "strict-reviewer", adapter: "codex", attestation: { ref: "strict-attestation" } };
+  const degradedReviewer = { type: "degraded", identity: "degraded-reviewer", adapter: "codex", attestation: { ref: "degraded-attestation" } };
   const strictUnavailable = (suffix) => ({
     schemaVersion: 1, reviewRecordId: `strict-record-${suffix}`, executionId: `strict-execution-${suffix}`,
-    reviewer: { type: "strict", identity: "strict-reviewer", adapter: "strict" },
+    reviewer: { type: "strict", identity: "strict-reviewer", adapter: "codex" },
     attestation: { ref: "strict-attestation", nonInteractive: false, isolatedContext: false, freshContext: false, readOnly: false },
     assuranceLevel: "strict-isolated", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit,
     manifestDigest: reviewPackage.manifestDigest, startedAt: `2026-08-13T00:00:0${suffix}.000Z`,
@@ -103,16 +142,16 @@ test("degraded execution resumes from the durable adapter-emitted strict result"
   const secondStrict = strictUnavailable("2");
   const degraded = file("valid-result.json");
   Object.assign(degraded, {
-    reviewer: { type: "degraded", identity: "degraded-reviewer", adapter: "degraded" },
+    reviewer: { type: "degraded", identity: "degraded-reviewer", adapter: "codex" },
     attestation: { ref: "degraded-attestation", nonInteractive: true, isolatedContext: false, freshContext: true, readOnly: false },
     assuranceLevel: "authorized-degraded", manifestDigest: reviewPackage.manifestDigest,
     capabilityLedger: { enforced: ["githubMutation", "deployment", "release", "externalSend", "delegatedMutation"], unavailable: ["workspaceWrite", "gitWrite", "credentialAccess", "authenticatedNetwork", "authenticatedParentLaunchEvidence", "hostPinnedReviewerExecutableIdentity"], instructionConstrained: [] },
-    strictUnavailable: { reviewRecordId: firstStrict.reviewRecordId, executionId: firstStrict.executionId, adapter: "strict", status: "unavailable", unavailableCode: firstStrict.unavailableCode, baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
+    strictUnavailable: { reviewRecordId: firstStrict.reviewRecordId, executionId: firstStrict.executionId, adapter: "codex", status: "unavailable", unavailableCode: firstStrict.unavailableCode, baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
     degradedAuthorization: { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic exact fallback", fallbackBoundary: "fresh-separated-reviewer-only" }
   });
   const authorization = { expiresAt: "2026-08-14T00:00:00.000Z", degradedIndependentReview: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic exact fallback", fallbackBoundary: "fresh-separated-reviewer-only", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest } };
   let strictCalls = 0;
-  const common = { package: reviewPackage, strictAdapter: adapter, degradedAdapter: { freshContext: true, nonInteractive: true, detachedView: true, sealedPackageOnly: true, disabledMutationTools: true, credentialScrubbed: true }, configuredReviewer, degradedReviewer, implementerSession: "implementer", authorization, selectedEntry: "change", now: "2026-08-13T00:00:00.000Z", clock: () => "2026-08-13T00:00:01.000Z", invokeStrict: async () => (++strictCalls === 1 ? firstStrict : secondStrict), invokeDegraded: async () => degraded };
+  const common = { package: reviewPackage, configurationSnapshot, adapterImplementations: implementations({ strict: async () => (++strictCalls === 1 ? firstStrict : secondStrict), degraded: async () => degraded }), configuredReviewer, degradedReviewer, implementerSession: "implementer", authorization, selectedEntry: "change", now: "2026-08-13T00:00:00.000Z", clock: () => "2026-08-13T00:00:01.000Z" };
   const first = await executeAuthorizedIndependentReview(common);
   assert.equal(first.code, "strict-unavailable-evidence-not-durable");
   assert.equal(first.strictResult, firstStrict);
@@ -123,13 +162,12 @@ test("degraded execution resumes from the durable adapter-emitted strict result"
 
 test("synthesized strict-unavailable evidence is current enough for the degraded delivery gate", async () => {
   const reviewPackage = file("valid-package.json"); reviewPackage.manifestDigest = packageDigest(reviewPackage);
-  const configuredReviewer = { type: "strict", identity: "strict-reviewer", available: true, attestation: { ref: "strict-attestation" } };
-  const degradedReviewer = { type: "degraded", identity: "degraded-reviewer", available: true, attestation: { ref: "degraded-attestation" } };
+  const configuredReviewer = { type: "strict", identity: "strict-reviewer", adapter: "codex", available: true, attestation: { ref: "strict-attestation" } };
+  const degradedReviewer = { type: "degraded", identity: "degraded-reviewer", adapter: "codex", available: true, attestation: { ref: "degraded-attestation" } };
   const applyEvidence = { reference: "apply-current", current: true, headCommit: reviewPackage.headCommit, completedAt: "2026-08-13T00:00:00.000Z", validationEvidence: reviewPackage.validationEvidence };
   const authorization = { expiresAt: "2026-08-14T00:00:00.000Z", degradedIndependentReview: { enabled: true, change: "change", transitions: ["merge-pr"], expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic exact fallback", fallbackBoundary: "fresh-separated-reviewer-only", baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest } };
   const common = {
-    package: reviewPackage, strictAdapter: {}, configuredReviewer, degradedReviewer,
-    degradedAdapter: { freshContext: true, nonInteractive: true, detachedView: true, sealedPackageOnly: true, disabledMutationTools: true, credentialScrubbed: true },
+    package: reviewPackage, configurationSnapshot, adapterImplementations: implementations({ strictBoundary: {} }), configuredReviewer, degradedReviewer,
     implementerSession: "implementer", authorization, selectedEntry: "change",
     now: "2026-08-13T00:00:01.000Z", clock: () => "2026-08-13T00:00:02.000Z"
   };
@@ -141,18 +179,18 @@ test("synthesized strict-unavailable evidence is current enough for the degraded
   const result = file("valid-result.json");
   Object.assign(result, {
     reviewRecordId: "degraded-after-apply", executionId: "degraded-after-apply-execution",
-    reviewer: { type: "degraded", identity: "degraded-reviewer", adapter: "degraded" },
+    reviewer: { type: "degraded", identity: "degraded-reviewer", adapter: "codex" },
     attestation: { ref: "degraded-attestation", nonInteractive: true, isolatedContext: false, freshContext: true, readOnly: false },
     assuranceLevel: "authorized-degraded", manifestDigest: reviewPackage.manifestDigest,
     startedAt: "2026-08-13T00:00:03.000Z", completedAt: "2026-08-13T00:00:04.000Z",
     capabilityLedger: { enforced: ["githubMutation", "deployment", "release", "externalSend", "delegatedMutation"], unavailable: ["workspaceWrite", "gitWrite", "credentialAccess", "authenticatedNetwork", "authenticatedParentLaunchEvidence", "hostPinnedReviewerExecutableIdentity"], instructionConstrained: [] },
-    strictUnavailable: { reviewRecordId: pending.strictResult.reviewRecordId, executionId: pending.strictResult.executionId, adapter: "strict", status: "unavailable", unavailableCode: pending.strictResult.unavailableCode, baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
+    strictUnavailable: { reviewRecordId: pending.strictResult.reviewRecordId, executionId: pending.strictResult.executionId, adapter: "codex", status: "unavailable", unavailableCode: pending.strictResult.unavailableCode, baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest },
     degradedAuthorization: { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic exact fallback", fallbackBoundary: "fresh-separated-reviewer-only" }
   });
   const completed = await executeAuthorizedIndependentReview({
     ...common,
     durableStrictUnavailable: { reference: "checkpoint:strict-current", current: true, result: pending.strictResult },
-    invokeDegraded: async () => result
+    adapterImplementations: implementations({ strictBoundary: {}, degraded: async () => result })
   });
   assert.equal(completed.status, "passed", JSON.stringify(completed));
   const deliveryGate = validateIndependentReviewV1({
@@ -165,8 +203,8 @@ test("synthesized strict-unavailable evidence is current enough for the degraded
 
 test("production orchestration automatically consumes recoverable host requests", async () => {
   const reviewPackage = file("valid-package.json"); reviewPackage.manifestDigest = packageDigest(reviewPackage);
-  const configuredReviewer = { type: "codex", identity: "strict-reviewer", attestation: { ref: "strict-attestation" } };
-  const degradedReviewer = { type: "codex-degraded", identity: "fresh-reviewer", attestation: { ref: "degraded-attestation" } };
+  const configuredReviewer = { type: "codex", identity: "strict-reviewer", adapter: "codex", attestation: { ref: "strict-attestation" } };
+  const degradedReviewer = { type: "codex-degraded", identity: "fresh-reviewer", adapter: "codex", attestation: { ref: "degraded-attestation" } };
   const strictUnavailable = {
     schemaVersion: 1, reviewRecordId: "strict-runtime-record", executionId: "strict-runtime-execution",
     reviewer: { type: "codex", identity: "strict-reviewer", adapter: "codex" },
@@ -200,11 +238,10 @@ test("production orchestration automatically consumes recoverable host requests"
     degradedAuthorization: { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic exact fallback", fallbackBoundary: "fresh-separated-reviewer-only" }
   });
   const common = {
-    package: reviewPackage, strictAdapter: {}, configuredReviewer, degradedReviewer,
+    package: reviewPackage, configurationSnapshot, adapterImplementations: implementations({ strictBoundary: {} }), configuredReviewer, degradedReviewer,
     implementerSession: "implementer", authorization, selectedEntry: "change",
     durableStrictUnavailable: { reference: "checkpoint:strict", current: true, result: strictUnavailable },
-    launcherRecovery, now: "2026-08-13T00:00:00.000Z", clock: () => "2026-08-13T00:00:01.000Z",
-    invokeDegraded: async () => { throw new Error("direct degraded invocation must not run"); }
+    launcherRecovery, now: "2026-08-13T00:00:00.000Z", clock: () => "2026-08-13T00:00:01.000Z"
   };
   let transportCalls = 0;
   const completed = await executeAuthorizedIndependentReview({
@@ -214,6 +251,7 @@ test("production orchestration automatically consumes recoverable host requests"
       const response = {
         allowed: true, status: "passed", code: "review-launcher-host-complete",
         launchId: prepared.hostRequest.launchId, requestDigest: prepared.hostRequest.requestDigest,
+        reviewAdapter: "codex-detached-read-only-v1",
         launcherId: "codex-review-launcher", launcherKind: "codex-detached-read-only-v1",
         hostScript: "scripts/sdd/review-launcher-host.mjs", hostExecutionId: "host-runtime-execution",
         worktreeLifecycle: { operation: prepared.expectedRecovery.worktreeLifecycle.operation, requestDigest: prepared.worktreeLifecycleRequest.requestDigest, expiresAt: prepared.expectedRecovery.worktreeLifecycle.expiresAt },
@@ -222,7 +260,7 @@ test("production orchestration automatically consumes recoverable host requests"
       return {
         status: "executed",
         response,
-        runtimeReceipt: { schemaVersion: 1, source: "codex-exec-tool", status: "executed", securityVerifiable: false, outsideManagedSandbox: true, executionRef: "codex-exec-tool:fixture", launcherId: response.launcherId, launcherKind: response.launcherKind, hostScript: response.hostScript, requestDigest: response.requestDigest, hostExecutionId: response.hostExecutionId }
+        runtimeReceipt: { schemaVersion: 1, source: "codex-exec-tool", reviewAdapter: "codex-detached-read-only-v1", runtimeHelper: "platform-review-adapters", status: "executed", securityVerifiable: false, outsideManagedSandbox: true, executionRef: "codex-exec-tool:fixture", launcherId: response.launcherId, launcherKind: response.launcherKind, hostScript: response.hostScript, requestDigest: response.requestDigest, hostExecutionId: response.hostExecutionId }
       };
     }
   });

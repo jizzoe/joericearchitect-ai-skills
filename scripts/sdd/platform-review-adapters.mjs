@@ -10,6 +10,7 @@ import { createArchivedReviewView, removeArchivedReviewView } from "./detached-r
 import { buildReviewPackage, canonicalJson, parseReviewFindingsPayload, validateReviewFindingsPayload, validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { requiredReviewDenials } from "./review-adapter-contract.mjs";
+import { validateReviewAdapterDispatchBinding } from "./review-adapter-dispatch.mjs";
 import { createReviewDiagnostic, diagnosticFromCode, diagnosticFromError, unavailableOutcome, unclassifiedRuntimeDiagnostic } from "./review-diagnostics.mjs";
 import { writeReviewPackageCapsule } from "./review-package-capsule.mjs";
 
@@ -34,10 +35,20 @@ function runtimePath(value) {
 }
 
 function validPreparedRecovery(prepared) {
-  return prepared?.allowed === true &&
+  const request = prepared?.hostRequest?.request;
+  const dispatch = validateReviewAdapterDispatchBinding({
+    configurationSnapshot: request?.configurationSnapshot,
+    binding: request?.reviewAdapterBinding,
+    launcher: request?.launcher
+  });
+  return dispatch.valid && prepared?.allowed === true &&
     prepared.code === "review-launcher-external-host-required" &&
     /^[0-9a-f]{64}$/.test(prepared?.hostRequest?.requestDigest ?? "") &&
-    prepared?.expectedRecovery?.hostScript === reviewLauncherHostScript;
+    prepared?.expectedRecovery?.hostScript === reviewLauncherHostScript &&
+    prepared.expectedRecovery.reviewAdapter === dispatch.binding.reviewAdapter &&
+    prepared.expectedRecovery.adapterBindingDigest === dispatch.binding.bindingDigest &&
+    prepared.expectedRecovery.launcherKind === dispatch.binding.launcherKind &&
+    prepared.expectedRecovery.runtimeHelper === dispatch.binding.runtimeHelper;
 }
 
 function resultArtifactDiagnostics({ present = false, bytes = 0, sha256 = "", parse = "not-attempted", payload = "not-attempted", validation = "not-attempted", cleanup = "not-attempted" } = {}) {
@@ -408,6 +419,8 @@ function strictRuntimeStateMatchesRequest(state) {
     ownershipToken: view.ownershipToken
   };
   return canonicalJson(packageBinding) === canonicalJson(evidence.packageBinding) &&
+    canonicalJson(state.configurationSnapshot) === canonicalJson(evidence.configurationSnapshot) &&
+    canonicalJson(state.reviewAdapterBinding) === canonicalJson(evidence.reviewAdapterBinding) &&
     canonicalJson(state.configuredReviewer) === canonicalJson(evidence.reviewer) &&
     canonicalJson(state.executableIdentity) === canonicalJson(evidence.executableIdentity) &&
     canonicalJson(state.artifactDelivery) === canonicalJson(evidence.artifactDelivery) &&
@@ -498,7 +511,7 @@ function prepareCodexCaptureLaunch({ mode, view, reviewPackage, repositoryPath, 
  * command. No repository-controlled executable or shell text is run outside
  * the managed parent sandbox.
  */
-export function buildCodexParentStrictReviewToolRequest({ reviewPackage, repositoryPath, reviewer, implementerSession, attestationRef, executable = "codex" } = {}, {
+export function buildCodexParentStrictReviewToolRequest({ reviewPackage, repositoryPath, reviewer, implementerSession, attestationRef, executable = "codex", configurationSnapshot } = {}, {
   createView = createArchivedReviewView,
   removeView = removeArchivedReviewView,
   rebuildPackage = buildReviewPackage,
@@ -516,6 +529,13 @@ export function buildCodexParentStrictReviewToolRequest({ reviewPackage, reposit
 } = {}) {
   const packageValidation = validateReviewPackage(reviewPackage);
   const ref = attestationRef ?? reviewer?.attestation?.ref;
+  const dispatch = validateReviewAdapterDispatchBinding({
+    configurationSnapshot,
+    ...(reviewer?.adapter === undefined ? {} : { reviewer })
+  });
+  if (!dispatch.valid || dispatch.binding?.reviewAdapter !== "codex-detached-read-only-v1") {
+    return platformUnavailable("adapter-dispatch", "prepare-codex-strict-review-tool", dispatch.valid ? "review-adapter-launcher-mismatch" : dispatch.code, "review-adapter", "The durable review-adapter selection does not authorize the Codex strict transport.");
+  }
   if (!packageValidation.valid || !runtimePath(repositoryPath) || !safeIdentity(reviewer?.type) ||
       !safeIdentity(reviewer?.identity) || !safeIdentity(implementerSession) || reviewer.identity === implementerSession || !safeIdentity(ref)) {
     return platformUnavailable("parent-transport", "prepare-codex-strict-review-tool", "independent-reviewer-parent-strict-request-invalid", "strict-review-request", "The parent strict-review request is invalid or self-reviewing.");
@@ -573,7 +593,7 @@ export function buildCodexParentStrictReviewToolRequest({ reviewPackage, reposit
       return strictParentUnavailable(capture.diagnostic, cleanup);
     }
     const arguments_ = capture.arguments;
-    const configuredReviewer = Object.freeze({ type: reviewer.type, identity: reviewer.identity, adapter: "codex", attestation: Object.freeze({ ref }) });
+    const configuredReviewer = Object.freeze({ type: reviewer.type, identity: reviewer.identity, adapter: dispatch.binding.resultAdapter, attestation: Object.freeze({ ref }) });
     const viewBinding = Object.freeze({
       kind: view.kind,
       repository: view.repository,
@@ -585,6 +605,8 @@ export function buildCodexParentStrictReviewToolRequest({ reviewPackage, reposit
     });
     const requestEvidence = Object.freeze({
       schemaVersion: 1,
+      configurationSnapshot: structuredClone(configurationSnapshot),
+      reviewAdapterBinding: dispatch.binding,
       packageBinding: Object.freeze({ baseCommit: reviewPackage.baseCommit, headCommit: reviewPackage.headCommit, manifestDigest: reviewPackage.manifestDigest }),
       reviewer: configuredReviewer,
       implementerSession,
@@ -619,7 +641,7 @@ export function buildCodexParentStrictReviewToolRequest({ reviewPackage, reposit
       approvalReviewer: "auto_review",
       requestDigest,
       runtimeState: Object.freeze({ view, requestPath, resultPath, receiptPath, captureRequestDigest: capture.requestDigest, hostIdentities: capture.hostIdentities,
-        reviewPackage, configuredReviewer, implementerSession, executionId, startedAt, expiresAt, executableIdentity,
+        reviewPackage, configurationSnapshot: structuredClone(configurationSnapshot), reviewAdapterBinding: dispatch.binding, configuredReviewer, implementerSession, executionId, startedAt, expiresAt, executableIdentity,
         cliVersionClassification: capture.request.cliVersionClassification,
         artifactDelivery: requestEvidence.artifactDelivery, requestEvidence })
     };
@@ -670,10 +692,16 @@ export function consumeCodexParentStrictReviewToolResult({ toolRequest, toolResu
 } = {}) {
   const cleanupView = () => toolRequest?.runtimeState?.view ? removeView(toolRequest.runtimeState.view) : { removed: false, code: "independent-review-view-cleanup-unsafe" };
   const state = toolRequest?.runtimeState;
+  const dispatch = validateReviewAdapterDispatchBinding({
+    configurationSnapshot: toolRequest?.runtimeState?.configurationSnapshot,
+    binding: state?.reviewAdapterBinding,
+    reviewer: state?.configuredReviewer
+  });
   const structurallyValid = toolRequest?.available === true && toolRequest.transport === "codex-parent-strict-exec-tool-v1" &&
     toolRequest.tool === "exec_command" && toolRequest.executable === "/usr/bin/env" &&
     toolRequest.sandboxPermissions === "require_escalated" && toolRequest.approvalPolicyRequirement === "interactive" &&
-    toolRequest.approvalReviewer === "auto_review" && state?.requestEvidence &&
+    toolRequest.approvalReviewer === "auto_review" && dispatch.valid &&
+    dispatch.binding.reviewAdapter === "codex-detached-read-only-v1" && state?.requestEvidence &&
     toolRequest.requestDigest === strictToolRequestDigest(state.requestEvidence) &&
     strictRuntimeStateMatchesRequest(state) &&
     canonicalJson(toolRequest.arguments) === canonicalJson(state.requestEvidence.arguments) &&
@@ -754,6 +782,8 @@ export function consumeCodexParentStrictReviewToolResult({ toolRequest, toolResu
     runtimeReceipt: {
       schemaVersion: 1,
       source: "codex-exec-tool",
+      reviewAdapter: state.reviewAdapterBinding.reviewAdapter,
+      runtimeHelper: state.reviewAdapterBinding.runtimeHelper,
       status: "executed",
       outsideManagedSandbox: true,
       innerPermissionProfile: "read-only",
@@ -868,6 +898,8 @@ export function buildCodexParentReviewHostToolRequest({ prepared, preparedReques
     }
     const requestEvidenceDigest = strictToolRequestDigest({
       preparedRequestDigest: prepared.hostRequest.requestDigest,
+      reviewAdapter: prepared.expectedRecovery.reviewAdapter,
+      adapterBindingDigest: prepared.expectedRecovery.adapterBindingDigest,
       captureRequestDigest: capture.requestDigest,
       arguments: capture.arguments,
       workingDirectory: capture.workingDirectory,
@@ -891,6 +923,7 @@ export function buildCodexParentReviewHostToolRequest({ prepared, preparedReques
       hostScript: reviewLauncherHostScript,
       hostExecutionModel: "sandbox-prepared-host-owned-executable",
       runtimeState: Object.freeze({ view, requestPath, resultPath, receiptPath, preparedRequestPath, captureRequestDigest: capture.requestDigest,
+        reviewAdapter: prepared.expectedRecovery.reviewAdapter, adapterBindingDigest: prepared.expectedRecovery.adapterBindingDigest,
         hostIdentities: capture.hostIdentities, executionId, expiresAt,
         cliVersionClassification: capture.request.cliVersionClassification, requestEvidenceDigest })
     };
@@ -916,6 +949,8 @@ export function consumeCodexParentReviewHostToolResult({ prepared, toolRequest, 
   const state = toolRequest?.runtimeState;
   const evidenceDigest = state && strictToolRequestDigest({
     preparedRequestDigest: prepared?.hostRequest?.requestDigest,
+    reviewAdapter: prepared?.expectedRecovery?.reviewAdapter,
+    adapterBindingDigest: prepared?.expectedRecovery?.adapterBindingDigest,
     captureRequestDigest: state.captureRequestDigest,
     arguments: toolRequest.arguments,
     workingDirectory: toolRequest.workingDirectory,
@@ -928,7 +963,9 @@ export function consumeCodexParentReviewHostToolResult({ prepared, toolRequest, 
       toolRequest.hostExecutionModel !== "sandbox-prepared-host-owned-executable" ||
       toolRequest.executable !== "/usr/bin/env" || !validPreparedRecovery(prepared) ||
       toolRequest.requestDigest !== prepared.hostRequest.requestDigest || toolRequest.captureEvidenceDigest !== evidenceDigest ||
-      state?.requestEvidenceDigest !== evidenceDigest) {
+      state?.requestEvidenceDigest !== evidenceDigest ||
+      state?.reviewAdapter !== prepared.expectedRecovery.reviewAdapter ||
+      state?.adapterBindingDigest !== prepared.expectedRecovery.adapterBindingDigest) {
     const cleanup = cleanupView();
     return unavailableCodexParentResult("review-launcher-codex-tool-receipt-invalid", resultArtifactDiagnostics(), cleanup);
   }
@@ -1002,6 +1039,7 @@ export function consumeCodexParentReviewHostToolResult({ prepared, toolRequest, 
     code: "review-launcher-host-complete",
     launchId: prepared.hostRequest.launchId,
     requestDigest: toolRequest.requestDigest,
+    reviewAdapter: prepared.expectedRecovery.reviewAdapter,
     launcherId: prepared.expectedRecovery.launcherId,
     launcherKind: prepared.expectedRecovery.launcherKind,
     hostScript: reviewLauncherHostScript,
@@ -1016,6 +1054,8 @@ export function consumeCodexParentReviewHostToolResult({ prepared, toolRequest, 
     runtimeReceipt: {
       schemaVersion: 1,
       source: "codex-exec-tool",
+      reviewAdapter: prepared.expectedRecovery.reviewAdapter,
+      runtimeHelper: prepared.expectedRecovery.runtimeHelper,
       status: "executed",
       securityVerifiable: false,
       outsideManagedSandbox: true,

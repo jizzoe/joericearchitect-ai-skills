@@ -95,6 +95,20 @@
       }
     },
     {
+      "name": "review-adapter-dispatch",
+      "module": "scripts/runtime/bin/review-adapter-dispatch.mjs",
+      "invocation": "cli",
+      "payloadWrapper": "scripts/sdd/review-adapter-dispatch.mjs",
+      "smoke": {
+        "args": [
+          "--help"
+        ],
+        "exitCodes": [
+          0
+        ]
+      }
+    },
+    {
       "name": "validate-implementation-quality",
       "module": "scripts/validation/validate-implementation-quality.mjs",
       "invocation": "cli",

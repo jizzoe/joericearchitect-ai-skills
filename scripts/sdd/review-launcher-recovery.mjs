@@ -7,6 +7,7 @@ import { canonicalJson, validateReviewPackage, validateReviewResult } from "./in
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { prepareReviewWorktreeLifecycle, validatePreparedReviewWorktreeLifecycle, validateReviewWorktreeLifecycle } from "./review-worktree-lifecycle.mjs";
 import { diagnosticFromCode, diagnosticFromError, preservedDiagnostic, unavailableOutcome } from "./review-diagnostics.mjs";
+import { validateReviewAdapterDispatchBinding } from "./review-adapter-dispatch.mjs";
 
 const hostScript = "scripts/sdd/review-launcher-host.mjs";
 const text = (value) => typeof value === "string" && value.trim().length > 0;
@@ -71,9 +72,17 @@ export function reviewLauncherRequestDigest({ schemaVersion, launchId, request }
   return createHash("sha256").update(canonicalJson({ schemaVersion, launchId, request: digestRequest })).digest("hex");
 }
 
-export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, repositoryPath, sourceRequestDigest, strictResult, launcher, runtime, reviewer, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
+export function validateReviewLauncherRecovery({ failureCode, authorization, selectedEntry, transition = "merge-pr", reviewPackage, repositoryPath, sourceRequestDigest, strictResult, launcher, runtime, reviewer, configurationSnapshot, reviewAdapterBinding, correctionAttempts = 0, derivedCorrection = false, correctionEvidence, now = new Date().toISOString() } = {}) {
   const packageCheck = validateReviewPackage(reviewPackage);
   if (!packageCheck.valid) return fail(packageCheck.issues[0].code);
+  const dispatch = validateReviewAdapterDispatchBinding({
+    configurationSnapshot,
+    ...(reviewAdapterBinding === undefined ? {} : { binding: reviewAdapterBinding }),
+    launcher,
+    reviewer,
+    result: strictResult
+  });
+  if (!dispatch.valid) return fail(dispatch.code);
   if (!text(authorization?.implementerSession) || !text(reviewer?.identity)) return fail("review-launcher-identity-binding-missing");
   if (authorization.implementerSession === reviewer.identity) return fail("review-launcher-self-review");
   const definition = reviewLauncherDefinition(launcher?.kind);
@@ -105,8 +114,12 @@ export function validateReviewLauncherRecovery({ failureCode, authorization, sel
     allowed: true,
     status: "ready",
     code: "review-launcher-recovery-ready",
+    adapterBinding: dispatch.binding,
     degradedAuthorization: degradedCheck.authorization,
     recovery: Object.freeze({
+      reviewAdapter: dispatch.binding.reviewAdapter,
+      adapterBindingDigest: dispatch.binding.bindingDigest,
+      runtimeHelper: dispatch.binding.runtimeHelper,
       launcherId: launcher.id,
       launcherKind: launcher.kind,
       hostScript,
@@ -130,6 +143,7 @@ export function prepareReviewLauncherRecovery(request, { launchId = randomUUID()
   if (!preflight.allowed) return preflight;
   const sealedRequest = structuredClone(request);
   delete sealedRequest.now;
+  sealedRequest.reviewAdapterBinding = preflight.adapterBinding;
   const hostRequest = { schemaVersion: 1, launchId, request: sealedRequest };
   hostRequest.requestDigest = reviewLauncherRequestDigest(hostRequest);
   // The standing policy authorizes derivation of one exact lifecycle record.
@@ -166,6 +180,8 @@ function validRuntimeReceipt(value, prepared, response) {
   return value?.schemaVersion === 1 && value.status === "executed" &&
     ["codex-exec-tool", "claude-parent-runtime", "ci-review-service"].includes(value.source) &&
     value.outsideManagedSandbox === true && value.securityVerifiable === false &&
+    value.reviewAdapter === prepared.expectedRecovery.reviewAdapter &&
+    value.runtimeHelper === prepared.expectedRecovery.runtimeHelper &&
     text(value.executionRef) && value.launcherId === prepared.expectedRecovery.launcherId &&
     value.launcherKind === prepared.expectedRecovery.launcherKind && value.hostScript === hostScript &&
     value.requestDigest === prepared.hostRequest.requestDigest &&
@@ -181,6 +197,7 @@ export function acceptReviewLauncherHostResponse({ prepared, response, runtimeRe
   if (!preflight.allowed) return preflight;
   if (response?.allowed !== true || response.code !== "review-launcher-host-complete" ||
       response.launchId !== hostRequest.launchId || response.requestDigest !== requestDigest ||
+      response.reviewAdapter !== preflight.recovery.reviewAdapter ||
       response.launcherId !== preflight.recovery.launcherId || response.launcherKind !== preflight.recovery.launcherKind ||
       response.hostScript !== hostScript || !text(response.hostExecutionId)) return fail("review-launcher-host-response-invalid");
   const lifecycle = validatePreparedReviewWorktreeLifecycle({
@@ -201,6 +218,15 @@ export function acceptReviewLauncherHostResponse({ prepared, response, runtimeRe
   const configuredReviewer = { ...request.reviewer, attestation: request.reviewer?.attestation ?? { ref: request.attestationRef } };
   const validation = validateReviewResult(response.result, { expectedPackage: request.reviewPackage, configuredReviewer, implementerSession: request.authorization?.implementerSession });
   if (!validation.valid || response.result.assuranceLevel !== "authorized-degraded") return fail("review-launcher-result-invalid", validation.issues?.[0]?.code);
+  const dispatch = validateReviewAdapterDispatchBinding({
+    configurationSnapshot: request.configurationSnapshot,
+    binding: request.reviewAdapterBinding,
+    launcher: request.launcher,
+    reviewer: request.reviewer,
+    runtimeReceipt: receipt,
+    result: response.result
+  });
+  if (!dispatch.valid) return fail(dispatch.code);
   if (!strictSummaryMatchesResult(response.result.strictUnavailable, request.strictResult)) return fail("review-launcher-strict-unavailable-mismatch");
   if (!degradedAuthorizationMatchesResult(response.result.degradedAuthorization, preflight.degradedAuthorization)) return fail("review-launcher-degraded-authorization-mismatch");
   if (canonicalJson(response.launcherEvidence) !== canonicalJson(preflight.recovery) || response.cleanup?.removed !== true) return fail("review-launcher-host-evidence-invalid");
