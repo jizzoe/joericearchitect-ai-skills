@@ -57,25 +57,25 @@
 - [x] 4.3 Update the canonical independent-review protocol and verify thin Claude/Codex wrappers remain thin.
   - Depends on: 2.3, 3.3, 4.2.
   - Evidence: protocol diff and canonical/thin-wrapper drift checks distinguish JSONL and capsule transport input from the accepted host-owned artifact and durable adapter binding.
-- [ ] 4.4 Temporarily select `claude-detached-restricted-v1`, create the exact owner-authorized bootstrap binding to the N-1 runtime, and preserve product configuration provenance.
+- [x] 4.4 Temporarily select `claude-detached-restricted-v1`, create the exact owner-authorized bootstrap binding to the N-1 runtime, and preserve product configuration provenance.
   - Depends on: current Claude capability probe, 4.1, 4.2.
   - Evidence: configuration validation and bootstrap record bind exact base/head/manifest, expiry, N-1 runtime digest, Claude launcher/reviewer, and worktree lifecycle; accepted evidence identifies N-1 Claude and cannot originate from changed Codex capture code.
-- [ ] 4.5 Update tracking implementation paths and record issue #247 as the blocking prerequisite for PR #246 while leaving PR #246 and controller `controller-e45c82049d4f6606bcfc1abbef4ad8cc` unchanged.
+- [x] 4.5 Update tracking implementation paths and record issue #247 as the blocking prerequisite for PR #246 while leaving PR #246 and controller `controller-e45c82049d4f6606bcfc1abbef4ad8cc` unchanged.
   - Depends on: 2.5, 3.4, 4.1, 4.2, 4.3, 4.4.
   - Evidence: tracking validation plus read-only PR #246 comparison and exact controller identity/current-phase/step/digest comparison before runtime installation.
 
 ## 5. Validation, review, and delivery evidence
 
-- [ ] 5.1 Run focused parser, artifact, capsule, parent-transport, dispatch, adapter, runtime-distribution, security, and portability tests.
+- [x] 5.1 Run focused parser, artifact, capsule, parent-transport, dispatch, adapter, runtime-distribution, security, and portability tests.
   - Depends on: 1.4, 2.5, 3.4, 4.1, 4.2, 4.3, 4.4, 4.5.
   - Evidence: exact focused commands and passing results retained under the change evidence boundary.
-- [ ] 5.2 Run complete SDD/runtime regression suites twice where repeatability applies, `git diff --check`, and `openspec validate --all --strict`.
+- [x] 5.2 Run complete SDD/runtime regression suites twice where repeatability applies, `git diff --check`, and `openspec validate --all --strict`.
   - Depends on: 5.1.
   - Evidence: current-head passing regression, repeatability, diff, and strict-validation output; every bounded correction has rerun evidence.
-- [ ] 5.3 Run a fresh bounded local code, security, recovery, and whole-system coherence review over every changed path and correct objective findings.
+- [x] 5.3 Run a fresh bounded local code, security, recovery, and whole-system coherence review over every changed path and correct objective findings.
   - Depends on: 5.2.
   - Evidence: current-head reviewed-path inventory, findings/dispositions, correction evidence, and a fresh no-objective-finding rereview.
-- [ ] 5.4 Build a candidate runtime and run the real installed-Codex multi-step acceptance probe with tool use, an intermediate message, and the bounded large-package capsule.
+- [x] 5.4 Build a candidate runtime and run the real installed-Codex multi-step acceptance probe with tool use, an intermediate message, and the bounded large-package capsule.
   - Depends on: 5.1, 5.2, 5.3.
   - Evidence: candidate digest, valid safe receipt, one completed turn, and exact host-created final artifact from `--json --output-schema`.
 - [ ] 5.5 Run OpenSpec Verify, exact-head CI, and a fresh N-1 Claude strict-first-degraded independent review for one final package through the exact bootstrap binding.
