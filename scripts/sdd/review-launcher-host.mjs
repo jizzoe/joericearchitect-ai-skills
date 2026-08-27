@@ -36,8 +36,12 @@ export function executeReviewLauncherHost(hostRequest, {
   const request = hostRequest.request;
   const preflight = validateReviewLauncherRecovery({ ...request, sourceRequestDigest: digest, now });
   if (!preflight.allowed) return preflight;
-  const definition = reviewLauncherDefinition(preflight.recovery.launcherKind);
-  const invokeAdapter = invoke ?? (preflight.recovery.launcherKind === "claude-detached-restricted-v1" ? runClaudeDegradedReviewAdapter : runCodexDegradedReviewAdapter);
+  const selectedAdapter = preflight.adapterBinding.reviewAdapter;
+  const definition = reviewLauncherDefinition(selectedAdapter);
+  if (selectedAdapter === "codex-detached-read-only-v1" && typeof invoke !== "function") {
+    return fail("independent-reviewer-codex-capture-parent-required");
+  }
+  const invokeAdapter = invoke ?? (selectedAdapter === "claude-detached-restricted-v1" ? runClaudeDegradedReviewAdapter : runCodexDegradedReviewAdapter);
   if (!definition) return fail("review-launcher-capability-unavailable");
   if (!text(request.repositoryPath) || !request.reviewer || !text(request.reviewer.type) || !text(request.reviewer.identity) || !text(request.attestationRef)) return fail("review-launcher-input-incomplete");
   const preparedLifecycle = prepareReviewWorktreeLifecycle({
@@ -105,6 +109,7 @@ export function executeReviewLauncherHost(hostRequest, {
             code: "review-launcher-host-complete",
             launchId: hostRequest.launchId,
             requestDigest: digest,
+            reviewAdapter: selectedAdapter,
             launcherId: preflight.recovery.launcherId,
             launcherKind: preflight.recovery.launcherKind,
             hostScript,

@@ -2,6 +2,7 @@ import { validateReviewPackage } from "./independent-review-contract.mjs";
 import { validateDegradedIndependentReviewAuthorization } from "./degraded-independent-review-authorization.mjs";
 import { deliverStrictReviewArtifact, strictReviewDeliveryCodes, strictReviewTerminalKey } from "./autonomous-sdd-strict-review-delivery.mjs";
 import { diagnosticFromCode, unavailableOutcome } from "./review-diagnostics.mjs";
+import { selectReviewAdapterImplementation, validateReviewAdapterDispatchBinding } from "./review-adapter-dispatch.mjs";
 
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const hex64 = (value) => text(value) && /^[0-9a-f]{64}$/.test(value);
@@ -71,26 +72,27 @@ export function dispatchReview({
   reviewPackage,
   configuredReviewer,
   implementerSession,
-  launch,
+  configurationSnapshot,
+  adapterImplementations,
   strictResult,
   selectedEntry,
   transition = "merge-pr",
   deliver = deliverStrictReviewArtifact,
   degradedAuthorization,
-  runDegraded,
   now = new Date().toISOString(),
 } = {}) {
   const packageCheck = validateReviewPackage(reviewPackage);
   if (!packageCheck.valid) {
     return unavailable(reviewDispatchCodes.requestInvalid, "The review dispatch request has an invalid sealed package.");
   }
-  if (typeof launch !== "function") {
-    return unavailable(reviewDispatchCodes.launchUnavailable, "The review launcher is unavailable.");
-  }
+  const selected = selectReviewAdapterImplementation({ configurationSnapshot, implementations: adapterImplementations, phase: "strict" });
+  if (!selected.valid) return unavailable(selected.code, "The durable review-adapter selection cannot be dispatched.");
+  const reviewerBinding = validateReviewAdapterDispatchBinding({ configurationSnapshot, binding: selected.binding, reviewer: configuredReviewer });
+  if (!reviewerBinding.valid) return unavailable(reviewerBinding.code, "The configured reviewer does not match the durable review-adapter selection.");
 
   let launched;
   try {
-    launched = launch({ reviewPackage, now });
+    launched = selected.operation({ reviewPackage, adapterBinding: selected.binding, now });
   } catch {
     return unavailable(reviewDispatchCodes.launchUnavailable, "The review launcher failed before producing a receipt.");
   }
@@ -102,6 +104,15 @@ export function dispatchReview({
 
   const delivery = deliver({ launchId, requestDigest, reviewPackage, configuredReviewer, implementerSession, capture: launched.capture });
   if (delivery?.allowed === true) {
+    if (!launched.runtimeReceipt) return unavailable("review-adapter-runtime-receipt-mismatch", "The strict review runtime receipt is missing.");
+    const completionBinding = validateReviewAdapterDispatchBinding({
+      configurationSnapshot,
+      binding: selected.binding,
+      reviewer: configuredReviewer,
+      runtimeReceipt: launched.runtimeReceipt,
+      result: delivery.result
+    });
+    if (!completionBinding.valid) return unavailable(completionBinding.code, "The strict review result does not match the durable review-adapter selection.");
     return freeze({
       kind: "terminal",
       allowed: true,
@@ -109,6 +120,7 @@ export function dispatchReview({
       code: reviewDispatchCodes.complete,
       key: delivery.key,
       result: delivery.result,
+      ...(launched.runtimeReceipt ? { runtimeReceipt: launched.runtimeReceipt } : {}),
       cleanup: delivery.cleanup,
     });
   }
@@ -135,11 +147,18 @@ export function dispatchReview({
   }
 
   if (classification.kind === "degraded-eligible") {
-    if (typeof runDegraded !== "function") {
-      return unavailable(reviewDispatchCodes.fallbackNotEligible, "The degraded fallback is not available.", { terminalKey });
-    }
-    const degraded = runDegraded({ reviewPackage, strictResult, degradedAuthorization: degradedCheck.authorization, now });
+    const selectedDegraded = selectReviewAdapterImplementation({ configurationSnapshot, implementations: adapterImplementations, phase: "authorized-degraded" });
+    if (!selectedDegraded.valid) return unavailable(selectedDegraded.code, "The durable degraded review-adapter selection cannot be dispatched.", { terminalKey });
+    const degraded = selectedDegraded.operation({ reviewPackage, strictResult, degradedAuthorization: degradedCheck.authorization, adapterBinding: selectedDegraded.binding, now });
     if (degraded?.allowed === true) {
+      if (!degraded.runtimeReceipt) return unavailable("review-adapter-runtime-receipt-mismatch", "The degraded review runtime receipt is missing.", { terminalKey });
+      const degradedBinding = validateReviewAdapterDispatchBinding({
+        configurationSnapshot,
+        binding: selectedDegraded.binding,
+        runtimeReceipt: degraded.runtimeReceipt,
+        result: degraded.result
+      });
+      if (!degradedBinding.valid) return unavailable(degradedBinding.code, "The degraded review result does not match the durable review-adapter selection.", { terminalKey });
       return freeze({
         kind: "terminal",
         allowed: true,
@@ -147,6 +166,7 @@ export function dispatchReview({
         code: reviewDispatchCodes.complete,
         assuranceLevel: "authorized-degraded",
         result: degraded.result,
+        runtimeReceipt: degraded.runtimeReceipt,
         terminalKey,
       });
     }
@@ -155,4 +175,3 @@ export function dispatchReview({
 
   return unavailable(code, "The strict review did not produce a usable result.", { terminalKey });
 }
-

@@ -5,5 +5,9 @@
     "designBriefRoot": "docs/design-briefs",
     "planRoot": "docs/plans"
   },
-  "runtime": { "schemaVersion": 1, "evidenceRoot": "docs/evidence" }
+  "runtime": {
+    "schemaVersion": 1,
+    "evidenceRoot": "docs/evidence",
+    "reviewAdapter": "claude-detached-restricted-v1"
+  }
 }

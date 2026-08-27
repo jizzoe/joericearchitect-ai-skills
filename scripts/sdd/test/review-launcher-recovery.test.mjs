@@ -29,8 +29,9 @@ const authorization = {
 };
 const launcher = { id: "codex-review-launcher", kind: "codex-detached-read-only-v1", hostScript: "scripts/sdd/review-launcher-host.mjs", enabled: true, executable: "/opt/tools/codex", detachedView: true, innerReadOnlySandbox: true, ephemeral: true, sealedPackageOnly: true, credentialScrubbed: true, nonInteractive: true };
 const runtime = { permittedReviewLaunchers: ["codex-review-launcher"] };
-const reviewer = { type: "codex-degraded", identity: "fresh-reviewer", attestation: { ref: "degraded-attestation" } };
-const baseInput = { failureCode: strictResult.unavailableCode, authorization, selectedEntry: "change", transition: "merge-pr", reviewPackage, strictResult, launcher, runtime, repositoryPath: "/fixture", reviewer, attestationRef: "degraded-attestation", now: "2026-08-13T13:00:00.000Z" };
+const reviewer = { type: "codex-degraded", identity: "fresh-reviewer", adapter: "codex", attestation: { ref: "degraded-attestation" } };
+const configurationSnapshot = { schemaVersion: 1, sources: ["config/ai-skills.json:runtime"], values: { reviewAdapter: "codex-detached-read-only-v1" } };
+const baseInput = { failureCode: strictResult.unavailableCode, authorization, selectedEntry: "change", transition: "merge-pr", reviewPackage, strictResult, launcher, runtime, repositoryPath: "/fixture", reviewer, attestationRef: "degraded-attestation", configurationSnapshot, now: "2026-08-13T13:00:00.000Z" };
 
 function validResult() {
   return {
@@ -58,7 +59,21 @@ function hostRun(prepared, result = validResult(), viewHead = reviewPackage.head
     hostExecutionId: "host-execution-1",
     now,
     createView: () => ({ available: true, view }),
-    removeView: (received) => { removed = received === view; fs.rmSync(temporaryRoot, { recursive: true, force: true }); return { removed, status: removed ? "removed" : "unavailable", requestDigest: received.lifecycleRequestDigest }; },
+    removeView: (received) => {
+      removed = received === view;
+      for (const directory of [path.join(reviewPath, ".ai-independent-review-package"), path.join(reviewPath, ".ai-independent-review-package", "chunks")]) {
+        try { fs.chmodSync(directory, 0o700); } catch { /* capsule may not have been created */ }
+      }
+      try {
+        const capsulePath = path.join(reviewPath, ".ai-independent-review-package");
+        fs.chmodSync(path.join(capsulePath, "index.json"), 0o600);
+        for (const name of fs.readdirSync(path.join(capsulePath, "chunks"))) {
+          fs.chmodSync(path.join(capsulePath, "chunks", name), 0o600);
+        }
+      } catch { /* capsule may not have been completed */ }
+      fs.rmSync(temporaryRoot, { recursive: true, force: true });
+      return { removed, status: removed ? "removed" : "unavailable", requestDigest: received.lifecycleRequestDigest };
+    },
     rebuildPackage: (input) => {
       assert.equal(input.repositoryPath, reviewPath);
       assert.equal(input.baseCommit, prepared.hostRequest.request.reviewPackage.baseCommit);
@@ -72,11 +87,16 @@ function hostRun(prepared, result = validResult(), viewHead = reviewPackage.head
 }
 
 function runtimeEvidence(prepared, response, selectedLauncher = launcher) {
-  return { schemaVersion: 1, source: selectedLauncher.kind.startsWith("claude-") ? "claude-parent-runtime" : "codex-exec-tool", status: "executed", securityVerifiable: false, outsideManagedSandbox: true, executionRef: "runtime:test:1", launcherId: selectedLauncher.id, launcherKind: selectedLauncher.kind, hostScript: selectedLauncher.hostScript, requestDigest: prepared.hostRequest.requestDigest, hostExecutionId: response.hostExecutionId };
+  return { schemaVersion: 1, source: selectedLauncher.kind.startsWith("claude-") ? "claude-parent-runtime" : "codex-exec-tool", reviewAdapter: selectedLauncher.kind, runtimeHelper: "platform-review-adapters", status: "executed", securityVerifiable: false, outsideManagedSandbox: true, executionRef: "runtime:test:1", launcherId: selectedLauncher.id, launcherKind: selectedLauncher.kind, hostScript: selectedLauncher.hostScript, requestDigest: prepared.hostRequest.requestDigest, hostExecutionId: response.hostExecutionId };
 }
 
 test("recovery preflight requires exact authorization, fixed host, and runtime permission", () => {
   assert.equal(validateReviewLauncherRecovery(baseInput).allowed, true);
+  assert.equal(validateReviewLauncherRecovery({ ...baseInput, configurationSnapshot: undefined }).code, "review-adapter-selection-missing");
+  assert.equal(validateReviewLauncherRecovery({
+    ...baseInput,
+    configurationSnapshot: { schemaVersion: 1, sources: ["config/ai-skills.json:runtime"], values: { reviewAdapter: "claude-detached-restricted-v1" } }
+  }).code, "review-adapter-launcher-mismatch");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, authorization: { ...authorization, implementerSession: undefined } }).code, "review-launcher-identity-binding-missing");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, reviewer: { ...reviewer, identity: authorization.implementerSession } }).code, "review-launcher-self-review");
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, runtime: {} }).code, "review-launcher-runtime-permission-required");
@@ -87,7 +107,7 @@ test("recovery preflight requires exact authorization, fixed host, and runtime p
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, failureCode: "independent-reviewer-codex-execution-unavailable" }).code, "review-launcher-failure-not-recoverable");
 });
 
-test("Codex recovery accepts only the durable strict artifact-missing precursor", () => {
+test("Codex recovery accepts only durable transport-eligible strict precursors", () => {
   const artifactMissing = {
     ...strictResult,
     reviewRecordId: "strict-artifact-missing-record",
@@ -101,6 +121,14 @@ test("Codex recovery accepts only the durable strict artifact-missing precursor"
   });
   assert.equal(allowed.allowed, true, JSON.stringify(allowed));
   assert.equal(allowed.recovery.launcherKind, "codex-detached-read-only-v1");
+  for (const unavailableCode of ["codex-jsonl-final-agent-missing", "codex-jsonl-turn-completed-missing"]) {
+    const terminalEvent = validateReviewLauncherRecovery({
+      ...baseInput,
+      failureCode: unavailableCode,
+      strictResult: { ...artifactMissing, unavailableCode }
+    });
+    assert.equal(terminalEvent.allowed, true, `${unavailableCode}: ${JSON.stringify(terminalEvent)}`);
+  }
 
   const rejected = validateReviewLauncherRecovery({
     ...baseInput,
@@ -215,7 +243,8 @@ test("Claude launcher uses the same sealed host protocol with a read-tools-only 
     authorization: claudeAuthorization,
     launcher: claudeLauncher,
     runtime: { permittedReviewLaunchers: [claudeLauncher.id] },
-    reviewer: { type: "claude-degraded", identity: "fresh-reviewer", attestation: { ref: "degraded-attestation" } }
+    reviewer: { type: "claude-degraded", identity: "fresh-reviewer", adapter: "claude", attestation: { ref: "degraded-attestation" } },
+    configurationSnapshot: { schemaVersion: 1, sources: ["config/ai-skills.json:runtime"], values: { reviewAdapter: "claude-detached-restricted-v1" } }
   };
   const prepared = prepareReviewLauncherRecovery(claudeInput, { launchId: "claude-launch-1" });
   assert.equal(prepared.allowed, true, JSON.stringify(prepared));
@@ -280,6 +309,7 @@ test("acceptance authenticates exact precursor, authorization, and host executio
     assert.equal(acceptReviewLauncherHostResponse({ prepared, response: { ...response, result: { ...response.result, degradedAuthorization } }, runtimeLaunchEvidence: evidence, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-degraded-authorization-mismatch");
   }
   assert.equal(acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: { ...evidence, outsideManagedSandbox: false }, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-runtime-receipt-invalid");
+  assert.equal(acceptReviewLauncherHostResponse({ prepared, response, runtimeLaunchEvidence: { ...evidence, reviewAdapter: "claude-detached-restricted-v1" }, now: "2026-08-13T13:00:00.000Z" }).code, "review-launcher-runtime-receipt-invalid");
 });
 
 test("host execution and controller acceptance each use their current clock", () => {

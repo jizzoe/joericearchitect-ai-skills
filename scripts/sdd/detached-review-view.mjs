@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { createReviewDiagnostic, diagnosticFromError } from "./review-diagnostics.mjs";
+import { reviewPackageCapsuleDirectoryName } from "./review-package-capsule.mjs";
 
 const commit = (value) => typeof value === "string" && /^[0-9a-f]{40}$/.test(value);
 const digest = (value) => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
@@ -60,6 +61,25 @@ function validLifecycleInput({ repositoryPath, headCommit, lifecycleRequestDiges
 
 function ownedMarkerPath(temporaryRoot) {
   return path.join(temporaryRoot, ".ai-skills-review-view.json");
+}
+
+function prepareOwnedCapsuleForCleanup(reviewPath) {
+  const capsulePath = path.join(reviewPath, reviewPackageCapsuleDirectoryName);
+  try {
+    const capsule = fs.lstatSync(capsulePath);
+    if (capsule.isSymbolicLink() || !capsule.isDirectory()) return true;
+    fs.chmodSync(capsulePath, 0o700);
+    const chunksPath = path.join(capsulePath, "chunks");
+    try {
+      const chunks = fs.lstatSync(chunksPath);
+      if (chunks.isDirectory() && !chunks.isSymbolicLink()) fs.chmodSync(chunksPath, 0o700);
+    } catch (error) {
+      if (error?.code !== "ENOENT") return false;
+    }
+    return true;
+  } catch (error) {
+    return error?.code === "ENOENT";
+  }
 }
 
 function partialCleanupFailure(error, requestDigest) {
@@ -183,6 +203,7 @@ export function removeArchivedReviewView(view) {
     if (marker.ownershipToken !== view.ownershipToken || marker.launchPath !== view.launchPath || marker.reviewPath !== view.reviewPath) {
       return archiveCleanupUnavailable("independent-review-view-cleanup-ownership-mismatch", "ownership-invalid", "review-archive", "The review archive cannot be removed because ownership does not match.");
     }
+    if (!prepareOwnedCapsuleForCleanup(view.reviewPath)) throw new Error("review-package-capsule-cleanup-preparation-failed");
     fs.rmSync(view.temporaryRoot, { recursive: true, force: false });
     return { removed: true };
   } catch (error) {
@@ -289,6 +310,7 @@ export function removeDetachedReviewView(view, { now = new Date().toISOString(),
         safeMessage: "The review worktree cannot be removed because ownership does not match the lifecycle request." }) };
     }
     if (!date(now)) throw new Error("invalid cleanup clock");
+    if (!prepareOwnedCapsuleForCleanup(view.reviewPath)) throw new Error("review-package-capsule-cleanup-preparation-failed");
     runGit(["-C", view.repository, "worktree", "remove", "--force", view.reviewPath]);
     fs.rmSync(view.temporaryRoot, { recursive: true, force: false });
     return { removed: true, status: "removed", requestDigest };

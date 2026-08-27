@@ -1,0 +1,6 @@
+schema_version: 1
+source_path: "ai-planning/design-briefs/strict-review-multistep-artifact-delivery.md"
+source_sha256: "304f90340c733591bed43d9b385a6d67b8832c13a94d22bc38a3040381fbf86d"
+copied_at: "2026-08-26T22:00:00.000Z"
+selection_mode: "explicit"
+change: "repair-strict-review-terminal-event-capture"

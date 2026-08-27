@@ -14,6 +14,16 @@ noncanonical paths and any entry that is absent, a symlink, directory,
 submodule, or other non-regular object. Never derive declared artifact bytes by
 following the detached view's filesystem paths.
 
+Expose the canonical package only through the read-only, digest-indexed
+`.ai-independent-review-package/` capsule. Its canonical index fixes the
+ordered chunk names, UTF-8 byte counts, and SHA-256 digests. Before launch,
+reconstruct the complete canonical package bytes in that order and revalidate
+the unchanged `independent-review-package-v1` manifest digest. Reject missing,
+duplicate, reordered, extra, symlinked, non-regular, oversized, or
+digest-mismatched entries. Initial fixed limits are 16 MiB for canonical
+package bytes, 1 MiB for the index, 64 KiB per chunk, and 512 chunks; measure
+all limits in UTF-8 bytes. Never expose the package as one unbounded line.
+
 ## Execution Boundary
 
 Create a detached disposable Git view pinned to the exact head. The reviewer
@@ -38,6 +48,45 @@ copies only a bounded regular authentication artifact when present. It does
 not copy config, sessions, skills, plugins, or history, and the sealed command
 profile cannot read that sibling state.
 
+Resolve review dispatch once from the immutable work-unit configuration
+snapshot. The allowlisted `reviewAdapter` must select one matching launcher,
+installed-runtime helper, reviewer identity class, strict and
+authorized-degraded operation, runtime-receipt source, and accepted result
+adapter. Bind that complete selection into every prepared request and receipt.
+Reject missing or unsupported selections, later product-configuration rereads,
+direct launcher substitution, and any request, launcher, reviewer, receipt, or
+result mismatch.
+
+For Codex, JSONL stdout is untrusted transport input, not review evidence. A
+fixed installed-runtime host adapter launches only the sealed Codex executable
+and argument vector, keeps stdout separate from drained and discarded stderr,
+and incrementally enforces `codex-jsonl-final-agent-v1`. It accepts exactly one
+thread start, one turn start, allowlisted item events, exactly one
+`turn.completed`, and then end-of-stream. The sole candidate is the last
+completed `agent_message` before that terminal event; an earlier schema-valid
+message is never final merely because it parses. Reject malformed, unknown,
+failed, incomplete, duplicate, post-terminal, or over-bound streams. Initial
+fixed bounds are 16 MiB for the stream, 2 MiB per line, 100,000 events, and 1
+MiB for the final candidate.
+
+After validating the selected payload, the host—not Codex—creates the findings
+artifact and metadata-only receipt. Publish each through a same-directory
+temporary regular file and atomic same-filesystem hard link as the no-clobber
+commit point, then verify file identity and content. Existing or concurrently
+created destinations, symlinks, unsupported publication semantics, receipt
+loss, or cleanup failure return typed unavailable and never overwrite a file.
+The parent accepts only that inspected host-owned findings artifact with its
+matching safe receipt; it never accepts JSONL, stderr, a combined shell-tool
+transcript, reasoning, tool output, or a repository-written file as findings.
+
+At most one fresh transport-only retry is allowed, and only when an otherwise
+supported stream lacks a final completed agent message or lacks
+`turn.completed`, exact-owned cleanup succeeded, and package, identities,
+authorization, and expiry remain current. Preserve the first attempt in the
+lineage. Never retry malformed, ambiguous, over-bound, schema-invalid,
+identity-mismatched, write-unsafe, expired, repeated, or cleanup-incomplete
+failures, and do not consume or reset an objective-correction budget.
+
 ### Outer-sandbox launcher recovery
 
 If the managed implementation sandbox denies the nested Codex app-server or
@@ -48,7 +97,8 @@ unavailability, prepare a direct parent strict request with
 configured distinct reviewer, attestation, neutral working directory,
 canonical host-owned Codex executable identity and content hash from a fixed
 platform install location, an OS-backed signer or root-owned non-writable path
-policy, fixed arguments, start/expiry, and final artifact. Managed-sandbox
+policy, fixed arguments, start/expiry, capture contract, result, and receipt.
+Managed-sandbox
 write denial is defense in depth, not host-ownership proof. Caller-selected
 executable paths are ineligible. Invoke the returned argument vector only
 through the
@@ -56,10 +106,10 @@ actual shell tool with `require_escalated`; never run repository code with that
 authority. The child still uses the sealed read-only permission profile, no
 command network, no inherited command environment, and ephemeral execution.
 Accept it only through `consumeCodexParentStrictReviewToolResult`, which
-rechecks the request digest, executable identity, expiration, structured
-artifact, canonical package/result bindings, and owned cleanup. The parent
-seals the findings into `strict-isolated` evidence; reviewer self-attestation
-alone is never trusted.
+rechecks the request digest, executable identity, expiration, host-created
+artifact and receipt, canonical package/result bindings, and owned cleanup. The
+parent seals the findings into `strict-isolated` evidence; reviewer
+self-attestation alone is never trusted.
 
 If the managed implementation sandbox denies owned worktree creation, the
 direct parent strict transport, or Claude's strict sandbox, record the
@@ -102,11 +152,15 @@ never prints a command for an operator. The approved runtime invokes the
 configured host-owned reviewer executable against the sandbox-prepared
 archive. The controller has already reconstructed the exact base-to-head diff
 and every declared artifact hash from Git objects, rejected any canonical
-package mismatch, and exclusively created the sealed-package file so a pre-
-existing file or symlink fails closed. The transport starts either a fresh
+package mismatch, and exclusively created the bounded capsule's directories,
+index, and chunks so a pre-existing file, directory, or symlink fails closed.
+The transport starts either a fresh
 ephemeral Codex process with `read-only` requested or a fresh nonpersistent
 Claude process exposing only read/search tools. It accepts no arbitrary shell
-text. Every adapter probe
+text. The fixed strict Codex prompt requires one short non-findings progress
+message before its first inspection tool call so the last-agent rule is
+continuously exercised; only the later validated final message can become the
+host-owned artifact. Every adapter probe
 and strict or degraded reviewer subprocess receives only allowlisted
 cross-platform operational environment variables and fixed adapter overrides,
 not the caller's ambient credential values or process-injection variables.
@@ -123,7 +177,8 @@ removes only its ownership-guarded view after the tool result returns.
 
 The controller accepts the response only when the directly captured runtime
 receipt identifies the configured launcher, host script, request digest, host
-execution, and outside-managed-sandbox boundary. In authorized degraded mode,
+execution, selected adapter, installed helper, and outside-managed-sandbox
+boundary. In authorized degraded mode,
 that receipt and the executable path are caller-readable ordinary data: they
 are not cryptographically authenticated or host-pinned and cannot prove the
 boundary against an adversarial implementation process. The executable path is
@@ -188,3 +243,24 @@ A derived review package is eligible only when that count equals the complete
 chain length and its latest attempt number. The correction limit is evaluated
 separately by immutable `failureSignature`; unrelated signatures do not consume
 one another's three-attempt budget.
+
+## Bootstrap Review Boundary
+
+A change that modifies the Codex capture or durable dispatch trust boundary
+must not use that candidate code to certify itself. Each separately
+owner-authorized bootstrap attempt binds the exact base, head, package manifest,
+delivery transition, `strict-first-degraded` policy, expiry, authorization
+reference and scope digest, installed N-1 runtime generation and content digest,
+Claude launcher executable digest and capability probe, distinct implementer
+and exact reviewer identities, selected Claude adapter binding, and one
+prepared exact-owned worktree lifecycle request. Validate that binding before
+launch and match it again to the runtime receipt and accepted result. A
+`strict-first-degraded` sequence uses a separate exact binding and fresh
+lifecycle for each attempt; degraded review remains eligible only after durable
+strict unavailability under the same package and active authorization.
+
+Accepted bootstrap evidence must identify the N-1 runtime and Claude transport
+and must explicitly exclude the candidate Codex capture path. If the bound
+Claude path, exact cleanup, authentication, package, identity, or expiry cannot
+be validated, preserve the work and pause. Do not fall back to candidate Codex,
+self-review, transcript parsing, or an unbound launcher.

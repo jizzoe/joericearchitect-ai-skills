@@ -1,0 +1,52 @@
+schema_version: 1
+openspec:
+  change: "repair-strict-review-terminal-event-capture"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 247
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/247"
+  project_owner: "jizzoe"
+  project_number: 1
+delivery_dependencies:
+  - prerequisite_issue: 247
+    blocked_pull_request: 246
+    sequencing: "Merge, archive, and install issue #247 before rebasing or reviewing PR #246."
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - ".github/workflows/runtime-matrix.yml"
+      - "config/ai-skills.json"
+      - "openspec/changes/repair-strict-review-terminal-event-capture/"
+      - "schemas/independent-review-findings-v1.schema.json"
+      - "schemas/independent-review-package-index-v1.schema.json"
+      - "schemas/independent-review-result-v1.schema.json"
+      - "scripts/runtime/manifest.json"
+      - "scripts/runtime/bin/review-adapter-dispatch.mjs"
+      - "scripts/runtime/test/build-runtime.test.mjs"
+      - "scripts/runtime/test/install-runtime.test.mjs"
+      - "scripts/runtime/test/payload-wrapper.test.mjs"
+      - "scripts/sdd/autonomous-sdd-review-dispatcher.mjs"
+      - "scripts/sdd/codex-review-event-capture.mjs"
+      - "scripts/sdd/codex-review-event-contract.mjs"
+      - "scripts/sdd/detached-review-view.mjs"
+      - "scripts/sdd/execute-independent-review.mjs"
+      - "scripts/sdd/independent-review-contract.mjs"
+      - "scripts/sdd/platform-review-adapters.mjs"
+      - "scripts/sdd/review-adapter-dispatch.mjs"
+      - "scripts/sdd/review-bootstrap-binding.mjs"
+      - "scripts/sdd/review-launcher-host.mjs"
+      - "scripts/sdd/review-launcher-recovery.mjs"
+      - "scripts/sdd/review-package-capsule.mjs"
+      - "scripts/sdd/test/codex-review-event-capture.test.mjs"
+      - "scripts/sdd/test/codex-review-event-contract.test.mjs"
+      - "scripts/sdd/test/detached-review-view.test.mjs"
+      - "scripts/sdd/test/autonomous-sdd-review-dispatcher.test.mjs"
+      - "scripts/sdd/test/execute-independent-review.test.mjs"
+      - "scripts/sdd/test/independent-review-contract.test.mjs"
+      - "scripts/sdd/test/platform-review-adapters.test.mjs"
+      - "scripts/sdd/test/review-adapter-dispatch.test.mjs"
+      - "scripts/sdd/test/review-bootstrap-binding.test.mjs"
+      - "scripts/sdd/test/review-launcher-recovery.test.mjs"
+      - "scripts/sdd/test/review-package-capsule.test.mjs"
+      - "skills/base/independent-review/references/protocol.md"

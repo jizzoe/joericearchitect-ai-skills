@@ -10,10 +10,12 @@ const safePath = (value) => {
   if (!text(value) || /[\\\x00-\x1f\x7f]/.test(value) || path.posix.isAbsolute(value) || path.win32.isAbsolute(value)) return false;
   return value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
 };
+const transportOwnedEvidencePath = (value) => value === ".ai-independent-review-package.json" ||
+  value === ".ai-independent-review-package" || value.startsWith(".ai-independent-review-package/");
 // Reviewer findings identify a committed file, never a line/column location.
 // Keeping the evidence as a path lets the sealed result be checked against the
 // exact detached review tree before it becomes durable evidence.
-const safeFindingEvidencePath = (value) => safePath(value) && !value.includes(":");
+const safeFindingEvidencePath = (value) => safePath(value) && !value.includes(":") && !transportOwnedEvidencePath(value);
 const failure = (code, detail) => ({ valid: false, issues: [{ code, ...(detail ? { detail } : {}) }] });
 const secretLike = /(gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{16,}|-----BEGIN (?:[A-Z ]+)?PRIVATE KEY-----|Bearer\s+[A-Za-z0-9._-]{12,})/i;
 const degradedBoundary = "fresh-separated-reviewer-only";
@@ -25,6 +27,46 @@ export function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
   return JSON.stringify(value);
+}
+
+const exactKeys = (value, expected) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const actual = Object.keys(value).sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+};
+
+/** Parse the existing findings payload, including the two legacy Claude envelopes. */
+export function parseReviewFindingsPayload(output, { allowEnvelope = true } = {}) {
+  if (typeof output !== "string" || !output.trim()) return { parsed: false, code: "independent-review-findings-payload-empty" };
+  try {
+    const outer = JSON.parse(output);
+    if (allowEnvelope && outer?.structured_output && typeof outer.structured_output === "object") {
+      return { parsed: true, payload: outer.structured_output };
+    }
+    if (allowEnvelope && typeof outer?.result === "string") {
+      return { parsed: true, payload: JSON.parse(outer.result) };
+    }
+    return { parsed: true, payload: outer };
+  } catch {
+    return { parsed: false, code: "independent-review-findings-payload-malformed" };
+  }
+}
+
+/** Validate exactly the schema consumed by every findings-artifact path. */
+export function validateReviewFindingsPayload(value) {
+  if (!exactKeys(value, ["findings", "schemaVersion", "status"]) || value.schemaVersion !== 1 ||
+      !["passed", "failed"].includes(value.status) || !Array.isArray(value.findings)) {
+    return failure("independent-review-findings-payload-invalid");
+  }
+  if (!value.findings.every((finding) =>
+    exactKeys(finding, ["evidence", "id", "recommendation", "severity"]) &&
+    typeof finding.id === "string" && finding.id.length > 0 &&
+    ["blocker", "high", "objective-fix", "warning", "false-positive"].includes(finding.severity) &&
+    safeFindingEvidencePath(finding.evidence) &&
+    typeof finding.recommendation === "string" && finding.recommendation.length > 0)) {
+    return failure("independent-review-findings-payload-finding-invalid");
+  }
+  return { valid: true, issues: [] };
 }
 
 export function packageDigest(input) {
