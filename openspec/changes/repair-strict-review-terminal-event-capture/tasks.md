@@ -33,13 +33,13 @@
 
 ## 3. Bounded package exposure
 
-- [ ] 3.1 Implement a versioned package-capsule index and UTF-8 byte-bounded section/chunk writer without changing `independent-review-package-v1` or its manifest digest.
+- [x] 3.1 Implement a versioned package-capsule index and UTF-8 byte-bounded section/chunk writer without changing `independent-review-package-v1` or its manifest digest.
   - Depends on: planning review.
   - Evidence: unit tests prove fixed total, index, chunk, and count bounds plus deterministic output for metadata, artifacts, validation evidence, and patch bytes.
-- [ ] 3.2 Implement capsule reconstruction and pre-launch validation for exact ordering, paths, regular-file identity, byte counts, chunk digests, canonical package bytes, and original manifest digest.
+- [x] 3.2 Implement capsule reconstruction and pre-launch validation for exact ordering, paths, regular-file identity, byte counts, chunk digests, canonical package bytes, and original manifest digest.
   - Depends on: 3.1.
   - Evidence: adversarial tests reject missing, duplicate, reordered, extra, oversized, symlinked, non-regular, and digest-mismatched index/chunk entries.
-- [ ] 3.3 Route Codex and Claude prompts to the bounded capsule index and remove one-line package injection and line-only package-read guidance.
+- [x] 3.3 Route Codex and Claude prompts to the bounded capsule index and remove one-line package injection and line-only package-read guidance.
   - Depends on: 3.1, 3.2.
   - Evidence: strict/degraded invocation fixtures for both assistants reference only the capsule representation and preserve exact package/result bindings.
 - [ ] 3.4 Complete multibyte, newline, large-package, portability, and cleanup coverage for capsule creation and inspection.

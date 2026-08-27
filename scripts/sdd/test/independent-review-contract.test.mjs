@@ -24,6 +24,8 @@ test("one findings-payload contract accepts only the existing exact schema", () 
     { ...failed, findings: [{ ...finding, severity: "critical" }] },
     { ...failed, findings: [{ ...finding, evidence: "../outside" }] },
     { ...failed, findings: [{ ...finding, evidence: "scripts/file.mjs:2" }] },
+    { ...failed, findings: [{ ...finding, evidence: ".ai-independent-review-package/index.json" }] },
+    { ...failed, findings: [{ ...finding, evidence: ".ai-independent-review-package.json" }] },
     { ...failed, findings: [{ ...finding, recommendation: "" }] },
     { ...failed, findings: [{ ...finding, extra: true }] }
   ];

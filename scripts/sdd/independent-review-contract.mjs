@@ -10,10 +10,12 @@ const safePath = (value) => {
   if (!text(value) || /[\\\x00-\x1f\x7f]/.test(value) || path.posix.isAbsolute(value) || path.win32.isAbsolute(value)) return false;
   return value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
 };
+const transportOwnedEvidencePath = (value) => value === ".ai-independent-review-package.json" ||
+  value === ".ai-independent-review-package" || value.startsWith(".ai-independent-review-package/");
 // Reviewer findings identify a committed file, never a line/column location.
 // Keeping the evidence as a path lets the sealed result be checked against the
 // exact detached review tree before it becomes durable evidence.
-const safeFindingEvidencePath = (value) => safePath(value) && !value.includes(":");
+const safeFindingEvidencePath = (value) => safePath(value) && !value.includes(":") && !transportOwnedEvidencePath(value);
 const failure = (code, detail) => ({ valid: false, issues: [{ code, ...(detail ? { detail } : {}) }] });
 const secretLike = /(gh[pousr]_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{16,}|-----BEGIN (?:[A-Z ]+)?PRIVATE KEY-----|Bearer\s+[A-Za-z0-9._-]{12,})/i;
 const degradedBoundary = "fresh-separated-reviewer-only";

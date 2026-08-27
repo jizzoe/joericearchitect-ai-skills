@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ai-skills.invalid/independent-review-package-index-v1.schema.json",
+  "title": "Independent Review Package Capsule Index v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "representationRevision", "packageSchemaVersion", "baseCommit", "headCommit", "manifestDigest", "totalCanonicalBytes", "chunkCount", "chunks"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "representationRevision": {"const": "independent-review-package-capsule-v1"},
+    "packageSchemaVersion": {"const": 1},
+    "baseCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "headCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "manifestDigest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "totalCanonicalBytes": {"type": "integer", "minimum": 1, "maximum": 16777216},
+    "chunkCount": {"type": "integer", "minimum": 1, "maximum": 512},
+    "chunks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ordinal", "relativePath", "section", "byteCount", "sha256"],
+        "properties": {
+          "ordinal": {"type": "integer", "minimum": 0, "maximum": 511},
+          "relativePath": {"type": "string", "pattern": "^chunks/[0-9]{4}-(metadata|artifacts|validation-evidence|diff)\\.(json|patch)$"},
+          "section": {"enum": ["metadata", "artifacts", "validation-evidence", "diff"]},
+          "byteCount": {"type": "integer", "minimum": 1, "maximum": 65536},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    }
+  }
+}

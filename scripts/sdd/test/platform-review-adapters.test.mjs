@@ -86,7 +86,7 @@ test("review package injection rejects a pre-existing symlink without changing i
   try {
     assert.throws(
       () => writeReviewPackageForView({ reviewPath }, packageFixture()),
-      (error) => error?.code === "EEXIST"
+      (error) => error?.code === "independent-review-package-legacy-exposure-present"
     );
     assert.equal(fs.readFileSync(canaryPath, "utf8"), "outside\n");
     assert.equal(fs.lstatSync(packagePath).isSymbolicLink(), true);
@@ -117,6 +117,8 @@ test("strict and degraded reviewer subprocesses receive only allowlisted operati
   ];
 
   for (const [label, invocation, expectedHome] of invocations) {
+    assert.match(invocation.args.at(-1), /\.ai-independent-review-package\/index\.json/, `${label} uses the bounded package capsule`);
+    assert.doesNotMatch(invocation.args.at(-1), /\.ai-independent-review-package\.json/, `${label} does not use the legacy one-line package`);
     let receivedEnvironment = null;
     invokeReviewProcess(invocation, view, (_executable, _args, options) => {
       receivedEnvironment = options.env;
@@ -823,6 +825,10 @@ test("findings output schema is accepted by strict structured-output validators"
   assert.equal(schema.additionalProperties, false);
   assert.deepEqual(new Set(schema.required), new Set(Object.keys(schema.properties)));
   assert.equal("allOf" in schema, false);
+  const evidencePattern = new RegExp(schema.properties.findings.items.properties.evidence.pattern);
+  assert.equal(evidencePattern.test("scripts/sdd/example.mjs"), true);
+  assert.equal(evidencePattern.test(".ai-independent-review-package/index.json"), false);
+  assert.equal(evidencePattern.test(".ai-independent-review-package.json"), false);
 });
 
 test("strict result schema distinguishes unavailable from proven isolation", () => {
@@ -831,6 +837,9 @@ test("strict result schema distinguishes unavailable from proven isolation", () 
   assert.equal(schema.allOf[0].if.properties.status.enum.includes("passed"), true);
   assert.equal(schema.allOf[1].if.properties.status.const, "unavailable");
   assert.equal(schema.allOf[1].then.properties.attestation.properties.readOnly.const, false);
+  const evidencePattern = new RegExp(schema.properties.findings.items.properties.evidence.pattern);
+  assert.equal(evidencePattern.test("scripts/sdd/example.mjs"), true);
+  assert.equal(evidencePattern.test(".ai-independent-review-package/index.json"), false);
 });
 
 test("Claude adapter uses a temporary strict sandbox configuration without inherited settings", () => {

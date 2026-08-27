@@ -58,7 +58,21 @@ function hostRun(prepared, result = validResult(), viewHead = reviewPackage.head
     hostExecutionId: "host-execution-1",
     now,
     createView: () => ({ available: true, view }),
-    removeView: (received) => { removed = received === view; fs.rmSync(temporaryRoot, { recursive: true, force: true }); return { removed, status: removed ? "removed" : "unavailable", requestDigest: received.lifecycleRequestDigest }; },
+    removeView: (received) => {
+      removed = received === view;
+      for (const directory of [path.join(reviewPath, ".ai-independent-review-package"), path.join(reviewPath, ".ai-independent-review-package", "chunks")]) {
+        try { fs.chmodSync(directory, 0o700); } catch { /* capsule may not have been created */ }
+      }
+      try {
+        const capsulePath = path.join(reviewPath, ".ai-independent-review-package");
+        fs.chmodSync(path.join(capsulePath, "index.json"), 0o600);
+        for (const name of fs.readdirSync(path.join(capsulePath, "chunks"))) {
+          fs.chmodSync(path.join(capsulePath, "chunks", name), 0o600);
+        }
+      } catch { /* capsule may not have been completed */ }
+      fs.rmSync(temporaryRoot, { recursive: true, force: true });
+      return { removed, status: removed ? "removed" : "unavailable", requestDigest: received.lifecycleRequestDigest };
+    },
     rebuildPackage: (input) => {
       assert.equal(input.repositoryPath, reviewPath);
       assert.equal(input.baseCommit, prepared.hostRequest.request.reviewPackage.baseCommit);

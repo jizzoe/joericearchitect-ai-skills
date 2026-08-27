@@ -6,6 +6,8 @@ import path from "node:path";
 import test from "node:test";
 import { createArchivedReviewView, createDetachedReviewView, removeArchivedReviewView, removeDetachedReviewView, withDetachedReviewView } from "../detached-review-view.mjs";
 import { probeIndependentReviewAdapter } from "../execute-independent-review.mjs";
+import { packageDigest } from "../independent-review-contract.mjs";
+import { writeReviewPackageCapsule } from "../review-package-capsule.mjs";
 
 const git = (root, args) => execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim();
 const denials = { workspaceWrite: true, gitWrite: true, githubMutation: true, credentialAccess: true, authenticatedNetwork: true, externalSend: true, deployment: true, release: true, delegatedMutation: true };
@@ -29,6 +31,9 @@ test("detached review view is pinned to committed state and cleanup is ownership
     assert.equal(fs.existsSync(path.join(created.view.reviewPath, "unrelated.txt")), false);
     assert.throws(() => git(created.view.reviewPath, ["symbolic-ref", "--quiet", "--short", "HEAD"]));
     assert.equal(removeDetachedReviewView({ ...created.view, ownershipToken: "wrong" }, { now: "2026-08-13T12:00:00.000Z" }).removed, false);
+    const packageDraft = { schemaVersion: 1, baseCommit: head, headCommit: head, diff: "diff --git a/tracked.txt b/tracked.txt\n", artifacts: [{ path: "tracked.txt", sha256: "c".repeat(64), bytes: 10 }], validationEvidence: ["fixture passed"] };
+    const reviewPackage = { ...packageDraft, manifestDigest: packageDigest(packageDraft) };
+    assert.equal(writeReviewPackageCapsule(created.view.reviewPath, reviewPackage).available, true);
     assert.equal(removeDetachedReviewView(created.view, { now: "2026-08-13T12:00:00.000Z" }).removed, true);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
