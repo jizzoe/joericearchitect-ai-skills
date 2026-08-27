@@ -27,6 +27,46 @@ export function canonicalJson(value) {
   return JSON.stringify(value);
 }
 
+const exactKeys = (value, expected) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const actual = Object.keys(value).sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+};
+
+/** Parse the existing findings payload, including the two legacy Claude envelopes. */
+export function parseReviewFindingsPayload(output, { allowEnvelope = true } = {}) {
+  if (typeof output !== "string" || !output.trim()) return { parsed: false, code: "independent-review-findings-payload-empty" };
+  try {
+    const outer = JSON.parse(output);
+    if (allowEnvelope && outer?.structured_output && typeof outer.structured_output === "object") {
+      return { parsed: true, payload: outer.structured_output };
+    }
+    if (allowEnvelope && typeof outer?.result === "string") {
+      return { parsed: true, payload: JSON.parse(outer.result) };
+    }
+    return { parsed: true, payload: outer };
+  } catch {
+    return { parsed: false, code: "independent-review-findings-payload-malformed" };
+  }
+}
+
+/** Validate exactly the schema consumed by every findings-artifact path. */
+export function validateReviewFindingsPayload(value) {
+  if (!exactKeys(value, ["findings", "schemaVersion", "status"]) || value.schemaVersion !== 1 ||
+      !["passed", "failed"].includes(value.status) || !Array.isArray(value.findings)) {
+    return failure("independent-review-findings-payload-invalid");
+  }
+  if (!value.findings.every((finding) =>
+    exactKeys(finding, ["evidence", "id", "recommendation", "severity"]) &&
+    typeof finding.id === "string" && finding.id.length > 0 &&
+    ["blocker", "high", "objective-fix", "warning", "false-positive"].includes(finding.severity) &&
+    safeFindingEvidencePath(finding.evidence) &&
+    typeof finding.recommendation === "string" && finding.recommendation.length > 0)) {
+    return failure("independent-review-findings-payload-finding-invalid");
+  }
+  return { valid: true, issues: [] };
+}
+
 export function packageDigest(input) {
   const { manifestDigest, ...unsigned } = input ?? {};
   return sha(canonicalJson(unsigned));

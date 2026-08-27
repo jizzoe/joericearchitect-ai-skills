@@ -4,9 +4,37 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
-import { buildReviewPackage, packageDigest, validateReviewPackage, validateReviewResult } from "../independent-review-contract.mjs";
+import { buildReviewPackage, packageDigest, parseReviewFindingsPayload, validateReviewFindingsPayload, validateReviewPackage, validateReviewResult } from "../independent-review-contract.mjs";
 
 const fixture = (name) => JSON.parse(fs.readFileSync(new URL(`../../../evals/skills/independent-review/fixtures/${name}`, import.meta.url), "utf8"));
+
+test("one findings-payload contract accepts only the existing exact schema", () => {
+  const finding = { id: "F-1", severity: "warning", evidence: "scripts/sdd/example.mjs", recommendation: "Inspect the warning." };
+  const passed = { schemaVersion: 1, findings: [], status: "passed" };
+  const failed = { schemaVersion: 1, findings: [finding], status: "failed" };
+  for (const value of [passed, failed, { ...failed, findings: [{ ...finding, severity: "blocker" }] },
+    { ...failed, findings: [{ ...finding, severity: "high" }] }, { ...failed, findings: [{ ...finding, severity: "objective-fix" }] },
+    { ...failed, findings: [{ ...finding, severity: "false-positive" }] }]) {
+    assert.equal(validateReviewFindingsPayload(value).valid, true, JSON.stringify(value));
+  }
+  const invalid = [
+    null, [], {}, { ...passed, schemaVersion: 2 }, { ...passed, status: "unavailable" },
+    { ...passed, extra: true }, { ...passed, findings: "none" },
+    { ...failed, findings: [{ ...finding, id: "" }] },
+    { ...failed, findings: [{ ...finding, severity: "critical" }] },
+    { ...failed, findings: [{ ...finding, evidence: "../outside" }] },
+    { ...failed, findings: [{ ...finding, evidence: "scripts/file.mjs:2" }] },
+    { ...failed, findings: [{ ...finding, recommendation: "" }] },
+    { ...failed, findings: [{ ...finding, extra: true }] }
+  ];
+  for (const value of invalid) assert.equal(validateReviewFindingsPayload(value).valid, false, JSON.stringify(value));
+
+  assert.deepEqual(parseReviewFindingsPayload(JSON.stringify(passed)), { parsed: true, payload: passed });
+  assert.deepEqual(parseReviewFindingsPayload(JSON.stringify({ structured_output: passed })), { parsed: true, payload: passed });
+  assert.deepEqual(parseReviewFindingsPayload(JSON.stringify({ result: JSON.stringify(passed) })), { parsed: true, payload: passed });
+  assert.deepEqual(parseReviewFindingsPayload(JSON.stringify({ structured_output: passed }), { allowEnvelope: false }).payload.structured_output, passed);
+  assert.equal(parseReviewFindingsPayload("not-json").parsed, false);
+});
 test("review package requires canonical immutable fields and digest", () => {
   const value = fixture("valid-package.json"); value.manifestDigest = packageDigest(value);
   assert.equal(validateReviewPackage(value).valid, true);

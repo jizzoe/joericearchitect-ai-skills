@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { createArchivedReviewView, removeArchivedReviewView } from "./detached-review-view.mjs";
-import { buildReviewPackage, canonicalJson, validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
+import { buildReviewPackage, canonicalJson, parseReviewFindingsPayload, validateReviewFindingsPayload, validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
 import { requiredReviewDenials } from "./review-adapter-contract.mjs";
 import { createReviewDiagnostic, diagnosticFromCode, diagnosticFromError, unavailableOutcome, unclassifiedRuntimeDiagnostic } from "./review-diagnostics.mjs";
@@ -77,14 +77,14 @@ export function inspectCodexReviewResultArtifact(resultPath) {
     sha256: createHash("sha256").update(raw).digest("hex"),
     parse: "attempted"
   });
-  const payload = parseJsonResult(raw.toString("utf8"));
-  if (!payload) {
+  const parsed = parseReviewFindingsPayload(raw.toString("utf8"));
+  if (!parsed.parsed) {
     return artifactUnavailable("review-launcher-codex-result-artifact-malformed", { ...diagnostics, parse: "invalid" });
   }
-  if (!validFindingPayload(payload)) {
+  if (!validateReviewFindingsPayload(parsed.payload).valid) {
     return artifactUnavailable("review-launcher-codex-result-payload-invalid", { ...diagnostics, parse: "valid", payload: "invalid" });
   }
-  return { available: true, payload, diagnostics: { ...diagnostics, parse: "valid", payload: "valid" } };
+  return { available: true, payload: parsed.payload, diagnostics: { ...diagnostics, parse: "valid", payload: "valid" } };
 }
 
 function unavailableCodexParentResult(code, diagnostics, cleanup) {
@@ -1070,24 +1070,12 @@ export function writeReviewPackageForView(view, reviewPackage) {
 }
 
 function parseJsonResult(output) {
-  if (typeof output !== "string" || !output.trim()) return null;
-  try {
-    const outer = JSON.parse(output);
-    if (outer?.structured_output && typeof outer.structured_output === "object") return outer.structured_output;
-    if (typeof outer?.result === "string") return JSON.parse(outer.result);
-    return outer;
-  } catch {
-    return null;
-  }
+  const parsed = parseReviewFindingsPayload(output);
+  return parsed.parsed ? parsed.payload : null;
 }
 
 function validFindingPayload(value) {
-  return value?.schemaVersion === 1 && ["passed", "failed"].includes(value.status) &&
-    Array.isArray(value.findings) && value.findings.every((finding) =>
-      typeof finding?.id === "string" && finding.id.length > 0 &&
-      ["blocker", "high", "objective-fix", "warning", "false-positive"].includes(finding.severity) &&
-      safeFindingEvidencePath(finding.evidence) &&
-      typeof finding.recommendation === "string" && finding.recommendation.length > 0);
+  return validateReviewFindingsPayload(value).valid;
 }
 
 function safeFindingEvidencePath(value) {
