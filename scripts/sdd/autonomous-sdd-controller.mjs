@@ -6,6 +6,16 @@ import path from "node:path";
 import { archiveTerminalRun, defaultStateHome, publishImmutableRecord, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
 import { buildParentProjection, deriveRepositoryId, digestValue, normalizeCanonicalRemote, validateBootstrapPreSnapshotWorkUnit, validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
 import { admitV2RunFromInitializer, inspectV2Admission } from "./autonomous-sdd-admission.mjs";
+import {
+  buildControllerRetirementMarker,
+  buildControllerTerminalMarker,
+  controllerRetirementMarkerName,
+  controllerTerminalMarkerName,
+  publishControllerMarker,
+  readControllerRetirementEvidence,
+  validControllerRetirementMarker,
+  validControllerTerminalMarker
+} from "./autonomous-sdd-controller-retirement.mjs";
 import { executeWorkspaceCleanup, migrateLegacyWorkspaceResource, planWorkspaceCleanup } from "./sdd-workspace-cleanup.mjs";
 import {
   authContextBindingDigest,
@@ -468,6 +478,20 @@ function activeRunHasProgressArtifacts(activePath, fileSystem = fs) {
   } catch { return true; }
 }
 
+function controllerMatchesRetirementBaseline(record, retirement) {
+  return record?.schemaVersion === 5 && record.runId === retirement.controllerRunId &&
+    record.selectedEntry === retirement.approvedChangeId && record.currentPhase === "propose" &&
+    record.v2Admission?.state === "admitted" && record.v2Admission?.repositoryId === retirement.repositoryId &&
+    record.v2Admission?.parentRunId === retirement.parentRunId && record.v2Admission?.workUnitId === retirement.workUnitId &&
+    record.v2Admission?.claimId === retirement.claimId && Array.isArray(record.steps) && record.steps.length === phases.length &&
+    record.steps.every((step, index) => step?.id === phases[index] && step.status === "pending" && step.evidence === undefined) &&
+    Array.isArray(record.resourceRecords) && record.resourceRecords.length === 0 &&
+    Array.isArray(record.issueIntakeRecords) && record.issueIntakeRecords.length === 0 &&
+    Array.isArray(record.authContextRecords) && record.authContextRecords.length === 0 &&
+    Array.isArray(record.cleanupReceipts) && record.cleanupReceipts.length === 0 &&
+    Array.isArray(record.completedEntries) && record.completedEntries.length === 0;
+}
+
 function controllerHasProgressArtifacts(repositoryPath, retirement, runGit) {
   const persisted = readPersistedControllerRecord({
     repositoryPath,
@@ -475,21 +499,62 @@ function controllerHasProgressArtifacts(repositoryPath, retirement, runGit) {
       runId: retirement.controllerRunId,
       checkpointPath: checkpointForRun(retirement.controllerRunId)
     },
-    runGit
+    runGit,
+    allowRetirementEvidence: true
   });
-  if (!persisted.valid) return true;
-  const record = persisted.record;
-  return record.schemaVersion !== 5 || record.runId !== retirement.controllerRunId ||
-    record.selectedEntry !== retirement.approvedChangeId || record.currentPhase !== "propose" ||
-    record.v2Admission?.state !== "admitted" || record.v2Admission?.repositoryId !== retirement.repositoryId ||
-    record.v2Admission?.parentRunId !== retirement.parentRunId || record.v2Admission?.workUnitId !== retirement.workUnitId ||
-    record.v2Admission?.claimId !== retirement.claimId || !Array.isArray(record.steps) || record.steps.length !== phases.length ||
-    record.steps.some((step, index) => step?.id !== phases[index] || step.status !== "pending" || step.evidence !== undefined) ||
-    !Array.isArray(record.resourceRecords) || record.resourceRecords.length !== 0 ||
-    !Array.isArray(record.issueIntakeRecords) || record.issueIntakeRecords.length !== 0 ||
-    !Array.isArray(record.authContextRecords) || record.authContextRecords.length !== 0 ||
-    !Array.isArray(record.cleanupReceipts) || record.cleanupReceipts.length !== 0 ||
-    !Array.isArray(record.completedEntries) || record.completedEntries.length !== 0;
+  return !persisted.valid || !controllerMatchesRetirementBaseline(persisted.record, retirement);
+}
+
+function ensureControllerRetirementEvidence({ repositoryPath, retirement, requestDigest, cancellationReceipt, archivePath, runGit, fileSystem = fs } = {}) {
+  const state = resolveControllerStateRoot({ repositoryPath, runGit });
+  if (!state.valid) return state;
+  const checkpointPath = checkpointForRun(retirement?.controllerRunId);
+  let containment;
+  try { containment = safeContainedDestination(state.stateRoot, checkpointPath); } catch { return { valid: false, reason: "controller-retirement-checkpoint-conflict" }; }
+  if (!containment || !containment.inspectComponents()) return { valid: false, reason: "controller-retirement-checkpoint-conflict" };
+  const lock = path.join(path.dirname(containment.destination), `.${path.basename(containment.destination)}.lock`);
+  const lockHandle = acquireControllerRecordLock(lock);
+  if (lockHandle === undefined) return { valid: false, reason: "controller-record-lock-unavailable" };
+  try {
+    const controller = safeJson(fileSystem, containment.destination);
+    if (!controllerMatchesRetirementBaseline(controller, retirement)) {
+      return { valid: false, reason: "controller-retirement-checkpoint-conflict" };
+    }
+    const retirementMarker = buildControllerRetirementMarker({
+      controller, retirement, requestDigest, cancellationReceipt, createdAt: cancellationReceipt?.createdAt
+    });
+    if (!retirementMarker) return { valid: false, reason: "controller-retirement-marker-invalid" };
+    const publishedRetirement = publishControllerMarker({
+      stateRoot: state.stateRoot,
+      controller,
+      name: controllerRetirementMarkerName,
+      marker: retirementMarker,
+      validate: (value) => validControllerRetirementMarker(value, { controller, cancellationReceipt }),
+      fileSystem
+    });
+    if (!publishedRetirement.valid) return publishedRetirement;
+    if (!archivePath) return { valid: true, state: "retiring", retirementMarker, path: publishedRetirement.path };
+    const archiveManifest = safeJson(fileSystem, path.join(archivePath, "archive-manifest.json"));
+    const terminalMarker = buildControllerTerminalMarker({ controller, retirementMarker, cancellationReceipt, archiveManifest });
+    if (!terminalMarker) return { valid: false, reason: "controller-terminal-marker-invalid" };
+    const publishedTerminal = publishControllerMarker({
+      stateRoot: state.stateRoot,
+      controller,
+      name: controllerTerminalMarkerName,
+      marker: terminalMarker,
+      validate: (value) => validControllerTerminalMarker(value, {
+        controller, retirementMarker, cancellationReceipt, archiveManifest
+      }),
+      fileSystem
+    });
+    return publishedTerminal.valid
+      ? { valid: true, state: "retired", retirementMarker, terminalMarker, path: publishedTerminal.path }
+      : publishedTerminal;
+  } finally {
+    try { fileSystem.closeSync(lockHandle.descriptor); } catch {}
+    try { fileSystem.unlinkSync(lock); } catch {}
+    try { fileSystem.unlinkSync(lockHandle.ownerPath); } catch {}
+  }
 }
 
 function cancelledTerminalSummaryFor({ claim, workUnit, reason, now }) {
@@ -561,6 +626,15 @@ function cancelV2Run({ readableRepositoryName, repositoryPath, cancellation, req
   const requestDigest = digestValue(request);
   const archived = cancellationArchiveMatch({ paths, cancellation, requestDigest, fileSystem });
   if (archived?.valid) {
+    if (retirement) {
+      const marked = ensureControllerRetirementEvidence({
+        repositoryPath, retirement, requestDigest, cancellationReceipt: archived.receipt,
+        archivePath: archived.archivePath, runGit, fileSystem
+      });
+      if (!marked.valid || marked.state !== "retired") {
+        return { valid: false, classification: "failed", reason: marked.reason ?? "controller-retirement-marker-incomplete", requestDigest };
+      }
+    }
     return { valid: true, classification: alreadyClassification, requestDigest, archivePath: archived.archivePath, receipt: archived.receipt };
   }
   if (archived && !archived.valid) return { ...archived, classification: "paused", requestDigest };
@@ -620,6 +694,14 @@ function cancelV2Run({ readableRepositoryName, repositoryPath, cancellation, req
   };
   const receiptValidation = validateDomainRecord(receipt);
   if (!receiptValidation.valid) return { valid: false, classification: "paused", reason: "cancellation-receipt-invalid", requestDigest };
+  if (retirement) {
+    const marked = ensureControllerRetirementEvidence({
+      repositoryPath, retirement, requestDigest, cancellationReceipt: receipt, runGit, fileSystem
+    });
+    if (!marked.valid || marked.state !== "retiring") {
+      return { valid: false, classification: "failed", reason: marked.reason ?? "controller-retirement-marker-incomplete", requestDigest };
+    }
+  }
   const claimRelease = {
     kind: "claim-release",
     schemaVersion: 2,
@@ -641,6 +723,15 @@ function cancelV2Run({ readableRepositoryName, repositoryPath, cancellation, req
   const verified = cancellationArchiveMatch({ paths, cancellation, requestDigest, fileSystem });
   if (!verified?.valid || verified.archivePath !== archivedRun.archivePath) {
     return { valid: false, classification: "failed", reason: "cancellation-post-archive-verification-failed", requestDigest };
+  }
+  if (retirement) {
+    const marked = ensureControllerRetirementEvidence({
+      repositoryPath, retirement, requestDigest, cancellationReceipt: verified.receipt,
+      archivePath: verified.archivePath, runGit, fileSystem
+    });
+    if (!marked.valid || marked.state !== "retired") {
+      return { valid: false, classification: "failed", reason: marked.reason ?? "controller-retirement-marker-incomplete", requestDigest };
+    }
   }
   return { valid: true, classification, requestDigest, archivePath: archivedRun.archivePath, receipt: verified.receipt, index: archivedRun.index };
 }
@@ -807,6 +898,13 @@ export function initializeV2Delivery({ authorization, repository, canonicalRemot
         existing.repository !== repository || existing.expiresAt !== authorization.expiresAt ||
         !sameV2AdmissionBinding(existing.v2Admission, pendingBinding)) {
       return { valid: false, classification: "paused", reason: "controller-initialization-context-conflict", checkpointPath };
+    }
+    const retirementEvidence = readControllerRetirementEvidence({ stateRoot: state.stateRoot, controller: existing });
+    if (retirementEvidence.present) {
+      return retirementEvidence.valid && retirementEvidence.state === "retired"
+        ? { valid: false, classification: "retired", reason: "controller-owner-retired", checkpointPath }
+        : { valid: false, classification: "paused", reason: retirementEvidence.valid
+          ? "controller-retirement-in-progress" : retirementEvidence.reason, checkpointPath };
     }
     record = existing;
   } else {
@@ -1003,7 +1101,7 @@ export function advanceControllerQueue(record, { now = new Date().toISOString() 
   return { valid: true, record: next };
 }
 
-export function inspectControllerRecord(record, { authorization, repository, now = new Date().toISOString() } = {}) {
+export function inspectControllerRecord(record, { authorization, repository, retirementEvidence, now = new Date().toISOString() } = {}) {
   if (!record || record.schemaVersion === 1 || record.schemaVersion === 2 || record.schemaVersion === 3) return { classification: "paused", reason: "controller-record-legacy", nextPhase: null };
   if (!controllerSchema(record.schemaVersion) || !validRunId(record.runId) || record.checkpointPath !== checkpointForRun(record.runId) || !text(record.selectedEntry) || !text(record.repository) || !text(record.checkpointPath) || !Array.isArray(record.steps) ||
       !Array.isArray(record.resourceRecords) || (record.issueIntakeRecords !== undefined && !Array.isArray(record.issueIntakeRecords)) ||
@@ -1019,6 +1117,12 @@ export function inspectControllerRecord(record, { authorization, repository, now
   }
   if (!selectedByAuthorization(record.selectedEntry, authorization) || record.repository !== repository || record.authorizationDigest !== authorizationDigest(authorization) || record.expiresAt !== authorization?.expiresAt) {
     return { classification: "paused", reason: "controller-context-conflict", nextPhase: null };
+  }
+  if (retirementEvidence?.present) {
+    if (!retirementEvidence.valid) return { classification: "paused", reason: retirementEvidence.reason ?? "controller-retirement-evidence-invalid", nextPhase: null };
+    if (retirementEvidence.state === "retiring") return { classification: "paused", reason: "controller-retirement-in-progress", nextPhase: null };
+    if (retirementEvidence.state === "retired") return { classification: "retired", reason: "controller-owner-retired", nextPhase: null };
+    return { classification: "paused", reason: "controller-retirement-evidence-invalid", nextPhase: null };
   }
   if (Date.parse(record.expiresAt) <= Date.parse(now)) return { classification: "paused", reason: "controller-context-expired", nextPhase: null };
   if (record.schemaVersion === 5 && record.v2Admission.state !== "admitted") {
@@ -1036,6 +1140,13 @@ export function inspectControllerRecord(record, { authorization, repository, now
   return next
     ? { classification: "continue", reason: "controller-first-incomplete-phase", nextPhase: next.id }
     : { classification: "complete", reason: "controller-all-phases-complete", nextPhase: null };
+}
+
+export function inspectPersistedControllerRecord({ repositoryPath, record, authorization, repository, now = new Date().toISOString(), runGit, fileSystem = fs } = {}) {
+  const state = resolveControllerStateRoot({ repositoryPath, runGit });
+  if (!state.valid) return { classification: "paused", reason: state.reason, nextPhase: null };
+  const retirementEvidence = readControllerRetirementEvidence({ stateRoot: state.stateRoot, controller: record, fileSystem });
+  return inspectControllerRecord(record, { authorization, repository, retirementEvidence, now });
 }
 
 function validPhaseEvidence(evidence, phase) {
@@ -1140,7 +1251,7 @@ function sameControllerContext(left, right) {
     left?.expiresAt === right?.expiresAt;
 }
 
-function readPersistedControllerRecord({ repositoryPath, record, runGit } = {}) {
+function readPersistedControllerRecord({ repositoryPath, record, runGit, allowRetirementEvidence = false } = {}) {
   if (!text(repositoryPath) || !validRunId(record?.runId) || record?.checkpointPath !== checkpointForRun(record.runId) || path.isAbsolute(record.checkpointPath)) {
     return { valid: false, reason: "controller-record-path-invalid" };
   }
@@ -1154,9 +1265,16 @@ function readPersistedControllerRecord({ repositoryPath, record, runGit } = {}) 
       return { valid: false, reason: "controller-record-unavailable" };
     }
     const durable = safeJson(fs, containment.destination);
-    return durable && validRunId(durable.runId)
-      ? { valid: true, record: durable, path: containment.destination }
-      : { valid: false, reason: "controller-record-invalid" };
+    if (!durable || !validRunId(durable.runId)) return { valid: false, reason: "controller-record-invalid" };
+    if (!allowRetirementEvidence) {
+      const retirementEvidence = readControllerRetirementEvidence({ stateRoot: state.stateRoot, controller: durable });
+      if (retirementEvidence.present) {
+        return { valid: false, reason: retirementEvidence.valid && retirementEvidence.state === "retired"
+          ? "controller-record-retired"
+          : retirementEvidence.valid ? "controller-retirement-in-progress" : retirementEvidence.reason };
+      }
+    }
+    return { valid: true, record: durable, path: containment.destination };
   } catch { return { valid: false, reason: "controller-record-unavailable" }; }
 }
 
@@ -1167,6 +1285,9 @@ export function persistControllerRecord({ repositoryPath, record, expectedRecord
   }
   const state = resolveControllerStateRoot({ repositoryPath, runGit });
   if (!state.valid) return state;
+  const retirementEvidence = readControllerRetirementEvidence({ stateRoot: state.stateRoot, controller: record });
+  if (retirementEvidence.present) return { valid: false, reason: retirementEvidence.valid && retirementEvidence.state === "retired"
+    ? "controller-record-retired" : retirementEvidence.valid ? "controller-retirement-in-progress" : retirementEvidence.reason };
   try {
     fs.mkdirSync(state.stateRoot, { recursive: true, mode: 0o700 });
     if (fs.lstatSync(state.stateRoot).isSymbolicLink()) return { valid: false, reason: "controller-state-root-symlink" };
@@ -1185,6 +1306,9 @@ export function persistControllerRecord({ repositoryPath, record, expectedRecord
     if (!inspectComponents() || fs.realpathSync(directory) === root || !fs.realpathSync(directory).startsWith(`${root}${path.sep}`)) return { valid: false, reason: "controller-record-path-symlink" };
     lockHandle = acquireControllerRecordLock(lock);
     if (lockHandle === undefined) return { valid: false, reason: "controller-record-lock-unavailable" };
+    const lockedRetirementEvidence = readControllerRetirementEvidence({ stateRoot: state.stateRoot, controller: record });
+    if (lockedRetirementEvidence.present) return { valid: false, reason: lockedRetirementEvidence.valid && lockedRetirementEvidence.state === "retired"
+      ? "controller-record-retired" : lockedRetirementEvidence.valid ? "controller-retirement-in-progress" : lockedRetirementEvidence.reason };
     if (fs.existsSync(destination)) {
       const existing = JSON.parse(fs.readFileSync(destination, "utf8"));
       if (existing?.runId !== record.runId) return { valid: false, reason: "controller-record-run-conflict" };

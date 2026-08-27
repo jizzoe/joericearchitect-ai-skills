@@ -7,7 +7,7 @@ import { workspaceIoFromEnvironment } from "../workspace-io.mjs";
 import {
   advanceControllerLifecyclePhase, bindControllerLifecycleDelivery,
   attachBootstrapCleanupMigration, executeBootstrapCleanupAttachment,
-  executeControllerLifecycleCleanup, inspectControllerRecord, persistControllerCleanupReceipt,
+  executeControllerLifecycleCleanup, inspectPersistedControllerRecord, persistControllerCleanupReceipt,
   persistControllerAuthContext, persistControllerAuthContextEvidence,
   persistControllerIssueIntake, persistControllerIssueIntakeEvidence,
   initializeV2Delivery, registerControllerLifecycleResource, retainBootstrapCleanupResource, cancelExpiredV2Run, resolveControllerStateRoot, retireBlockedV2Run, terminalizeV2Run
@@ -96,7 +96,9 @@ const controllerOperations = {
     ...payload, readableRepositoryName: payload?.readableRepositoryName ?? path.basename(repositoryPath(payload)),
     operations: localBootstrapCleanupOperations(repositoryPath(payload))
   }),
-  "inspect-controller-record": (payload) => inspectControllerRecord(payload?.record, {
+  "inspect-controller-record": (payload) => inspectPersistedControllerRecord({
+    repositoryPath: repositoryPath(payload),
+    record: payload?.record,
     authorization: payload?.authorization,
     repository: payload?.repository ?? repositoryPath(payload),
     ...(payload?.now ? { now: payload.now } : {})

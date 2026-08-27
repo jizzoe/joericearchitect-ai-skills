@@ -6,7 +6,11 @@ import path from "node:path";
 import test from "node:test";
 
 import { admitV2Run } from "../autonomous-sdd-admission.mjs";
-import { cancelExpiredV2Run, createControllerRecord, earlyRetirementAuthorizationPayload, retireBlockedV2Run } from "../autonomous-sdd-controller.mjs";
+import {
+  cancelExpiredV2Run, createControllerRecord, earlyRetirementAuthorizationPayload,
+  initializeV2Delivery, inspectPersistedControllerRecord, persistControllerRecord, retireBlockedV2Run
+} from "../autonomous-sdd-controller.mjs";
+import { digestValue } from "../autonomous-sdd-run-contract.mjs";
 import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
 
 const root = () => fs.mkdtempSync(path.join(os.tmpdir(), "autonomous-sdd-cancellation-"));
@@ -69,7 +73,7 @@ const controllerFixture = (stateHome, admitted, mutate = (record) => record) => 
   const destination = path.join(repositoryPath, ".git", "sdd-delivery-runs", persisted.checkpointPath);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   fs.writeFileSync(destination, `${JSON.stringify(persisted, null, 2)}\n`);
-  return { repositoryPath, runGit: () => ".git" };
+  return { repositoryPath, runGit: () => ".git", record: persisted, destination, stateRoot: path.join(repositoryPath, ".git", "sdd-delivery-runs") };
 };
 
 test("cancellation retires an exact expired unfinished run and releases only its claim", () => {
@@ -150,8 +154,65 @@ test("separately authorized early retirement archives one exact blocked undelive
     assert.equal(retired.classification, "retired");
     assert.equal(JSON.parse(fs.readFileSync(path.join(retired.archivePath, "archive-manifest.json"), "utf8")).reason, "owner-authorized-blocked-controller");
     assert.equal(JSON.parse(fs.readFileSync(path.join(retired.archivePath, "projection.json"), "utf8")).children[0].terminalStatus, "cancelled");
+    const markerDirectory = path.dirname(controller.destination);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(markerDirectory, "controller-retirement.json"), "utf8")).state, "retiring");
+    assert.equal(JSON.parse(fs.readFileSync(path.join(markerDirectory, "controller-terminal.json"), "utf8")).state, "retired");
+    const inspected = inspectPersistedControllerRecord({
+      ...controller, authorization, repository: "owner/repository", now: "2026-08-20T13:00:00.000Z"
+    });
+    assert.deepEqual(inspected, { classification: "retired", reason: "controller-owner-retired", nextPhase: null });
+    assert.equal(persistControllerRecord({
+      ...controller, record: controller.record, expectedRecordDigest: digestValue(controller.record)
+    }).reason, "controller-record-retired");
     const retry = retireBlockedV2Run({ readableRepositoryName: "repository", retirement, transitionAvailable: () => false, ...trustedOwner, ...controller, stateHome, now: "2026-08-20T13:00:00.000Z" });
     assert.equal(retry.classification, "already-retired");
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
+});
+
+test("an interrupted early-retirement retry completes the terminal marker before reporting success", () => {
+  const stateHome = root();
+  try {
+    const admitted = admitV2Run(fixture(stateHome));
+    const controller = controllerFixture(stateHome, admitted);
+    const retirement = retirementFor(admitted);
+    const first = retireBlockedV2Run({
+      readableRepositoryName: "repository", retirement, transitionAvailable: () => false, ...trustedOwner,
+      ...controller, stateHome, now: "2026-08-20T13:00:00.000Z"
+    });
+    assert.equal(first.classification, "retired");
+    const terminalMarker = path.join(path.dirname(controller.destination), "controller-terminal.json");
+    fs.rmSync(terminalMarker);
+    assert.deepEqual(inspectPersistedControllerRecord({
+      ...controller, authorization, repository: "owner/repository", now: "2026-08-20T13:00:00.000Z"
+    }), { classification: "paused", reason: "controller-retirement-in-progress", nextPhase: null });
+    fs.mkdirSync(path.join(controller.repositoryPath, "config"));
+    fs.writeFileSync(path.join(controller.repositoryPath, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+    const nextAuthorization = resolveSddDeliveryRequest({
+      target: "next-change", mode: "autonomous", qualityProfile: "prototype-rapid",
+      authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h"
+    }, { goalStartedAt: started }).effectiveAuthorization;
+    const blockedAdmission = initializeV2Delivery({
+      ...fixture(stateHome, { authorization: nextAuthorization }), repository: "owner/repository",
+      repositoryPath: controller.repositoryPath, legacyDirectory: controller.stateRoot, runGit: controller.runGit
+    });
+    assert.equal(blockedAdmission.reason, "legacy-inventory-ambiguous");
+
+    const retry = retireBlockedV2Run({
+      readableRepositoryName: "repository", retirement, transitionAvailable: () => false, ...trustedOwner,
+      ...controller, stateHome, now: "2026-08-20T13:00:00.000Z"
+    });
+    assert.equal(retry.valid, true);
+    assert.equal(retry.classification, "already-retired");
+    assert.equal(fs.existsSync(terminalMarker), true);
+    assert.equal(inspectPersistedControllerRecord({
+      ...controller, authorization, repository: "owner/repository", now: "2026-08-20T13:00:00.000Z"
+    }).classification, "retired");
+    const next = initializeV2Delivery({
+      ...fixture(stateHome, { authorization: nextAuthorization }), repository: "owner/repository",
+      repositoryPath: controller.repositoryPath, legacyDirectory: controller.stateRoot, runGit: controller.runGit
+    });
+    assert.equal(next.valid, true, JSON.stringify(next));
+    assert.equal(next.classification, "initialized");
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });
 
