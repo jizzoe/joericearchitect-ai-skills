@@ -96,6 +96,21 @@ test("terminal parser rejects invalid UTF-8 and ambiguous item lifecycles", () =
   assert.equal(parseCodexReviewEventStream(incompleteItem).code, "codex-jsonl-item-lifecycle-incomplete");
 });
 
+test("terminal parser permits Codex terminal-only items but makes them immutable", () => {
+  const terminalOnly = stream(lifecycle([message(payload(), "terminal-only")]));
+  assert.equal(parseCodexReviewEventStream(terminalOnly).available, true);
+  const terminalThenUpdate = stream(lifecycle([
+    message(payload(), "terminal-only"),
+    event("item.updated", { item: { id: "terminal-only", type: "agent_message" } })
+  ]));
+  assert.equal(parseCodexReviewEventStream(terminalThenUpdate).code, "codex-jsonl-item-lifecycle-ambiguous");
+  const terminalThenStart = stream(lifecycle([
+    message(payload(), "terminal-only"),
+    event("item.started", { item: { id: "terminal-only", type: "agent_message" } })
+  ]));
+  assert.equal(parseCodexReviewEventStream(terminalThenStart).code, "codex-jsonl-item-lifecycle-ambiguous");
+});
+
 test("terminal parser enforces every byte and count bound", () => {
   const valid = stream(lifecycle([message(payload())]));
   assert.equal(parseCodexReviewEventStream(valid, { bounds: { totalBytes: Buffer.byteLength(valid) - 1 } }).code, "codex-jsonl-stream-bound-exceeded");

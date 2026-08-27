@@ -116,6 +116,10 @@ export function createCodexReviewEventParser({ bounds: requestedBounds } = {}) {
         return fail("codex-jsonl-item-lifecycle-ambiguous");
       }
     } else if (event.type === "item.completed") {
+      // Codex JSONL supports terminal-only item records: a completed item can
+      // be the first event for its id. Treat that as its immutable terminal
+      // state, while still rejecting every later duplicate, type change, or
+      // update for the same id.
       if (itemState?.state === "completed" || (itemState && itemState.type !== item.type)) {
         return fail("codex-jsonl-item-lifecycle-ambiguous");
       }

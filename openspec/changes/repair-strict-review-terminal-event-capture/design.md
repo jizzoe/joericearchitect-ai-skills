@@ -95,6 +95,14 @@ stdout and applies terminal-event contract `codex-jsonl-final-agent-v1`:
 7. the last completed agent message before `turn.completed` is the sole
    candidate payload.
 
+Codex supports terminal-only item records: an allowlisted `item.completed`
+event may be the first event for its item ID. That event establishes the
+item's immutable completed state; a later duplicate, type change, start, or
+update for that ID is ambiguous and fails closed. `item.updated` still
+requires a prior matching `item.started`, and any started item must complete
+before the turn can complete. This preserves the observed Codex JSONL shape
+without accepting an unconstrained or reusable item identity.
+
 Failed or incomplete turns, missing candidates, duplicate lifecycle events,
 post-terminal events, malformed lines, unknown top-level event types, and
 unsupported contract revisions are typed unavailable. Tool commands and
