@@ -15,11 +15,17 @@ on:
       - "scripts/sdd/codex-review-event-*.mjs"
       - "scripts/sdd/independent-review-contract.mjs"
       - "scripts/sdd/platform-review-adapters.mjs"
+      - "scripts/sdd/review-adapter-dispatch.mjs"
+      - "scripts/sdd/review-bootstrap-binding.mjs"
       - "scripts/sdd/review-package-capsule.mjs"
       - "scripts/sdd/test/codex-review-event-*.test.mjs"
       - "scripts/sdd/test/independent-review-contract.test.mjs"
+      - "scripts/sdd/test/review-adapter-dispatch.test.mjs"
+      - "scripts/sdd/test/review-bootstrap-binding.test.mjs"
       - "scripts/sdd/test/review-package-capsule.test.mjs"
+      - "schemas/independent-review-findings-v1.schema.json"
       - "schemas/independent-review-package-index-v1.schema.json"
+      - "schemas/independent-review-result-v1.schema.json"
       - "scripts/skills/**"
       - "scripts/validation/**"
       - "scripts/install-ai-skills.sh"
@@ -69,6 +75,8 @@ jobs:
           scripts/sdd/test/codex-review-event-capture.test.mjs
           scripts/sdd/test/codex-review-event-contract.test.mjs
           scripts/sdd/test/independent-review-contract.test.mjs
+          scripts/sdd/test/review-adapter-dispatch.test.mjs
+          scripts/sdd/test/review-bootstrap-binding.test.mjs
           scripts/sdd/test/review-package-capsule.test.mjs
 
       - name: Runtime reference validation

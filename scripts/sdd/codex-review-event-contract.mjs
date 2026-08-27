@@ -97,6 +97,9 @@ export function createCodexReviewEventParser({ bounds: requestedBounds } = {}) {
     }
     if (!state.turnStarted) return fail("codex-jsonl-turn-start-missing");
     if (event.type === "turn.completed") {
+      if ([...state.itemStates.values()].some((itemState) => itemState.state !== "completed")) {
+        return fail("codex-jsonl-item-lifecycle-incomplete");
+      }
       state.turnCompleted = true;
       return null;
     }
@@ -107,12 +110,16 @@ export function createCodexReviewEventParser({ bounds: requestedBounds } = {}) {
     const itemState = state.itemStates.get(item.id);
     if (event.type === "item.started") {
       if (itemState) return fail("codex-jsonl-item-lifecycle-ambiguous");
-      state.itemStates.set(item.id, "started");
+      state.itemStates.set(item.id, { state: "started", type: item.type });
     } else if (event.type === "item.updated") {
-      if (itemState !== "started") return fail("codex-jsonl-item-lifecycle-ambiguous");
+      if (itemState?.state !== "started" || itemState.type !== item.type) {
+        return fail("codex-jsonl-item-lifecycle-ambiguous");
+      }
     } else if (event.type === "item.completed") {
-      if (itemState === "completed") return fail("codex-jsonl-item-lifecycle-ambiguous");
-      state.itemStates.set(item.id, "completed");
+      if (itemState?.state === "completed" || (itemState && itemState.type !== item.type)) {
+        return fail("codex-jsonl-item-lifecycle-ambiguous");
+      }
+      state.itemStates.set(item.id, { state: "completed", type: item.type });
     }
     if (item.type !== "agent_message") {
       state.toolEventCount += 1;

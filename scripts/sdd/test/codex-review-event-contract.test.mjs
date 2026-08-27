@@ -84,6 +84,16 @@ test("terminal parser rejects invalid UTF-8 and ambiguous item lifecycles", () =
     message(payload())
   ]));
   assert.equal(parseCodexReviewEventStream(updateWithoutStart).code, "codex-jsonl-item-lifecycle-ambiguous");
+  const changedType = stream(lifecycle([
+    event("item.started", { item: { id: "shared", type: "command_execution" } }),
+    event("item.completed", { item: { id: "shared", type: "agent_message", text: payload() } })
+  ]));
+  assert.equal(parseCodexReviewEventStream(changedType).code, "codex-jsonl-item-lifecycle-ambiguous");
+  const incompleteItem = stream(lifecycle([
+    event("item.started", { item: { id: "command", type: "command_execution" } }),
+    message(payload())
+  ]));
+  assert.equal(parseCodexReviewEventStream(incompleteItem).code, "codex-jsonl-item-lifecycle-incomplete");
 });
 
 test("terminal parser enforces every byte and count bound", () => {
