@@ -1,15 +1,15 @@
 ## 1. Terminal-event contract and artifact creation
 
-- [ ] 1.1 Extract one canonical findings-payload validator for event capture and existing artifact inspection.
+- [x] 1.1 Extract one canonical findings-payload validator for event capture and existing artifact inspection.
   - Depends on: planning review.
   - Evidence: focused compatibility tests for every accepted and rejected findings payload shape.
-- [ ] 1.2 Implement the bounded `codex-jsonl-final-agent-v1` state machine with last-agent selection, lifecycle ordering, end-of-stream proof, fixed bounds, and safe diagnostics.
+- [x] 1.2 Implement the bounded `codex-jsonl-final-agent-v1` state machine with last-agent selection, lifecycle ordering, end-of-stream proof, fixed bounds, and safe diagnostics.
   - Depends on: 1.1.
   - Evidence: deterministic parser tests for valid, malformed, unknown, failed, incomplete, duplicate, post-terminal, and over-bound streams.
-- [ ] 1.3 Implement exclusive same-directory atomic findings and metadata-receipt writes with non-symlink, nonexistence, final-inspection, and cleanup handling.
+- [x] 1.3 Implement exclusive same-directory atomic findings and metadata-receipt writes with non-symlink, nonexistence, final-inspection, and cleanup handling.
   - Depends on: 1.1, 1.2.
   - Evidence: filesystem tests for atomic hard-link no-clobber publication, successful writes, pre-existing and concurrently created destinations, symlinks, unsupported filesystems, write failure, receipt loss, mismatch, and cleanup on POSIX and Windows.
-- [ ] 1.4 Complete portable replay coverage for no-tool and multi-tool success, intermediate schema-valid messages, findings, bounds, newline variants, and diagnostic minimization.
+- [x] 1.4 Complete portable replay coverage for no-tool and multi-tool success, intermediate schema-valid messages, findings, bounds, newline variants, and diagnostic minimization.
   - Depends on: 1.1, 1.2, 1.3.
   - Evidence: focused replay suite passing on supported Node platforms with no raw event, path, command, package, or credential content in diagnostics.
 

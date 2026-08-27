@@ -11,6 +11,7 @@ implementation_repositories:
   - repository: "jizzoe/joericearchitect-ai-skills"
     default_branch: "main"
     paths:
+      - ".github/workflows/runtime-matrix.yml"
       - "config/ai-skills.json"
       - "openspec/changes/repair-strict-review-terminal-event-capture/"
       - "schemas/independent-review-package-index-v1.schema.json"
