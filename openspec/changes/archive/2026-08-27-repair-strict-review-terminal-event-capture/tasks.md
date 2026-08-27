@@ -81,6 +81,6 @@
 - [x] 5.5 Run OpenSpec Verify, exact-head CI, and a fresh N-1 Claude strict-first-degraded independent review for one final package through the exact bootstrap binding.
   - Depends on: 5.4.
   - Evidence: Verify report, CI head binding, strict/degraded lineage as applicable, N-1 runtime and Claude result identity, validated result, and dispositions; unavailable Claude evidence pauses rather than self-certifies.
-- [ ] 5.6 Record final delivery evidence and verify migration coherence before runtime installation and dependent-work resumption.
+- [x] 5.6 Record final delivery evidence and verify migration coherence before runtime installation and dependent-work resumption.
   - Depends on: 5.5.
   - Evidence: issue #247 delivery/Archive record and ordered proof that repaired runtime installation precedes PR #246 rebase/review; after PR #246 installation, fresh owner authorization is required before reconciling the named requirements-to-plan controller at its first incomplete `propose` phase.
