@@ -78,7 +78,7 @@
 - [x] 5.4 Build a candidate runtime and run the real installed-Codex multi-step acceptance probe with tool use, an intermediate message, and the bounded large-package capsule.
   - Depends on: 5.1, 5.2, 5.3.
   - Evidence: candidate digest, valid safe receipt, one completed turn, and exact host-created final artifact from `--json --output-schema`.
-- [ ] 5.5 Run OpenSpec Verify, exact-head CI, and a fresh N-1 Claude strict-first-degraded independent review for one final package through the exact bootstrap binding.
+- [x] 5.5 Run OpenSpec Verify, exact-head CI, and a fresh N-1 Claude strict-first-degraded independent review for one final package through the exact bootstrap binding.
   - Depends on: 5.4.
   - Evidence: Verify report, CI head binding, strict/degraded lineage as applicable, N-1 runtime and Claude result identity, validated result, and dispositions; unavailable Claude evidence pauses rather than self-certifies.
 - [ ] 5.6 Record final delivery evidence and verify migration coherence before runtime installation and dependent-work resumption.
