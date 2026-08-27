@@ -101,6 +101,13 @@ unsupported contract revisions are typed unavailable. Tool commands and
 outputs are counted but never retained or interpreted. Intermediate agent
 messages are discarded when replaced and never written.
 
+The fixed strict prompt requires one short non-findings progress message before
+the first inspection tool call. This makes the live production acceptance
+probe exercise intermediate-message replacement without accepting a
+caller-selected prompt or a test-only transport. The progress message remains
+non-authoritative and is never schema-validated or written unless the stream
+incorrectly ends with it, in which case final-payload validation fails closed.
+
 Initial fixed bounds are 16 MiB for the complete event stream, 2 MiB per JSONL
 line, 100,000 events, 1 MiB for the final candidate (matching the existing
 artifact bound), and the request's existing fifteen-minute expiry. These are

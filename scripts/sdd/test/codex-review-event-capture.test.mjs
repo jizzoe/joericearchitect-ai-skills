@@ -364,3 +364,37 @@ test("capture preserves typed event failures but classifies an empty nonzero chi
     assert.equal(inspected.receipt.artifactReceiptState, "absent");
   });
 });
+
+test("capture waits for confirmed child exit and force-terminates an uncooperative rejected stream", async () => withTemporaryAsync(async (root) => {
+  const fixture = captureFixture(root);
+  const child = new EventEmitter();
+  child.pid = 12345;
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  const signals = [];
+  let closed = false;
+  child.kill = (signal) => {
+    signals.push(signal);
+    if (signal === "SIGKILL") {
+      queueMicrotask(() => {
+        closed = true;
+        child.stdout.end();
+        child.stderr.end();
+        child.emit("close", null, "SIGKILL");
+      });
+    }
+    return true;
+  };
+  queueMicrotask(() => child.stdout.write("not-json\n"));
+
+  const outcome = await executeCodexCaptureRequest(fixture.request.requestPath, fixture.written.requestDigest, {
+    spawnChild: () => child,
+    modulePath: fixture.capturePath,
+    eventContractPath: fixture.eventContractPath,
+    terminationGraceMs: 1
+  });
+  assert.equal(closed, true, "capture settles only after child close");
+  assert.deepEqual(signals, ["SIGTERM", "SIGKILL"]);
+  assert.equal(outcome.code, "codex-jsonl-line-malformed");
+  assert.equal(inspectCodexCaptureReceiptArtifact(fixture.request.receiptPath).available, true);
+}));

@@ -87,3 +87,32 @@ regression assertion now rejects future lookaround in either transport schema,
 and the canonical-validator test retains capsule-path rejection. Focused
 contract/parser/capture/adapter tests pass: 55 passed, 0 failed. This correction
 creates a new source head and package before any further acceptance attempt.
+
+## Live Codex acceptance attempt 3 — transport success, review finding
+
+The schema-corrected package used source head
+`219e260bee8bc624f20e8656ec252fefbf93a006`, candidate runtime digest
+`ddd2100957bfca265234270c6f9a9962a25fa1f03a89a186ff8ddc8d80c12cf8`,
+package manifest
+`313e70e5b7790047421afc1b3da45eb755a190f1d401e9d57808fd8856b060d7`,
+and 10 capsule chunks. Host capture completed with exit 0, 265,419 event bytes,
+32 events, 28 tool events, one completed agent-message candidate, one
+completed turn, and a 627-byte host-created artifact whose SHA-256 matched the
+safe receipt. The parent validated the exact package/result/runtime bindings,
+preserved a one-finding `failed` result, and completed exact-owned cleanup.
+
+This proves the repaired host-artifact path after real multi-step tool use, but
+does not satisfy task 5.4 because only one completed agent message was emitted.
+The finding identified that timeout/interruption paths could settle immediately
+after requesting child termination. The correction now waits for the child
+`close` event, escalates from `SIGTERM` to `SIGKILL` after a bounded grace
+period, and never publishes a receipt for an identified child whose exit cannot
+be observed. An uncooperative-child fixture proves no settlement occurs before
+confirmed close.
+
+The fixed strict prompt now also requires one short non-findings progress
+message before the first inspection tool call. This exercises last-message
+replacement through the production transport without a caller-selected prompt
+or test-only acceptance mode. The progress message is discarded when replaced;
+if it were left as the terminal candidate, normal findings-payload validation
+would reject it. Focused capture/parser/adapter tests pass: 49 passed, 0 failed.

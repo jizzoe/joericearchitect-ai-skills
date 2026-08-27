@@ -534,6 +534,7 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
     assert.ok(captureRequest.childArguments.includes(launchPath));
     assert.equal(captureRequest.childArguments.includes("--json"), true);
     assert.equal(captureRequest.childArguments.includes("--output-last-message"), false);
+    assert.match(captureRequest.childArguments.at(-1), /Before your first inspection tool call, emit one short plain-language progress message/);
     const tampered = consumeCodexParentStrictReviewToolResult({ toolRequest: { ...toolRequest, workingDirectory: reviewPath }, toolResult: { exit_code: 0, output: "{}" } }, {
       removeView: () => ({ removed: true }),
       clock: () => "2026-08-15T04:01:00.000Z"

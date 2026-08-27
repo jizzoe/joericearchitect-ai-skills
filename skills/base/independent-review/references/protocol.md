@@ -157,7 +157,10 @@ index, and chunks so a pre-existing file, directory, or symlink fails closed.
 The transport starts either a fresh
 ephemeral Codex process with `read-only` requested or a fresh nonpersistent
 Claude process exposing only read/search tools. It accepts no arbitrary shell
-text. Every adapter probe
+text. The fixed strict Codex prompt requires one short non-findings progress
+message before its first inspection tool call so the last-agent rule is
+continuously exercised; only the later validated final message can become the
+host-owned artifact. Every adapter probe
 and strict or degraded reviewer subprocess receives only allowlisted
 cross-platform operational environment variables and fixed adapter overrides,
 not the caller's ambient credential values or process-injection variables.
