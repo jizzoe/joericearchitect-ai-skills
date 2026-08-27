@@ -7,6 +7,10 @@ Observed on 2026-08-27 for OpenSpec change
 
 - Issue [#247](https://github.com/jizzoe/joericearchitect-ai-skills/issues/247)
   closed at `2026-08-27T15:00:19Z`.
+- The issue is present in configured user Project 1 as item
+  `PVTI_lAHOADpDHM4Bfzvdzg4Su_Q` with Status `Done`. Adding the already-closed
+  issue produced the terminal status through GitHub's configured lifecycle; no
+  separate status override was required.
 - Implementation PR
   [#248](https://github.com/jizzoe/joericearchitect-ai-skills/pull/248)
   squash-merged exact topic head
