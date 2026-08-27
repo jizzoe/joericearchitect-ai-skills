@@ -59,3 +59,31 @@ candidate head after complete repeatable regression evidence. Task 5.4 remains
 open until a real bounded large-package run records tool use, at least two
 completed agent-message candidates, one completed turn, a valid safe receipt,
 and the exact host-created final findings artifact.
+
+## Live Codex acceptance attempt 2 — unavailable and diagnosed
+
+The next exact package used source head
+`e57d9ded5ecba41570cda0950faf8424207128c5`, candidate runtime digest
+`ddd2100957bfca265234270c6f9a9962a25fa1f03a89a186ff8ddc8d80c12cf8`,
+package manifest
+`d42087a64612f1122571aa36637190a8fa1b817b1dd9dc0c647ca8a2be56a20a`,
+and 10 capsule chunks. It failed with the same safe receipt shape as attempt 1:
+466 event bytes, 3 events, no candidate or tool event, absent artifact,
+`codex-jsonl-turn-failed`, one attempt, and complete exact-owned cleanup.
+
+A redacted same-schema/minimal-prompt diagnostic then isolated the cause. The
+installed CLI emitted `thread.started`, `turn.started`, `error`, and
+`turn.failed`; it exited 1 and matched only the allowlisted `schema` failure
+category. The earlier minimal-schema smoke had succeeded at the same elevated
+host boundary. Inspection found an unsupported regex negative lookahead in the
+two changed findings-evidence schema patterns. Codex rejected that structured
+output schema before model or tool execution.
+
+The correction removes regex lookaround from the transport-facing findings and
+result schemas. The canonical findings/result validator still rejects legacy
+or capsule-owned evidence paths, so the security boundary is unchanged while
+the generation schema remains compatible with the installed CLI. An offline
+regression assertion now rejects future lookaround in either transport schema,
+and the canonical-validator test retains capsule-path rejection. Focused
+contract/parser/capture/adapter tests pass: 55 passed, 0 failed. This correction
+creates a new source head and package before any further acceptance attempt.

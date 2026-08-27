@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import test from "node:test";
 import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexParentStrictReviewToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, consumeCodexParentStrictReviewToolResult, createClaudeReviewSettings, degradedCapabilityLedger, diagnoseClaudeExecutionFailure, diagnoseCodexExecutionFailure, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, pinnedExecutableUnchanged, prepareClaudeReviewerEnvironment, prepareCodexReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, resolveTrustedReviewerExecutable, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, sealCodexDegradedReviewPayload, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
-import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
+import { packageDigest, validateReviewFindingsPayload, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 import { resolveReviewAdapterDispatch } from "../review-adapter-dispatch.mjs";
 
@@ -861,10 +861,13 @@ test("findings output schema is accepted by strict structured-output validators"
   assert.equal(schema.additionalProperties, false);
   assert.deepEqual(new Set(schema.required), new Set(Object.keys(schema.properties)));
   assert.equal("allOf" in schema, false);
-  const evidencePattern = new RegExp(schema.properties.findings.items.properties.evidence.pattern);
+  const pattern = schema.properties.findings.items.properties.evidence.pattern;
+  assert.doesNotMatch(pattern, /\(\?[=!<]/, "Codex structured outputs reject regex lookaround");
+  const evidencePattern = new RegExp(pattern);
   assert.equal(evidencePattern.test("scripts/sdd/example.mjs"), true);
-  assert.equal(evidencePattern.test(".ai-independent-review-package/index.json"), false);
-  assert.equal(evidencePattern.test(".ai-independent-review-package.json"), false);
+  assert.equal(validateReviewFindingsPayload({ schemaVersion: 1, status: "failed", findings: [{
+    id: "capsule-path", severity: "high", evidence: ".ai-independent-review-package/index.json", recommendation: "Use committed evidence."
+  }] }).valid, false, "canonical validation rejects transport-owned evidence after schema generation");
 });
 
 test("strict result schema distinguishes unavailable from proven isolation", () => {
@@ -873,9 +876,10 @@ test("strict result schema distinguishes unavailable from proven isolation", () 
   assert.equal(schema.allOf[0].if.properties.status.enum.includes("passed"), true);
   assert.equal(schema.allOf[1].if.properties.status.const, "unavailable");
   assert.equal(schema.allOf[1].then.properties.attestation.properties.readOnly.const, false);
-  const evidencePattern = new RegExp(schema.properties.findings.items.properties.evidence.pattern);
+  const pattern = schema.properties.findings.items.properties.evidence.pattern;
+  assert.doesNotMatch(pattern, /\(\?[=!<]/, "Claude/Codex schema transport receives no regex lookaround");
+  const evidencePattern = new RegExp(pattern);
   assert.equal(evidencePattern.test("scripts/sdd/example.mjs"), true);
-  assert.equal(evidencePattern.test(".ai-independent-review-package/index.json"), false);
 });
 
 test("Claude adapter uses a temporary strict sandbox configuration without inherited settings", () => {
