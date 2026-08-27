@@ -128,6 +128,7 @@ test("dispatchReview runs the fallback only under a valid degraded authorization
   assert.equal(out.allowed, true);
   assert.equal(out.status, "degraded");
   assert.equal(out.assuranceLevel, "authorized-degraded");
+  assert.deepEqual(out.runtimeReceipt, runtimeReceipt);
 });
 
 test("dispatch rejects a direct unkeyed launcher and a mismatched durable selection", () => {

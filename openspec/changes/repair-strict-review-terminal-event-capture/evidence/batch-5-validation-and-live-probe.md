@@ -116,3 +116,25 @@ replacement through the production transport without a caller-selected prompt
 or test-only acceptance mode. The progress message is discarded when replaced;
 if it were left as the terminal candidate, normal findings-payload validation
 would reject it. Focused capture/parser/adapter tests pass: 49 passed, 0 failed.
+
+## Live Codex acceptance attempt 4 — acceptance shape met, review finding
+
+The next exact package used source head
+`850144beef52ddeef11be86c45be14982969c7b4`, candidate runtime digest
+`22d018b3d31ad6b09b9c32552f04743bc410eb4159c1e7e1dd7b475204069cef`,
+package manifest
+`93ccd452c24c0895e069cba7983ed07f5497906061de6d9d6d9fbc267540c98c`,
+and 10 capsule chunks. Its safe receipt proves the complete task-5.4 transport
+shape: exit 0, 257,216 event bytes, 32 events, 3 completed agent-message
+candidates, 26 tool events, one completed turn, one attempt, and a 409-byte
+host-created artifact whose SHA-256
+`8915bb7b420e3f48ea8e9230bdd958970cc2efa5b06eb34f11be01de85a56172`
+matched the receipt. The parent validated the exact package/result/runtime
+bindings, preserved the one-finding result, and completed exact-owned cleanup.
+
+The objective finding identified that the successful authorized-degraded
+dispatcher validated its runtime receipt but omitted it from the returned
+terminal record. The dispatcher now returns that exact validated receipt, and
+its success-path test asserts preservation. A new exact-head live probe is
+still required because final evidence and unresolved-finding disposition must
+bind the same corrected head.

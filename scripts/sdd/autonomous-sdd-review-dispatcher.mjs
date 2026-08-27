@@ -166,6 +166,7 @@ export function dispatchReview({
         code: reviewDispatchCodes.complete,
         assuranceLevel: "authorized-degraded",
         result: degraded.result,
+        runtimeReceipt: degraded.runtimeReceipt,
         terminalKey,
       });
     }
