@@ -12,6 +12,12 @@ on:
   pull_request:
     paths:
       - "scripts/runtime/**"
+      - "scripts/sdd/codex-review-event-*.mjs"
+      - "scripts/sdd/independent-review-contract.mjs"
+      - "scripts/sdd/platform-review-adapters.mjs"
+      - "scripts/sdd/test/codex-review-event-*.test.mjs"
+      - "scripts/sdd/test/independent-review-contract.test.mjs"
+      - "scripts/sdd/test/platform-review-adapters.test.mjs"
       - "scripts/skills/**"
       - "scripts/validation/**"
       - "scripts/install-ai-skills.sh"
@@ -54,6 +60,14 @@ jobs:
 
       - name: Runtime unit and contract tests
         run: node --test scripts/runtime/test/
+
+      - name: Terminal review event portability
+        run: >-
+          node --test
+          scripts/sdd/test/codex-review-event-capture.test.mjs
+          scripts/sdd/test/codex-review-event-contract.test.mjs
+          scripts/sdd/test/independent-review-contract.test.mjs
+          scripts/sdd/test/platform-review-adapters.test.mjs
 
       - name: Runtime reference validation
         run: node scripts/validation/validate-runtime-references.mjs
