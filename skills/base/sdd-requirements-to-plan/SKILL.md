@@ -53,6 +53,40 @@ the write commits. A missing or negative receipt, or a thrown writer error,
 pauses with `artifact-write-failed`; never report the plan completed without
 that explicit receipt.
 
+## Requirements Outcome Contract (v1)
+
+Planning requires a versioned, content-bound outcome block in the accepted
+requirements document. The installed planning runtime owns the validator and
+never accepts a caller-supplied validator, outcome list, or digest.
+
+The document's first non-empty line must be exactly:
+
+    <!-- ai-skills-requirements-outcomes: v1 -->
+
+After optional blank lines, the exact heading `## Accepted outcomes` follows.
+The section then contains one or more consecutive top-level outcome bullets,
+each immediately followed by a two-space-indented acceptance line:
+
+    - Outcome: <observable behavior>
+      Acceptance: <observable verification evidence>
+
+The parser stops at the next level-two heading and rejects trailing or
+interleaved content inside the accepted-outcomes section. A field that is
+empty, punctuation-only, a placeholder (`TBD`, `TODO`, `N/A`, or `unknown`),
+or instruction-like (attempting to override instructions, adopt a role, or
+request an external mutation) is invalid.
+
+The result binds the parsed outcomes to the SHA-256 digest of the exact
+requirements bytes. Requirements documents without this explicit v1 block are
+legacy and pause planning with migration guidance; no heuristic compatibility
+parser is used.
+
+### Migrating a legacy requirements document
+
+Add the exact marker and heading, then convert each accepted behavior into a
+complete `- Outcome:` / two-space-indented `Acceptance:` pair. Legacy documents
+continue to pause until migrated; the block is inert data for older runtimes.
+
 ## Write the Plan
 
 Write a plan with outcome-oriented milestones, semantically named candidate
