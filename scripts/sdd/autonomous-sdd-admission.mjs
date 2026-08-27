@@ -8,6 +8,11 @@ import { inventoryLegacyReconciliationReceipts, legacyRecordDigest } from "./aut
 import { createRepositoryClaim, defaultStateHome, ensureStateLayout, publishImmutableRecord, rebuildRepositoryIndex, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
 import { digestOperationContract, normalizeAgentPolicy } from "./autonomous-sdd-operation-contract.mjs";
 import { loadRuntimeConfiguration, resolveRuntimeConfiguration } from "./runtime-configuration.mjs";
+import {
+  readControllerRetirementEvidence,
+  validControllerRetirementMarker,
+  validControllerTerminalMarker
+} from "./autonomous-sdd-controller-retirement.mjs";
 
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const identifier = /^[a-z0-9][a-z0-9-]{2,127}$/i;
@@ -92,7 +97,7 @@ function archiveMatchesFor(paths, parentRunId, fileSystem = fs) {
   return matches;
 }
 
-function validTerminalV2Controller(controller, { repository, repositoryId, paths, fileSystem = fs } = {}) {
+function validTerminalV2Controller(controller, { repository, repositoryId, paths, legacyDirectory, fileSystem = fs } = {}) {
   if (!controller || controller.schemaVersion !== 5 || !identifier.test(controller.runId ?? "") || !text(repository) || controller.repository !== repository ||
       !Array.isArray(controller.steps) || controller.steps.length !== controllerPhases.length ||
       controller.steps.some((step, index) => step?.id !== controllerPhases[index]) ||
@@ -148,7 +153,19 @@ function validTerminalV2Controller(controller, { repository, repositoryId, paths
       summary.claimDisposition === "released" && summary.terminalSummaryDigest === terminalSummaryDigest(summary) &&
       (terminalized ? summary.terminalStatus === "complete" && summary.cleanupDisposition === "completed" : summary.terminalStatus === "cancelled" && summary.cleanupDisposition === "cancelled")
   };
-  return Object.values(checks).every(Boolean);
+  if (!Object.values(checks).every(Boolean)) return false;
+  if (cancelled && summary.terminalReason === "owner-authorized-blocked-controller") {
+    const retirementEvidence = readControllerRetirementEvidence({ stateRoot: legacyDirectory, controller, fileSystem });
+    return retirementEvidence.valid && retirementEvidence.state === "retired" &&
+      validControllerRetirementMarker(retirementEvidence.retirementMarker, { controller, cancellationReceipt }) &&
+      validControllerTerminalMarker(retirementEvidence.terminalMarker, {
+        controller,
+        retirementMarker: retirementEvidence.retirementMarker,
+        cancellationReceipt,
+        archiveManifest: manifest
+      });
+  }
+  return true;
 }
 
 function verifiedTerminalV2Controllers({ legacyDirectory, repository, stateHome, readableRepositoryName, repositoryId, fileSystem = fs } = {}) {
@@ -166,7 +183,7 @@ function verifiedTerminalV2Controllers({ legacyDirectory, repository, stateHome,
           let controller;
           try { controller = JSON.parse(content); } catch { continue; }
           const expectedReference = path.resolve(legacyDirectory, controller?.checkpointPath ?? "invalid");
-          if (expectedReference === path.resolve(target) && validTerminalV2Controller(controller, { repository, repositoryId, paths, fileSystem })) {
+          if (expectedReference === path.resolve(target) && validTerminalV2Controller(controller, { repository, repositoryId, paths, legacyDirectory, fileSystem })) {
             verified.push({ reference: target, recordDigest: legacyRecordDigest(content), runId: controller.runId,
               selectedEntry: controller.selectedEntry, repository: controller.repository });
           }

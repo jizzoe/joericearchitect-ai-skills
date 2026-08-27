@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -98,6 +99,12 @@ test("the staged controller initializes and resumes in real Git-common state wit
 
   const target = syntheticTargetRepository("initializer-target-");
   const stateHome = temporaryDirectory("initializer-state-");
+  const proposalContents = "runtime proposal evidence";
+  fs.writeFileSync(path.join(target, "proposal.md"), proposalContents);
+  const proposalEvidence = {
+    current: true, phase: "propose", reference: "runtime-proposal",
+    artifacts: [{ path: "proposal.md", sha256: crypto.createHash("sha256").update(proposalContents).digest("hex") }]
+  };
   fs.mkdirSync(path.join(target, "config"));
   fs.writeFileSync(path.join(target, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
   const initialized = invoke(target, "initialize-v2-delivery", basePayload(stateHome));
@@ -109,6 +116,24 @@ test("the staged controller initializes and resumes in real Git-common state wit
   assert.equal(initialized.record.v2Admission.claimId, initialized.admission.claim.claimId);
   const commonDirectory = execFileSync("git", ["-C", target, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).trim();
   assert.equal(fs.existsSync(path.resolve(target, commonDirectory, "sdd-delivery-runs", initialized.record.checkpointPath)), true);
+  const advanced = invoke(target, "advance-controller-lifecycle-phase", {
+    record: initialized.record,
+    authorization,
+    repository: "example/runtime-fixture",
+    phase: "propose",
+    evidence: proposalEvidence,
+    now: startedAt
+  });
+  assert.equal(advanced.classification, "advanced", JSON.stringify(advanced));
+  const retry = invoke(target, "advance-controller-lifecycle-phase", {
+    record: initialized.record,
+    authorization,
+    repository: "example/runtime-fixture",
+    phase: "propose",
+    evidence: proposalEvidence,
+    now: startedAt
+  });
+  assert.equal(retry.classification, "already-advanced", JSON.stringify(retry));
   const resumed = invoke(target, "initialize-v2-delivery", basePayload(stateHome));
   assert.equal(resumed.valid, true, JSON.stringify(resumed));
   assert.equal(resumed.classification, "resumed");

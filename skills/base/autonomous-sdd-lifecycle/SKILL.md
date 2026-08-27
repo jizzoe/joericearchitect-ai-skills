@@ -57,6 +57,20 @@ published choices, and perform no selection or mutation.
    owner-authorized reconciliation binding is available; it publishes an
    immutable sidecar receipt and returns to ordinary admission without creating
    a v2 run, claim, or lifecycle phase.
+   Complete a controller phase only through
+   `advance-controller-lifecycle-phase`: provide the resolved authorization,
+   repository identity, current durable record, first incomplete phase, and
+   current evidence. The transition rereads the Git-common checkpoint,
+   persists only the first incomplete phase, makes an identical retry
+   idempotent, and pauses on stale or conflicting state. Never edit a
+   controller checkpoint directly. If an admitted undelivered run is blocked
+   because its named required controller transition is absent from its installed runtime, use
+   `retire-blocked-v2-run` only with a separate exact, expiring signed owner binding
+   for that controller, admission, claim, fixed blocking reason, and recovery
+   reference. The dispatcher independently verifies that the transition is
+   unavailable and uses its configured trusted owner/public key rather than
+   caller-provided trust material. A run for which the transition is available must resume; a
+   retirement is cancelled history, not delivery or completion.
    Before every GitHub CLI lifecycle operation, create or reuse an exact,
    non-secret authentication-context binding for its selected entry, operation,
    repository, optional payload digest, command kind, and expiry. Persist the
@@ -161,6 +175,12 @@ For durable v2 delivery initialization, invoke the controller through the instal
 
 ```
 ai-skills-runtime run autonomous-sdd-controller initialize-v2-delivery --repository <absolute-target-repository> -- --input <initialization.json>
+```
+
+To advance an admitted controller, invoke the declared durable transition:
+
+```
+ai-skills-runtime run autonomous-sdd-controller advance-controller-lifecycle-phase --repository <absolute-target-repository> -- --input <phase-evidence.json>
 ```
 
 For normalized topology, gates, outcomes, and review-reuse checks, use the
