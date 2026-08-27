@@ -1,39 +1,118 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { PassThrough } from "node:stream";
+import { fileURLToPath } from "node:url";
 
-import { publishCodexCaptureReceipt, publishCodexCaptureSuccess, publishExclusiveReviewArtifact, validateCodexCaptureReceipt } from "../codex-review-event-capture.mjs";
+import { buildCodexCaptureRequest, executeCodexCaptureRequest, inspectCodexCaptureReceiptArtifact, publishCodexCaptureReceipt, publishCodexCaptureSuccess, publishExclusiveReviewArtifact, validateCodexCaptureReceipt, writeCodexCaptureRequest } from "../codex-review-event-capture.mjs";
 
-const receipt = (overrides = {}) => ({
-  schemaVersion: 1,
-  transportRevision: "codex-jsonl-final-agent-v1",
-  executionId: "execution-fixture",
-  requestDigest: "a".repeat(64),
-  cliIdentitySha256: "b".repeat(64),
-  cliVersionClassification: "supported",
-  exitStatus: 0,
-  eventBytes: 128,
-  eventCount: 4,
-  candidateCount: 1,
-  toolEventCount: 0,
-  terminalClassification: "completed",
-  artifactReceiptState: "published",
-  diagnosticCode: "codex-jsonl-final-agent-complete",
-  ...overrides
-});
+const receipt = (overrides = {}) => {
+  const value = {
+    schemaVersion: 1,
+    transportRevision: "codex-jsonl-final-agent-v1",
+    executionId: "execution-fixture",
+    requestDigest: "a".repeat(64),
+    cliIdentitySha256: "b".repeat(64),
+    cliVersionClassification: "supported",
+    exitStatus: 0,
+    eventBytes: 128,
+    eventCount: 4,
+    candidateCount: 1,
+    toolEventCount: 0,
+    terminalClassification: "completed",
+    artifactReceiptState: "published",
+    artifactBytes: 51,
+    artifactSha256: "f905fd0743a4e7fe15aa2b086a715bb2554f2d81df61528e09f44dbc5d92e06b",
+    diagnosticCode: "codex-jsonl-final-agent-complete",
+    attemptCount: 1,
+    ...overrides
+  };
+  value.attempts = overrides.attempts ?? [{ attempt: 1, exitStatus: value.exitStatus, eventBytes: value.eventBytes, eventCount: value.eventCount,
+    candidateCount: value.candidateCount, toolEventCount: value.toolEventCount, terminalClassification: value.terminalClassification,
+    diagnosticCode: value.diagnosticCode }];
+  return value;
+};
 
 const withTemporary = (fn) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-event-capture-"));
   try { fn(root); } finally { fs.rmSync(root, { recursive: true, force: true }); }
 };
 
+const withTemporaryAsync = async (fn) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-event-capture-"));
+  try { await fn(root); } finally { fs.rmSync(root, { recursive: true, force: true }); }
+};
+
+const fileIdentity = (filePath) => {
+  const realPath = fs.realpathSync(filePath);
+  const entry = fs.statSync(realPath);
+  return { realPath, device: entry.dev, inode: entry.ino, size: entry.size, modifiedMs: entry.mtimeMs,
+    contentSha256: createHash("sha256").update(fs.readFileSync(realPath)).digest("hex"), managedMutationDenied: true };
+};
+
+const eventLine = (value) => `${JSON.stringify(value)}\n`;
+const passedPayload = JSON.stringify({ schemaVersion: 1, findings: [], status: "passed" });
+
+function childFixture(stdout, stderr = "discarded secret diagnostic", exitStatus = 0) {
+  const child = new EventEmitter();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  child.kill = () => {};
+  queueMicrotask(() => {
+    child.stderr.write(stderr);
+    child.stderr.end();
+    child.stdout.write(stdout);
+    child.stdout.end();
+    child.emit("close", exitStatus);
+  });
+  return child;
+}
+
+function captureFixture(root, overrides = {}) {
+  const capturePath = fileURLToPath(new URL("../codex-review-event-capture.mjs", import.meta.url));
+  const eventContractPath = fileURLToPath(new URL("../codex-review-event-contract.mjs", import.meta.url));
+  const nodeIdentity = fileIdentity(process.execPath);
+  const requestPath = path.join(root, "request.json");
+  const resultPath = path.join(root, "result.json");
+  const receiptPath = path.join(root, "receipt.json");
+  const workingDirectory = path.join(root, "review-session");
+  const schemaPath = path.join(root, "schema.json");
+  fs.mkdirSync(workingDirectory, { mode: 0o700 });
+  fs.writeFileSync(schemaPath, "{}\n");
+  const request = buildCodexCaptureRequest({
+    executionId: "capture-fixture",
+    mode: "strict",
+    packageBinding: { baseCommit: "a".repeat(40), headCommit: "b".repeat(40), manifestDigest: "c".repeat(64) },
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    requestPath,
+    resultPath,
+    receiptPath,
+    workingDirectory,
+    schemaPath,
+    environment: { HOME: root, PATH: "/usr/bin", NO_COLOR: "1" },
+    nodeIdentity,
+    captureAdapterIdentity: fileIdentity(capturePath),
+    eventContractIdentity: fileIdentity(eventContractPath),
+    codexIdentity: nodeIdentity,
+    ...overrides
+  });
+  assert.ok(request);
+  const written = writeCodexCaptureRequest(request);
+  assert.equal(written.written, true, JSON.stringify(written));
+  return { request, written, capturePath, eventContractPath };
+}
+
 test("capture receipt contract is metadata-only and exact", () => {
   assert.equal(validateCodexCaptureReceipt(receipt()), true);
   assert.equal(validateCodexCaptureReceipt({ ...receipt(), rawStdout: "secret" }), false);
   assert.equal(validateCodexCaptureReceipt(receipt({ requestDigest: "bad" })), false);
   assert.equal(validateCodexCaptureReceipt(receipt({ eventBytes: -1 })), false);
+  assert.equal(validateCodexCaptureReceipt(receipt({ artifactReceiptState: "absent", artifactBytes: 0, artifactSha256: "" })), false);
+  assert.equal(validateCodexCaptureReceipt(receipt({ exitStatus: 1 })), false);
 });
 
 test("exclusive publication uses one no-clobber hard-link identity", () => withTemporary((root) => {
@@ -160,8 +239,128 @@ test("success publication revalidates the final candidate before creating either
 
 test("an unavailable receipt can be atomically published without a findings artifact", () => withTemporary((root) => {
   const receiptPath = path.join(root, "unavailable-receipt.json");
-  const unavailable = receipt({ exitStatus: 1, terminalClassification: "failed", artifactReceiptState: "absent", diagnosticCode: "codex-jsonl-turn-failed" });
+  const unavailable = receipt({ exitStatus: 1, terminalClassification: "unavailable", artifactReceiptState: "absent", artifactBytes: 0, artifactSha256: "", diagnosticCode: "codex-jsonl-turn-failed" });
   const result = publishCodexCaptureReceipt({ receiptPath, receipt: unavailable });
   assert.equal(result.published, true);
   assert.deepEqual(JSON.parse(fs.readFileSync(receiptPath, "utf8")), unavailable);
 }));
+
+test("capture authenticates raw request bytes before parsing or child launch", async () => withTemporaryAsync(async (root) => {
+  const fixture = captureFixture(root);
+  fs.chmodSync(fixture.request.requestPath, 0o600);
+  fs.writeFileSync(fixture.request.requestPath, '{"attackerExecutable":"/tmp/attacker"}\n');
+  let launches = 0;
+  const outcome = await executeCodexCaptureRequest(fixture.request.requestPath, fixture.written.requestDigest, {
+    spawnChild: () => { launches += 1; return childFixture(""); },
+    modulePath: fixture.capturePath
+  });
+  assert.equal(outcome.code, "codex-capture-request-digest-mismatch");
+  assert.equal(launches, 0);
+  assert.equal(fs.existsSync(fixture.request.resultPath), false);
+  assert.equal(fs.existsSync(fixture.request.receiptPath), false);
+}));
+
+test("capture launches only sealed JSONL argv, separates stderr, and publishes the host artifact", async () => withTemporaryAsync(async (root) => {
+  const fixture = captureFixture(root);
+  const stream = eventLine({ type: "thread.started", thread_id: "thread" }) +
+    eventLine({ type: "turn.started" }) +
+    eventLine({ type: "item.completed", item: { id: "first", type: "agent_message", text: passedPayload } }) +
+    eventLine({ type: "item.completed", item: { id: "tool", type: "command_execution", command: "secret command" } }) +
+    eventLine({ type: "item.completed", item: { id: "final", type: "agent_message", text: passedPayload } }) +
+    eventLine({ type: "turn.completed" });
+  let launch;
+  const outcome = await executeCodexCaptureRequest(fixture.request.requestPath, fixture.written.requestDigest, {
+    spawnChild: (executable, args, options) => {
+      launch = { executable, args, options };
+      return childFixture(stream, "credential=/private/secret");
+    },
+    modulePath: fixture.capturePath
+  });
+  assert.equal(outcome.completed, true, JSON.stringify(outcome));
+  assert.equal(launch.executable, fixture.request.identities.codex.realPath);
+  assert.deepEqual(launch.args, fixture.request.childArguments);
+  assert.equal(launch.args.includes("--json"), true);
+  assert.equal(launch.args.includes("--output-last-message"), false);
+  assert.deepEqual(JSON.parse(fs.readFileSync(fixture.request.resultPath, "utf8")), JSON.parse(passedPayload));
+  const inspected = inspectCodexCaptureReceiptArtifact(fixture.request.receiptPath);
+  assert.equal(inspected.available, true, JSON.stringify(inspected));
+  assert.equal(inspected.receipt.attemptCount, 1);
+  assert.equal(inspected.receipt.candidateCount, 2);
+  assert.equal(inspected.receipt.toolEventCount, 1);
+  assert.equal(JSON.stringify(inspected).includes("credential"), false);
+  assert.equal(JSON.stringify(inspected).includes("secret command"), false);
+}));
+
+test("capture preserves one incomplete attempt and permits exactly one fresh transport retry", async () => withTemporaryAsync(async (root) => {
+  const fixture = captureFixture(root);
+  const incomplete = eventLine({ type: "thread.started", thread_id: "thread" }) + eventLine({ type: "turn.started" });
+  const complete = eventLine({ type: "thread.started", thread_id: "thread-2" }) + eventLine({ type: "turn.started" }) +
+    eventLine({ type: "item.completed", item: { id: "final", type: "agent_message", text: passedPayload } }) + eventLine({ type: "turn.completed" });
+  let launches = 0;
+  const outcome = await executeCodexCaptureRequest(fixture.request.requestPath, fixture.written.requestDigest, {
+    spawnChild: () => childFixture(launches++ === 0 ? incomplete : complete),
+    modulePath: fixture.capturePath
+  });
+  assert.equal(outcome.completed, true, JSON.stringify(outcome));
+  assert.equal(launches, 2);
+  const inspected = inspectCodexCaptureReceiptArtifact(fixture.request.receiptPath);
+  assert.equal(inspected.receipt.attemptCount, 2);
+  assert.equal(inspected.receipt.attempts[0].diagnosticCode, "codex-jsonl-turn-completed-missing");
+  assert.equal(inspected.receipt.attempts[1].diagnosticCode, "codex-jsonl-final-agent-complete");
+}));
+
+test("capture never retries malformed or ambiguous transport", async () => withTemporaryAsync(async (root) => {
+  const fixture = captureFixture(root);
+  let launches = 0;
+  const outcome = await executeCodexCaptureRequest(fixture.request.requestPath, fixture.written.requestDigest, {
+    spawnChild: () => { launches += 1; return childFixture("not-json\n"); },
+    modulePath: fixture.capturePath
+  });
+  assert.equal(outcome.completed, false);
+  assert.equal(outcome.code, "codex-jsonl-line-malformed");
+  assert.equal(launches, 1);
+  const inspected = inspectCodexCaptureReceiptArtifact(fixture.request.receiptPath);
+  assert.equal(inspected.available, true);
+  assert.equal(inspected.receipt.attemptCount, 1);
+  assert.equal(inspected.receipt.artifactReceiptState, "absent");
+}));
+
+test("capture preserves typed event failures but classifies an empty nonzero child exit", async () => {
+  await withTemporaryAsync(async (root) => {
+    const fixture = captureFixture(root);
+    const malformed = await executeCodexCaptureRequest(fixture.request.requestPath, fixture.written.requestDigest, {
+      spawnChild: () => childFixture("not-json\n", "discarded", 1),
+      modulePath: fixture.capturePath,
+      eventContractPath: fixture.eventContractPath
+    });
+    assert.equal(malformed.code, "codex-jsonl-line-malformed");
+    assert.equal(malformed.attempts, 1);
+  });
+  await withTemporaryAsync(async (root) => {
+    const fixture = captureFixture(root);
+    const empty = await executeCodexCaptureRequest(fixture.request.requestPath, fixture.written.requestDigest, {
+      spawnChild: () => childFixture("", "discarded", 1),
+      modulePath: fixture.capturePath,
+      eventContractPath: fixture.eventContractPath
+    });
+    assert.equal(empty.code, "codex-capture-child-exit-nonzero");
+    assert.equal(empty.attempts, 1);
+  });
+  await withTemporaryAsync(async (root) => {
+    const fixture = captureFixture(root);
+    const complete = eventLine({ type: "thread.started", thread_id: "thread" }) + eventLine({ type: "turn.started" }) +
+      eventLine({ type: "item.completed", item: { id: "final", type: "agent_message", text: passedPayload } }) +
+      eventLine({ type: "turn.completed" });
+    const failedExit = await executeCodexCaptureRequest(fixture.request.requestPath, fixture.written.requestDigest, {
+      spawnChild: () => childFixture(complete, "discarded", 1),
+      modulePath: fixture.capturePath,
+      eventContractPath: fixture.eventContractPath
+    });
+    assert.equal(failedExit.code, "codex-capture-child-exit-nonzero");
+    assert.equal(failedExit.attempts, 1);
+    const inspected = inspectCodexCaptureReceiptArtifact(fixture.request.receiptPath);
+    assert.equal(inspected.available, true, JSON.stringify(inspected));
+    assert.equal(inspected.receipt.terminalClassification, "unavailable");
+    assert.equal(inspected.receipt.artifactReceiptState, "absent");
+  });
+});

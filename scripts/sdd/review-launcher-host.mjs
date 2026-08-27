@@ -37,6 +37,9 @@ export function executeReviewLauncherHost(hostRequest, {
   const preflight = validateReviewLauncherRecovery({ ...request, sourceRequestDigest: digest, now });
   if (!preflight.allowed) return preflight;
   const definition = reviewLauncherDefinition(preflight.recovery.launcherKind);
+  if (preflight.recovery.launcherKind === "codex-detached-read-only-v1" && typeof invoke !== "function") {
+    return fail("independent-reviewer-codex-capture-parent-required");
+  }
   const invokeAdapter = invoke ?? (preflight.recovery.launcherKind === "claude-detached-restricted-v1" ? runClaudeDegradedReviewAdapter : runCodexDegradedReviewAdapter);
   if (!definition) return fail("review-launcher-capability-unavailable");
   if (!text(request.repositoryPath) || !request.reviewer || !text(request.reviewer.type) || !text(request.reviewer.identity) || !text(request.attestationRef)) return fail("review-launcher-input-incomplete");

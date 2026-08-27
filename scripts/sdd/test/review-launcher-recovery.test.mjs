@@ -87,7 +87,7 @@ test("recovery preflight requires exact authorization, fixed host, and runtime p
   assert.equal(validateReviewLauncherRecovery({ ...baseInput, failureCode: "independent-reviewer-codex-execution-unavailable" }).code, "review-launcher-failure-not-recoverable");
 });
 
-test("Codex recovery accepts only the durable strict artifact-missing precursor", () => {
+test("Codex recovery accepts only durable transport-eligible strict precursors", () => {
   const artifactMissing = {
     ...strictResult,
     reviewRecordId: "strict-artifact-missing-record",
@@ -101,6 +101,14 @@ test("Codex recovery accepts only the durable strict artifact-missing precursor"
   });
   assert.equal(allowed.allowed, true, JSON.stringify(allowed));
   assert.equal(allowed.recovery.launcherKind, "codex-detached-read-only-v1");
+  for (const unavailableCode of ["codex-jsonl-final-agent-missing", "codex-jsonl-turn-completed-missing"]) {
+    const terminalEvent = validateReviewLauncherRecovery({
+      ...baseInput,
+      failureCode: unavailableCode,
+      strictResult: { ...artifactMissing, unavailableCode }
+    });
+    assert.equal(terminalEvent.allowed, true, `${unavailableCode}: ${JSON.stringify(terminalEvent)}`);
+  }
 
   const rejected = validateReviewLauncherRecovery({
     ...baseInput,

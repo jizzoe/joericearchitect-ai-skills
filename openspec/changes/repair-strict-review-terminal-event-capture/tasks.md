@@ -15,19 +15,19 @@
 
 ## 2. Sealed Codex host transport
 
-- [ ] 2.1 Add the fixed installed-runtime capture entrypoint that validates one sealed request, separates child stdout and stderr, launches only sealed Codex argv, and emits no raw review content.
+- [x] 2.1 Add the fixed installed-runtime capture entrypoint that validates one sealed request, separates child stdout and stderr, launches only sealed Codex argv, and emits no raw review content.
   - Depends on: 1.2, 1.3.
   - Evidence: child-process fixtures prove the independently supplied request digest is checked before operational-field parsing, request substitution is rejected before child launch, streams stay separate, and command/path choices are fixed.
-- [ ] 2.2 Update strict and authorized-degraded Codex builders to retain `--output-schema`, add `--json`, remove `--output-last-message`, and seal Node, capture-adapter, Codex, event-contract, path, package, and expiry identities.
+- [x] 2.2 Update strict and authorized-degraded Codex builders to retain `--output-schema`, add `--json`, remove `--output-last-message`, and seal Node, capture-adapter, Codex, event-contract, path, package, and expiry identities.
   - Depends on: 2.1.
   - Evidence: request-shape tests prove fixed argv, content identities, no active-repository executable, and no caller-selected fields.
-- [ ] 2.3 Require the safe capture receipt plus host-created artifact while preserving package, result, assurance, identity, and cleanup checks.
+- [x] 2.3 Require the safe capture receipt plus host-created artifact while preserving package, result, assurance, identity, and cleanup checks.
   - Depends on: 1.3, 2.2.
   - Evidence: parent-consumer tests distinguish missing/invalid receipt, artifact, identity, payload, expiry, and cleanup outcomes.
-- [ ] 2.4 Add one fresh transport-only retry for eligible missing-final-message or missing-completed-turn outcomes without changing objective-correction budgets.
+- [x] 2.4 Add one fresh transport-only retry for eligible missing-final-message or missing-completed-turn outcomes without changing objective-correction budgets.
   - Depends on: 2.3.
   - Evidence: lineage tests preserve attempt one, allow exactly one eligible retry, and reject unsafe or repeated retries.
-- [ ] 2.5 Complete strict/degraded integration and fault-injection coverage, including assurance labels and Claude non-regression.
+- [x] 2.5 Complete strict/degraded integration and fault-injection coverage, including assurance labels and Claude non-regression.
   - Depends on: 2.1, 2.2, 2.3, 2.4.
   - Evidence: integration tests cover child mismatch, result/receipt tampering, active-repository exclusion, cleanup, retry policy, strict/degraded labels, and unchanged Claude behavior.
 

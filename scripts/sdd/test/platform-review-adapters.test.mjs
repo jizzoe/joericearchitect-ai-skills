@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexParentStrictReviewToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, consumeCodexParentStrictReviewToolResult, createClaudeReviewSettings, degradedCapabilityLedger, diagnoseClaudeExecutionFailure, diagnoseCodexExecutionFailure, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, pinnedExecutableUnchanged, prepareClaudeReviewerEnvironment, prepareCodexReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, resolveTrustedReviewerExecutable, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
+import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexParentStrictReviewToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, consumeCodexParentStrictReviewToolResult, createClaudeReviewSettings, degradedCapabilityLedger, diagnoseClaudeExecutionFailure, diagnoseCodexExecutionFailure, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, pinnedExecutableUnchanged, prepareClaudeReviewerEnvironment, prepareCodexReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, resolveTrustedReviewerExecutable, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, sealCodexDegradedReviewPayload, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 
@@ -11,6 +12,68 @@ const packageFixture = () => {
   return value;
 };
 const view = { temporaryRoot: "/tmp/ai-skills-review-fixture", launchPath: "/tmp/ai-skills-review-fixture/review-session", reviewPath: "/tmp/ai-skills-review-fixture/review-session/repository" };
+
+const identityFor = (filePath) => {
+  const realPath = fs.realpathSync(filePath);
+  const entry = fs.statSync(realPath);
+  return { realPath, device: entry.dev, inode: entry.ino, size: entry.size, modifiedMs: entry.mtimeMs,
+    contentSha256: createHash("sha256").update(fs.readFileSync(realPath)).digest("hex"), managedMutationDenied: true };
+};
+
+function writeCaptureSuccess(toolRequest, payload = { schemaVersion: 1, findings: [], status: "passed" }) {
+  const state = toolRequest.runtimeState;
+  const artifact = JSON.stringify(payload);
+  fs.writeFileSync(state.resultPath, artifact);
+  const attempt = { attempt: 1, exitStatus: 0, eventBytes: 256, eventCount: 4, candidateCount: 1, toolEventCount: 1,
+    terminalClassification: "completed", diagnosticCode: "codex-jsonl-final-agent-complete" };
+  fs.writeFileSync(state.receiptPath, JSON.stringify({
+    schemaVersion: 1,
+    transportRevision: "codex-jsonl-final-agent-v1",
+    executionId: state.executionId,
+    requestDigest: state.captureRequestDigest,
+    cliIdentitySha256: state.hostIdentities.codex.contentSha256,
+    cliVersionClassification: "codex-json-output-capability-v1",
+    exitStatus: 0,
+    eventBytes: attempt.eventBytes,
+    eventCount: attempt.eventCount,
+    candidateCount: attempt.candidateCount,
+    toolEventCount: attempt.toolEventCount,
+    terminalClassification: attempt.terminalClassification,
+    artifactReceiptState: "published",
+    artifactBytes: Buffer.byteLength(artifact),
+    artifactSha256: createHash("sha256").update(artifact).digest("hex"),
+    diagnosticCode: attempt.diagnosticCode,
+    attemptCount: 1,
+    attempts: [attempt]
+  }));
+}
+
+function writeCaptureUnavailable(toolRequest, diagnosticCode, exitStatus = 1) {
+  const state = toolRequest.runtimeState;
+  try { fs.unlinkSync(state.resultPath); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+  const attempt = { attempt: 1, exitStatus, eventBytes: 32, eventCount: 1, candidateCount: 0, toolEventCount: 0,
+    terminalClassification: "unavailable", diagnosticCode };
+  fs.writeFileSync(state.receiptPath, JSON.stringify({
+    schemaVersion: 1,
+    transportRevision: "codex-jsonl-final-agent-v1",
+    executionId: state.executionId,
+    requestDigest: state.captureRequestDigest,
+    cliIdentitySha256: state.hostIdentities.codex.contentSha256,
+    cliVersionClassification: "codex-json-output-capability-v1",
+    exitStatus,
+    eventBytes: attempt.eventBytes,
+    eventCount: attempt.eventCount,
+    candidateCount: attempt.candidateCount,
+    toolEventCount: attempt.toolEventCount,
+    terminalClassification: attempt.terminalClassification,
+    artifactReceiptState: "absent",
+    artifactBytes: 0,
+    artifactSha256: "",
+    diagnosticCode,
+    attemptCount: 1,
+    attempts: [attempt]
+  }));
+}
 
 test("review package injection rejects a pre-existing symlink without changing its target", () => {
   const temporary = fs.mkdtempSync("/tmp/review-package-injection-");
@@ -158,21 +221,24 @@ test("Codex adapter uses a fresh read-only noninteractive transport without user
   assert.ok(invocation.args.includes("--ignore-user-config"));
   assert.ok(invocation.args.includes("--skip-git-repo-check"));
   assert.equal(invocation.args[invocation.args.indexOf("--color") + 1], "never");
-  assert.equal(invocation.args[invocation.args.indexOf("--output-last-message") + 1], "/tmp/result.json");
+  assert.equal(invocation.args.includes("--output-last-message"), false);
+  assert.equal(invocation.args.includes("--json"), true);
+  assert.equal(invocation.args[invocation.args.indexOf("--output-schema") + 1], "/tmp/result-schema.json");
   assert.match(invocation.args.at(-1), /Use bounded reads only/);
   assert.match(invocation.args.at(-1), /\/bin\/cat, \/usr\/bin\/awk, and \/usr\/bin\/perl/);
   assert.match(invocation.args.at(-1), /do not invoke git, sed, rg, ls/);
   const probe = probeCodexReviewAdapter();
   assert.equal(typeof probe.available, "boolean");
   if (probe.available) assert.equal(probe.capability.denied.delegatedMutation, true);
-  const missingFinalFileCapability = probeCodexReviewAdapter({ executable: "fixture-codex" }, {
+  const missingJsonCapability = probeCodexReviewAdapter({ executable: "fixture-codex" }, {
     help: (_executable, _arguments, required) => {
-      assert.ok(required.includes("--output-last-message"));
+      assert.ok(required.includes("--json"));
+      assert.equal(required.includes("--output-last-message"), false);
       assert.ok(required.includes("--color"));
       return false;
     }
   });
-  assert.equal(missingFinalFileCapability.code, "independent-reviewer-codex-runtime-unavailable");
+  assert.equal(missingJsonCapability.code, "independent-reviewer-codex-runtime-unavailable");
   const completeCapability = probeCodexReviewAdapter({ executable: "fixture-codex" }, { help: () => true });
   assert.equal(completeCapability.available, true);
 });
@@ -185,6 +251,7 @@ test("degraded Codex transport is explicitly reduced-assurance and scrubs mutati
   assert.equal(invocation.environment.GH_TOKEN, "");
   const ledger = degradedCapabilityLedger();
   assert.ok(ledger.enforced.includes("innerReadOnlySandbox"));
+  assert.ok(ledger.enforced.includes("hostCapturedFinalArtifact"));
   assert.ok(ledger.unavailable.includes("authenticatedParentLaunchEvidence"));
   assert.ok(ledger.unavailable.includes("hostPinnedReviewerExecutableIdentity"));
   assert.ok(ledger.instructionConstrained.includes("gitWrite"));
@@ -225,7 +292,7 @@ test("Codex parent transport builds only the fixed escalated host tool request a
     allowed: true,
     code: "review-launcher-external-host-required",
     hostRequest: { launchId: "launch", requestDigest: digest, request: { reviewPackage, strictResult, transition: "merge-pr", reviewer: { type: "codex-degraded", identity: "degraded-reviewer", attestation: { ref: "degraded-attestation" } }, attestationRef: "degraded-attestation", launcher: { executable: "/opt/tools/codex" }, authorization: { implementerSession: "implementer", degradedIndependentReview: degradedAuthorization } } },
-    expectedRecovery: { hostScript: "scripts/sdd/review-launcher-host.mjs", launcherId: "codex-review-launcher", launcherKind: "codex-detached-read-only-v1" }
+    expectedRecovery: { hostScript: "scripts/sdd/review-launcher-host.mjs", launcherId: "codex-review-launcher", launcherKind: "codex-detached-read-only-v1", expiresAt: "2099-01-01T00:00:00.000Z" }
   };
   const temporary = fs.mkdtempSync("/tmp/codex-parent-transport-");
   const launchPath = `${temporary}/review-session`;
@@ -247,7 +314,14 @@ test("Codex parent transport builds only the fixed escalated host tool request a
       createView: () => ({ available: true, view: viewForTransport }),
       rebuildPackage: () => ({ valid: true, package: reviewPackage }),
       injectPackage: () => `${reviewPath}/.ai-independent-review-package.json`,
-      prepareEnvironment: () => ({ available: true, environment: { HOME: `${temporary}/reviewer-home`, PATH: "/usr/bin", NO_COLOR: "1" } })
+      prepareEnvironment: () => ({ available: true, environment: { HOME: `${temporary}/reviewer-home`, PATH: "/usr/bin", NO_COLOR: "1" } }),
+      pinExecutable: () => identityFor(process.execPath),
+      pinHostFile: identityFor,
+      nodePath: process.execPath,
+      capturePath: fs.realpathSync("/bin/echo"),
+      eventContractPath: fs.realpathSync("/bin/echo"),
+      probeRuntime: () => ({ available: true, capability: { versionClassification: "codex-json-output-capability-v1" } }),
+      executionId: "degraded-capture"
     });
     assert.equal(toolRequest.available, true, JSON.stringify(toolRequest));
     assert.equal(toolRequest.tool, "exec_command");
@@ -255,9 +329,11 @@ test("Codex parent transport builds only the fixed escalated host tool request a
     assert.equal(toolRequest.approvalPolicyRequirement, "interactive");
     assert.equal(toolRequest.approvalReviewer, "auto_review");
     assert.equal(toolRequest.executable, "/usr/bin/env");
-    assert.ok(toolRequest.arguments.includes("/opt/tools/codex"));
+    assert.ok(toolRequest.arguments.includes(fs.realpathSync(process.execPath)));
+    assert.ok(toolRequest.arguments.includes(fs.realpathSync("/bin/echo")));
+    assert.equal(toolRequest.arguments.includes("/opt/tools/codex"), false);
     assert.ok(toolRequest.arguments.some((value) => value.startsWith("PATH=")));
-    assert.ok(toolRequest.arguments.includes("--skip-git-repo-check"));
+    assert.equal(toolRequest.arguments.includes("--skip-git-repo-check"), false, "Codex argv stays inside the authenticated request file");
     assert.equal(toolRequest.arguments.some((value) => value.endsWith("review-launcher-host.mjs")), false);
     assert.equal(toolRequest.arguments.some((value) => /host-debug|danger-full-access|--yolo/.test(value)), false);
 
@@ -271,10 +347,10 @@ test("Codex parent transport builds only the fixed escalated host tool request a
       hostExecutionId: "host-execution"
     });
     assert.equal(transcriptOnly.status, "unavailable");
-    assert.equal(transcriptOnly.code, "review-launcher-codex-result-artifact-malformed");
-    assert.equal(transcriptOnly.diagnostics.parse, "invalid");
+    assert.equal(transcriptOnly.code, "review-launcher-codex-capture-receipt-missing");
+    assert.equal(JSON.stringify(transcriptOnly).includes("findings"), false, "combined tool output is ignored");
 
-    fs.writeFileSync(toolRequest.runtimeState.resultPath, JSON.stringify({ schemaVersion: 1, findings: [], status: "passed" }));
+    writeCaptureSuccess(toolRequest);
     const normalizationFailure = consumeCodexParentReviewHostToolResult({
       prepared,
       toolRequest,
@@ -352,8 +428,7 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
   fs.writeFileSync(`${reviewPath}/schemas/independent-review-findings-v1.schema.json`, "{}\n");
   const reviewPackage = packageFixture();
   const executablePath = fs.realpathSync("/bin/echo");
-  const executableEntry = fs.statSync(executablePath);
-  const executableIdentity = { realPath: executablePath, device: executableEntry.dev, inode: executableEntry.ino, size: executableEntry.size, modifiedMs: executableEntry.mtimeMs };
+  const executableIdentity = identityFor(executablePath);
   const strictView = { kind: "archived-review-view-v1", launchPath, reviewPath, temporaryRoot: temporary, headCommit: reviewPackage.headCommit, ownershipToken: "fixture" };
   try {
     const callerSelectedExecutable = `${temporary}/codex`;
@@ -385,6 +460,25 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
     assert.equal(unavailablePreflight.code, "independent-reviewer-codex-preflight-boundary-unavailable");
     assert.equal(unavailablePreflight.diagnostic.stage, "adapter-preflight");
     assert.equal(attemptedView, false);
+    const activeCaptureDenied = buildCodexParentStrictReviewToolRequest({
+      reviewPackage,
+      repositoryPath: process.cwd(),
+      reviewer: { type: "codex", identity: "fresh-strict-reviewer" },
+      implementerSession: "implementer-session",
+      attestationRef: "attestations/codex-read-only-v1.json"
+    }, {
+      createView: () => ({ available: true, view: strictView }),
+      removeView: () => ({ removed: true }),
+      rebuildPackage: () => ({ valid: true, package: reviewPackage }),
+      injectPackage: () => `${reviewPath}/.ai-independent-review-package.json`,
+      prepareEnvironment: () => ({ available: true, environment: { HOME: `${temporary}/reviewer-home`, CODEX_HOME: `${temporary}/reviewer-home/codex`, PATH: "/usr/bin", NO_COLOR: "1" } }),
+      pinExecutable: () => executableIdentity,
+      pinHostFile: identityFor,
+      probeRuntime: () => ({ available: true, capability: {} }),
+      clock: () => "2026-08-15T04:00:00.000Z",
+      executionId: "active-capture-denied"
+    });
+    assert.equal(activeCaptureDenied.code, "independent-reviewer-codex-capture-active-workspace-denied");
     const toolRequest = buildCodexParentStrictReviewToolRequest({
       reviewPackage,
       repositoryPath: process.cwd(),
@@ -397,17 +491,26 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       injectPackage: () => `${reviewPath}/.ai-independent-review-package.json`,
       prepareEnvironment: () => ({ available: true, environment: { HOME: `${temporary}/reviewer-home`, CODEX_HOME: `${temporary}/reviewer-home/codex`, PATH: "/usr/bin", NO_COLOR: "1" } }),
       pinExecutable: () => executableIdentity,
+      pinHostFile: identityFor,
+      nodePath: process.execPath,
+      capturePath: executablePath,
+      eventContractPath: executablePath,
       probeRuntime: () => ({ available: true, capability: {} }),
       clock: () => "2026-08-15T04:00:00.000Z",
       executionId: "strict-execution"
     });
     assert.equal(toolRequest.available, true, JSON.stringify(toolRequest));
     assert.equal(toolRequest.transport, "codex-parent-strict-exec-tool-v1");
-    assert.deepEqual(toolRequest.runtimeState.artifactDelivery, { channel: "owned-final-file-v1", outputSchema: true, outputLastMessage: true, color: "never", permissionProfile: "read-only" });
+    assert.deepEqual(toolRequest.runtimeState.artifactDelivery, { channel: "host-captured-final-agent-v1", outputSchema: true, jsonEvents: true, outputLastMessage: false, color: "never", permissionProfile: "read-only", transportRetryBudget: 1 });
     assert.equal(toolRequest.workingDirectory, launchPath);
     assert.ok(toolRequest.arguments.includes(executablePath));
-    assert.ok(toolRequest.arguments.includes(launchPath));
-    assert.equal(toolRequest.arguments.includes(reviewPath), false, "Codex starts from the neutral parent rather than repository context");
+    assert.ok(toolRequest.arguments.includes(fs.realpathSync(process.execPath)));
+    assert.equal(toolRequest.arguments.includes(launchPath), false, "operational Codex paths remain inside the authenticated request");
+    assert.equal(toolRequest.arguments.includes(reviewPath), false);
+    const captureRequest = JSON.parse(fs.readFileSync(toolRequest.runtimeState.requestPath, "utf8"));
+    assert.ok(captureRequest.childArguments.includes(launchPath));
+    assert.equal(captureRequest.childArguments.includes("--json"), true);
+    assert.equal(captureRequest.childArguments.includes("--output-last-message"), false);
     const tampered = consumeCodexParentStrictReviewToolResult({ toolRequest: { ...toolRequest, workingDirectory: reviewPath }, toolResult: { exit_code: 0, output: "{}" } }, {
       removeView: () => ({ removed: true }),
       clock: () => "2026-08-15T04:01:00.000Z"
@@ -437,6 +540,22 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       clock: () => "2026-08-15T04:01:00.000Z"
     });
     assert.equal(tamperedExpiration.code, "independent-reviewer-parent-strict-tool-receipt-invalid");
+    writeCaptureSuccess(toolRequest);
+    const mismatchedReceipt = JSON.parse(fs.readFileSync(toolRequest.runtimeState.receiptPath, "utf8"));
+    mismatchedReceipt.requestDigest = "f".repeat(64);
+    fs.writeFileSync(toolRequest.runtimeState.receiptPath, JSON.stringify(mismatchedReceipt));
+    const receiptMismatch = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "ignored" } }, {
+      removeView: () => ({ removed: true }), verifyExecutable: () => true, clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(receiptMismatch.code, "independent-reviewer-codex-capture-receipt-mismatch");
+    writeCaptureSuccess(toolRequest);
+    fs.appendFileSync(toolRequest.runtimeState.resultPath, " ");
+    const artifactReceiptMismatch = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "ignored" } }, {
+      removeView: () => ({ removed: true }), verifyExecutable: () => true, clock: () => "2026-08-15T04:01:00.000Z"
+    });
+    assert.equal(artifactReceiptMismatch.code, "independent-reviewer-codex-capture-artifact-receipt-mismatch");
+    writeCaptureSuccess(toolRequest);
+    fs.unlinkSync(toolRequest.runtimeState.resultPath);
     const artifactMissing = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
       removeView: () => ({ removed: true }),
       verifyExecutable: () => true,
@@ -448,22 +567,24 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
     assert.equal(artifactMissing.result.baseCommit, reviewPackage.baseCommit);
     assert.equal(artifactMissing.result.headCommit, reviewPackage.headCommit);
     assert.equal(artifactMissing.result.manifestDigest, reviewPackage.manifestDigest);
+    writeCaptureUnavailable(toolRequest, "codex-capture-child-exit-nonzero", 1);
     const authenticationFailure = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 1, output: "authentication token expired at /private/secret" } }, {
       removeView: () => ({ removed: true }),
       verifyExecutable: () => true,
       clock: () => "2026-08-15T04:01:00.000Z"
     });
-    assert.equal(authenticationFailure.code, "independent-reviewer-codex-authentication-unavailable");
+    assert.equal(authenticationFailure.code, "codex-capture-child-exit-nonzero");
     assert.equal(JSON.stringify(authenticationFailure).includes("/private/secret"), false);
-    assert.equal(authenticationFailure.diagnostics.artifactReceipt, "review-launcher-codex-result-artifact-missing");
+    assert.equal(authenticationFailure.diagnostics.captureReceipt, "valid");
+    writeCaptureSuccess(toolRequest);
     const nonzeroWithArtifact = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 1, output: "authentication failed" } }, {
       removeView: () => ({ removed: true }),
       verifyExecutable: () => true,
       inspectResult: () => ({ available: true, diagnostics: { resultArtifactPresent: true, parse: "valid", payload: "valid" } }),
       clock: () => "2026-08-15T04:01:00.000Z"
     });
-    assert.equal(nonzeroWithArtifact.code, "independent-reviewer-codex-authentication-unavailable");
-    assert.equal(nonzeroWithArtifact.diagnostics.artifactReceipt, "valid");
+    assert.equal(nonzeroWithArtifact.code, "codex-jsonl-final-agent-complete");
+    assert.equal(nonzeroWithArtifact.diagnostics.captureReceipt, "valid");
     const changedExecutable = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
       removeView: () => ({ removed: true }),
       verifyExecutable: () => false,
@@ -471,14 +592,14 @@ test("Codex parent strict transport binds a neutral view, pinned executable, res
       clock: () => "2026-08-15T04:01:00.000Z"
     });
     assert.equal(changedExecutable.code, "independent-reviewer-codex-executable-identity-changed");
-    assert.equal(changedExecutable.diagnostics.artifactReceipt, "valid");
+    assert.equal(changedExecutable.diagnostics.captureReceipt, "valid");
     const expired = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
       removeView: () => ({ removed: true }),
       inspectResult: () => ({ available: true, diagnostics: { resultArtifactPresent: true, parse: "valid", payload: "valid" } }),
       clock: () => "2026-08-15T04:20:00.000Z"
     });
     assert.equal(expired.code, "independent-reviewer-parent-strict-request-expired");
-    assert.equal(expired.diagnostics.artifactReceipt, "valid");
+    assert.equal(expired.diagnostics.captureReceipt, "valid");
     fs.writeFileSync(toolRequest.runtimeState.resultPath, JSON.stringify({ schemaVersion: 1, findings: [], status: "passed" }));
     const consumed = consumeCodexParentStrictReviewToolResult({ toolRequest, toolResult: { exit_code: 0, output: "review completed" } }, {
       removeView: (received) => ({ removed: received === strictView }),
@@ -674,43 +795,26 @@ test("Codex parent transport classifies owned final artifacts without retaining 
 test("strict parent transport keeps reusable contracts free of product-specific values", () => {
   const source = fs.readFileSync(new URL("../platform-review-adapters.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(source, /joericearchitect|home-roots-reinvest|jizzoe|AI Skills Development/i);
-  assert.match(source, /owned-final-file-v1/);
-  assert.match(source, /output-last-message/);
+  assert.match(source, /host-captured-final-agent-v1/);
+  assert.match(source, /jsonEvents/);
 });
 
-test("degraded adapter seals reviewer findings into parent-owned exact-package evidence", () => {
+test("degraded Codex payload sealer preserves exact-package evidence while direct launch fails closed", () => {
   const reviewPackage = packageFixture();
   const strictResult = unavailableReviewResult("independent-reviewer-nested-app-server-denied", { reviewPackage, adapter: "codex", reviewer: { type: "codex", identity: "strict-reviewer" }, attestationRef: "strict-attestation" });
-  const temporary = fs.mkdtempSync("/tmp/degraded-adapter-");
-  const resultPath = `${temporary}/result.json`;
   const payload = { schemaVersion: 1, findings: [], status: "passed" };
-  const run = (_executable, args) => {
-    assert.ok(args.includes("--sandbox") && args.includes("read-only"));
-    fs.writeFileSync(resultPath, JSON.stringify(payload));
-    return { status: 0, signal: null, stdout: "", stderr: "" };
-  };
-  try {
-    const output = runCodexDegradedReviewAdapter({
-      reviewPackage,
-      view,
-      schemaPath: "/tmp/findings-schema.json",
-      resultPath,
-      reviewer: { type: "codex-degraded", identity: "degraded-reviewer" },
-      attestationRef: "degraded-attestation",
-      strictResult,
-      degradedAuthorization: { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only" },
-      run,
-      prepareEnvironment: () => ({ available: true, environment: { HOME: temporary, PATH: "/usr/bin", NO_COLOR: "1" } })
-    });
-    assert.equal(output.status, "passed");
-    assert.equal(output.result.assuranceLevel, "authorized-degraded");
-    assert.ok(output.result.capabilityLedger.unavailable.includes("authenticatedParentLaunchEvidence"));
-    assert.ok(output.result.capabilityLedger.unavailable.includes("hostPinnedReviewerExecutableIdentity"));
-    assert.equal(output.result.strictUnavailable.unavailableCode, "independent-reviewer-nested-app-server-denied");
-    assert.deepEqual(output.result.findings, []);
-  } finally {
-    fs.rmSync(temporary, { recursive: true, force: true });
-  }
+  const reviewer = { type: "codex-degraded", identity: "degraded-reviewer" };
+  const degradedAuthorization = { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only" };
+  const output = sealCodexDegradedReviewPayload({ payload, reviewPackage, reviewer, attestationRef: "degraded-attestation", strictResult, degradedAuthorization });
+  assert.equal(output.status, "passed");
+  assert.equal(output.result.assuranceLevel, "authorized-degraded");
+  assert.ok(output.result.capabilityLedger.unavailable.includes("authenticatedParentLaunchEvidence"));
+  assert.ok(output.result.capabilityLedger.unavailable.includes("hostPinnedReviewerExecutableIdentity"));
+  assert.ok(output.result.capabilityLedger.enforced.includes("hostCapturedFinalArtifact"));
+  assert.equal(output.result.strictUnavailable.unavailableCode, "independent-reviewer-nested-app-server-denied");
+  assert.deepEqual(output.result.findings, []);
+  const direct = runCodexDegradedReviewAdapter({ reviewPackage, reviewer, attestationRef: "degraded-attestation" });
+  assert.equal(direct.code, "independent-reviewer-codex-capture-parent-required");
 });
 
 test("findings output schema is accepted by strict structured-output validators", () => {

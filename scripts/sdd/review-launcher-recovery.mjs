@@ -30,7 +30,9 @@ const launcherDefinitions = Object.freeze({
     recoverableFailures: Object.freeze([
       "independent-review-view-create-failed",
       "independent-reviewer-nested-app-server-denied",
-      "review-launcher-codex-result-artifact-missing"
+      "review-launcher-codex-result-artifact-missing",
+      "codex-jsonl-final-agent-missing",
+      "codex-jsonl-turn-completed-missing"
     ]),
     requiredCapability: "innerReadOnlySandbox",
     innerBoundary: "read-only-sandbox"
