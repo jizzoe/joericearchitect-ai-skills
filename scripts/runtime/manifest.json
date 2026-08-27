@@ -69,6 +69,32 @@
       }
     },
     {
+      "name": "codex-review-event-capture",
+      "module": "scripts/sdd/codex-review-event-capture.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": [
+          "--help"
+        ],
+        "exitCodes": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "review-package-capsule",
+      "module": "scripts/sdd/review-package-capsule.mjs",
+      "invocation": "cli",
+      "smoke": {
+        "args": [
+          "--help"
+        ],
+        "exitCodes": [
+          0
+        ]
+      }
+    },
+    {
       "name": "validate-implementation-quality",
       "module": "scripts/validation/validate-implementation-quality.mjs",
       "invocation": "cli",

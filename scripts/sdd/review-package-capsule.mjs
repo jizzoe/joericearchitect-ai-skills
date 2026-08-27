@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { canonicalJson, validateReviewPackage } from "./independent-review-contract.mjs";
 
@@ -339,4 +340,13 @@ export function writeReviewPackageCapsule(reviewPath, reviewPackage, { fileSyste
     return unavailable(inspected.available ? "independent-review-package-capsule-reconstruction-mismatch" : inspected.code);
   }
   return { ...inspected, code: "independent-review-package-capsule-written" };
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (process.argv.length === 3 && ["--help", "-h"].includes(process.argv[2])) {
+    process.stdout.write("review-package-capsule.mjs is an installed-runtime internal module; import its bounded writer and inspector.\n");
+    process.exit(0);
+  }
+  process.stderr.write("usage: review-package-capsule.mjs --help\n");
+  process.exit(2);
 }

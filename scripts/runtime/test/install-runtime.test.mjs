@@ -10,7 +10,7 @@ import {
   RECEIPT_SCHEMA_VERSION, SUPPORTED_AGENTS, installAiSkills, launcherShim, parseArgs,
   parseSkillInstallResult, preflightNode, resolveSource
 } from "../install-runtime.mjs";
-import { activatePrevious } from "../launcher.mjs";
+import { activatePrevious, loadBuiltManifest, verifyRuntimeContent } from "../launcher.mjs";
 import { readActiveMetadata, readInstalledHistory, runtimePaths } from "../runtime-home.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -98,6 +98,14 @@ test("a reviewed local source installs skills and the matching runtime as one pa
   const paths = runtimePaths(environment, "linux");
   assert.equal(receipt.runtime.path, path.join(paths.runtimeRoot, `runtime-${receipt.runtime.digest.slice(0, 12)}`));
   assert.equal(fs.existsSync(path.join(receipt.runtime.path, "runtime-manifest.json")), true);
+  const installedManifest = loadBuiltManifest(receipt.runtime.path);
+  assert.equal(installedManifest.ok, true);
+  assert.equal(verifyRuntimeContent(receipt.runtime.path, installedManifest.manifest).ok, true);
+  for (const relative of ["scripts/sdd/codex-review-event-capture.mjs", "scripts/sdd/review-package-capsule.mjs"]) {
+    assert.equal(fs.existsSync(path.join(receipt.runtime.path, relative)), true, `missing installed review transport module: ${relative}`);
+    assert.match(installedManifest.manifest.files[relative], /^[0-9a-f]{64}$/);
+    assert.doesNotMatch(fs.readFileSync(path.join(receipt.runtime.path, relative), "utf8"), new RegExp(repositoryRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
   assert.equal(readActiveMetadata(paths).activePath, receipt.runtime.path);
   assert.equal(readInstalledHistory(paths).history.length, 1);
 

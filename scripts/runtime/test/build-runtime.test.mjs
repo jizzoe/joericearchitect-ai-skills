@@ -206,11 +206,19 @@ test("the repository's own manifest and helper inventory build a complete runtim
   const declared = new Set(result.manifest.entrypoints.map((entry) => entry.name));
   for (const helper of ["check-operation-authorization", "github-cli-auth-context", "platform-review-adapters", "autonomous-sdd-controller",
     "independent-review-contract", "research-planning-skill-runtime", "sdd-lifecycle-hygiene",
-    "sdd-workspace-cleanup", "create-or-find-issue", "select-next-work", "validate-pr-contract"]) {
+    "sdd-workspace-cleanup", "create-or-find-issue", "select-next-work", "validate-pr-contract",
+    "codex-review-event-capture", "review-package-capsule"]) {
     assert.ok(declared.has(helper), `missing declared helper: ${helper}`);
   }
   for (const entry of result.manifest.entrypoints) {
     assert.ok(fs.existsSync(path.join(output, entry.module)), `unstaged entrypoint: ${entry.name}`);
+  }
+  for (const relative of ["scripts/sdd/codex-review-event-capture.mjs", "scripts/sdd/review-package-capsule.mjs"]) {
+    const installed = path.join(output, relative);
+    const source = path.join(repositoryRoot, relative);
+    assert.equal(result.manifest.files[relative], digestFiles({ staging: output, files: [relative] }).digests[relative]);
+    assert.equal(fs.readFileSync(installed).compare(fs.readFileSync(source)), 0);
+    assert.doesNotMatch(fs.readFileSync(installed, "utf8"), new RegExp(repositoryRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
 });
 

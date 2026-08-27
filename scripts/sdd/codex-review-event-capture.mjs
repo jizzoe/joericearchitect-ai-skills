@@ -639,6 +639,10 @@ export async function runCodexCaptureCli(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (process.argv.length === 3 && ["--help", "-h"].includes(process.argv[2])) {
+    process.stdout.write("usage: codex-review-event-capture.mjs <sealed-request.json> <expected-request-sha256>\n");
+    process.exit(0);
+  }
   const outcome = await runCodexCaptureCli();
   process.exit(outcome.completed ? 0 : 1);
 }
