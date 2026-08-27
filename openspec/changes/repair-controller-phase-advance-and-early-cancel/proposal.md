@@ -46,6 +46,9 @@ None.
   thin wrappers, with repository identity and exact run IDs supplied as inputs.
 - GitHub issue #245 tracks the separately authorized bootstrap delivery; its
   linkage is recorded in `tracking.yaml`.
+- The configuration diff intentionally restores
+  `codex-detached-read-only-v1` after the predecessor capture repair's temporary
+  Claude selection; it does not couple the controller implementation to Codex.
 - Reuse plan: retain canonical controller behavior in `scripts/sdd/`, preserve
   product values in typed request records, and avoid credentials or raw
   external evidence in checkpoints.

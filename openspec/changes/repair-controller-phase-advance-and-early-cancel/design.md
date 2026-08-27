@@ -50,6 +50,18 @@ This is selected over waiting for expiry because the held claim itself prevents
 the repair/retry path; it is selected over direct checkpoint editing because
 that bypasses immutable identity and recovery evidence.
 
+### Restore the intended product review adapter after the predecessor repair
+
+The immediately preceding `repair-strict-review-terminal-event-capture` change
+temporarily selected `claude-detached-restricted-v1` so that repair would not
+certify its changed Codex capture transport with itself. That repair is now
+merged, archived, and installed. This branch therefore intentionally restores
+the product configuration to `codex-detached-read-only-v1`; the configuration
+diff is a planned sequencing dependency, not an incidental controller change.
+The controller implementation remains adapter-neutral, and the one-time N-1
+Claude bootstrap used to review this repair does not become product
+configuration or standing fallback authority.
+
 ### Test and exposure strategy
 
 Update canonical controller tests and add installed-runtime tests exercising

@@ -43,7 +43,7 @@ const selectedByAuthorization = (selectedEntry, authorization) =>
   text(selectedEntry) && Array.isArray(authorization?.target?.entries) && authorization.target.entries.includes(selectedEntry);
 const validRunId = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9-]{7,127}$/i.test(value);
 const validTransitionName = (value) => typeof value === "string" && /^[a-z0-9][a-z0-9-]{2,127}$/i.test(value);
-const safeEvidencePath = (value) => typeof value === "string" && value.length > 0 && !path.isAbsolute(value) && !/[\\\0\r\n]/.test(value) && value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== ".." && segment !== ".git");
+const safeEvidencePath = (value) => typeof value === "string" && value.length > 0 && !path.isAbsolute(value) && !/[\\\0\r\n]/.test(value) && value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== ".." && segment.toLowerCase() !== ".git");
 const checkpointForRun = (runId) => `runs/${runId}/controller.json`;
 const digest = (value) => typeof value === "string" && /^[0-9a-f]{64}$/i.test(value);
 const repositoryId = (value) => typeof value === "string" && /^r1-[0-9a-f]{64}$/i.test(value);

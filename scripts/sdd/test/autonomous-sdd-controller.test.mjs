@@ -501,6 +501,8 @@ test("executable phase advancement persists only the first incomplete phase", ()
     const proposalEvidence = phaseEvidence("propose", "proposal", "proposal.md", "proposal evidence");
     assert.equal(advanceControllerRecord(created.record, "propose", { ...proposalEvidence, extra: "rejected" }).reason, "controller-phase-advance-invalid");
     assert.equal(advanceControllerRecord(created.record, "propose", phaseEvidence("propose", "metadata", ".git/phase.md")).reason, "controller-phase-advance-invalid");
+    assert.equal(advanceControllerRecord(created.record, "propose", phaseEvidence("propose", "metadata", ".Git/phase.md")).reason, "controller-phase-advance-invalid");
+    assert.equal(advanceControllerRecord(created.record, "propose", phaseEvidence("propose", "metadata", ".GIT/phase.md")).reason, "controller-phase-advance-invalid");
     assert.equal(advanceControllerLifecyclePhase({ repositoryPath: root, record: created.record, authorization, repository: "owner/repository", phase: "propose", evidence: { ...proposalEvidence, artifacts: [{ ...proposalEvidence.artifacts[0], sha256: "f".repeat(64) }] }, now: started, runGit }).reason, "controller-phase-evidence-artifacts-invalid");
     const checkpoint = path.join(root, ".git", "sdd-delivery-runs", created.record.checkpointPath);
     const staleLock = path.join(path.dirname(checkpoint), `.${path.basename(checkpoint)}.lock`);
