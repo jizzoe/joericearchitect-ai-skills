@@ -1,0 +1,33 @@
+schema_version: 1
+openspec:
+  change: "repair-strict-review-terminal-event-capture"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 247
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/247"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "config/ai-skills.json"
+      - "openspec/changes/repair-strict-review-terminal-event-capture/"
+      - "schemas/independent-review-package-index-v1.schema.json"
+      - "scripts/runtime/manifest.json"
+      - "scripts/sdd/codex-review-event-capture.mjs"
+      - "scripts/sdd/codex-review-event-contract.mjs"
+      - "scripts/sdd/independent-review-contract.mjs"
+      - "scripts/sdd/platform-review-adapters.mjs"
+      - "scripts/sdd/review-adapter-dispatch.mjs"
+      - "scripts/sdd/review-launcher-host.mjs"
+      - "scripts/sdd/review-launcher-recovery.mjs"
+      - "scripts/sdd/review-package-capsule.mjs"
+      - "scripts/sdd/test/codex-review-event-capture.test.mjs"
+      - "scripts/sdd/test/codex-review-event-contract.test.mjs"
+      - "scripts/sdd/test/independent-review-contract.test.mjs"
+      - "scripts/sdd/test/platform-review-adapters.test.mjs"
+      - "scripts/sdd/test/review-adapter-dispatch.test.mjs"
+      - "scripts/sdd/test/review-launcher-recovery.test.mjs"
+      - "scripts/sdd/test/review-package-capsule.test.mjs"
+      - "skills/base/independent-review/references/protocol.md"
