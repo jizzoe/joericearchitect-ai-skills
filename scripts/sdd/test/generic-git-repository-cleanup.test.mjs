@@ -430,3 +430,51 @@ test("verifyPlanFreshness ignores a forged directToDefault for spec-governed fil
   assert.equal(result.ok, false);
   assert.equal(result.drifted.some((d) => d.reason === "commit-target-is-default-branch"), true);
 });
+
+test("audit reports archived changes and surfaces an unresolved remote-branch entry", () => {
+  const repo = tmpRepo({ after: () => {} });
+  fs.mkdirSync(path.join(repo, "openspec", "changes", "archive", "2026-08-01-example-change"), { recursive: true });
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
+    ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\nfeature-merged\t${H("b")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
+    ["merge-base --is-ancestor feature-merged refs/remotes/origin/main", { ok: true, stdout: "" }],
+    ["merge-base --is-ancestor refs/remotes/origin/feature-merged refs/remotes/origin/main", { ok: false, status: 1, stdout: "" }]
+  ]);
+  const result = auditGenericGitRepository({ repositoryPath: repo, run });
+  assert.deepEqual(result.audit.archivedChanges, ["2026-08-01-example-change"]);
+  assert.equal(result.audit.unresolved.some((e) => e.kind === "remote-branch" && e.reason === "remote-counterpart-unmerged"), true);
+});
+
+test("audit classifies a squash-merged branch as retire-eligible via pull-request evidence", () => {
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
+    ["rev-parse --show-toplevel", { ok: true, stdout: "/repo\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\nfeature-squashed\t${H("c")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: "worktree /repo\nbranch refs/heads/main\n" }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
+    ["merge-base --is-ancestor feature-squashed refs/remotes/origin/main", { ok: false, status: 1, stdout: "" }]
+  ]);
+  const pullRequestEvidence = (branch) => branch === "feature-squashed" ? { merged: true, reference: "https://github.com/org/repo/pull/1" } : null;
+  const result = auditGenericGitRepository({ repositoryPath: "/repo", run, pullRequestEvidence });
+  assert.equal(result.audit.retireEligible.some((e) => e.kind === "branch" && e.id === "feature-squashed" && e.reason === "delivered-via-pull-request"), true);
+});
+
+test("plan-apply includes discovered validation commands in the result and confirmation", () => {
+  const audit = {
+    remote: "origin",
+    defaultBranch: "main",
+    validationCommands: "npm test",
+    retireEligible: [],
+    commitCandidates: [],
+    unresolved: []
+  };
+  const result = planGenericCleanupApply({ audit, selection: { retire: [], commitCandidates: [], push: false } });
+  assert.equal(result.ok, true);
+  assert.equal(result.validationCommands, "npm test");
+  assert.equal(result.confirmation.validationCommands, "npm test");
+});

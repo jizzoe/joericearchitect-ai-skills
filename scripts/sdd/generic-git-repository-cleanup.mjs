@@ -134,6 +134,15 @@ export function listActiveChangeNames({ repositoryPath, fileSystem = fs } = {}) 
   }
 }
 
+export function listArchivedChangeNames({ repositoryPath, fileSystem = fs } = {}) {
+  const root = path.join(repositoryPath, "openspec", "changes", "archive");
+  try {
+    return fileSystem.readdirSync(root).filter((name) => !name.startsWith("."));
+  } catch (error) {
+    return error?.code === "ENOENT" ? [] : null;
+  }
+}
+
 export function isAncestor({ run, branch, target } = {}) {
   return run(["merge-base", "--is-ancestor", branch, target]).ok;
 }
@@ -170,7 +179,7 @@ function overlapsActiveChange(names, name) {
 
 // Deterministic, read-only audit. Every Git read goes through the injected
 // `run`, so the audit never mutates the repository and is fully testable.
-export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunner(repositoryPath), explicitDefaultBranch } = {}) {
+export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunner(repositoryPath), explicitDefaultBranch, pullRequestEvidence } = {}) {
   if (!text(repositoryPath)) return { ok: false, reason: "repository-path-invalid" };
   const remote = discoverRemote({ run });
   const defaultBranch = discoverDefaultBranch({ run, remote, explicit: explicitDefaultBranch });
@@ -180,6 +189,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   const worktrees = listWorktrees({ run });
   const status = listStatus({ run });
   const activeChanges = listActiveChangeNames({ repositoryPath });
+  const archivedChanges = listArchivedChangeNames({ repositoryPath });
   const protectedBranches = discoverProtectedBranches({ run });
   const validationCommands = discoverValidationCommands({ run });
 
@@ -259,9 +269,17 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       const remoteRef = `refs/remotes/${remote}/${branch.id}`;
       const remoteExists = text(remote) && run(["rev-parse", "--verify", remoteRef]).ok;
       const remoteMerged = remoteExists ? isAncestor({ run, branch: remoteRef, target: `refs/remotes/${remote}/${defaultBranch}` }) : false;
+      if (remoteExists && !remoteMerged) {
+        unresolvedList.push(unresolved("remote-branch", `${remote}/${branch.id}`, "remote-counterpart-unmerged", "the remote counterpart exists but is not proven merged to the remote default branch", "delete it only after confirming its changes are merged to the remote default branch"));
+      }
       retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-and-inactive", evidence: { ancestryMerged: true, referencedByWorktree: false, activeChangeClaim: false, remoteCounterpart: remoteExists ? { exists: true, mergedToRemoteDefault: remoteMerged } : { exists: false } } }));
     } else {
-      unresolvedList.push(unresolved("branch", branch.id, "delivery-unproven", "not proven merged to the configured default branch (squash/rebase needs exact PR evidence)", "provide exact merged-PR/default-branch evidence or review manually"));
+      const prEvidence = typeof pullRequestEvidence === "function" ? pullRequestEvidence(branch.id) : null;
+      if (prEvidence?.merged === true) {
+        retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-via-pull-request", evidence: { ancestryMerged: false, pullRequestMerged: true, pullRequestReference: prEvidence.reference ?? null, referencedByWorktree: false, activeChangeClaim: false } }));
+      } else {
+        unresolvedList.push(unresolved("branch", branch.id, "delivery-unproven", "not proven merged to the configured default branch (squash/rebase needs exact PR evidence)", "provide exact merged-PR/default-branch evidence or review manually"));
+      }
     }
   }
 
@@ -312,7 +330,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
     commitCandidates.push(entry("commit", `working-tree:${f.status.path}:${statusClass}`, { classification: "commit-candidate", files: [f.status.path], purpose: `out-of-scope ${statusClass} file ${f.status.path}`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${branchToken}-${statusClass}-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: capture out-of-scope ${statusClass} file ${f.status.path}` }));
   }
 
-  return { ok: true, audit: { remote, defaultBranch, protectedBranches, validationCommands, retireEligible, commitCandidates, unresolved: unresolvedList } };
+  return { ok: true, audit: { remote, defaultBranch, protectedBranches, validationCommands, archivedChanges, retireEligible, commitCandidates, unresolved: unresolvedList } };
 }
 
 // Confirmation-gated planning only. Never mutates Git.
@@ -384,7 +402,8 @@ export function planGenericCleanupApply({ audit, selection } = {}) {
     "Spec-governed content is never committed or pushed directly to the default branch; non-spec files may commit directly to the default branch."
   ];
 
-  return { ok: true, plan, confirmation, recoveryNotes };
+  const validationCommands = audit.validationCommands ?? null;
+  return { ok: true, plan, confirmation: { ...confirmation, validationCommands }, validationCommands, recoveryNotes };
 }
 
 // Fresh re-inspection immediately before apply. Each step's precondition is
