@@ -424,10 +424,11 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   }
 
   const commitCandidates = [];
-  for (const s of status.filter((s) => activeChanges.some((c) => s.path.startsWith(`openspec/changes/${c}/`)))) {
+  const activePrefix = activeChangeLocation.replace(/\/+$/, "");
+  for (const s of status.filter((s) => activeChanges.some((c) => s.path.startsWith(`${activePrefix}/${c}/`)))) {
     unresolvedList.push(unresolved("file", s.path, "active-change-scope", "path is inside an active OpenSpec change and is owned by that change's lifecycle", "leave it to the owning change; generic cleanup does not commit or retire it"));
   }
-  const changed = status.filter((s) => !activeChanges.some((c) => s.path.startsWith(`openspec/changes/${c}/`)));
+  const changed = status.filter((s) => !activeChanges.some((c) => s.path.startsWith(`${activePrefix}/${c}/`)));
   const conflicted = changed.filter((s) => /^(DD|AU|UD|UA|DU|AA|UU)/.test(s.code));
   for (const c of conflicted) {
     unresolvedList.push(unresolved("file", c.path, "conflicted", "file has a merge conflict", "resolve the conflict manually"));
