@@ -312,7 +312,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
 
   const retireEligible = [];
   const unresolvedList = [];
-  const retireEligibleWorktrees = new Map(); // branch -> worktree path
+  const retireEligibleWorktrees = new Map(); // branch -> { id, pullRequestMerged }
 
   // Pass 1: classify worktrees first so their delivered branches can be
   // selected for retirement after the worktree is removed.
@@ -346,12 +346,18 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       continue;
     }
     const branchMerged = isAncestor({ run, branch: wt.branch, target: deliveryTarget });
+    let pullRequestMerged = false;
     if (!branchMerged) {
-      unresolvedList.push(unresolved("worktree", wt.id, "delivery-unproven", "worktree branch is not proven merged to the configured default branch", "provide exact merged-PR/default-branch evidence or review manually"));
-      continue;
+      const wtBranchHead = branches.find((b) => b.id === wt.branch)?.head ?? null;
+      const prEvidence = typeof pullRequestEvidence === "function" ? pullRequestEvidence(wt.branch, remote) : null;
+      pullRequestMerged = prEvidence?.merged === true && prEvidence?.branch === wt.branch && prEvidence?.headCommit === wtBranchHead && prEvidence?.defaultBranch === defaultBranch && text(prEvidence?.reference);
+      if (!pullRequestMerged) {
+        unresolvedList.push(unresolved("worktree", wt.id, "delivery-unproven", "worktree branch is not proven merged to the configured default branch", "provide exact merged-PR/default-branch evidence or review manually"));
+        continue;
+      }
     }
-    retireEligible.push(entry("worktree", wt.id, { classification: "retire-eligible", reason: "clean-non-primary-unlocked", evidence: { branch: wt.branch, clean: true, locked: false, primary: false, branchMerged: true } }));
-    retireEligibleWorktrees.set(wt.branch, wt.id);
+    retireEligible.push(entry("worktree", wt.id, { classification: "retire-eligible", reason: branchMerged ? "clean-non-primary-unlocked" : "delivered-via-pull-request", evidence: { branch: wt.branch, clean: true, locked: false, primary: false, branchMerged, pullRequestMerged } }));
+    retireEligibleWorktrees.set(wt.branch, { id: wt.id, pullRequestMerged });
   }
 
   // Pass 2: classify branches.
@@ -372,7 +378,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
     }
     const dependentWorktree = retireEligibleWorktrees.get(branch.id);
     if (dependentWorktree) {
-      retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-after-worktree-removal", dependsOn: [`worktree:${dependentWorktree}`], evidence: { ancestryMerged: true, referencedByRetireEligibleWorktree: true, activeChangeClaim: false } }));
+      retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-after-worktree-removal", dependsOn: [`worktree:${dependentWorktree.id}`], evidence: { ancestryMerged: !dependentWorktree.pullRequestMerged, pullRequestMerged: dependentWorktree.pullRequestMerged, referencedByRetireEligibleWorktree: true, activeChangeClaim: false } }));
       continue;
     }
     if (branchReferencedByWorktree(worktrees, branch.id)) {
