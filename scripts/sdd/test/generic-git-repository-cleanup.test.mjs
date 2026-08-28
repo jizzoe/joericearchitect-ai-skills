@@ -352,8 +352,8 @@ test("verifyPlanFreshness drifts a direct-to-default commit when HEAD is not on 
     ["diff --cached --name-only", { ok: true, stdout: "ai-planning/brief.md\n" }]
   ]);
   const plan = [
-    { kind: "stage-paths", files: ["ai-planning/brief.md"], target: "ai-planning/brief.md" },
-    { kind: "commit-paths", files: ["ai-planning/brief.md"], target: "ai-planning/brief.md", directToDefault: true, message: "docs: brief" }
+    { kind: "stage-paths", files: ["ai-planning/brief.md"], target: "ai-planning/brief.md", id: "working-tree:ai-planning/brief.md:new" },
+    { kind: "commit-paths", files: ["ai-planning/brief.md"], target: "ai-planning/brief.md", id: "working-tree:ai-planning/brief.md:new", directToDefault: true, message: "docs: brief" }
   ];
   const result = verifyPlanFreshness({ repositoryPath: repo, run, plan });
   assert.equal(result.ok, false);
@@ -429,7 +429,7 @@ test("verifyPlanFreshness ignores a forged directToDefault for spec-governed fil
     ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? skills/foo.md\n" }],
     ["diff --cached --name-only", { ok: true, stdout: "skills/foo.md\n" }]
   ]);
-  const plan = [{ kind: "commit-paths", files: ["skills/foo.md"], target: "skills/foo.md", directToDefault: true, message: "chore: forged" }];
+  const plan = [{ kind: "commit-paths", files: ["skills/foo.md"], target: "skills/foo.md", id: "working-tree:skills/foo.md:new", directToDefault: true, message: "chore: forged" }];
   const result = verifyPlanFreshness({ repositoryPath: repo, run, plan });
   assert.equal(result.ok, false);
   assert.equal(result.drifted.some((d) => d.reason === "commit-target-branch-mismatch"), true);

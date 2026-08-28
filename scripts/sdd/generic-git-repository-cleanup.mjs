@@ -437,8 +437,8 @@ export function planGenericCleanupApply({ audit, selection } = {}) {
     if (!directToDefault) {
       plan.push({ order: plan.length, command: ["git", "switch", "-c", targetBranch], target: targetBranch, kind: "create-topic-branch" });
     }
-    plan.push({ order: plan.length, command: ["git", "add", "--", ...candidate.files], target: candidate.files.join(", "), files: candidate.files, kind: "stage-paths" });
-    plan.push({ order: plan.length, command: ["git", "commit", "-m", message], target: candidate.files.join(", "), files: candidate.files, message, directToDefault, targetBranch, kind: "commit-paths" });
+    plan.push({ order: plan.length, command: ["git", "add", "--", ...candidate.files], target: candidate.files.join(", "), files: candidate.files, id: candidate.id, kind: "stage-paths" });
+    plan.push({ order: plan.length, command: ["git", "commit", "-m", message], target: candidate.files.join(", "), files: candidate.files, id: candidate.id, message, directToDefault, targetBranch, kind: "commit-paths" });
     if (push) {
       plan.push(directToDefault
         ? { order: plan.length, command: ["git", "push", audit.remote ?? "origin", "--", targetBranch], target: targetBranch, committedFiles: candidate.files, kind: "push-default-branch" }
@@ -470,7 +470,6 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
   if (!auditResult.ok) return auditResult;
   const audit = auditResult.audit;
   const eligible = new Map(audit.retireEligible.map((e) => [`${e.kind}:${e.id}`, e]));
-  const commitFiles = new Set(audit.commitCandidates.flatMap((c) => c.files));
   const worktreesNow = listWorktrees({ run });
   const currentWorktrees = new Set((worktreesNow ?? []).map((wt) => wt.id));
   const verifiedPlan = [];
@@ -507,13 +506,11 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       verifiedPlan.push({ kind: "create-topic-branch", target: step.target, command: ["git", "switch", "-c", step.target] });
     } else if (step.kind === "stage-paths" || step.kind === "commit-paths") {
       const files = Array.isArray(step.files) ? step.files : (step.target ?? "").split(", ").filter(Boolean);
-      const missing = files.filter((f) => !commitFiles.has(f));
-      if (missing.length > 0) { drifted.push({ step, reason: "files-no-longer-commit-candidates", detail: missing }); continue; }
+      const candidate = audit.commitCandidates.find((c) => c.kind === "commit" && c.id === step.id && c.files.join("\n") === files.join("\n"));
+      if (!candidate) { drifted.push({ step, reason: "commit-candidate-no-longer-matches" }); continue; }
       if (step.kind === "stage-paths") {
         verifiedPlan.push({ kind: "stage-paths", target: files.join(", "), command: ["git", "add", "--", ...files] });
       } else {
-        const candidate = audit.commitCandidates.find((c) => c.kind === "commit" && c.files.join("\n") === files.join("\n"));
-        if (!candidate) { drifted.push({ step, reason: "commit-candidate-no-longer-matches" }); continue; }
         const directToDefault = candidate.directToDefault === true;
         const message = text(candidate.message) ? candidate.message : "chore: capture out-of-scope changes";
         const targetBranch = text(candidate.targetBranch) ? candidate.targetBranch : null;
