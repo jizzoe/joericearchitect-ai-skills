@@ -477,7 +477,9 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
   const drifted = [];
   const knownKinds = new Set(["worktree-remove", "branch-delete", "remote-branch-delete", "create-topic-branch", "stage-paths", "commit-paths", "push-topic-branch", "push-default-branch"]);
 
-  for (const step of steps) {
+  for (let stepPosition = 0; stepPosition < steps.length; stepPosition++) {
+    const step = steps[stepPosition];
+    const planIndex = stepIndex === undefined ? stepPosition : stepIndex;
     if (!knownKinds.has(step.kind)) { drifted.push({ step, reason: "unknown-step-kind" }); continue; }
     if (step.kind === "worktree-remove") {
       if (!eligible.has(`worktree:${step.target}`)) { drifted.push({ step, reason: "target-no-longer-retire-eligible" }); continue; }
@@ -537,30 +539,34 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       if (discoverProtectedBranches({ run }).includes(step.target)) { drifted.push({ step, reason: "push-target-protected" }); continue; }
       const committedFiles = Array.isArray(step.committedFiles) ? step.committedFiles : [];
       if (committedFiles.length === 0) { drifted.push({ step, reason: "push-without-preceding-commit" }); continue; }
-      const precedingCommit = plan.some((p) => p.kind === "commit-paths" && p.targetBranch === step.target && (p.files ?? []).join("\n") === committedFiles.join("\n"));
-      if (!precedingCommit) { drifted.push({ step, reason: "push-without-matching-preceding-commit" }); continue; }
+      const commitIndex = plan.findIndex((p) => p.kind === "commit-paths" && p.targetBranch === step.target && (p.files ?? []).join("\n") === committedFiles.join("\n"));
+      if (commitIndex === -1 || commitIndex >= planIndex) { drifted.push({ step, reason: "push-without-ordered-preceding-commit" }); continue; }
+      const committedOid = plan[commitIndex]?.outcome;
+      if (!fullCommit(committedOid)) { drifted.push({ step, reason: "push-without-commit-outcome" }); continue; }
+      const headOid = run(["rev-parse", "HEAD"]);
+      if (!headOid.ok || headOid.stdout.trim() !== committedOid) { drifted.push({ step, reason: "push-head-not-committed-oid" }); continue; }
       const remaining = run(["status", "--porcelain=v1", "--untracked-files=all", "--", ...committedFiles]);
       if (!remaining.ok || remaining.stdout.trim() !== "") { drifted.push({ step, reason: "push-without-clean-commit" }); continue; }
       const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
       if (!head.ok || head.stdout.trim() !== step.target) { drifted.push({ step, reason: "head-not-on-topic-branch" }); continue; }
-      const oid = run(["rev-parse", "HEAD"]);
-      if (!oid.ok || !fullCommit(oid.stdout.trim())) { drifted.push({ step, reason: "push-oid-unresolvable" }); continue; }
-      verifiedPlan.push({ kind: "push-topic-branch", target: step.target, commit: oid.stdout.trim(), command: ["git", "push", audit.remote, `${oid.stdout.trim()}:refs/heads/${step.target}`] });
+      verifiedPlan.push({ kind: "push-topic-branch", target: step.target, commit: committedOid, command: ["git", "push", audit.remote, `${committedOid}:refs/heads/${step.target}`] });
     } else if (step.kind === "push-default-branch") {
       if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }
       if (step.target !== audit.defaultBranch) { drifted.push({ step, reason: "push-target-is-not-default-branch" }); continue; }
       if (discoverProtectedBranches({ run }).includes(step.target)) { drifted.push({ step, reason: "push-target-protected" }); continue; }
       const committedFiles = Array.isArray(step.committedFiles) ? step.committedFiles : [];
       if (committedFiles.length === 0) { drifted.push({ step, reason: "push-without-preceding-commit" }); continue; }
-      const precedingCommit = plan.some((p) => p.kind === "commit-paths" && p.directToDefault === true && (p.files ?? []).join("\n") === committedFiles.join("\n"));
-      if (!precedingCommit) { drifted.push({ step, reason: "push-without-matching-preceding-commit" }); continue; }
+      const commitIndex = plan.findIndex((p) => p.kind === "commit-paths" && p.directToDefault === true && (p.files ?? []).join("\n") === committedFiles.join("\n"));
+      if (commitIndex === -1 || commitIndex >= planIndex) { drifted.push({ step, reason: "push-without-ordered-preceding-commit" }); continue; }
+      const committedOid = plan[commitIndex]?.outcome;
+      if (!fullCommit(committedOid)) { drifted.push({ step, reason: "push-without-commit-outcome" }); continue; }
+      const headOid = run(["rev-parse", "HEAD"]);
+      if (!headOid.ok || headOid.stdout.trim() !== committedOid) { drifted.push({ step, reason: "push-head-not-committed-oid" }); continue; }
       const remaining = run(["status", "--porcelain=v1", "--untracked-files=all", "--", ...committedFiles]);
       if (!remaining.ok || remaining.stdout.trim() !== "") { drifted.push({ step, reason: "push-without-clean-commit" }); continue; }
       const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
       if (!head.ok || head.stdout.trim() !== audit.defaultBranch) { drifted.push({ step, reason: "head-not-on-default-branch" }); continue; }
-      const oid = run(["rev-parse", "HEAD"]);
-      if (!oid.ok || !fullCommit(oid.stdout.trim())) { drifted.push({ step, reason: "push-oid-unresolvable" }); continue; }
-      verifiedPlan.push({ kind: "push-default-branch", target: step.target, commit: oid.stdout.trim(), command: ["git", "push", audit.remote, `${oid.stdout.trim()}:refs/heads/${step.target}`] });
+      verifiedPlan.push({ kind: "push-default-branch", target: step.target, commit: committedOid, command: ["git", "push", audit.remote, `${committedOid}:refs/heads/${step.target}`] });
     }
   }
 
