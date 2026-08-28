@@ -478,10 +478,13 @@ function validateRequirementsOutcomeEvidence(requirements, validateRequirementsO
   return { observableOutcomes: [...validation.observableOutcomes] };
 }
 
-function deliveryPlanContent(input, candidates, resolvedInputs) {
+function deliveryPlanContent(input, candidates, resolvedInputs, observableOutcomes = []) {
   const nextAction = input.nextOpenSpecAction === "openspec-propose" ? "OpenSpec Propose" : "OpenSpec Explore";
   return [
     `# ${markdownText(input.planSlug ?? "Delivery")} plan`,
+    "",
+    "## Outcome-oriented milestones",
+    ...(observableOutcomes.length ? observableOutcomes.map((outcome) => `- ${markdownText(outcome)}`) : ["- (none)"]),
     "",
     ...candidates.flatMap((candidate, index) => {
       const approval = candidate.preapproval
@@ -490,7 +493,7 @@ function deliveryPlanContent(input, candidates, resolvedInputs) {
       return [
         `## Candidate ${index + 1}: ${markdownText(candidate.name)} (proposed)`,
         `Readiness: ${input.nextOpenSpecAction === "openspec-propose" ? "Propose-ready" : "Explore-ready"}.`,
-        `Outcome-oriented milestone: ${markdownText(candidate.outcome)}`,
+        `Candidate outcome: ${markdownText(candidate.outcome)}`,
         `Delivery profile: ${markdownText(candidate.deliveryProfile)}`,
         `Profile rationale — data: ${markdownText(candidate.profileRationale.data)}; exposure: ${markdownText(candidate.profileRationale.exposure)}; recovery: ${markdownText(candidate.profileRationale.recovery)}.`,
         `Scope: ${markdownText(candidate.scope)}`,
@@ -667,7 +670,7 @@ export function executeSddRequirementsToPlan(input = {}, { readArtifact, writeAr
   const outputPath = resolveWorkspacePath(input.targetWorkspace, relativeOutputPath);
   if (!outputPath) return gap(skill, mode, "paused", "missing-output", "Provide a safe target-workspace-relative delivery-plan output path.");
   if (typeof writeArtifact !== "function") return gap(skill, mode, "paused", "missing-writer", "Provide a bounded artifact writer.");
-  const operations = [{ operation: "local-edit", path: outputPath, target: `workspace:${outputPath}`, contentKind: "delivery-plan", content: deliveryPlanContent(input, candidates, resolved.artifacts) }];
+  const operations = [{ operation: "local-edit", path: outputPath, target: `workspace:${outputPath}`, contentKind: "delivery-plan", content: deliveryPlanContent(input, candidates, resolved.artifacts, outcomeValidation.observableOutcomes) }];
   const checks = authorize(input, "local-implementation", operations);
   if (checks.some((check) => check.allowed !== true)) return pauseForAuthorization(skill, mode, checks);
   const writeResult = performWrites(operations, writeArtifact);

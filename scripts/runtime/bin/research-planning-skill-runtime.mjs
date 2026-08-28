@@ -4,6 +4,7 @@ import { workspaceIoFromEnvironment } from "../workspace-io.mjs";
 import {
   executeDesignBriefFromResearch, executeResearchTopicWorkflow, executeSddRequirementsToPlan
 } from "../../sdd/research-planning-skill-runtime.mjs";
+import { validateRequirementsOutcomesV1 } from "../../sdd/requirements-outcomes-v1.mjs";
 
 // The launcher supplies the validated target repository, so workspace reads and
 // writes stay inside it. Guidance display and existing-artifact reconciliation
@@ -20,6 +21,7 @@ function injections(payload) {
       readArtifact: io ? io.readArtifact : undefined,
       writeArtifact: io ? io.writeArtifact : undefined,
       writeArtifactsAtomically: io ? io.writeArtifactsAtomically : undefined,
+      validateRequirementsOutcomes: validateRequirementsOutcomesV1,
       displayGuidance: (guidance) => { displayed.push(guidance); },
       reconcileExistingArtifact: Object.keys(reconciliations).length > 0
         ? ({ artifactPath }) => reconciliations[artifactPath]
