@@ -289,9 +289,10 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
         deletions.push(d.path);
       }
     }
-    if (deletions.length > 0) {
-      const specGoverned = deletions.some((p) => isSpecGovernedPath(p));
-      commitCandidates.push(entry("commit", "working-tree:deleted", { classification: "commit-candidate", files: deletions, purpose: "out-of-scope deletions", specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-deletions-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: "chore: remove out-of-scope deleted paths" }));
+    for (const delPath of deletions) {
+      const specGoverned = isSpecGovernedPath(delPath);
+      const branchToken = delPath.replace(/[^a-zA-Z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "working-tree";
+      commitCandidates.push(entry("commit", `working-tree:${delPath}:deleted`, { classification: "commit-candidate", files: [delPath], purpose: `out-of-scope deleted file ${delPath}`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${branchToken}-deleted-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: remove out-of-scope deleted file ${delPath}` }));
     }
   }
   const fileChecks = toRead.map((s) => ({ status: s, file: readFileAt({ repositoryPath, relativePath: s.path }) }));
@@ -304,20 +305,11 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
     }
   }
   const eligible = fileChecks.filter((f) => !blocked.includes(f));
-  const groups = new Map();
   for (const f of eligible) {
-    const idx = f.status.path.lastIndexOf("/");
-    const group = idx === -1 ? "(root)" : f.status.path.slice(0, idx);
+    const specGoverned = isSpecGovernedPath(f.status.path);
     const statusClass = f.status.code.trim() === "??" ? "new" : "modified";
-    const key = `${group}\u0000${statusClass}`;
-    if (!groups.has(key)) groups.set(key, { group, statusClass, files: [] });
-    groups.get(key).files.push(f.status.path);
-  }
-  for (const [, g] of groups) {
-    const { group, statusClass } = g;
-    const specGoverned = g.files.some((p) => isSpecGovernedPath(p));
-    const branchToken = group.replace(/[^a-zA-Z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "working-tree";
-    commitCandidates.push(entry("commit", `working-tree:${group}:${statusClass}`, { classification: "commit-candidate", files: g.files, purpose: `out-of-scope ${statusClass} changes under ${group}`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${branchToken}-${statusClass}-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: capture out-of-scope ${statusClass} changes under ${group}` }));
+    const branchToken = f.status.path.replace(/[^a-zA-Z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "working-tree";
+    commitCandidates.push(entry("commit", `working-tree:${f.status.path}:${statusClass}`, { classification: "commit-candidate", files: [f.status.path], purpose: `out-of-scope ${statusClass} file ${f.status.path}`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${branchToken}-${statusClass}-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: capture out-of-scope ${statusClass} file ${f.status.path}` }));
   }
 
   return { ok: true, audit: { remote, defaultBranch, protectedBranches, validationCommands, retireEligible, commitCandidates, unresolved: unresolvedList } };
@@ -335,8 +327,10 @@ export function planGenericCleanupApply({ audit, selection } = {}) {
 
   const knownRetire = new Set(audit.retireEligible.map((e) => `${e.kind}:${e.id}`));
   const retireSteps = [];
+  const remoteSelections = [];
   for (const rawId of retire) {
     const key = typeof rawId === "string" && rawId.includes(":") ? rawId : `branch:${rawId}`;
+    if (key.startsWith("remote:")) { remoteSelections.push(key); continue; }
     if (!knownRetire.has(key)) return { ok: false, reason: `selection-not-retire-eligible:${rawId}` };
     const sep = key.indexOf(":");
     const kind = key.slice(0, sep);
@@ -349,13 +343,17 @@ export function planGenericCleanupApply({ audit, selection } = {}) {
   retireSteps.sort((a, b) => (a.kind === b.kind ? 0 : (a.kind === "worktree" ? -1 : 1)));
   for (const s of retireSteps) {
     plan.push({ order: plan.length, command: s.command, target: s.id, kind: s.stepKind });
-    if (s.kind === "branch") {
-      const branchEntry = audit.retireEligible.find((e) => e.kind === "branch" && e.id === s.id);
-      if (branchEntry?.evidence?.remoteCounterpart?.mergedToRemoteDefault && text(audit.remote)) {
-        plan.push({ order: plan.length, command: ["git", "push", audit.remote, "--delete", "--", s.id], target: s.id, kind: "remote-branch-delete" });
-        confirmation.retire.push(`remote:${s.id}`);
-      }
-    }
+  }
+  // Remote-branch deletion is a separate, explicitly confirmed target. It is
+  // never auto-appended when a local branch is selected.
+  for (const remoteKey of remoteSelections) {
+    const branchId = remoteKey.slice("remote:".length);
+    const branchEntry = audit.retireEligible.find((e) => e.kind === "branch" && e.id === branchId);
+    if (!branchEntry) return { ok: false, reason: `selection-not-retire-eligible:${remoteKey}` };
+    if (!branchEntry.evidence?.remoteCounterpart?.mergedToRemoteDefault) return { ok: false, reason: `remote-counterpart-not-merged:${branchId}` };
+    if (!text(audit.remote)) return { ok: false, reason: "remote-delete-requires-remote" };
+    plan.push({ order: plan.length, command: ["git", "push", audit.remote, "--delete", "--", branchId], target: branchId, kind: "remote-branch-delete" });
+    confirmation.retire.push(remoteKey);
   }
 
   const knownCommit = audit.commitCandidates.filter((c) => c.kind === "commit");

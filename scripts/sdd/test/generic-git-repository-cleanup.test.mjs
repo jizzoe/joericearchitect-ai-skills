@@ -115,7 +115,7 @@ test("audit marks a worktree whose branch is unmerged as unresolved", () => {
   assert.equal(result.audit.unresolved.find((e) => e.kind === "worktree" && e.id === "/repo-other")?.reason, "delivery-unproven");
 });
 
-test("audit groups eligible dirty files by top-level directory and blocks renames", () => {
+test("audit emits one commit candidate per dirty file and blocks renames", () => {
   const repo = tmpRepo({ after: () => {} });
   fs.mkdirSync(path.join(repo, "alpha"), { recursive: true });
   fs.mkdirSync(path.join(repo, "beta"), { recursive: true });
@@ -132,7 +132,7 @@ test("audit groups eligible dirty files by top-level directory and blocks rename
   ]);
   const result = auditGenericGitRepository({ repositoryPath: repo, run });
   const groups = result.audit.commitCandidates.map((c) => c.id).sort();
-  assert.deepEqual(groups, ["working-tree:alpha:new", "working-tree:beta:new"]);
+  assert.deepEqual(groups, ["working-tree:alpha/one.txt:new", "working-tree:beta/two.txt:new"]);
   assert.equal(result.audit.unresolved.some((e) => e.reason === "renamed-or-copied"), true);
 });
 
@@ -289,7 +289,7 @@ test("plan-apply commits non-spec files directly on the default branch without a
   assert.equal(result.plan[1].kind, "commit-paths");
 });
 
-test("plan-apply emits remote-branch-delete for a branch whose remote counterpart is merged to the remote default", () => {
+test("plan-apply emits remote-branch-delete only on explicit remote selection", () => {
   const audit = {
     remote: "origin",
     defaultBranch: "main",
@@ -297,12 +297,17 @@ test("plan-apply emits remote-branch-delete for a branch whose remote counterpar
     commitCandidates: [],
     unresolved: []
   };
-  const result = planGenericCleanupApply({ audit, selection: { retire: ["branch:feature-merged"], commitCandidates: [], push: false } });
-  assert.equal(result.ok, true);
-  assert.ok(result.plan.some((s) => s.kind === "remote-branch-delete" && s.target === "feature-merged"));
+  // Selecting only the local branch must not auto-append remote deletion.
+  const localOnly = planGenericCleanupApply({ audit, selection: { retire: ["branch:feature-merged"], commitCandidates: [], push: false } });
+  assert.equal(localOnly.ok, true);
+  assert.equal(localOnly.plan.some((s) => s.kind === "remote-branch-delete"), false);
+  // Explicit remote selection plans the deletion after the local branch.
+  const withRemote = planGenericCleanupApply({ audit, selection: { retire: ["branch:feature-merged", "remote:feature-merged"], commitCandidates: [], push: false } });
+  assert.equal(withRemote.ok, true);
+  assert.ok(withRemote.plan.some((s) => s.kind === "remote-branch-delete" && s.target === "feature-merged"));
 });
 
-test("plan-apply omits remote-branch-delete when the remote counterpart is not merged", () => {
+test("plan-apply rejects remote-branch-delete when the remote counterpart is not merged", () => {
   const audit = {
     remote: "origin",
     defaultBranch: "main",
@@ -310,9 +315,9 @@ test("plan-apply omits remote-branch-delete when the remote counterpart is not m
     commitCandidates: [],
     unresolved: []
   };
-  const result = planGenericCleanupApply({ audit, selection: { retire: ["branch:feature-merged"], commitCandidates: [] } });
-  assert.equal(result.ok, true);
-  assert.equal(result.plan.some((s) => s.kind === "remote-branch-delete"), false);
+  const result = planGenericCleanupApply({ audit, selection: { retire: ["remote:feature-merged"], commitCandidates: [] } });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "remote-counterpart-not-merged:feature-merged");
 });
 
 test("verifyPlanFreshness drifts a remote-branch-delete whose remote counterpart is not merged", () => {
@@ -389,7 +394,7 @@ test("verifyPlanFreshness drifts a push to a protected branch", () => {
   assert.equal(result.drifted.some((d) => d.reason === "push-target-protected"), true);
 });
 
-test("audit groups commit candidates by full parent directory, not just top-level root", () => {
+test("audit does not combine unrelated dirty files into a single candidate", () => {
   const repo = tmpRepo({ after: () => {} });
   fs.mkdirSync(path.join(repo, "scripts", "sdd"), { recursive: true });
   fs.mkdirSync(path.join(repo, "scripts", "runtime"), { recursive: true });
@@ -404,7 +409,7 @@ test("audit groups commit candidates by full parent directory, not just top-leve
     ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? scripts/sdd/a.md\n?? scripts/runtime/b.md\n" }]
   ]);
   const result = auditGenericGitRepository({ repositoryPath: repo, run });
-  assert.deepEqual(result.audit.commitCandidates.map((c) => c.id).sort(), ["working-tree:scripts/runtime:new", "working-tree:scripts/sdd:new"]);
+  assert.deepEqual(result.audit.commitCandidates.map((c) => c.id).sort(), ["working-tree:scripts/runtime/b.md:new", "working-tree:scripts/sdd/a.md:new"]);
 });
 
 test("verifyPlanFreshness ignores a forged directToDefault for spec-governed files", () => {
