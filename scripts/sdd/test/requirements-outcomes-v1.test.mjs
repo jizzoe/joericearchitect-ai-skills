@@ -94,6 +94,17 @@ test("non-Latin outcomes are accepted", () => {
   assert.deepEqual(result.observableOutcomes, ["更新仓库记录 — Acceptance: 记录已更新"]);
 });
 
+test("declarative mutation-oriented outcomes are accepted", () => {
+  const documents = [
+    `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: users can open issues\n  Acceptance: the issue form is visible\n`,
+    `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: merged branches are displayed\n  Acceptance: the branch list shows merged branches\n`
+  ];
+  for (const document of documents) {
+    const result = validateRequirementsOutcomesV1(document);
+    assert.equal(result.valid, true, JSON.stringify(result));
+  }
+});
+
 test("non-string input is rejected without a digest", () => {
   const result = validateRequirementsOutcomesV1(null);
   assert.equal(result.valid, false);
