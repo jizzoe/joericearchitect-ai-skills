@@ -79,6 +79,14 @@ export function parseRequirementsOutcomesV1(content) {
     index += 1;
   }
 
+  // Reject a duplicate accepted-outcomes section: content after the first
+  // section would otherwise bypass validation.
+  for (let rest = index; rest < lines.length; rest += 1) {
+    if (lines[rest] === REQUIREMENTS_OUTCOMES_V1_HEADING) {
+      return { valid: false, reason: "duplicate-outcomes-section", outcomes: [] };
+    }
+  }
+
   // Trim surrounding blank lines; blank lines inside the pair sequence are
   // rejected because the contract requires consecutive pairs.
   while (section.length > 0 && section[0].trim() === "") section.shift();
