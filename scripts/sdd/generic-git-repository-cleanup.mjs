@@ -566,7 +566,7 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       const freshRemote = typeof remoteState === "function" ? remoteState(audit.remote, step.target, audit.defaultBranch) : null;
       if (!freshRemote || freshRemote.defaultBranch !== audit.defaultBranch || freshRemote.merged === null || !fullCommit(freshRemote.branchOid) || !fullCommit(freshRemote.defaultBranchOid)) { drifted.push({ step, reason: "remote-state-unavailable" }); continue; }
       if (freshRemote.merged === false) { drifted.push({ step, reason: "remote-counterpart-not-merged" }); continue; }
-      verifiedPlan.push({ kind: "remote-branch-delete", target: step.target, branchOid: freshRemote.branchOid, command: ["git", "push", audit.remote, "--delete", "--", step.target] });
+      verifiedPlan.push({ kind: "remote-branch-delete", target: step.target, branchOid: freshRemote.branchOid, command: ["git", "push", `--force-with-lease=refs/heads/${step.target}:${freshRemote.branchOid}`, audit.remote, `:refs/heads/${step.target}`] });
     } else if (step.kind === "create-topic-branch") {
       if (!run(["check-ref-format", "--branch", step.target]).ok) { drifted.push({ step, reason: "invalid-branch-name" }); continue; }
       const candidate = audit.commitCandidates.find((c) => c.kind === "commit" && c.targetBranch === step.target && c.directToDefault !== true);
@@ -589,6 +589,18 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
         const unrelated = stagedFiles.filter((f) => !files.includes(f));
         const missing = files.filter((f) => !stagedFiles.includes(f));
         if (unrelated.length > 0 || missing.length > 0) { drifted.push({ step, reason: "staged-set-mismatch", detail: { unrelated, missing } }); continue; }
+        // Inspect the exact staged blobs for secret/binary/size content before
+        // authorizing the commit; the audit inspected working-tree content only.
+        let stagedUnsafe = null;
+        for (const f of files) {
+          const blob = run(["cat-file", "blob", `:${f}`]);
+          if (!blob.ok) { stagedUnsafe = { reason: "staged-content-unreadable", detail: f }; break; }
+          const content = blob.stdout;
+          if (BINARY_CONTROL.test(content.slice(0, 8192)) || SECRET_PATTERNS.some((re) => re.test(content)) || Buffer.byteLength(content, "utf8") > LARGE_FILE_BYTES) {
+            stagedUnsafe = { reason: "staged-content-unsafe", detail: f }; break;
+          }
+        }
+        if (stagedUnsafe) { drifted.push({ step, ...stagedUnsafe }); continue; }
         const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
         const headName = head.ok ? head.stdout.trim() : null;
         if (directToDefault) {

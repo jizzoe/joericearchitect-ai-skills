@@ -16,6 +16,7 @@ function mockRun(responses) {
     const key = args.join(" ");
     if (key === "remote") return { ok: true, status: 0, stdout: "origin\n", stderr: "" };
     if (key === "rev-parse --git-common-dir") return { ok: true, status: 0, stdout: ".git\n", stderr: "" };
+    if (key.startsWith("cat-file blob")) return { ok: true, status: 0, stdout: "safe content\n", stderr: "" };
     if (key.startsWith("rev-parse --verify refs/remotes/")) return { ok: true, status: 0, stdout: `${H("a")}\n`, stderr: "" };
     for (const [pattern, response] of responses) {
       if (key.startsWith(pattern)) return typeof response === "function" ? response(args, options) : response;
