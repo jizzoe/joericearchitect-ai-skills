@@ -166,6 +166,15 @@ test("valid v1 requirements are consumed as data and cannot create governance or
   assert.equal(output.details.liveStateDelegatedTo, "dependency-aware-work-selection");
 });
 
+test("the plan's milestones come from content-bound requirements outcomes", () => {
+  const { output, writes } = run();
+  valid(output);
+  const content = writes[0].content;
+  assert.equal(content.includes("## Outcome-oriented milestones"), true);
+  assert.equal(content.includes("strict isolated review succeeds"), true);
+  assert.equal(content.includes("Candidate outcome: Strict independent review succeeds without degraded fallback."), true);
+});
+
 test("generated plan contains the complete readiness and delivery-authority contract", () => {
   const { writes } = run();
   const content = writes[0].content;
