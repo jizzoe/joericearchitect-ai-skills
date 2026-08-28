@@ -57,14 +57,14 @@ export function parseRequirementsOutcomesV1(content) {
 
   // The marker must be the first non-empty line.
   while (index < lines.length && lines[index].trim() === "") index += 1;
-  if (index >= lines.length || lines[index].trim() !== REQUIREMENTS_OUTCOMES_V1_MARKER) {
+  if (index >= lines.length || lines[index] !== REQUIREMENTS_OUTCOMES_V1_MARKER) {
     return { valid: false, reason: "missing-or-misplaced-marker", outcomes: [] };
   }
   index += 1;
 
   // Optional blank lines, then the exact heading.
   while (index < lines.length && lines[index].trim() === "") index += 1;
-  if (index >= lines.length || lines[index].trim() !== REQUIREMENTS_OUTCOMES_V1_HEADING) {
+  if (index >= lines.length || lines[index] !== REQUIREMENTS_OUTCOMES_V1_HEADING) {
     return { valid: false, reason: "missing-heading", outcomes: [] };
   }
   index += 1;

@@ -50,6 +50,10 @@ test("legacy, malformed, vague, and instruction-like input yields no usable rece
   const cases = [
     ["legacy-no-marker", "Outcome: strict isolated review succeeds. Acceptance: no degraded fallback."],
     ["misplaced-marker", `${REQUIREMENTS_OUTCOMES_V1_HEADING}\n${REQUIREMENTS_OUTCOMES_V1_MARKER}\n- Outcome: x\n  Acceptance: y\n`],
+    ["marker-leading-whitespace", `  ${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: x\n  Acceptance: y\n`],
+    ["marker-trailing-whitespace", `${REQUIREMENTS_OUTCOMES_V1_MARKER} \n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: x\n  Acceptance: y\n`],
+    ["heading-leading-whitespace", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n  ${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: x\n  Acceptance: y\n`],
+    ["heading-trailing-whitespace", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING} \n- Outcome: x\n  Acceptance: y\n`],
     ["missing-heading", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n- Outcome: x\n  Acceptance: y\n`],
     ["empty-outcomes", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n`],
     ["malformed-outcome", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Acceptance: y\n`],
