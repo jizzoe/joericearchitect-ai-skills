@@ -114,9 +114,11 @@ export function listWorktrees({ run } = {}) {
   return records;
 }
 
-export function primaryWorktreePath({ run } = {}) {
-  const result = run(["rev-parse", "--show-toplevel"]);
-  return result.ok ? result.stdout.trim() : null;
+export function primaryWorktreePath({ run, repositoryPath } = {}) {
+  const common = run(["rev-parse", "--git-common-dir"]);
+  if (!common.ok) return null;
+  const commonDir = path.resolve(repositoryPath ?? ".", common.stdout.trim());
+  return path.dirname(commonDir);
 }
 
 export function listStatus({ run } = {}) {
@@ -203,7 +205,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   const remote = discoverRemote({ run });
   const defaultBranch = discoverDefaultBranch({ run, remote, explicit: explicitDefaultBranch });
   const current = currentBranch({ run });
-  const primary = primaryWorktreePath({ run });
+  const primary = primaryWorktreePath({ run, repositoryPath });
   const branches = listLocalBranches({ run });
   const worktrees = listWorktrees({ run });
   const status = listStatus({ run });

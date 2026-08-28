@@ -15,6 +15,7 @@ function mockRun(responses) {
   return (args, options = {}) => {
     const key = args.join(" ");
     if (key === "remote") return { ok: true, status: 0, stdout: "origin\n", stderr: "" };
+    if (key === "rev-parse --git-common-dir") return { ok: true, status: 0, stdout: ".git\n", stderr: "" };
     if (key.startsWith("rev-parse --verify refs/remotes/")) return { ok: true, status: 0, stdout: `${H("a")}\n`, stderr: "" };
     for (const [pattern, response] of responses) {
       if (key.startsWith(pattern)) return typeof response === "function" ? response(args, options) : response;
@@ -555,4 +556,21 @@ test("buildCleanupReceipt records selected and skipped entries", () => {
   assert.deepEqual(receipt.selected, [{ kind: "branch-delete", target: "feature" }]);
   assert.deepEqual(receipt.skipped, [{ kind: "branch", target: "other" }]);
   assert.match(receipt.digest, /^[0-9a-f]{64}$/);
+});
+
+test("audit from a linked worktree never classifies the primary worktree as retire-eligible", () => {
+  const repo = tmpRepo({ after: () => {} });
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n\nworktree ${repo}/linked\nbranch refs/heads/main\n` }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
+    ["merge-base --is-ancestor main refs/remotes/origin/main", { ok: true, stdout: "" }]
+  ]);
+  // repositoryPath points at the primary repo, but the common dir resolves the
+  // primary worktree from authoritative Git data regardless of cwd.
+  const result = auditGenericGitRepository({ repositoryPath: repo, run });
+  assert.equal(result.audit.retireEligible.some((e) => e.kind === "worktree" && e.id === repo), false);
+  assert.equal(result.audit.unresolved.some((e) => e.kind === "worktree" && e.id === repo && e.reason === "primary-worktree"), true);
 });
