@@ -80,6 +80,13 @@ test("a changed document invalidates any previously derived digest binding", () 
   assert.equal(altered.valid, true);
 });
 
+test("legitimate mutation-oriented outcomes are accepted", () => {
+  const document = `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: update repository records\n  Acceptance: records are updated in place\n`;
+  const result = validateRequirementsOutcomesV1(document);
+  assert.equal(result.valid, true, JSON.stringify(result));
+  assert.deepEqual(result.observableOutcomes, ["update repository records — Acceptance: records are updated in place"]);
+});
+
 test("non-string input is rejected without a digest", () => {
   const result = validateRequirementsOutcomesV1(null);
   assert.equal(result.valid, false);
