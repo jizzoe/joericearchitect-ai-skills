@@ -167,6 +167,50 @@ export function discoverActiveChangeOwnership({ repositoryPath, fileSystem = fs 
   return { readable, claims };
 }
 
+// Fresh remote-state query (read-only) that returns the current remote branch
+// and default-branch OIDs from `git ls-remote`, never from stale local
+// remote-tracking refs.
+export function queryRemoteState({ repositoryPath, remote, branch } = {}) {
+  if (!text(repositoryPath) || !text(remote) || !text(branch)) return null;
+  try {
+    const head = spawnSync("git", ["-C", repositoryPath, "symbolic-ref", "--quiet", `refs/remotes/${remote}/HEAD`], { encoding: "utf8" });
+    const defaultBranch = head.status === 0 ? (head.stdout.trim().match(new RegExp(`refs/remotes/${remote}/(.+)$`))?.[1] ?? null) : null;
+    if (!defaultBranch) return null;
+    const result = spawnSync("git", ["-C", repositoryPath, "ls-remote", remote, `refs/heads/${branch}`, `refs/heads/${defaultBranch}`], { encoding: "utf8" });
+    if (result.status !== 0) return null;
+    const oids = new Map();
+    for (const line of (result.stdout ?? "").split("\n")) {
+      const match = line.trim().match(/^([0-9a-f]{40})\s+refs\/heads\/(.+)$/);
+      if (match) oids.set(match[2], match[1]);
+    }
+    const branchOid = oids.get(branch);
+    const defaultBranchOid = oids.get(defaultBranch);
+    return branchOid && defaultBranchOid ? { branchOid, defaultBranchOid } : null;
+  } catch { return null; }
+}
+
+// Trusted, read-only pull-request evidence source bound to the exact branch
+// head OID. Returns merged evidence only when a merged PR for this branch head
+// exists; otherwise null.
+export function queryPullRequestEvidence({ repositoryPath, remote, branch } = {}) {
+  if (!text(repositoryPath) || !text(branch)) return null;
+  try {
+    const remoteName = text(remote) ? remote : "origin";
+    const head = spawnSync("git", ["-C", repositoryPath, "symbolic-ref", "--quiet", `refs/remotes/${remoteName}/HEAD`], { encoding: "utf8" });
+    const defaultBranch = head.status === 0 ? (head.stdout.trim().match(new RegExp(`refs/remotes/${remoteName}/(.+)$`))?.[1] ?? null) : null;
+    if (!defaultBranch) return null;
+    const url = spawnSync("git", ["-C", repositoryPath, "remote", "get-url", remoteName], { encoding: "utf8" }).stdout.trim();
+    const slug = url.replace(/^git@github\.com:/, "").replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "");
+    if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(slug)) return null;
+    const result = spawnSync("gh", ["pr", "list", "--repo", slug, "--head", branch, "--state", "merged", "--json", "number,url,headRefOid", "--limit", "1"], { encoding: "utf8" });
+    if (result.status !== 0) return null;
+    const prs = JSON.parse(result.stdout || "[]");
+    const pr = prs[0];
+    if (!pr?.headRefOid || !pr?.url) return null;
+    return { merged: true, branch, headCommit: pr.headRefOid, defaultBranch, reference: pr.url };
+  } catch { return null; }
+}
+
 export function isAncestor({ run, branch, target } = {}) {
   return run(["merge-base", "--is-ancestor", branch, target]).ok;
 }
