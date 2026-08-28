@@ -22,7 +22,7 @@ runAsMain({
   operations: {
     "audit": (payload) => auditGenericGitRepository({
       repositoryPath: workspace(payload),
-      pullRequestEvidence: (branch) => queryPullRequestEvidence({ repositoryPath: workspace(payload), branch }),
+      pullRequestEvidence: (branch, remote) => queryPullRequestEvidence({ repositoryPath: workspace(payload), remote, branch }),
       ...(payload?.explicitDefaultBranch ? { explicitDefaultBranch: payload.explicitDefaultBranch } : {})
     }),
     "plan-apply": (payload) => planGenericCleanupApply(payload ?? {}),
@@ -30,7 +30,7 @@ runAsMain({
       repositoryPath: workspace(payload),
       plan: payload?.plan,
       stepIndex: payload?.stepIndex,
-      pullRequestEvidence: (branch) => queryPullRequestEvidence({ repositoryPath: workspace(payload), branch }),
+      pullRequestEvidence: (branch, remote) => queryPullRequestEvidence({ repositoryPath: workspace(payload), remote, branch }),
       remoteState: (remote, branch, defaultBranch) => queryRemoteState({ repositoryPath: workspace(payload), remote, branch, defaultBranch })
     }),
     "build-receipt": (payload) => buildCleanupReceipt(payload ?? {}),

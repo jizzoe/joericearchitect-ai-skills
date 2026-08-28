@@ -77,7 +77,7 @@ test("audit marks a worktree-referenced branch and secret-like files as unresolv
     ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
     ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\ninuse\t${H("b")}\n` }],
     ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n\nworktree ${repo}-other\nbranch refs/heads/inuse\n` }],
-    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? secret.txt\n" }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? secret.txt\0" }],
     ["merge-base --is-ancestor inuse refs/remotes/origin/main", { ok: true, stdout: "" }]
   ]);
   const result = auditGenericGitRepository({ repositoryPath: repo, run });
@@ -128,7 +128,7 @@ test("audit emits one commit candidate per dirty file and blocks renames", () =>
     ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
     ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
     ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
-    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? alpha/one.txt\n?? beta/two.txt\nR  old.txt -> alpha/renamed.txt\n" }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? alpha/one.txt\0?? beta/two.txt\0R  old.txt -> alpha/renamed.txt\0" }],
     ["merge-base --is-ancestor main refs/remotes/origin/main", { ok: true, stdout: "" }]
   ]);
   const result = auditGenericGitRepository({ repositoryPath: repo, run });
@@ -230,7 +230,7 @@ test("commit-paths verifies against the planned topic branch after create-topic-
     ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: `${topic}\n` }],
     ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n${topic}\t${H("b")}\n` }],
     ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/${topic}\n` }],
-    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? skills/foo.md\n" }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? skills/foo.md\0" }],
     ["diff --cached --name-only", { ok: true, stdout: "skills/foo.md\n" }]
   ]);
   const plan = [{ kind: "commit-paths", files: ["skills/foo.md"], target: "skills/foo.md", id: "working-tree:skills/foo.md", targetBranch: topic, directToDefault: false, message: "chore: capture skill" }];
@@ -294,7 +294,7 @@ test("audit marks non-spec files direct-to-default and spec-governed files as to
     ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
     ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
     ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
-    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? ai-planning/brief.md\n?? skills/foo.md\n" }]
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? ai-planning/brief.md\0?? skills/foo.md\0" }]
   ]);
   const result = auditGenericGitRepository({ repositoryPath: repo, run });
   const nonSpec = result.audit.commitCandidates.find((c) => c.files.includes("ai-planning/brief.md"));
@@ -379,7 +379,7 @@ test("verifyPlanFreshness drifts a direct-to-default commit when HEAD is not on 
     ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
     ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\nfeature\t${H("b")}\n` }],
     ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/feature\n` }],
-    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? ai-planning/brief.md\n" }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? ai-planning/brief.md\0" }],
     ["diff --cached --name-only", { ok: true, stdout: "ai-planning/brief.md\n" }]
   ]);
   const plan = [
@@ -441,7 +441,7 @@ test("audit does not combine unrelated dirty files into a single candidate", () 
     ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
     ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
     ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
-    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? scripts/sdd/a.md\n?? scripts/runtime/b.md\n" }]
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? scripts/sdd/a.md\0?? scripts/runtime/b.md\0" }]
   ]);
   const result = auditGenericGitRepository({ repositoryPath: repo, run });
   assert.deepEqual(result.audit.commitCandidates.map((c) => c.id).sort(), ["working-tree:scripts/runtime/b.md", "working-tree:scripts/sdd/a.md"]);
@@ -457,7 +457,7 @@ test("verifyPlanFreshness ignores a forged directToDefault for spec-governed fil
     ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
     ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
     ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
-    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? skills/foo.md\n" }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? skills/foo.md\0" }],
     ["diff --cached --name-only", { ok: true, stdout: "skills/foo.md\n" }]
   ]);
   const plan = [{ kind: "commit-paths", files: ["skills/foo.md"], target: "skills/foo.md", id: "working-tree:skills/foo.md", directToDefault: true, message: "chore: forged" }];
@@ -524,7 +524,7 @@ test("audit surfaces active-change-scope status entries as unresolved instead of
     ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
     ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
     ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
-    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? openspec/changes/active-change/design.md\n" }]
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? openspec/changes/active-change/design.md\0" }]
   ]);
   const result = auditGenericGitRepository({ repositoryPath: repo, run });
   assert.equal(result.audit.unresolved.some((e) => e.kind === "file" && e.reason === "active-change-scope"), true);

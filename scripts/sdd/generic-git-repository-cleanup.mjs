@@ -122,9 +122,9 @@ export function primaryWorktreePath({ run, repositoryPath } = {}) {
 }
 
 export function listStatus({ run } = {}) {
-  const result = run(["status", "--porcelain=v1", "--untracked-files=all"]);
+  const result = run(["status", "--porcelain=v1", "--untracked-files=all", "-z"]);
   if (!result.ok) return null;
-  return result.stdout.split("\n").filter(Boolean).map((line) => ({ code: line.slice(0, 2), path: line.slice(3).trim() }));
+  return result.stdout.split("\0").filter((record) => record.length >= 4).map((record) => ({ code: record.slice(0, 2), path: record.slice(3) }));
 }
 
 export function listActiveChangeNames({ repositoryPath, fileSystem = fs } = {}) {
@@ -360,7 +360,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       }
       retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-and-inactive", evidence: { ancestryMerged: true, referencedByWorktree: false, activeChangeClaim: false, remoteCounterpart: text(remote) ? (remoteExists ? { exists: true, mergedToRemoteDefault: remoteMerged } : { exists: false }) : { exists: false, unproven: true } } }));
     } else {
-      const prEvidence = typeof pullRequestEvidence === "function" ? pullRequestEvidence(branch.id) : null;
+      const prEvidence = typeof pullRequestEvidence === "function" ? pullRequestEvidence(branch.id, remote) : null;
       const prBound = prEvidence?.merged === true && prEvidence?.branch === branch.id && prEvidence?.headCommit === branch.head && prEvidence?.defaultBranch === defaultBranch && text(prEvidence?.reference);
       if (prBound) {
         retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-via-pull-request", evidence: { ancestryMerged: false, pullRequestMerged: true, pullRequestReference: prEvidence.reference, referencedByWorktree: false, activeChangeClaim: false } }));
