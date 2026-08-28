@@ -170,12 +170,9 @@ export function discoverActiveChangeOwnership({ repositoryPath, fileSystem = fs 
 // Fresh remote-state query (read-only) that returns the current remote branch
 // and default-branch OIDs from `git ls-remote`, never from stale local
 // remote-tracking refs.
-export function queryRemoteState({ repositoryPath, remote, branch } = {}) {
-  if (!text(repositoryPath) || !text(remote) || !text(branch)) return null;
+export function queryRemoteState({ repositoryPath, remote, branch, defaultBranch } = {}) {
+  if (!text(repositoryPath) || !text(remote) || !text(branch) || !text(defaultBranch)) return null;
   try {
-    const head = spawnSync("git", ["-C", repositoryPath, "symbolic-ref", "--quiet", `refs/remotes/${remote}/HEAD`], { encoding: "utf8" });
-    const defaultBranch = head.status === 0 ? (head.stdout.trim().match(new RegExp(`refs/remotes/${remote}/(.+)$`))?.[1] ?? null) : null;
-    if (!defaultBranch) return null;
     const result = spawnSync("git", ["-C", repositoryPath, "ls-remote", remote, `refs/heads/${branch}`, `refs/heads/${defaultBranch}`], { encoding: "utf8" });
     if (result.status !== 0) return null;
     const oids = new Map();
@@ -185,7 +182,7 @@ export function queryRemoteState({ repositoryPath, remote, branch } = {}) {
     }
     const branchOid = oids.get(branch);
     const defaultBranchOid = oids.get(defaultBranch);
-    return branchOid && defaultBranchOid ? { branchOid, defaultBranchOid } : null;
+    return branchOid && defaultBranchOid ? { branchOid, defaultBranchOid, defaultBranch } : null;
   } catch { return null; }
 }
 
@@ -537,8 +534,8 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
     } else if (step.kind === "remote-branch-delete") {
       if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }
       if (step.target === audit.defaultBranch) { drifted.push({ step, reason: "remote-delete-target-is-default-branch" }); continue; }
-      const freshRemote = typeof remoteState === "function" ? remoteState(audit.remote, step.target) : null;
-      if (!freshRemote || !fullCommit(freshRemote.branchOid) || !fullCommit(freshRemote.defaultBranchOid)) { drifted.push({ step, reason: "remote-state-unavailable" }); continue; }
+      const freshRemote = typeof remoteState === "function" ? remoteState(audit.remote, step.target, audit.defaultBranch) : null;
+      if (!freshRemote || freshRemote.defaultBranch !== audit.defaultBranch || !fullCommit(freshRemote.branchOid) || !fullCommit(freshRemote.defaultBranchOid)) { drifted.push({ step, reason: "remote-state-unavailable" }); continue; }
       if (!isAncestor({ run, branch: freshRemote.branchOid, target: freshRemote.defaultBranchOid })) { drifted.push({ step, reason: "remote-counterpart-not-merged" }); continue; }
       verifiedPlan.push({ kind: "remote-branch-delete", target: step.target, branchOid: freshRemote.branchOid, command: ["git", "push", audit.remote, "--delete", "--", step.target] });
     } else if (step.kind === "create-topic-branch") {
@@ -557,7 +554,7 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       } else {
         const directToDefault = candidate.directToDefault === true;
         const message = text(candidate.message) ? candidate.message : "chore: capture out-of-scope changes";
-        const targetBranch = text(candidate.targetBranch) ? candidate.targetBranch : null;
+        const targetBranch = text(step.targetBranch) ? step.targetBranch : (text(candidate.targetBranch) ? candidate.targetBranch : null);
         const staged = run(["diff", "--cached", "--name-only"]);
         const stagedFiles = staged.ok ? staged.stdout.split("\n").map((s) => s.trim()).filter(Boolean) : [];
         const unrelated = stagedFiles.filter((f) => !files.includes(f));

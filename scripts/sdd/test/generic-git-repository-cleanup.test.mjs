@@ -220,6 +220,24 @@ test("writeCleanupReceipt rejects a path whose parent is a symlink into the work
   assert.equal(result.reason, "receipt-path-inside-worktree");
 });
 
+test("commit-paths verifies against the planned topic branch after create-topic-branch", () => {
+  const repo = tmpRepo({ after: () => {} });
+  fs.mkdirSync(path.join(repo, "skills"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "skills", "foo.md"), "skill");
+  const topic = "topic/main-skills-foo-md-cleanup";
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: `${topic}\n` }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n${topic}\t${H("b")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/${topic}\n` }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? skills/foo.md\n" }],
+    ["diff --cached --name-only", { ok: true, stdout: "skills/foo.md\n" }]
+  ]);
+  const plan = [{ kind: "commit-paths", files: ["skills/foo.md"], target: "skills/foo.md", id: "working-tree:skills/foo.md", targetBranch: topic, directToDefault: false, message: "chore: capture skill" }];
+  const result = verifyPlanFreshness({ repositoryPath: repo, run, plan, stepIndex: 0 });
+  assert.equal(result.ok, true, JSON.stringify(result));
+});
+
 test("verifyPlanFreshness flags a branch-delete whose dependency worktree is still present", () => {
   const run = mockRun([
     ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
@@ -345,7 +363,7 @@ test("verifyPlanFreshness drifts a remote-branch-delete whose remote counterpart
     ["merge-base --is-ancestor refs/remotes/origin/feature-merged refs/remotes/origin/main", { ok: false, status: 1, stdout: "" }]
   ]);
   const plan = [{ kind: "branch-delete", target: "feature-merged" }, { kind: "remote-branch-delete", target: "feature-merged" }];
-  const remoteState = (remote, branch) => branch === "feature-merged" ? { branchOid: H("c"), defaultBranchOid: H("a") } : null;
+  const remoteState = (remote, branch, defaultBranch) => branch === "feature-merged" ? { branchOid: H("c"), defaultBranchOid: H("a"), defaultBranch } : null;
   const result = verifyPlanFreshness({ repositoryPath: "/repo", run, plan, remoteState });
   assert.equal(result.ok, false);
   assert.equal(result.drifted.some((d) => d.reason === "remote-counterpart-not-merged"), true);

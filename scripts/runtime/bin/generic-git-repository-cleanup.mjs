@@ -31,7 +31,7 @@ runAsMain({
       plan: payload?.plan,
       stepIndex: payload?.stepIndex,
       pullRequestEvidence: (branch) => queryPullRequestEvidence({ repositoryPath: workspace(payload), branch }),
-      remoteState: (remote, branch) => queryRemoteState({ repositoryPath: workspace(payload), remote, branch })
+      remoteState: (remote, branch, defaultBranch) => queryRemoteState({ repositoryPath: workspace(payload), remote, branch, defaultBranch })
     }),
     "build-receipt": (payload) => buildCleanupReceipt(payload ?? {}),
     "write-receipt": (payload) => writeCleanupReceipt({ ...(payload ?? {}), repositoryPath: workspace(payload) })
