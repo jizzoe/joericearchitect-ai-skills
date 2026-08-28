@@ -478,3 +478,49 @@ test("plan-apply includes discovered validation commands in the result and confi
   assert.equal(result.validationCommands, "npm test");
   assert.equal(result.confirmation.validationCommands, "npm test");
 });
+
+test("plan-apply uses -D for a squash/rebase-delivered branch", () => {
+  const audit = {
+    remote: "origin",
+    defaultBranch: "main",
+    retireEligible: [{ kind: "branch", id: "feature-squashed", classification: "retire-eligible", reason: "delivered-via-pull-request", evidence: { pullRequestMerged: true } }],
+    commitCandidates: [],
+    unresolved: []
+  };
+  const result = planGenericCleanupApply({ audit, selection: { retire: ["branch:feature-squashed"], commitCandidates: [] } });
+  assert.equal(result.ok, true);
+  const step = result.plan.find((s) => s.kind === "branch-delete");
+  assert.deepEqual(step.command, ["git", "branch", "-D", "--", "feature-squashed"]);
+});
+
+test("audit classifies an ancestry-merged branch against the local default when no remote exists", () => {
+  const run = (args) => {
+    const key = args.join(" ");
+    if (key === "remote") return { ok: true, status: 0, stdout: "", stderr: "" };
+    if (key === "symbolic-ref --quiet refs/remotes/origin/HEAD") return { ok: false, status: 1, stdout: "", stderr: "" };
+    if (key === "config --get init.defaultBranch") return { ok: true, status: 0, stdout: "main\n", stderr: "" };
+    if (key === "config --get sdd.validation") return { ok: false, status: 1, stdout: "", stderr: "" };
+    if (key.startsWith("config --get-regexp")) return { ok: false, status: 1, stdout: "", stderr: "" };
+    if (key === "rev-parse --abbrev-ref HEAD") return { ok: true, status: 0, stdout: "main\n", stderr: "" };
+    if (key === "rev-parse --show-toplevel") return { ok: true, status: 0, stdout: "/repo\n", stderr: "" };
+    if (key.startsWith("for-each-ref")) return { ok: true, status: 0, stdout: `main\t${H("a")}\nfeature-merged\t${H("b")}\n`, stderr: "" };
+    if (key.startsWith("worktree list")) return { ok: true, status: 0, stdout: "worktree /repo\nbranch refs/heads/main\n", stderr: "" };
+    if (key.startsWith("status")) return { ok: true, status: 0, stdout: "", stderr: "" };
+    if (key === "merge-base --is-ancestor feature-merged refs/heads/main") return { ok: true, status: 0, stdout: "", stderr: "" };
+    return { ok: false, status: 1, stdout: "", stderr: "" };
+  };
+  const result = auditGenericGitRepository({ repositoryPath: "/repo", run });
+  assert.equal(result.audit.retireEligible.some((e) => e.kind === "branch" && e.id === "feature-merged"), true);
+});
+
+test("buildCleanupReceipt records selected and skipped entries", () => {
+  const receipt = buildCleanupReceipt({
+    plan: [{ kind: "branch-delete", target: "feature" }],
+    outcomes: [{ kind: "branch-delete", target: "feature", status: "completed" }],
+    selected: [{ kind: "branch-delete", target: "feature" }],
+    skipped: [{ kind: "branch", target: "other" }]
+  });
+  assert.deepEqual(receipt.selected, [{ kind: "branch-delete", target: "feature" }]);
+  assert.deepEqual(receipt.skipped, [{ kind: "branch", target: "other" }]);
+  assert.match(receipt.digest, /^[0-9a-f]{64}$/);
+});

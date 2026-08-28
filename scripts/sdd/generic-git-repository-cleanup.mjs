@@ -205,6 +205,10 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
     return { ok: true, audit: { remote, defaultBranch, retireEligible: [], commitCandidates: [], unresolved: [unresolved("repository", repositoryPath, "remote-tracking-ref-unavailable", `refs/remotes/${remote}/${defaultBranch} is not available, so ancestry cannot prove delivery`, "fetch the remote or provide exact merged-PR/default-branch evidence")] } };
   }
 
+  // When no remote is configured, ancestry is proven against the local default
+  // branch and remote state is classified as unproven rather than inferred.
+  const deliveryTarget = text(remote) ? `refs/remotes/${remote}/${defaultBranch}` : `refs/heads/${defaultBranch}`;
+
   const retireEligible = [];
   const unresolvedList = [];
   const retireEligibleWorktrees = new Map(); // branch -> worktree path
@@ -235,7 +239,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       unresolvedList.push(unresolved("worktree", wt.id, "ambiguous-active-change-association", "worktree branch overlaps an active OpenSpec change but no authoritative ownership metadata confirms the claim", "inspect the change's tracking metadata or archive the change before retirement"));
       continue;
     }
-    const branchMerged = isAncestor({ run, branch: wt.branch, target: `refs/remotes/${remote}/${defaultBranch}` });
+    const branchMerged = isAncestor({ run, branch: wt.branch, target: deliveryTarget });
     if (!branchMerged) {
       unresolvedList.push(unresolved("worktree", wt.id, "delivery-unproven", "worktree branch is not proven merged to the configured default branch", "provide exact merged-PR/default-branch evidence or review manually"));
       continue;
@@ -264,15 +268,15 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       unresolvedList.push(unresolved("branch", branch.id, "worktree-references-branch", "a registered worktree still uses this branch and is not itself retire-eligible", "retire the worktree first, then re-inspect this branch"));
       continue;
     }
-    const merged = isAncestor({ run, branch: branch.id, target: `refs/remotes/${remote}/${defaultBranch}` });
+    const merged = isAncestor({ run, branch: branch.id, target: deliveryTarget });
     if (merged) {
       const remoteRef = `refs/remotes/${remote}/${branch.id}`;
       const remoteExists = text(remote) && run(["rev-parse", "--verify", remoteRef]).ok;
-      const remoteMerged = remoteExists ? isAncestor({ run, branch: remoteRef, target: `refs/remotes/${remote}/${defaultBranch}` }) : false;
+      const remoteMerged = remoteExists ? isAncestor({ run, branch: remoteRef, target: deliveryTarget }) : false;
       if (remoteExists && !remoteMerged) {
         unresolvedList.push(unresolved("remote-branch", `${remote}/${branch.id}`, "remote-counterpart-unmerged", "the remote counterpart exists but is not proven merged to the remote default branch", "delete it only after confirming its changes are merged to the remote default branch"));
       }
-      retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-and-inactive", evidence: { ancestryMerged: true, referencedByWorktree: false, activeChangeClaim: false, remoteCounterpart: remoteExists ? { exists: true, mergedToRemoteDefault: remoteMerged } : { exists: false } } }));
+      retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-and-inactive", evidence: { ancestryMerged: true, referencedByWorktree: false, activeChangeClaim: false, remoteCounterpart: text(remote) ? (remoteExists ? { exists: true, mergedToRemoteDefault: remoteMerged } : { exists: false }) : { exists: false, unproven: true } } }));
     } else {
       const prEvidence = typeof pullRequestEvidence === "function" ? pullRequestEvidence(branch.id) : null;
       if (prEvidence?.merged === true) {
@@ -353,7 +357,9 @@ export function planGenericCleanupApply({ audit, selection } = {}) {
     const sep = key.indexOf(":");
     const kind = key.slice(0, sep);
     const id = key.slice(sep + 1);
-    retireSteps.push({ kind, id, command: kind === "worktree" ? ["git", "worktree", "remove", "--", id] : ["git", "branch", "-d", "--", id], stepKind: kind === "worktree" ? "worktree-remove" : "branch-delete" });
+    const retireEntry = audit.retireEligible.find((e) => e.kind === kind && e.id === id);
+    const squashDelivered = retireEntry?.reason === "delivered-via-pull-request" || retireEntry?.evidence?.pullRequestMerged === true;
+    retireSteps.push({ kind, id, command: kind === "worktree" ? ["git", "worktree", "remove", "--", id] : ["git", "branch", squashDelivered ? "-D" : "-d", "--", id], forceDelete: kind === "branch" && squashDelivered, stepKind: kind === "worktree" ? "worktree-remove" : "branch-delete" });
     confirmation.retire.push(key);
   }
   // Dependency ordering: retire clean non-primary worktrees before their local
@@ -409,11 +415,11 @@ export function planGenericCleanupApply({ audit, selection } = {}) {
 // Fresh re-inspection immediately before apply. Each step's precondition is
 // re-checked against fresh state and its canonical command is reconstructed
 // from that state (never trusted from the caller's plan).
-export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = defaultGitRunner(repositoryPath), explicitDefaultBranch, observedAt = new Date().toISOString() } = {}) {
+export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = defaultGitRunner(repositoryPath), explicitDefaultBranch, pullRequestEvidence, observedAt = new Date().toISOString() } = {}) {
   if (!Array.isArray(plan) || plan.length === 0) return { ok: false, reason: "plan-required" };
   const steps = stepIndex === undefined ? plan : (Number.isInteger(stepIndex) && stepIndex >= 0 && stepIndex < plan.length ? [plan[stepIndex]] : null);
   if (steps === null) return { ok: false, reason: "step-index-invalid" };
-  const auditResult = auditGenericGitRepository({ repositoryPath, run, explicitDefaultBranch });
+  const auditResult = auditGenericGitRepository({ repositoryPath, run, explicitDefaultBranch, pullRequestEvidence });
   if (!auditResult.ok) return auditResult;
   const audit = auditResult.audit;
   const eligible = new Map(audit.retireEligible.map((e) => [`${e.kind}:${e.id}`, e]));
@@ -434,7 +440,8 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       if (!entry) { drifted.push({ step, reason: "target-no-longer-retire-eligible" }); continue; }
       const pending = (entry.dependsOn ?? []).filter((d) => d.startsWith("worktree:") && currentWorktrees.has(d.slice("worktree:".length)));
       if (pending.length > 0) { drifted.push({ step, reason: "dependency-worktree-still-present", detail: pending }); continue; }
-      verifiedPlan.push({ kind: "branch-delete", target: step.target, command: ["git", "branch", "-d", "--", step.target] });
+      const squashDelivered = entry.reason === "delivered-via-pull-request" || entry.evidence?.pullRequestMerged === true;
+      verifiedPlan.push({ kind: "branch-delete", target: step.target, forceDelete: squashDelivered, command: ["git", "branch", squashDelivered ? "-D" : "-d", "--", step.target] });
     } else if (step.kind === "remote-branch-delete") {
       if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }
       if (step.target === audit.defaultBranch) { drifted.push({ step, reason: "remote-delete-target-is-default-branch" }); continue; }
@@ -494,21 +501,34 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
     }
   }
 
-  const receipt = buildCleanupReceipt({ plan: verifiedPlan, outcomes: drifted.map((d) => ({ kind: d.step.kind, target: d.step.target, status: "blocked", detail: d.reason })), observedAt });
+  const selectedEntries = verifiedPlan.map((s) => ({ kind: s.kind, target: s.target }));
+  const plannedEntryKeys = new Set();
+  for (const s of verifiedPlan) {
+    if (s.kind === "branch-delete") plannedEntryKeys.add(`branch:${s.target}`);
+    else if (s.kind === "worktree-remove") plannedEntryKeys.add(`worktree:${s.target}`);
+    else if (s.kind === "remote-branch-delete") plannedEntryKeys.add(`remote:${s.target}`);
+  }
+  const skippedEntries = [...eligible.keys()].filter((key) => !plannedEntryKeys.has(key)).map((key) => {
+    const sep = key.indexOf(":");
+    return { kind: key.slice(0, sep), target: key.slice(sep + 1) };
+  });
+  const receipt = buildCleanupReceipt({ plan: verifiedPlan, outcomes: drifted.map((d) => ({ kind: d.step.kind, target: d.step.target, status: "blocked", detail: d.reason })), selected: selectedEntries, skipped: skippedEntries, observedAt });
   if (drifted.length > 0) return { ok: false, reason: "fresh-inspection-drift", drifted, receipt, verifiedPlan };
   return { ok: true, receipt, verifiedPlan };
 }
 
 // A durable, non-sensitive receipt of the plan and its outcomes. It is stored
 // outside the worktree so it never becomes an uncommitted cleanup candidate.
-export function buildCleanupReceipt({ plan, outcomes = [], observedAt = new Date().toISOString() } = {}) {
+export function buildCleanupReceipt({ plan, outcomes = [], selected = [], skipped = [], observedAt = new Date().toISOString() } = {}) {
   const redact = (target) => (typeof target === "string" && target.startsWith("/") ? path.basename(target) : target);
   const planEntries = (plan ?? []).map((s) => ({ kind: s.kind, target: redact(s.target) }));
   const outcomeEntries = (outcomes ?? []).map((o) => ({ kind: o.kind, target: redact(o.target), status: o.status, detail: o.detail ?? null }));
-  const body = { plan: planEntries, outcomes: outcomeEntries, observedAt };
+  const selectedEntries = (selected ?? []).map((s) => (typeof s === "string" ? { target: redact(s) } : { kind: s.kind, target: redact(s.target) }));
+  const skippedEntries = (skipped ?? []).map((s) => (typeof s === "string" ? { target: redact(s) } : { kind: s.kind, target: redact(s.target) }));
+  const body = { plan: planEntries, outcomes: outcomeEntries, selected: selectedEntries, skipped: skippedEntries, observedAt };
   const nonSensitive = !SECRET_PATTERNS.some((re) => re.test(JSON.stringify(body)));
   const digest = crypto.createHash("sha256").update(JSON.stringify(body)).digest("hex");
-  return { schemaVersion: 1, nonSensitive, observedAt, plan: planEntries, outcomes: outcomeEntries, digest };
+  return { schemaVersion: 1, nonSensitive, observedAt, plan: planEntries, outcomes: outcomeEntries, selected: selectedEntries, skipped: skippedEntries, digest };
 }
 
 // Persists a non-sensitive receipt to a configurable location outside the
