@@ -424,6 +424,12 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   }
 
   const commitCandidates = [];
+  if (primary && path.resolve(repositoryPath) === path.resolve(primary) && status.length > 0) {
+    for (const s of status) {
+      unresolvedList.push(unresolved("file", s.path, "primary-worktree-dirty", "the primary worktree has uncommitted changes and is out of scope for generic cleanup", "commit or discard those changes deliberately"));
+    }
+    return { ok: true, audit: { remote, defaultBranch, protectedBranches, validationCommands, archivedChanges, retireEligible, commitCandidates: [], unresolved: unresolvedList } };
+  }
   const activePrefix = activeChangeLocation.replace(/\/+$/, "");
   for (const s of status.filter((s) => activeChanges.some((c) => s.path.startsWith(`${activePrefix}/${c}/`)))) {
     unresolvedList.push(unresolved("file", s.path, "active-change-scope", "path is inside an active OpenSpec change and is owned by that change's lifecycle", "leave it to the owning change; generic cleanup does not commit or retire it"));

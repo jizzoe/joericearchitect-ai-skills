@@ -15,12 +15,12 @@ function mockRun(responses) {
   return (args, options = {}) => {
     const key = args.join(" ");
     if (key === "remote") return { ok: true, status: 0, stdout: "origin\n", stderr: "" };
-    if (key === "rev-parse --git-common-dir") return { ok: true, status: 0, stdout: ".git\n", stderr: "" };
     if (key.startsWith("cat-file blob")) return { ok: true, status: 0, stdout: "safe content\n", stderr: "" };
     if (key.startsWith("rev-parse --verify refs/remotes/")) return { ok: true, status: 0, stdout: `${H("a")}\n`, stderr: "" };
     for (const [pattern, response] of responses) {
       if (key.startsWith(pattern)) return typeof response === "function" ? response(args, options) : response;
     }
+    if (key === "rev-parse --git-common-dir") return { ok: true, status: 0, stdout: "../.git\n", stderr: "" };
     return { ok: false, status: 1, stdout: "", stderr: "" };
   };
 }
@@ -59,6 +59,7 @@ test("audit lists primary worktree as unresolved and clean non-primary as retire
     ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
     ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
     ["rev-parse --show-toplevel", { ok: true, stdout: "/repo\n" }],
+    ["rev-parse --git-common-dir", { ok: true, stdout: ".git\n" }],
     ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\nfeature-merged\t${H("b")}\n` }],
     ["worktree list --porcelain", { ok: true, stdout: "worktree /repo\nbranch refs/heads/main\n\nworktree /repo-other\nbranch refs/heads/feature-merged\n" }],
     ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
@@ -598,6 +599,7 @@ test("audit from a linked worktree never classifies the primary worktree as reti
   const run = mockRun([
     ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
     ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
+    ["rev-parse --git-common-dir", { ok: true, stdout: ".git\n" }],
     ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
     ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n\nworktree ${repo}/linked\nbranch refs/heads/main\n` }],
     ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
@@ -608,4 +610,20 @@ test("audit from a linked worktree never classifies the primary worktree as reti
   const result = auditGenericGitRepository({ repositoryPath: repo, run });
   assert.equal(result.audit.retireEligible.some((e) => e.kind === "worktree" && e.id === repo), false);
   assert.equal(result.audit.unresolved.some((e) => e.kind === "worktree" && e.id === repo && e.reason === "primary-worktree"), true);
+});
+
+test("audit classifies primary-worktree dirty files as unresolved, not commit candidates", () => {
+  const repo = tmpRepo({ after: () => {} });
+  fs.writeFileSync(path.join(repo, "notes.md"), "note");
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
+    ["rev-parse --git-common-dir", { ok: true, stdout: ".git\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? notes.md\0" }]
+  ]);
+  const result = auditGenericGitRepository({ repositoryPath: repo, run });
+  assert.equal(result.audit.commitCandidates.length, 0);
+  assert.equal(result.audit.unresolved.some((e) => e.reason === "primary-worktree-dirty"), true);
 });
