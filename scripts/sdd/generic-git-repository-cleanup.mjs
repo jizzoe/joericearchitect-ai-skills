@@ -199,10 +199,16 @@ export function queryRemoteState({ repositoryPath, remote, branch, defaultBranch
     const branchOid = oids.get(branch);
     const defaultBranchOid = oids.get(defaultBranch);
     if (!branchOid || !defaultBranchOid) return null;
-    // Fetch the exact objects so a subsequent local merge-base ancestry check
-    // can resolve them (a remote may have advanced past the local object store).
-    spawnSync("git", ["-C", repositoryPath, "fetch", "--no-tags", remote, `refs/heads/${branch}`, `refs/heads/${defaultBranch}`], { encoding: "utf8" });
-    return { branchOid, defaultBranchOid, defaultBranch };
+    // Read-only ancestry evidence via the GitHub compare API; no repository
+    // state is mutated. "ahead" or "identical" means branchOid is an ancestor.
+    const url = spawnSync("git", ["-C", repositoryPath, "remote", "get-url", remote], { encoding: "utf8" }).stdout.trim();
+    const slug = url.replace(/^git@github\.com:/, "").replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "");
+    let merged = null;
+    if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(slug)) {
+      const cmp = spawnSync("gh", ["api", `repos/${slug}/compare/${branchOid}...${defaultBranchOid}`, "--jq", ".status"], { encoding: "utf8" });
+      if (cmp.status === 0) merged = cmp.stdout.trim() === "ahead" || cmp.stdout.trim() === "identical";
+    }
+    return { branchOid, defaultBranchOid, defaultBranch, merged };
   } catch { return null; }
 }
 
@@ -558,8 +564,8 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }
       if (step.target === audit.defaultBranch) { drifted.push({ step, reason: "remote-delete-target-is-default-branch" }); continue; }
       const freshRemote = typeof remoteState === "function" ? remoteState(audit.remote, step.target, audit.defaultBranch) : null;
-      if (!freshRemote || freshRemote.defaultBranch !== audit.defaultBranch || !fullCommit(freshRemote.branchOid) || !fullCommit(freshRemote.defaultBranchOid)) { drifted.push({ step, reason: "remote-state-unavailable" }); continue; }
-      if (!isAncestor({ run, branch: freshRemote.branchOid, target: freshRemote.defaultBranchOid })) { drifted.push({ step, reason: "remote-counterpart-not-merged" }); continue; }
+      if (!freshRemote || freshRemote.defaultBranch !== audit.defaultBranch || freshRemote.merged === null || !fullCommit(freshRemote.branchOid) || !fullCommit(freshRemote.defaultBranchOid)) { drifted.push({ step, reason: "remote-state-unavailable" }); continue; }
+      if (freshRemote.merged === false) { drifted.push({ step, reason: "remote-counterpart-not-merged" }); continue; }
       verifiedPlan.push({ kind: "remote-branch-delete", target: step.target, branchOid: freshRemote.branchOid, command: ["git", "push", audit.remote, "--delete", "--", step.target] });
     } else if (step.kind === "create-topic-branch") {
       if (!run(["check-ref-format", "--branch", step.target]).ok) { drifted.push({ step, reason: "invalid-branch-name" }); continue; }

@@ -363,7 +363,7 @@ test("verifyPlanFreshness drifts a remote-branch-delete whose remote counterpart
     ["merge-base --is-ancestor refs/remotes/origin/feature-merged refs/remotes/origin/main", { ok: false, status: 1, stdout: "" }]
   ]);
   const plan = [{ kind: "branch-delete", target: "feature-merged" }, { kind: "remote-branch-delete", target: "feature-merged" }];
-  const remoteState = (remote, branch, defaultBranch) => branch === "feature-merged" ? { branchOid: H("c"), defaultBranchOid: H("a"), defaultBranch } : null;
+  const remoteState = (remote, branch, defaultBranch) => branch === "feature-merged" ? { branchOid: H("c"), defaultBranchOid: H("a"), defaultBranch, merged: false } : null;
   const result = verifyPlanFreshness({ repositoryPath: "/repo", run, plan, remoteState });
   assert.equal(result.ok, false);
   assert.equal(result.drifted.some((d) => d.reason === "remote-counterpart-not-merged"), true);
