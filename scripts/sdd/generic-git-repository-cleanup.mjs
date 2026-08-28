@@ -165,20 +165,22 @@ export function listArchivedChangeNames({ repositoryPath, fileSystem = fs } = {}
 export function discoverActiveChangeOwnership({ repositoryPath, fileSystem = fs } = {}) {
   const claims = new Map();
   let readable = false;
+  let allParsed = true;
   const root = path.join(repositoryPath, ".git", "sdd-delivery-runs", "runs");
   try {
-    for (const dir of fileSystem.readdirSync(root, { withFileTypes: true })) {
-      readable = true;
+    const dirs = fileSystem.readdirSync(root, { withFileTypes: true });
+    readable = true;
+    for (const dir of dirs) {
       if (!dir.isDirectory()) continue;
       try {
         const record = JSON.parse(fileSystem.readFileSync(path.join(root, dir.name, "controller.json"), "utf8"));
         for (const r of (Array.isArray(record?.resourceRecords) ? record.resourceRecords : [])) {
           if (r?.owned === true && text(r?.entry) && text(r?.id)) claims.set(r.id, r.entry);
         }
-      } catch { /* skip unreadable checkpoint */ }
+      } catch { allParsed = false; }
     }
-  } catch { /* checkpoint directory absent: not readable */ }
-  return { readable, claims };
+  } catch { readable = false; }
+  return { readable: readable && allParsed, claims };
 }
 
 // Fresh remote-state query (read-only) that returns the current remote branch
@@ -239,7 +241,10 @@ export function readFileAt({ repositoryPath, relativePath, fileSystem = fs } = {
   const resolved = path.resolve(root, relativePath);
   if (!resolved.startsWith(`${root}${path.sep}`)) return { present: false, reason: "path-escape" };
   try {
-    const stat = fileSystem.lstatSync(resolved);
+    const realRoot = fileSystem.realpathSync(root);
+    const realResolved = realpathExisting(resolved, fileSystem);
+    if (realResolved !== realRoot && !realResolved.startsWith(`${realRoot}${path.sep}`)) return { present: false, reason: "path-escape" };
+    const stat = fileSystem.lstatSync(realResolved);
     if (stat.isSymbolicLink()) return { present: false, reason: "symlink" };
     if (!stat.isFile()) return { present: false, reason: "not-a-file" };
     const content = fileSystem.readFileSync(resolved, "utf8");

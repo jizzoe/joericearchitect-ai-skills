@@ -30,6 +30,7 @@ runAsMain({
       repositoryPath: workspace(payload),
       plan: payload?.plan,
       stepIndex: payload?.stepIndex,
+      ...(payload?.explicitDefaultBranch ? { explicitDefaultBranch: payload.explicitDefaultBranch } : {}),
       pullRequestEvidence: (branch, remote) => queryPullRequestEvidence({ repositoryPath: workspace(payload), remote, branch }),
       remoteState: (remote, branch, defaultBranch) => queryRemoteState({ repositoryPath: workspace(payload), remote, branch, defaultBranch })
     }),
