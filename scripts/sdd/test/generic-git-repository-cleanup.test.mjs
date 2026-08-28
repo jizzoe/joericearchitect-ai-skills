@@ -371,8 +371,11 @@ test("verifyPlanFreshness binds a topic push to the exact commit OID", () => {
     ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
     ["check-ref-format --branch feature", { ok: true, stdout: "" }]
   ]);
-  const plan = [{ kind: "push-topic-branch", target: "feature", committedFiles: ["scripts/x.md"] }];
-  const result = verifyPlanFreshness({ repositoryPath: "/repo", run, plan });
+  const plan = [
+    { kind: "commit-paths", files: ["scripts/x.md"], targetBranch: "feature", directToDefault: false },
+    { kind: "push-topic-branch", target: "feature", committedFiles: ["scripts/x.md"] }
+  ];
+  const result = verifyPlanFreshness({ repositoryPath: "/repo", run, plan, stepIndex: 1 });
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.verifiedPlan[0].command, ["git", "push", "origin", `${H("b")}:refs/heads/feature`]);
   assert.equal(result.verifiedPlan[0].commit, H("b"));

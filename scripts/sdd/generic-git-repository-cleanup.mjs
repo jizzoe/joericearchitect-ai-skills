@@ -498,6 +498,8 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       verifiedPlan.push({ kind: "remote-branch-delete", target: step.target, command: ["git", "push", audit.remote, "--delete", "--", step.target] });
     } else if (step.kind === "create-topic-branch") {
       if (!run(["check-ref-format", "--branch", step.target]).ok) { drifted.push({ step, reason: "invalid-branch-name" }); continue; }
+      const candidate = audit.commitCandidates.find((c) => c.kind === "commit" && c.targetBranch === step.target && c.directToDefault !== true);
+      if (!candidate) { drifted.push({ step, reason: "topic-branch-not-derived-from-candidate" }); continue; }
       const exists = run(["rev-parse", "--verify", `refs/heads/${step.target}`]);
       if (exists.ok) { drifted.push({ step, reason: "topic-branch-already-exists" }); continue; }
       verifiedPlan.push({ kind: "create-topic-branch", target: step.target, command: ["git", "switch", "-c", step.target] });
@@ -535,6 +537,8 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       if (discoverProtectedBranches({ run }).includes(step.target)) { drifted.push({ step, reason: "push-target-protected" }); continue; }
       const committedFiles = Array.isArray(step.committedFiles) ? step.committedFiles : [];
       if (committedFiles.length === 0) { drifted.push({ step, reason: "push-without-preceding-commit" }); continue; }
+      const precedingCommit = plan.some((p) => p.kind === "commit-paths" && p.targetBranch === step.target && (p.files ?? []).join("\n") === committedFiles.join("\n"));
+      if (!precedingCommit) { drifted.push({ step, reason: "push-without-matching-preceding-commit" }); continue; }
       const remaining = run(["status", "--porcelain=v1", "--untracked-files=all", "--", ...committedFiles]);
       if (!remaining.ok || remaining.stdout.trim() !== "") { drifted.push({ step, reason: "push-without-clean-commit" }); continue; }
       const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
@@ -548,6 +552,8 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       if (discoverProtectedBranches({ run }).includes(step.target)) { drifted.push({ step, reason: "push-target-protected" }); continue; }
       const committedFiles = Array.isArray(step.committedFiles) ? step.committedFiles : [];
       if (committedFiles.length === 0) { drifted.push({ step, reason: "push-without-preceding-commit" }); continue; }
+      const precedingCommit = plan.some((p) => p.kind === "commit-paths" && p.directToDefault === true && (p.files ?? []).join("\n") === committedFiles.join("\n"));
+      if (!precedingCommit) { drifted.push({ step, reason: "push-without-matching-preceding-commit" }); continue; }
       const remaining = run(["status", "--porcelain=v1", "--untracked-files=all", "--", ...committedFiles]);
       if (!remaining.ok || remaining.stdout.trim() !== "") { drifted.push({ step, reason: "push-without-clean-commit" }); continue; }
       const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
