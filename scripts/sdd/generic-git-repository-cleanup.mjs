@@ -124,7 +124,21 @@ export function primaryWorktreePath({ run, repositoryPath } = {}) {
 export function listStatus({ run } = {}) {
   const result = run(["status", "--porcelain=v1", "--untracked-files=all", "-z"]);
   if (!result.ok) return null;
-  return result.stdout.split("\0").filter((record) => record.length >= 4).map((record) => ({ code: record.slice(0, 2), path: record.slice(3) }));
+  const records = result.stdout.split("\0").filter(Boolean);
+  const entries = [];
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+    if (record.length < 4) continue;
+    const code = record.slice(0, 2);
+    const path = record.slice(3);
+    if (code[0] === "R" || code[0] === "C") {
+      const dest = records[++i];
+      entries.push({ code, path: dest ? `${path} -> ${dest}` : path });
+    } else {
+      entries.push({ code, path });
+    }
+  }
+  return entries;
 }
 
 export function listActiveChangeNames({ repositoryPath, fileSystem = fs } = {}) {
@@ -362,7 +376,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       if (remoteExists && !remoteMerged) {
         unresolvedList.push(unresolved("remote-branch", `${remote}/${branch.id}`, "remote-counterpart-unmerged", "the remote counterpart exists but is not proven merged to the remote default branch", "delete it only after confirming its changes are merged to the remote default branch"));
       }
-      retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-and-inactive", evidence: { ancestryMerged: true, referencedByWorktree: false, activeChangeClaim: false, remoteCounterpart: text(remote) ? (remoteExists ? { exists: true, mergedToRemoteDefault: remoteMerged } : { exists: false }) : { exists: false, unproven: true } } }));
+      retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-and-inactive", evidence: { ancestryMerged: true, referencedByWorktree: false, activeChangeClaim: false, remoteCounterpart: text(remote) ? (remoteExists ? { exists: true, mergedToRemoteDefault: null, unproven: true } : { exists: false }) : { exists: false, unproven: true } } }));
     } else {
       const prEvidence = typeof pullRequestEvidence === "function" ? pullRequestEvidence(branch.id, remote) : null;
       const prBound = prEvidence?.merged === true && prEvidence?.branch === branch.id && prEvidence?.headCommit === branch.head && prEvidence?.defaultBranch === defaultBranch && text(prEvidence?.reference);
@@ -466,7 +480,7 @@ export function planGenericCleanupApply({ audit, selection } = {}) {
     const branchId = remoteKey.slice("remote:".length);
     const branchEntry = audit.retireEligible.find((e) => e.kind === "branch" && e.id === branchId);
     if (!branchEntry) return { ok: false, reason: `selection-not-retire-eligible:${remoteKey}` };
-    if (!branchEntry.evidence?.remoteCounterpart?.mergedToRemoteDefault) return { ok: false, reason: `remote-counterpart-not-merged:${branchId}` };
+    if (!branchEntry.evidence?.remoteCounterpart?.exists) return { ok: false, reason: `remote-counterpart-missing:${branchId}` };
     if (!text(audit.remote)) return { ok: false, reason: "remote-delete-requires-remote" };
     plan.push({ order: plan.length, command: ["git", "push", audit.remote, "--delete", "--", branchId], target: branchId, kind: "remote-branch-delete" });
     confirmation.retire.push(remoteKey);
@@ -644,6 +658,22 @@ export function buildCleanupReceipt({ plan, outcomes = [], selected = [], skippe
 
 // Persists a non-sensitive receipt to a configurable location outside the
 // worktree (e.g. a state or evidence directory) via an atomic write.
+function realpathExisting(target, fileSystem) {
+  let current = path.resolve(target);
+  const suffix = [];
+  while (true) {
+    try {
+      const real = fileSystem.realpathSync(current);
+      return suffix.length ? path.join(real, ...suffix.reverse()) : real;
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) return path.resolve(target);
+      suffix.push(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
 export function writeCleanupReceipt({ receipt, outputPath, repositoryPath, fileSystem = fs } = {}) {
   if (!receipt || receipt.nonSensitive !== true || !text(outputPath)) return { ok: false, reason: "receipt-input-invalid" };
   if (text(repositoryPath)) {
@@ -653,10 +683,7 @@ export function writeCleanupReceipt({ receipt, outputPath, repositoryPath, fileS
     let realOutput;
     try {
       realRoot = fileSystem.realpathSync(resolvedRoot);
-      const parent = path.dirname(resolvedOutput);
-      realOutput = fileSystem.existsSync(parent)
-        ? path.join(fileSystem.realpathSync(parent), path.basename(resolvedOutput))
-        : resolvedOutput;
+      realOutput = realpathExisting(resolvedOutput, fileSystem);
     } catch {
       realRoot = resolvedRoot;
       realOutput = resolvedOutput;

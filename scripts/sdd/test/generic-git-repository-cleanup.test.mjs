@@ -128,7 +128,7 @@ test("audit emits one commit candidate per dirty file and blocks renames", () =>
     ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
     ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
     ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
-    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? alpha/one.txt\0?? beta/two.txt\0R  old.txt -> alpha/renamed.txt\0" }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? alpha/one.txt\0?? beta/two.txt\0R  old.txt\0alpha/renamed.txt\0" }],
     ["merge-base --is-ancestor main refs/remotes/origin/main", { ok: true, stdout: "" }]
   ]);
   const result = auditGenericGitRepository({ repositoryPath: repo, run });
@@ -338,17 +338,17 @@ test("plan-apply emits remote-branch-delete only on explicit remote selection", 
   assert.ok(withRemote.plan.some((s) => s.kind === "remote-branch-delete" && s.target === "feature-merged"));
 });
 
-test("plan-apply rejects remote-branch-delete when the remote counterpart is not merged", () => {
+test("plan-apply plans an explicit remote-branch-delete and defers merge verification to verify-plan", () => {
   const audit = {
     remote: "origin",
     defaultBranch: "main",
-    retireEligible: [{ kind: "branch", id: "feature-merged", classification: "retire-eligible", evidence: { remoteCounterpart: { exists: true, mergedToRemoteDefault: false } } }],
+    retireEligible: [{ kind: "branch", id: "feature-merged", classification: "retire-eligible", evidence: { remoteCounterpart: { exists: true, mergedToRemoteDefault: null, unproven: true } } }],
     commitCandidates: [],
     unresolved: []
   };
   const result = planGenericCleanupApply({ audit, selection: { retire: ["remote:feature-merged"], commitCandidates: [] } });
-  assert.equal(result.ok, false);
-  assert.equal(result.reason, "remote-counterpart-not-merged:feature-merged");
+  assert.equal(result.ok, true);
+  assert.ok(result.plan.some((s) => s.kind === "remote-branch-delete" && s.target === "feature-merged"));
 });
 
 test("verifyPlanFreshness drifts a remote-branch-delete whose remote counterpart is not merged", () => {
