@@ -342,7 +342,7 @@ test("plan-apply plans an explicit remote-branch-delete and defers merge verific
   const audit = {
     remote: "origin",
     defaultBranch: "main",
-    retireEligible: [{ kind: "branch", id: "feature-merged", classification: "retire-eligible", evidence: { remoteCounterpart: { exists: true, mergedToRemoteDefault: null, unproven: true } } }],
+    retireEligible: [{ kind: "branch", id: "feature-merged", classification: "retire-eligible", evidence: { remoteCounterpart: { exists: true, mergedToRemoteDefault: true, unproven: true } } }],
     commitCandidates: [],
     unresolved: []
   };

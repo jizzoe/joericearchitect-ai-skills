@@ -387,7 +387,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       if (remoteExists && !remoteMerged) {
         unresolvedList.push(unresolved("remote-branch", `${remote}/${branch.id}`, "remote-counterpart-unmerged", "the remote counterpart exists but is not proven merged to the remote default branch", "delete it only after confirming its changes are merged to the remote default branch"));
       }
-      retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-and-inactive", evidence: { ancestryMerged: true, referencedByWorktree: false, activeChangeClaim: false, remoteCounterpart: text(remote) ? (remoteExists ? { exists: true, mergedToRemoteDefault: null, unproven: true } : { exists: false }) : { exists: false, unproven: true } } }));
+      retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-and-inactive", evidence: { ancestryMerged: true, referencedByWorktree: false, activeChangeClaim: false, remoteCounterpart: text(remote) ? (remoteExists ? { exists: true, mergedToRemoteDefault: remoteMerged, unproven: true } : { exists: false }) : { exists: false, unproven: true } } }));
     } else {
       const prEvidence = typeof pullRequestEvidence === "function" ? pullRequestEvidence(branch.id, remote) : null;
       const prBound = prEvidence?.merged === true && prEvidence?.branch === branch.id && prEvidence?.headCommit === branch.head && prEvidence?.defaultBranch === defaultBranch && text(prEvidence?.reference);
