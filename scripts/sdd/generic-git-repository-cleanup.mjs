@@ -173,13 +173,10 @@ function unresolved(kind, id, reason, evidenceGap, recoveryAction) {
   return entry(kind, id, { classification: "unresolved", reason, evidenceGap, recoveryAction });
 }
 
-function overlapsActiveChange(names, name) {
-  return names.some((c) => name === c || name.includes(c) || c.includes(name));
-}
-
-// Deterministic, read-only audit. Every Git read goes through the injected
-// `run`, so the audit never mutates the repository and is fully testable.
-export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunner(repositoryPath), explicitDefaultBranch, pullRequestEvidence } = {}) {
+// Authoritative active-change association is supplied by the caller (e.g. from
+// SDD controller resource records). The audit never infers association from
+// heuristic branch-name substring matching.
+export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunner(repositoryPath), explicitDefaultBranch, pullRequestEvidence, activeChangeOwnership } = {}) {
   if (!text(repositoryPath)) return { ok: false, reason: "repository-path-invalid" };
   const remote = discoverRemote({ run });
   const defaultBranch = discoverDefaultBranch({ run, remote, explicit: explicitDefaultBranch });
@@ -235,8 +232,9 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       unresolvedList.push(unresolved("worktree", wt.id, "dirty-worktree", "worktree has uncommitted changes", "commit or discard those changes deliberately"));
       continue;
     }
-    if (overlapsActiveChange(activeChanges, wt.branch)) {
-      unresolvedList.push(unresolved("worktree", wt.id, "ambiguous-active-change-association", "worktree branch overlaps an active OpenSpec change but no authoritative ownership metadata confirms the claim", "inspect the change's tracking metadata or archive the change before retirement"));
+    const owningChange = typeof activeChangeOwnership === "function" ? activeChangeOwnership(wt.branch) : null;
+    if (owningChange) {
+      unresolvedList.push(unresolved("worktree", wt.id, "ambiguous-active-change-association", `authoritative ownership metadata associates this worktree branch with active change ${owningChange}`, "inspect the change's tracking metadata or archive the change before retirement"));
       continue;
     }
     const branchMerged = isAncestor({ run, branch: wt.branch, target: deliveryTarget });
@@ -251,8 +249,9 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   // Pass 2: classify branches.
   for (const branch of branches) {
     if (branch.id === defaultBranch || branch.id === current) continue;
-    if (overlapsActiveChange(activeChanges, branch.id)) {
-      unresolvedList.push(unresolved("branch", branch.id, "ambiguous-active-change-association", "branch name overlaps an active OpenSpec change but no authoritative ownership metadata confirms the claim", "inspect the change's tracking metadata or archive the change before retirement"));
+    const owningChange = typeof activeChangeOwnership === "function" ? activeChangeOwnership(branch.id) : null;
+    if (owningChange) {
+      unresolvedList.push(unresolved("branch", branch.id, "ambiguous-active-change-association", `authoritative ownership metadata associates this branch with active change ${owningChange}`, "inspect the change's tracking metadata or archive the change before retirement"));
       continue;
     }
     if (!fullCommit(branch.head)) {
@@ -279,8 +278,11 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-and-inactive", evidence: { ancestryMerged: true, referencedByWorktree: false, activeChangeClaim: false, remoteCounterpart: text(remote) ? (remoteExists ? { exists: true, mergedToRemoteDefault: remoteMerged } : { exists: false }) : { exists: false, unproven: true } } }));
     } else {
       const prEvidence = typeof pullRequestEvidence === "function" ? pullRequestEvidence(branch.id) : null;
-      if (prEvidence?.merged === true) {
-        retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-via-pull-request", evidence: { ancestryMerged: false, pullRequestMerged: true, pullRequestReference: prEvidence.reference ?? null, referencedByWorktree: false, activeChangeClaim: false } }));
+      const prBound = prEvidence?.merged === true && prEvidence?.branch === branch.id && prEvidence?.headCommit === branch.head && prEvidence?.defaultBranch === defaultBranch && text(prEvidence?.reference);
+      if (prBound) {
+        retireEligible.push(entry("branch", branch.id, { classification: "retire-eligible", reason: "delivered-via-pull-request", evidence: { ancestryMerged: false, pullRequestMerged: true, pullRequestReference: prEvidence.reference, referencedByWorktree: false, activeChangeClaim: false } }));
+      } else if (prEvidence && prEvidence.merged === true) {
+        unresolvedList.push(unresolved("branch", branch.id, "pull-request-evidence-stale", "pull-request evidence is not bound to the exact branch head, default branch, or reference", "provide fresh pull-request evidence bound to the exact branch head"));
       } else {
         unresolvedList.push(unresolved("branch", branch.id, "delivery-unproven", "not proven merged to the configured default branch (squash/rebase needs exact PR evidence)", "provide exact merged-PR/default-branch evidence or review manually"));
       }
@@ -288,6 +290,9 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   }
 
   const commitCandidates = [];
+  for (const s of status.filter((s) => activeChanges.some((c) => s.path.startsWith(`openspec/changes/${c}/`)))) {
+    unresolvedList.push(unresolved("file", s.path, "active-change-scope", "path is inside an active OpenSpec change and is owned by that change's lifecycle", "leave it to the owning change; generic cleanup does not commit or retire it"));
+  }
   const changed = status.filter((s) => !activeChanges.some((c) => s.path.startsWith(`openspec/changes/${c}/`)));
   const conflicted = changed.filter((s) => /^(DD|AU|UD|UA|DU|AA|UU)/.test(s.code));
   for (const c of conflicted) {

@@ -459,9 +459,41 @@ test("audit classifies a squash-merged branch as retire-eligible via pull-reques
     ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
     ["merge-base --is-ancestor feature-squashed refs/remotes/origin/main", { ok: false, status: 1, stdout: "" }]
   ]);
-  const pullRequestEvidence = (branch) => branch === "feature-squashed" ? { merged: true, reference: "https://github.com/org/repo/pull/1" } : null;
+  const pullRequestEvidence = (branch) => branch === "feature-squashed" ? { merged: true, branch, headCommit: H("c"), defaultBranch: "main", reference: "https://github.com/org/repo/pull/1" } : null;
   const result = auditGenericGitRepository({ repositoryPath: "/repo", run, pullRequestEvidence });
   assert.equal(result.audit.retireEligible.some((e) => e.kind === "branch" && e.id === "feature-squashed" && e.reason === "delivered-via-pull-request"), true);
+});
+
+test("audit rejects stale or unbound pull-request evidence", () => {
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
+    ["rev-parse --show-toplevel", { ok: true, stdout: "/repo\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\nfeature-squashed\t${H("c")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: "worktree /repo\nbranch refs/heads/main\n" }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
+    ["merge-base --is-ancestor feature-squashed refs/remotes/origin/main", { ok: false, status: 1, stdout: "" }]
+  ]);
+  const pullRequestEvidence = () => ({ merged: true, reference: "https://github.com/org/repo/pull/1" });
+  const result = auditGenericGitRepository({ repositoryPath: "/repo", run, pullRequestEvidence });
+  assert.equal(result.audit.unresolved.some((e) => e.reason === "pull-request-evidence-stale"), true);
+});
+
+test("audit surfaces active-change-scope status entries as unresolved instead of dropping them", () => {
+  const repo = tmpRepo({ after: () => {} });
+  fs.mkdirSync(path.join(repo, "openspec", "changes", "active-change"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "openspec", "changes", "active-change", "design.md"), "d");
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
+    ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? openspec/changes/active-change/design.md\n" }]
+  ]);
+  const result = auditGenericGitRepository({ repositoryPath: repo, run });
+  assert.equal(result.audit.unresolved.some((e) => e.kind === "file" && e.reason === "active-change-scope"), true);
+  assert.equal(result.audit.commitCandidates.length, 0);
 });
 
 test("plan-apply includes discovered validation commands in the result and confirmation", () => {
