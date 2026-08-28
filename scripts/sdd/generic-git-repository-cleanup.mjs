@@ -141,8 +141,8 @@ export function listStatus({ run } = {}) {
   return entries;
 }
 
-export function listActiveChangeNames({ repositoryPath, fileSystem = fs } = {}) {
-  const root = path.join(repositoryPath, "openspec", "changes");
+export function listActiveChangeNames({ repositoryPath, activeChangeLocation = "openspec/changes", fileSystem = fs } = {}) {
+  const root = path.join(repositoryPath, activeChangeLocation);
   try {
     return fileSystem.readdirSync(root).filter((name) => name !== "archive" && !name.startsWith("."));
   } catch (error) {
@@ -150,8 +150,8 @@ export function listActiveChangeNames({ repositoryPath, fileSystem = fs } = {}) 
   }
 }
 
-export function listArchivedChangeNames({ repositoryPath, fileSystem = fs } = {}) {
-  const root = path.join(repositoryPath, "openspec", "changes", "archive");
+export function listArchivedChangeNames({ repositoryPath, activeChangeLocation = "openspec/changes", fileSystem = fs } = {}) {
+  const root = path.join(repositoryPath, activeChangeLocation, "archive");
   try {
     return fileSystem.readdirSync(root).filter((name) => !name.startsWith("."));
   } catch (error) {
@@ -159,14 +159,28 @@ export function listArchivedChangeNames({ repositoryPath, fileSystem = fs } = {}
   }
 }
 
+// Active-change and ownership locations come from inspected configuration or
+// explicit input, never from a reusable skill constant.
+export function discoverActiveChangeLocation({ run, explicit } = {}) {
+  if (text(explicit)) return explicit;
+  const config = run(["config", "--get", "sdd.active-change-location"]);
+  return config.ok && text(config.stdout) ? config.stdout.trim() : "openspec/changes";
+}
+
+export function discoverOwnershipLocation({ run, explicit } = {}) {
+  if (text(explicit)) return explicit;
+  const config = run(["config", "--get", "sdd.ownership-location"]);
+  return config.ok && text(config.stdout) ? config.stdout.trim() : ".git/sdd-delivery-runs/runs";
+}
+
 // Authoritative active-change ownership is read from the SDD controller
 // checkpoint directory. Returns { readable, claims } where claims maps a branch
 // or worktree id to the owning active change name.
-export function discoverActiveChangeOwnership({ repositoryPath, fileSystem = fs } = {}) {
+export function discoverActiveChangeOwnership({ repositoryPath, ownershipLocation = ".git/sdd-delivery-runs/runs", fileSystem = fs } = {}) {
   const claims = new Map();
   let readable = false;
   let allParsed = true;
-  const root = path.join(repositoryPath, ".git", "sdd-delivery-runs", "runs");
+  const root = path.join(repositoryPath, ownershipLocation);
   try {
     const dirs = fileSystem.readdirSync(root, { withFileTypes: true });
     readable = true;
@@ -270,7 +284,7 @@ function unresolved(kind, id, reason, evidenceGap, recoveryAction) {
 // Authoritative active-change association is supplied by the caller (e.g. from
 // SDD controller resource records). The audit never infers association from
 // heuristic branch-name substring matching.
-export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunner(repositoryPath), explicitDefaultBranch, pullRequestEvidence, activeChangeOwnership } = {}) {
+export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunner(repositoryPath), explicitDefaultBranch, pullRequestEvidence, activeChangeOwnership, explicitActiveChangeLocation, explicitOwnershipLocation } = {}) {
   if (!text(repositoryPath)) return { ok: false, reason: "repository-path-invalid" };
   const remote = discoverRemote({ run });
   const defaultBranch = discoverDefaultBranch({ run, remote, explicit: explicitDefaultBranch });
@@ -279,8 +293,10 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   const branches = listLocalBranches({ run });
   const worktrees = listWorktrees({ run });
   const status = listStatus({ run });
-  const activeChanges = listActiveChangeNames({ repositoryPath });
-  const archivedChanges = listArchivedChangeNames({ repositoryPath });
+  const activeChangeLocation = discoverActiveChangeLocation({ run, explicit: explicitActiveChangeLocation });
+  const ownershipLocation = discoverOwnershipLocation({ run, explicit: explicitOwnershipLocation });
+  const activeChanges = listActiveChangeNames({ repositoryPath, activeChangeLocation });
+  const archivedChanges = listArchivedChangeNames({ repositoryPath, activeChangeLocation });
   const protectedBranches = discoverProtectedBranches({ run });
   const validationCommands = discoverValidationCommands({ run });
 
@@ -303,7 +319,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   // Resolve authoritative active-change ownership for a branch/worktree id.
   // Returns a change name when claimed, null when authoritatively unclaimed,
   // or undefined when ownership cannot be determined (fail-closed).
-  const discoveredOwnership = typeof activeChangeOwnership === "function" ? null : discoverActiveChangeOwnership({ repositoryPath });
+  const discoveredOwnership = typeof activeChangeOwnership === "function" ? null : discoverActiveChangeOwnership({ repositoryPath, ownershipLocation });
   const owningChangeOf = (id) => {
     if (typeof activeChangeOwnership === "function") return activeChangeOwnership(id);
     if (discoveredOwnership.readable) return discoveredOwnership.claims.get(id) ?? null;
