@@ -23,7 +23,7 @@ const INSTRUCTION_LIKE_PATTERNS = Object.freeze([
 ]);
 
 function hasAlphanumeric(value) {
-  return /[A-Za-z0-9]/.test(value);
+  return /[\p{L}\p{N}]/u.test(value);
 }
 
 function isPlaceholder(value) {

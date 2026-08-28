@@ -87,6 +87,13 @@ test("legitimate mutation-oriented outcomes are accepted", () => {
   assert.deepEqual(result.observableOutcomes, ["update repository records — Acceptance: records are updated in place"]);
 });
 
+test("non-Latin outcomes are accepted", () => {
+  const document = `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: 更新仓库记录\n  Acceptance: 记录已更新\n`;
+  const result = validateRequirementsOutcomesV1(document);
+  assert.equal(result.valid, true, JSON.stringify(result));
+  assert.deepEqual(result.observableOutcomes, ["更新仓库记录 — Acceptance: 记录已更新"]);
+});
+
 test("non-string input is rejected without a digest", () => {
   const result = validateRequirementsOutcomesV1(null);
   assert.equal(result.valid, false);
