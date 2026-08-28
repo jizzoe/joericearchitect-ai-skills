@@ -454,7 +454,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
     for (const delPath of deletions) {
       const specGoverned = isSpecGovernedPath(delPath);
       const branchToken = delPath.replace(/[^a-zA-Z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "working-tree";
-      commitCandidates.push(entry("commit", `working-tree:${delPath}`, { classification: "commit-candidate", files: [delPath], purpose: `out-of-scope deleted file ${delPath}`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${branchToken}-deleted-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: remove out-of-scope deleted file ${delPath}` }));
+      commitCandidates.push(entry("commit", `working-tree:${delPath}`, { classification: "commit-candidate", files: [delPath], deleted: true, purpose: `out-of-scope deleted file ${delPath}`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${branchToken}-deleted-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: remove out-of-scope deleted file ${delPath}` }));
     }
   }
   const fileChecks = toRead.map((s) => ({ status: s, file: readFileAt({ repositoryPath, relativePath: s.path }) }));
@@ -615,12 +615,14 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
         // Inspect the exact staged blobs for secret/binary/size content before
         // authorizing the commit; the audit inspected working-tree content only.
         let stagedUnsafe = null;
-        for (const f of files) {
-          const blob = run(["cat-file", "blob", `:${f}`]);
-          if (!blob.ok) { stagedUnsafe = { reason: "staged-content-unreadable", detail: f }; break; }
-          const content = blob.stdout;
-          if (BINARY_CONTROL.test(content.slice(0, 8192)) || SECRET_PATTERNS.some((re) => re.test(content)) || Buffer.byteLength(content, "utf8") > LARGE_FILE_BYTES) {
-            stagedUnsafe = { reason: "staged-content-unsafe", detail: f }; break;
+        if (candidate.deleted !== true) {
+          for (const f of files) {
+            const blob = run(["cat-file", "blob", `:${f}`]);
+            if (!blob.ok) { stagedUnsafe = { reason: "staged-content-unreadable", detail: f }; break; }
+            const content = blob.stdout;
+            if (BINARY_CONTROL.test(content.slice(0, 8192)) || SECRET_PATTERNS.some((re) => re.test(content)) || Buffer.byteLength(content, "utf8") > LARGE_FILE_BYTES) {
+              stagedUnsafe = { reason: "staged-content-unsafe", detail: f }; break;
+            }
           }
         }
         if (stagedUnsafe) { drifted.push({ step, ...stagedUnsafe }); continue; }
