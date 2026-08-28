@@ -370,7 +370,7 @@ test("verifyPlanFreshness binds a topic push to the exact commit OID", () => {
     ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
     ["check-ref-format --branch feature", { ok: true, stdout: "" }]
   ]);
-  const plan = [{ kind: "push-topic-branch", target: "feature" }];
+  const plan = [{ kind: "push-topic-branch", target: "feature", committedFiles: ["scripts/x.md"] }];
   const result = verifyPlanFreshness({ repositoryPath: "/repo", run, plan });
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.verifiedPlan[0].command, ["git", "push", "origin", `${H("b")}:refs/heads/feature`]);
@@ -428,7 +428,7 @@ test("verifyPlanFreshness ignores a forged directToDefault for spec-governed fil
   const plan = [{ kind: "commit-paths", files: ["skills/foo.md"], target: "skills/foo.md", directToDefault: true, message: "chore: forged" }];
   const result = verifyPlanFreshness({ repositoryPath: repo, run, plan });
   assert.equal(result.ok, false);
-  assert.equal(result.drifted.some((d) => d.reason === "commit-target-is-default-branch"), true);
+  assert.equal(result.drifted.some((d) => d.reason === "commit-target-branch-mismatch"), true);
 });
 
 test("audit reports archived changes and surfaces an unresolved remote-branch entry", () => {

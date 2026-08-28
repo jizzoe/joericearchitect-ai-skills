@@ -143,6 +143,28 @@ export function listArchivedChangeNames({ repositoryPath, fileSystem = fs } = {}
   }
 }
 
+// Authoritative active-change ownership is read from the SDD controller
+// checkpoint directory. Returns { readable, claims } where claims maps a branch
+// or worktree id to the owning active change name.
+export function discoverActiveChangeOwnership({ repositoryPath, fileSystem = fs } = {}) {
+  const claims = new Map();
+  let readable = false;
+  const root = path.join(repositoryPath, ".git", "sdd-delivery-runs", "runs");
+  try {
+    for (const dir of fileSystem.readdirSync(root, { withFileTypes: true })) {
+      readable = true;
+      if (!dir.isDirectory()) continue;
+      try {
+        const record = JSON.parse(fileSystem.readFileSync(path.join(root, dir.name, "controller.json"), "utf8"));
+        for (const r of (Array.isArray(record?.resourceRecords) ? record.resourceRecords : [])) {
+          if (r?.owned === true && text(r?.entry) && text(r?.id)) claims.set(r.id, r.entry);
+        }
+      } catch { /* skip unreadable checkpoint */ }
+    }
+  } catch { /* checkpoint directory absent: not readable */ }
+  return { readable, claims };
+}
+
 export function isAncestor({ run, branch, target } = {}) {
   return run(["merge-base", "--is-ancestor", branch, target]).ok;
 }
@@ -206,6 +228,16 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   // branch and remote state is classified as unproven rather than inferred.
   const deliveryTarget = text(remote) ? `refs/remotes/${remote}/${defaultBranch}` : `refs/heads/${defaultBranch}`;
 
+  // Resolve authoritative active-change ownership for a branch/worktree id.
+  // Returns a change name when claimed, null when authoritatively unclaimed,
+  // or undefined when ownership cannot be determined (fail-closed).
+  const discoveredOwnership = typeof activeChangeOwnership === "function" ? null : discoverActiveChangeOwnership({ repositoryPath });
+  const owningChangeOf = (id) => {
+    if (typeof activeChangeOwnership === "function") return activeChangeOwnership(id);
+    if (discoveredOwnership.readable) return discoveredOwnership.claims.get(id) ?? null;
+    return activeChanges.length === 0 ? null : undefined;
+  };
+
   const retireEligible = [];
   const unresolvedList = [];
   const retireEligibleWorktrees = new Map(); // branch -> worktree path
@@ -232,7 +264,11 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       unresolvedList.push(unresolved("worktree", wt.id, "dirty-worktree", "worktree has uncommitted changes", "commit or discard those changes deliberately"));
       continue;
     }
-    const owningChange = typeof activeChangeOwnership === "function" ? activeChangeOwnership(wt.branch) : null;
+    const owningChange = owningChangeOf(wt.branch);
+    if (owningChange === undefined) {
+      unresolvedList.push(unresolved("worktree", wt.id, "active-change-ownership-unavailable", "authoritative active-change ownership could not be determined for this worktree", "provide active-change ownership metadata before retirement"));
+      continue;
+    }
     if (owningChange) {
       unresolvedList.push(unresolved("worktree", wt.id, "ambiguous-active-change-association", `authoritative ownership metadata associates this worktree branch with active change ${owningChange}`, "inspect the change's tracking metadata or archive the change before retirement"));
       continue;
@@ -249,7 +285,11 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   // Pass 2: classify branches.
   for (const branch of branches) {
     if (branch.id === defaultBranch || branch.id === current) continue;
-    const owningChange = typeof activeChangeOwnership === "function" ? activeChangeOwnership(branch.id) : null;
+    const owningChange = owningChangeOf(branch.id);
+    if (owningChange === undefined) {
+      unresolvedList.push(unresolved("branch", branch.id, "active-change-ownership-unavailable", "authoritative active-change ownership could not be determined for this branch", "provide active-change ownership metadata before retirement"));
+      continue;
+    }
     if (owningChange) {
       unresolvedList.push(unresolved("branch", branch.id, "ambiguous-active-change-association", `authoritative ownership metadata associates this branch with active change ${owningChange}`, "inspect the change's tracking metadata or archive the change before retirement"));
       continue;
@@ -396,11 +436,11 @@ export function planGenericCleanupApply({ audit, selection } = {}) {
       plan.push({ order: plan.length, command: ["git", "switch", "-c", targetBranch], target: targetBranch, kind: "create-topic-branch" });
     }
     plan.push({ order: plan.length, command: ["git", "add", "--", ...candidate.files], target: candidate.files.join(", "), files: candidate.files, kind: "stage-paths" });
-    plan.push({ order: plan.length, command: ["git", "commit", "-m", message], target: candidate.files.join(", "), files: candidate.files, message, directToDefault, kind: "commit-paths" });
+    plan.push({ order: plan.length, command: ["git", "commit", "-m", message], target: candidate.files.join(", "), files: candidate.files, message, directToDefault, targetBranch, kind: "commit-paths" });
     if (push) {
       plan.push(directToDefault
-        ? { order: plan.length, command: ["git", "push", audit.remote ?? "origin", "--", targetBranch], target: targetBranch, kind: "push-default-branch" }
-        : { order: plan.length, command: ["git", "push", audit.remote ?? "origin", "--", targetBranch], target: targetBranch, kind: "push-topic-branch" });
+        ? { order: plan.length, command: ["git", "push", audit.remote ?? "origin", "--", targetBranch], target: targetBranch, committedFiles: candidate.files, kind: "push-default-branch" }
+        : { order: plan.length, command: ["git", "push", audit.remote ?? "origin", "--", targetBranch], target: targetBranch, committedFiles: candidate.files, kind: "push-topic-branch" });
     }
     confirmation.commit.push({ id: candidate.id, files: candidate.files, message, targetBranch, directToDefault, push });
   }
@@ -470,6 +510,7 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
         if (!candidate) { drifted.push({ step, reason: "commit-candidate-no-longer-matches" }); continue; }
         const directToDefault = candidate.directToDefault === true;
         const message = text(candidate.message) ? candidate.message : "chore: capture out-of-scope changes";
+        const targetBranch = text(candidate.targetBranch) ? candidate.targetBranch : null;
         const staged = run(["diff", "--cached", "--name-only"]);
         const stagedFiles = staged.ok ? staged.stdout.split("\n").map((s) => s.trim()).filter(Boolean) : [];
         const unrelated = stagedFiles.filter((f) => !files.includes(f));
@@ -479,16 +520,21 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
         const headName = head.ok ? head.stdout.trim() : null;
         if (directToDefault) {
           if (headName !== audit.defaultBranch) { drifted.push({ step, reason: "commit-target-not-default-branch" }); continue; }
-        } else if (headName === audit.defaultBranch) {
-          drifted.push({ step, reason: "commit-target-is-default-branch" }); continue;
+        } else {
+          if (!targetBranch) { drifted.push({ step, reason: "commit-target-branch-unavailable" }); continue; }
+          if (headName !== targetBranch) { drifted.push({ step, reason: "commit-target-branch-mismatch", detail: { expected: targetBranch, actual: headName } }); continue; }
         }
-        verifiedPlan.push({ kind: "commit-paths", target: files.join(", "), message, directToDefault, command: ["git", "commit", "-m", message] });
+        verifiedPlan.push({ kind: "commit-paths", target: files.join(", "), message, directToDefault, targetBranch, command: ["git", "commit", "-m", message] });
       }
     } else if (step.kind === "push-topic-branch") {
       if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }
       if (!run(["check-ref-format", "--branch", step.target]).ok) { drifted.push({ step, reason: "invalid-branch-name" }); continue; }
       if (step.target === audit.defaultBranch) { drifted.push({ step, reason: "push-target-is-default-branch" }); continue; }
       if (discoverProtectedBranches({ run }).includes(step.target)) { drifted.push({ step, reason: "push-target-protected" }); continue; }
+      const committedFiles = Array.isArray(step.committedFiles) ? step.committedFiles : [];
+      if (committedFiles.length === 0) { drifted.push({ step, reason: "push-without-preceding-commit" }); continue; }
+      const remaining = run(["status", "--porcelain=v1", "--untracked-files=all", "--", ...committedFiles]);
+      if (!remaining.ok || remaining.stdout.trim() !== "") { drifted.push({ step, reason: "push-without-clean-commit" }); continue; }
       const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
       if (!head.ok || head.stdout.trim() !== step.target) { drifted.push({ step, reason: "head-not-on-topic-branch" }); continue; }
       const oid = run(["rev-parse", "HEAD"]);
@@ -498,6 +544,10 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }
       if (step.target !== audit.defaultBranch) { drifted.push({ step, reason: "push-target-is-not-default-branch" }); continue; }
       if (discoverProtectedBranches({ run }).includes(step.target)) { drifted.push({ step, reason: "push-target-protected" }); continue; }
+      const committedFiles = Array.isArray(step.committedFiles) ? step.committedFiles : [];
+      if (committedFiles.length === 0) { drifted.push({ step, reason: "push-without-preceding-commit" }); continue; }
+      const remaining = run(["status", "--porcelain=v1", "--untracked-files=all", "--", ...committedFiles]);
+      if (!remaining.ok || remaining.stdout.trim() !== "") { drifted.push({ step, reason: "push-without-clean-commit" }); continue; }
       const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
       if (!head.ok || head.stdout.trim() !== audit.defaultBranch) { drifted.push({ step, reason: "head-not-on-default-branch" }); continue; }
       const oid = run(["rev-parse", "HEAD"]);
