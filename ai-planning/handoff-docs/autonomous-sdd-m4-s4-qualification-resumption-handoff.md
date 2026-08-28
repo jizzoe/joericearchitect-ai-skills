@@ -186,6 +186,14 @@ do not forget:
 - **Jira-linkage rules** (2026-08-20): no durable Jira integration exists. Do
   not infer/create Jira records until a dedicated slice is accepted and an
   authorized connection is configured.
+- **Missing `tracking.yaml` on the archived M4-S4 qualification change**
+  (2026-08-28): `openspec/changes/archive/2026-08-25-qualify-autonomous-sdd-single-change-reliability/`
+  exists but has **no `tracking.yaml`**. This makes any PR that cites
+  `OpenSpec change: qualify-autonomous-sdd-single-change-reliability` fail the
+  `validate-openspec-linkage.mjs` `openspec.tracking_exists` check. The new
+  session should either add the missing tracking metadata (its own governed
+  change) or cite a change whose tracking.yaml exists when writing
+  qualification-related planning PRs.
 
 ## 9. Campaign mechanics and gotchas (learned, do not relearn)
 
