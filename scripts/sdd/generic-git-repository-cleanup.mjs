@@ -182,7 +182,11 @@ export function queryRemoteState({ repositoryPath, remote, branch, defaultBranch
     }
     const branchOid = oids.get(branch);
     const defaultBranchOid = oids.get(defaultBranch);
-    return branchOid && defaultBranchOid ? { branchOid, defaultBranchOid, defaultBranch } : null;
+    if (!branchOid || !defaultBranchOid) return null;
+    // Fetch the exact objects so a subsequent local merge-base ancestry check
+    // can resolve them (a remote may have advanced past the local object store).
+    spawnSync("git", ["-C", repositoryPath, "fetch", "--no-tags", remote, `refs/heads/${branch}`, `refs/heads/${defaultBranch}`], { encoding: "utf8" });
+    return { branchOid, defaultBranchOid, defaultBranch };
   } catch { return null; }
 }
 
@@ -199,12 +203,12 @@ export function queryPullRequestEvidence({ repositoryPath, remote, branch } = {}
     const url = spawnSync("git", ["-C", repositoryPath, "remote", "get-url", remoteName], { encoding: "utf8" }).stdout.trim();
     const slug = url.replace(/^git@github\.com:/, "").replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "");
     if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(slug)) return null;
-    const result = spawnSync("gh", ["pr", "list", "--repo", slug, "--head", branch, "--state", "merged", "--json", "number,url,headRefOid", "--limit", "1"], { encoding: "utf8" });
+    const result = spawnSync("gh", ["pr", "list", "--repo", slug, "--head", branch, "--state", "merged", "--json", "number,url,headRefOid,baseRefName", "--limit", "1"], { encoding: "utf8" });
     if (result.status !== 0) return null;
     const prs = JSON.parse(result.stdout || "[]");
     const pr = prs[0];
-    if (!pr?.headRefOid || !pr?.url) return null;
-    return { merged: true, branch, headCommit: pr.headRefOid, defaultBranch, reference: pr.url };
+    if (!pr?.headRefOid || !pr?.url || pr.baseRefName !== defaultBranch) return null;
+    return { merged: true, branch, headCommit: pr.headRefOid, defaultBranch: pr.baseRefName, reference: pr.url };
   } catch { return null; }
 }
 
