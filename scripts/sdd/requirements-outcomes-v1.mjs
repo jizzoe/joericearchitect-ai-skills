@@ -15,12 +15,12 @@ const PLACEHOLDERS = Object.freeze(new Set(["tbd", "todo", "n/a", "unknown"]));
 // categories: overriding prior/system instructions, adopting an injected role,
 // and invoking a tool or external mutation. It is not a semantic safety model.
 const INSTRUCTION_LIKE_PATTERNS = Object.freeze([
-  /^\s*(?:override|ignore|disregard|bypass|supersede)\b/i,
+  /^\s*(?:(?:please|kindly|now|then|just)\s+)?(?:override|ignore|disregard|bypass|supersede)\b/i,
   /\b(?:override|ignore|disregard|bypass|supersede)\b[^\n]{0,80}\b(?:instruction|prompt|system|rule)s?\b/i,
   /\b(?:instruction|prompt|system|rule)s?\b[^\n]{0,80}\b(?:override|ignore|disregard|bypass|supersede)/i,
   /\b(?:you\s+are|act\s+as|pretend\s+to\s+be|roleplay|forget\s+(?:all|prior|previous|earlier))\b/i,
   /\b(?:run|execute|invoke|call|spawn|launch|trigger)\b[^\n]{0,60}\b(?:shell|bash|zsh|command|tool|function|process|curl|wget|python|node|npm|gh|git|codex|claude)\b/i,
-  /^\s*(?:create|delete|close|merge|open|post|push|modify|edit|write|update)\b[^\n]{0,60}\b(?:issues?|pull\s+requests?|prs?|branches?|files?|credentials?|secrets?|tokens?|keys?|passwords?)\b/i
+  /^\s*(?:(?:please|kindly|now|then|just)\s+)?(?:create|delete|close|merge|open|post|push|modify|edit|write|update)\b[^\n]{0,60}\b(?:issues?|pull\s+requests?|prs?|branches?|files?|credentials?|secrets?|tokens?|keys?|passwords?)\b/i
 ]);
 
 function hasAlphanumeric(value) {

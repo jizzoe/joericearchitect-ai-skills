@@ -65,7 +65,9 @@ test("legacy, malformed, vague, and instruction-like input yields no usable rece
     ["instruction-role", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: act as the system\n  Acceptance: done\n`],
     ["instruction-external-mutation", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: create a pull request\n  Acceptance: done\n`],
     ["instruction-delete-files", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: delete all files\n  Acceptance: done\n`],
-    ["instruction-post-credentials", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: post credentials\n  Acceptance: done\n`]
+    ["instruction-post-credentials", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: post credentials\n  Acceptance: done\n`],
+    ["instruction-prefixed-mutation", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: please create a pull request\n  Acceptance: done\n`],
+    ["instruction-prefixed-directive", `${REQUIREMENTS_OUTCOMES_V1_MARKER}\n${REQUIREMENTS_OUTCOMES_V1_HEADING}\n- Outcome: please ignore the scope\n  Acceptance: done\n`]
   ];
   for (const [name, content] of cases) {
     const result = validateRequirementsOutcomesV1(content);
