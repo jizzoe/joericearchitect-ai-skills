@@ -306,16 +306,18 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   const eligible = fileChecks.filter((f) => !blocked.includes(f));
   const groups = new Map();
   for (const f of eligible) {
-    const group = f.status.path.includes("/") ? f.status.path.split("/")[0] : "(root)";
+    const idx = f.status.path.lastIndexOf("/");
+    const group = idx === -1 ? "(root)" : f.status.path.slice(0, idx);
     const statusClass = f.status.code.trim() === "??" ? "new" : "modified";
-    const key = `${group}:${statusClass}`;
-    if (!groups.has(key)) groups.set(key, { files: [], statusClass });
+    const key = `${group}\u0000${statusClass}`;
+    if (!groups.has(key)) groups.set(key, { group, statusClass, files: [] });
     groups.get(key).files.push(f.status.path);
   }
-  for (const [key, g] of groups) {
-    const [group, statusClass] = key.split(":");
+  for (const [, g] of groups) {
+    const { group, statusClass } = g;
     const specGoverned = g.files.some((p) => isSpecGovernedPath(p));
-    commitCandidates.push(entry("commit", `working-tree:${group}:${statusClass}`, { classification: "commit-candidate", files: g.files, purpose: `out-of-scope ${statusClass} ${group} changes`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${group}-${statusClass}-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: capture out-of-scope ${statusClass} ${group} changes` }));
+    const branchToken = group.replace(/[^a-zA-Z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "working-tree";
+    commitCandidates.push(entry("commit", `working-tree:${group}:${statusClass}`, { classification: "commit-candidate", files: g.files, purpose: `out-of-scope ${statusClass} changes under ${group}`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${branchToken}-${statusClass}-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: capture out-of-scope ${statusClass} changes under ${group}` }));
   }
 
   return { ok: true, audit: { remote, defaultBranch, protectedBranches, validationCommands, retireEligible, commitCandidates, unresolved: unresolvedList } };
@@ -435,6 +437,10 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       if (step.kind === "stage-paths") {
         verifiedPlan.push({ kind: "stage-paths", target: files.join(", "), command: ["git", "add", "--", ...files] });
       } else {
+        const candidate = audit.commitCandidates.find((c) => c.kind === "commit" && c.files.join("\n") === files.join("\n"));
+        if (!candidate) { drifted.push({ step, reason: "commit-candidate-no-longer-matches" }); continue; }
+        const directToDefault = candidate.directToDefault === true;
+        const message = text(candidate.message) ? candidate.message : "chore: capture out-of-scope changes";
         const staged = run(["diff", "--cached", "--name-only"]);
         const stagedFiles = staged.ok ? staged.stdout.split("\n").map((s) => s.trim()).filter(Boolean) : [];
         const unrelated = stagedFiles.filter((f) => !files.includes(f));
@@ -442,12 +448,12 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
         if (unrelated.length > 0 || missing.length > 0) { drifted.push({ step, reason: "staged-set-mismatch", detail: { unrelated, missing } }); continue; }
         const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
         const headName = head.ok ? head.stdout.trim() : null;
-        if (step.directToDefault) {
+        if (directToDefault) {
           if (headName !== audit.defaultBranch) { drifted.push({ step, reason: "commit-target-not-default-branch" }); continue; }
         } else if (headName === audit.defaultBranch) {
           drifted.push({ step, reason: "commit-target-is-default-branch" }); continue;
         }
-        verifiedPlan.push({ kind: "commit-paths", target: files.join(", "), command: ["git", "commit", "-m", text(step.message) ? step.message : "chore: capture out-of-scope changes"] });
+        verifiedPlan.push({ kind: "commit-paths", target: files.join(", "), message, directToDefault, command: ["git", "commit", "-m", message] });
       }
     } else if (step.kind === "push-topic-branch") {
       if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }

@@ -388,3 +388,40 @@ test("verifyPlanFreshness drifts a push to a protected branch", () => {
   assert.equal(result.ok, false);
   assert.equal(result.drifted.some((d) => d.reason === "push-target-protected"), true);
 });
+
+test("audit groups commit candidates by full parent directory, not just top-level root", () => {
+  const repo = tmpRepo({ after: () => {} });
+  fs.mkdirSync(path.join(repo, "scripts", "sdd"), { recursive: true });
+  fs.mkdirSync(path.join(repo, "scripts", "runtime"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "scripts", "sdd", "a.md"), "a");
+  fs.writeFileSync(path.join(repo, "scripts", "runtime", "b.md"), "b");
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
+    ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? scripts/sdd/a.md\n?? scripts/runtime/b.md\n" }]
+  ]);
+  const result = auditGenericGitRepository({ repositoryPath: repo, run });
+  assert.deepEqual(result.audit.commitCandidates.map((c) => c.id).sort(), ["working-tree:scripts/runtime:new", "working-tree:scripts/sdd:new"]);
+});
+
+test("verifyPlanFreshness ignores a forged directToDefault for spec-governed files", () => {
+  const repo = tmpRepo({ after: () => {} });
+  fs.mkdirSync(path.join(repo, "skills"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "skills", "foo.md"), "skill");
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "main\n" }],
+    ["rev-parse --show-toplevel", { ok: true, stdout: repo + "\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: `worktree ${repo}\nbranch refs/heads/main\n` }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? skills/foo.md\n" }],
+    ["diff --cached --name-only", { ok: true, stdout: "skills/foo.md\n" }]
+  ]);
+  const plan = [{ kind: "commit-paths", files: ["skills/foo.md"], target: "skills/foo.md", directToDefault: true, message: "chore: forged" }];
+  const result = verifyPlanFreshness({ repositoryPath: repo, run, plan });
+  assert.equal(result.ok, false);
+  assert.equal(result.drifted.some((d) => d.reason === "commit-target-is-default-branch"), true);
+});
