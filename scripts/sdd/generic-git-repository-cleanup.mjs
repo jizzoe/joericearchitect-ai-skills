@@ -62,6 +62,31 @@ export function discoverDefaultBranch({ run, remote, explicit } = {}) {
   return null;
 }
 
+// Protected-branch rules are discovered from repository configuration
+// (`branch.<name>.protected true`) or explicit input, never from a reusable
+// skill constant. The default branch is not implicitly protected; a repository
+// may protect it explicitly. A push to a discovered protected branch is gated.
+export function discoverProtectedBranches({ run, explicit = [] } = {}) {
+  const names = new Set(Array.isArray(explicit) ? explicit.filter(text) : []);
+  const config = run(["config", "--get-regexp", "^branch\\..*\\.protected$"]);
+  if (config.ok) {
+    for (const line of config.stdout.split("\n")) {
+      const match = line.trim().match(/^branch\.(.+)\.protected\s+true$/i);
+      if (match) names.add(match[1]);
+    }
+  }
+  return [...names];
+}
+
+// Validation commands are discovered from repository configuration
+// (`sdd.validation`) or explicit input; absent configuration yields null rather
+// than a fabricated command.
+export function discoverValidationCommands({ run, explicit } = {}) {
+  if (text(explicit)) return explicit;
+  const config = run(["config", "--get", "sdd.validation"]);
+  return config.ok && text(config.stdout) ? config.stdout.trim() : null;
+}
+
 export function currentBranch({ run } = {}) {
   const result = run(["rev-parse", "--abbrev-ref", "HEAD"]);
   return result.ok ? result.stdout.trim() : null;
@@ -155,6 +180,8 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
   const worktrees = listWorktrees({ run });
   const status = listStatus({ run });
   const activeChanges = listActiveChangeNames({ repositoryPath });
+  const protectedBranches = discoverProtectedBranches({ run });
+  const validationCommands = discoverValidationCommands({ run });
 
   if (branches === null || worktrees === null || status === null || activeChanges === null) {
     return { ok: true, audit: { remote, defaultBranch, retireEligible: [], commitCandidates: [], unresolved: [unresolved("repository", repositoryPath, "inspection-unavailable", "a required Git or OpenSpec inspection failed to enumerate", "resolve the inspection failure before any classification")] } };
@@ -291,7 +318,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
     commitCandidates.push(entry("commit", `working-tree:${group}:${statusClass}`, { classification: "commit-candidate", files: g.files, purpose: `out-of-scope ${statusClass} ${group} changes`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${group}-${statusClass}-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: capture out-of-scope ${statusClass} ${group} changes` }));
   }
 
-  return { ok: true, audit: { remote, defaultBranch, retireEligible, commitCandidates, unresolved: unresolvedList } };
+  return { ok: true, audit: { remote, defaultBranch, protectedBranches, validationCommands, retireEligible, commitCandidates, unresolved: unresolvedList } };
 }
 
 // Confirmation-gated planning only. Never mutates Git.
@@ -426,15 +453,21 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
       if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }
       if (!run(["check-ref-format", "--branch", step.target]).ok) { drifted.push({ step, reason: "invalid-branch-name" }); continue; }
       if (step.target === audit.defaultBranch) { drifted.push({ step, reason: "push-target-is-default-branch" }); continue; }
+      if (discoverProtectedBranches({ run }).includes(step.target)) { drifted.push({ step, reason: "push-target-protected" }); continue; }
       const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
-      if (head.ok && head.stdout.trim() !== step.target) { drifted.push({ step, reason: "head-not-on-topic-branch" }); continue; }
-      verifiedPlan.push({ kind: "push-topic-branch", target: step.target, command: ["git", "push", audit.remote, "--", step.target] });
+      if (!head.ok || head.stdout.trim() !== step.target) { drifted.push({ step, reason: "head-not-on-topic-branch" }); continue; }
+      const oid = run(["rev-parse", "HEAD"]);
+      if (!oid.ok || !fullCommit(oid.stdout.trim())) { drifted.push({ step, reason: "push-oid-unresolvable" }); continue; }
+      verifiedPlan.push({ kind: "push-topic-branch", target: step.target, commit: oid.stdout.trim(), command: ["git", "push", audit.remote, `${oid.stdout.trim()}:refs/heads/${step.target}`] });
     } else if (step.kind === "push-default-branch") {
       if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }
       if (step.target !== audit.defaultBranch) { drifted.push({ step, reason: "push-target-is-not-default-branch" }); continue; }
+      if (discoverProtectedBranches({ run }).includes(step.target)) { drifted.push({ step, reason: "push-target-protected" }); continue; }
       const head = run(["rev-parse", "--abbrev-ref", "HEAD"]);
       if (!head.ok || head.stdout.trim() !== audit.defaultBranch) { drifted.push({ step, reason: "head-not-on-default-branch" }); continue; }
-      verifiedPlan.push({ kind: "push-default-branch", target: step.target, command: ["git", "push", audit.remote, "--", step.target] });
+      const oid = run(["rev-parse", "HEAD"]);
+      if (!oid.ok || !fullCommit(oid.stdout.trim())) { drifted.push({ step, reason: "push-oid-unresolvable" }); continue; }
+      verifiedPlan.push({ kind: "push-default-branch", target: step.target, commit: oid.stdout.trim(), command: ["git", "push", audit.remote, `${oid.stdout.trim()}:refs/heads/${step.target}`] });
     }
   }
 
@@ -449,8 +482,10 @@ export function buildCleanupReceipt({ plan, outcomes = [], observedAt = new Date
   const redact = (target) => (typeof target === "string" && target.startsWith("/") ? path.basename(target) : target);
   const planEntries = (plan ?? []).map((s) => ({ kind: s.kind, target: redact(s.target) }));
   const outcomeEntries = (outcomes ?? []).map((o) => ({ kind: o.kind, target: redact(o.target), status: o.status, detail: o.detail ?? null }));
-  const nonSensitive = !SECRET_PATTERNS.some((re) => re.test(JSON.stringify({ plan: planEntries, outcomes: outcomeEntries })));
-  return { schemaVersion: 1, nonSensitive, observedAt, plan: planEntries, outcomes: outcomeEntries };
+  const body = { plan: planEntries, outcomes: outcomeEntries, observedAt };
+  const nonSensitive = !SECRET_PATTERNS.some((re) => re.test(JSON.stringify(body)));
+  const digest = crypto.createHash("sha256").update(JSON.stringify(body)).digest("hex");
+  return { schemaVersion: 1, nonSensitive, observedAt, plan: planEntries, outcomes: outcomeEntries, digest };
 }
 
 // Persists a non-sensitive receipt to a configurable location outside the

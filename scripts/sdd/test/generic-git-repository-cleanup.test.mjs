@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import {
   auditGenericGitRepository, planGenericCleanupApply, discoverDefaultBranch,
-  verifyPlanFreshness, buildCleanupReceipt, writeCleanupReceipt, isSpecGovernedPath
+  verifyPlanFreshness, buildCleanupReceipt, writeCleanupReceipt, isSpecGovernedPath,
+  discoverProtectedBranches, discoverValidationCommands
 } from "../generic-git-repository-cleanup.mjs";
 
 const H = (c) => c.repeat(40);
@@ -168,6 +169,25 @@ test("buildCleanupReceipt is non-sensitive and records outcomes", () => {
   const receipt = buildCleanupReceipt({ plan: [{ kind: "branch-delete", target: "feature", command: ["git", "branch", "-d", "--", "feature"] }], outcomes: [{ kind: "branch-delete", target: "feature", status: "completed" }] });
   assert.equal(receipt.nonSensitive, true);
   assert.equal(receipt.outcomes[0].status, "completed");
+  assert.match(receipt.digest, /^[0-9a-f]{64}$/);
+});
+
+test("buildCleanupReceipt digest changes when plan content changes", () => {
+  const a = buildCleanupReceipt({ plan: [{ kind: "branch-delete", target: "feature" }], outcomes: [] });
+  const b = buildCleanupReceipt({ plan: [{ kind: "branch-delete", target: "other" }], outcomes: [] });
+  assert.notEqual(a.digest, b.digest);
+});
+
+test("discoverProtectedBranches and discoverValidationCommands read config or explicit input", () => {
+  const run = mockRun([
+    ["config --get-regexp ^branch", { ok: true, stdout: "branch.main.protected true\nbranch.release.protected true\n" }],
+    ["config --get sdd.validation", { ok: true, stdout: "npm test\n" }]
+  ]);
+  assert.deepEqual(discoverProtectedBranches({ run }), ["main", "release"]);
+  assert.deepEqual(discoverProtectedBranches({ run: mockRun([]), explicit: ["main", "hotfix"] }), ["main", "hotfix"]);
+  assert.equal(discoverValidationCommands({ run }), "npm test");
+  assert.equal(discoverValidationCommands({ run: mockRun([]) }), null);
+  assert.equal(discoverValidationCommands({ explicit: "make verify" }), "make verify");
 });
 
 test("writeCleanupReceipt persists atomically to a configurable location", (t) => {
@@ -332,4 +352,39 @@ test("verifyPlanFreshness drifts a direct-to-default commit when HEAD is not on 
   const result = verifyPlanFreshness({ repositoryPath: repo, run, plan });
   assert.equal(result.ok, false);
   assert.equal(result.drifted.some((d) => d.reason === "commit-target-not-default-branch"), true);
+});
+
+test("verifyPlanFreshness binds a topic push to the exact commit OID", () => {
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "feature\n" }],
+    ["rev-parse HEAD", { ok: true, stdout: `${H("b")}\n` }],
+    ["rev-parse --show-toplevel", { ok: true, stdout: "/repo\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\nfeature\t${H("b")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: "worktree /repo\nbranch refs/heads/feature\n" }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
+    ["check-ref-format --branch feature", { ok: true, stdout: "" }]
+  ]);
+  const plan = [{ kind: "push-topic-branch", target: "feature" }];
+  const result = verifyPlanFreshness({ repositoryPath: "/repo", run, plan });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.verifiedPlan[0].command, ["git", "push", "origin", `${H("b")}:refs/heads/feature`]);
+  assert.equal(result.verifiedPlan[0].commit, H("b"));
+});
+
+test("verifyPlanFreshness drifts a push to a protected branch", () => {
+  const run = mockRun([
+    ["symbolic-ref --quiet refs/remotes/origin/HEAD", { ok: true, stdout: "refs/remotes/origin/main\n" }],
+    ["rev-parse --abbrev-ref HEAD", { ok: true, stdout: "release\n" }],
+    ["rev-parse --show-toplevel", { ok: true, stdout: "/repo\n" }],
+    ["for-each-ref --format=%(refname:short)%09%(objectname) refs/heads", { ok: true, stdout: `main\t${H("a")}\nrelease\t${H("b")}\n` }],
+    ["worktree list --porcelain", { ok: true, stdout: "worktree /repo\nbranch refs/heads/release\n" }],
+    ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "" }],
+    ["config --get-regexp ^branch", { ok: true, stdout: "branch.release.protected true\n" }],
+    ["check-ref-format --branch release", { ok: true, stdout: "" }]
+  ]);
+  const plan = [{ kind: "push-topic-branch", target: "release" }];
+  const result = verifyPlanFreshness({ repositoryPath: "/repo", run, plan });
+  assert.equal(result.ok, false);
+  assert.equal(result.drifted.some((d) => d.reason === "push-target-protected"), true);
 });
