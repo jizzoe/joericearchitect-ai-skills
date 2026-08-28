@@ -462,7 +462,7 @@ export function planGenericCleanupApply({ audit, selection } = {}) {
 // Fresh re-inspection immediately before apply. Each step's precondition is
 // re-checked against fresh state and its canonical command is reconstructed
 // from that state (never trusted from the caller's plan).
-export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = defaultGitRunner(repositoryPath), explicitDefaultBranch, pullRequestEvidence, observedAt = new Date().toISOString() } = {}) {
+export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = defaultGitRunner(repositoryPath), explicitDefaultBranch, pullRequestEvidence, remoteState, observedAt = new Date().toISOString() } = {}) {
   if (!Array.isArray(plan) || plan.length === 0) return { ok: false, reason: "plan-required" };
   const steps = stepIndex === undefined ? plan : (Number.isInteger(stepIndex) && stepIndex >= 0 && stepIndex < plan.length ? [plan[stepIndex]] : null);
   if (steps === null) return { ok: false, reason: "step-index-invalid" };
@@ -493,10 +493,10 @@ export function verifyPlanFreshness({ repositoryPath, plan, stepIndex, run = def
     } else if (step.kind === "remote-branch-delete") {
       if (!text(audit.remote)) { drifted.push({ step, reason: "push-remote-unavailable" }); continue; }
       if (step.target === audit.defaultBranch) { drifted.push({ step, reason: "remote-delete-target-is-default-branch" }); continue; }
-      const remoteRef = `refs/remotes/${audit.remote}/${step.target}`;
-      if (!run(["rev-parse", "--verify", remoteRef]).ok) { drifted.push({ step, reason: "remote-counterpart-missing" }); continue; }
-      if (!isAncestor({ run, branch: remoteRef, target: `refs/remotes/${audit.remote}/${audit.defaultBranch}` })) { drifted.push({ step, reason: "remote-counterpart-not-merged" }); continue; }
-      verifiedPlan.push({ kind: "remote-branch-delete", target: step.target, command: ["git", "push", audit.remote, "--delete", "--", step.target] });
+      const freshRemote = typeof remoteState === "function" ? remoteState(audit.remote, step.target) : null;
+      if (!freshRemote || !fullCommit(freshRemote.branchOid) || !fullCommit(freshRemote.defaultBranchOid)) { drifted.push({ step, reason: "remote-state-unavailable" }); continue; }
+      if (!isAncestor({ run, branch: freshRemote.branchOid, target: freshRemote.defaultBranchOid })) { drifted.push({ step, reason: "remote-counterpart-not-merged" }); continue; }
+      verifiedPlan.push({ kind: "remote-branch-delete", target: step.target, branchOid: freshRemote.branchOid, command: ["git", "push", audit.remote, "--delete", "--", step.target] });
     } else if (step.kind === "create-topic-branch") {
       if (!run(["check-ref-format", "--branch", step.target]).ok) { drifted.push({ step, reason: "invalid-branch-name" }); continue; }
       const candidate = audit.commitCandidates.find((c) => c.kind === "commit" && c.targetBranch === step.target && c.directToDefault !== true);
