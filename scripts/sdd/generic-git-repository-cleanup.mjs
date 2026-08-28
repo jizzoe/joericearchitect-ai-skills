@@ -132,8 +132,8 @@ export function listStatus({ run } = {}) {
     const code = record.slice(0, 2);
     const path = record.slice(3);
     if (code[0] === "R" || code[0] === "C") {
-      const dest = records[++i];
-      entries.push({ code, path: dest ? `${path} -> ${dest}` : path });
+      const source = records[++i];
+      entries.push({ code, path: source ? `${source} -> ${path}` : path });
     } else {
       entries.push({ code, path });
     }
@@ -352,7 +352,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
       unresolvedList.push(unresolved("worktree", wt.id, "dirty-worktree", "worktree has uncommitted changes", "commit or discard those changes deliberately"));
       continue;
     }
-    const owningChange = owningChangeOf(wt.branch);
+    const owningChange = owningChangeOf(wt.branch) ?? owningChangeOf(wt.id);
     if (owningChange === undefined) {
       unresolvedList.push(unresolved("worktree", wt.id, "active-change-ownership-unavailable", "authoritative active-change ownership could not be determined for this worktree", "provide active-change ownership metadata before retirement"));
       continue;
