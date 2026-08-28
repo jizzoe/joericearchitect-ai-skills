@@ -261,13 +261,13 @@ export function readFileAt({ repositoryPath, relativePath, fileSystem = fs } = {
   const resolved = path.resolve(root, relativePath);
   if (!resolved.startsWith(`${root}${path.sep}`)) return { present: false, reason: "path-escape" };
   try {
+    const stat = fileSystem.lstatSync(resolved);
+    if (stat.isSymbolicLink()) return { present: false, reason: "symlink" };
     const realRoot = fileSystem.realpathSync(root);
     const realResolved = realpathExisting(resolved, fileSystem);
     if (realResolved !== realRoot && !realResolved.startsWith(`${realRoot}${path.sep}`)) return { present: false, reason: "path-escape" };
-    const stat = fileSystem.lstatSync(realResolved);
-    if (stat.isSymbolicLink()) return { present: false, reason: "symlink" };
     if (!stat.isFile()) return { present: false, reason: "not-a-file" };
-    const content = fileSystem.readFileSync(resolved, "utf8");
+    const content = fileSystem.readFileSync(realResolved, "utf8");
     const binary = BINARY_CONTROL.test(content.slice(0, 8192));
     return { present: true, path: relativePath, content, bytes: stat.size, hasSecretPattern: SECRET_PATTERNS.some((re) => re.test(content)), large: stat.size > LARGE_FILE_BYTES, binary };
   } catch {
