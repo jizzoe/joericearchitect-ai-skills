@@ -95,7 +95,7 @@ const listFiles = (target) => {
       if (entry.name === ".git") continue;
       const child = path.join(current, entry.name);
       if (entry.isDirectory()) walk(child);
-      else files.push(path.relative(target, child));
+      else files.push(path.relative(target, child).split(path.sep).join("/"));
     }
   };
   walk(target);
