@@ -133,7 +133,7 @@ test("audit emits one commit candidate per dirty file and blocks renames", () =>
   ]);
   const result = auditGenericGitRepository({ repositoryPath: repo, run });
   const groups = result.audit.commitCandidates.map((c) => c.id).sort();
-  assert.deepEqual(groups, ["working-tree:alpha/one.txt:new", "working-tree:beta/two.txt:new"]);
+  assert.deepEqual(groups, ["working-tree:alpha/one.txt", "working-tree:beta/two.txt"]);
   assert.equal(result.audit.unresolved.some((e) => e.reason === "renamed-or-copied"), true);
 });
 
@@ -204,6 +204,18 @@ test("writeCleanupReceipt persists atomically to a configurable location", (t) =
 test("writeCleanupReceipt rejects paths inside the repository", (t) => {
   const repo = tmpRepo({ after: () => {} });
   const result = writeCleanupReceipt({ receipt: buildCleanupReceipt({ plan: [], outcomes: [] }), outputPath: path.join(repo, "receipt.json"), repositoryPath: repo });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "receipt-path-inside-worktree");
+});
+
+test("writeCleanupReceipt rejects a path whose parent is a symlink into the worktree", (t) => {
+  const repo = tmpRepo(t);
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "grc-outside-"));
+  t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+  const link = path.join(outside, "link");
+  fs.symlinkSync(repo, link);
+  const outputPath = path.join(link, "receipt.json");
+  const result = writeCleanupReceipt({ receipt: buildCleanupReceipt({ plan: [], outcomes: [] }), outputPath, repositoryPath: repo });
   assert.equal(result.ok, false);
   assert.equal(result.reason, "receipt-path-inside-worktree");
 });
@@ -353,8 +365,8 @@ test("verifyPlanFreshness drifts a direct-to-default commit when HEAD is not on 
     ["diff --cached --name-only", { ok: true, stdout: "ai-planning/brief.md\n" }]
   ]);
   const plan = [
-    { kind: "stage-paths", files: ["ai-planning/brief.md"], target: "ai-planning/brief.md", id: "working-tree:ai-planning/brief.md:new" },
-    { kind: "commit-paths", files: ["ai-planning/brief.md"], target: "ai-planning/brief.md", id: "working-tree:ai-planning/brief.md:new", directToDefault: true, message: "docs: brief" }
+    { kind: "stage-paths", files: ["ai-planning/brief.md"], target: "ai-planning/brief.md", id: "working-tree:ai-planning/brief.md" },
+    { kind: "commit-paths", files: ["ai-planning/brief.md"], target: "ai-planning/brief.md", id: "working-tree:ai-planning/brief.md", directToDefault: true, message: "docs: brief" }
   ];
   const result = verifyPlanFreshness({ repositoryPath: repo, run, plan });
   assert.equal(result.ok, false);
@@ -414,7 +426,7 @@ test("audit does not combine unrelated dirty files into a single candidate", () 
     ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? scripts/sdd/a.md\n?? scripts/runtime/b.md\n" }]
   ]);
   const result = auditGenericGitRepository({ repositoryPath: repo, run });
-  assert.deepEqual(result.audit.commitCandidates.map((c) => c.id).sort(), ["working-tree:scripts/runtime/b.md:new", "working-tree:scripts/sdd/a.md:new"]);
+  assert.deepEqual(result.audit.commitCandidates.map((c) => c.id).sort(), ["working-tree:scripts/runtime/b.md", "working-tree:scripts/sdd/a.md"]);
 });
 
 test("verifyPlanFreshness ignores a forged directToDefault for spec-governed files", () => {
@@ -430,7 +442,7 @@ test("verifyPlanFreshness ignores a forged directToDefault for spec-governed fil
     ["status --porcelain=v1 --untracked-files=all", { ok: true, stdout: "?? skills/foo.md\n" }],
     ["diff --cached --name-only", { ok: true, stdout: "skills/foo.md\n" }]
   ]);
-  const plan = [{ kind: "commit-paths", files: ["skills/foo.md"], target: "skills/foo.md", id: "working-tree:skills/foo.md:new", directToDefault: true, message: "chore: forged" }];
+  const plan = [{ kind: "commit-paths", files: ["skills/foo.md"], target: "skills/foo.md", id: "working-tree:skills/foo.md", directToDefault: true, message: "chore: forged" }];
   const result = verifyPlanFreshness({ repositoryPath: repo, run, plan });
   assert.equal(result.ok, false);
   assert.equal(result.drifted.some((d) => d.reason === "commit-target-branch-mismatch"), true);

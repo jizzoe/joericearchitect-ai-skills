@@ -405,7 +405,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
     for (const delPath of deletions) {
       const specGoverned = isSpecGovernedPath(delPath);
       const branchToken = delPath.replace(/[^a-zA-Z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "working-tree";
-      commitCandidates.push(entry("commit", `working-tree:${delPath}:deleted`, { classification: "commit-candidate", files: [delPath], purpose: `out-of-scope deleted file ${delPath}`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${branchToken}-deleted-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: remove out-of-scope deleted file ${delPath}` }));
+      commitCandidates.push(entry("commit", `working-tree:${delPath}`, { classification: "commit-candidate", files: [delPath], purpose: `out-of-scope deleted file ${delPath}`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${branchToken}-deleted-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: remove out-of-scope deleted file ${delPath}` }));
     }
   }
   const fileChecks = toRead.map((s) => ({ status: s, file: readFileAt({ repositoryPath, relativePath: s.path }) }));
@@ -422,7 +422,7 @@ export function auditGenericGitRepository({ repositoryPath, run = defaultGitRunn
     const specGoverned = isSpecGovernedPath(f.status.path);
     const statusClass = f.status.code.trim() === "??" ? "new" : "modified";
     const branchToken = f.status.path.replace(/[^a-zA-Z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "working-tree";
-    commitCandidates.push(entry("commit", `working-tree:${f.status.path}:${statusClass}`, { classification: "commit-candidate", files: [f.status.path], purpose: `out-of-scope ${statusClass} file ${f.status.path}`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${branchToken}-${statusClass}-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: capture out-of-scope ${statusClass} file ${f.status.path}` }));
+    commitCandidates.push(entry("commit", `working-tree:${f.status.path}`, { classification: "commit-candidate", files: [f.status.path], purpose: `out-of-scope ${statusClass} file ${f.status.path}`, specGoverned, targetBranch: specGoverned ? `topic/${current || "working-tree"}-${branchToken}-${statusClass}-cleanup` : defaultBranch, directToDefault: !specGoverned, push: false, message: `chore: capture out-of-scope ${statusClass} file ${f.status.path}` }));
   }
 
   return { ok: true, audit: { remote, defaultBranch, protectedBranches, validationCommands, archivedChanges, retireEligible, commitCandidates, unresolved: unresolvedList } };
@@ -648,7 +648,19 @@ export function writeCleanupReceipt({ receipt, outputPath, repositoryPath, fileS
   if (text(repositoryPath)) {
     const resolvedRoot = path.resolve(repositoryPath);
     const resolvedOutput = path.resolve(outputPath);
-    if (resolvedOutput === resolvedRoot || resolvedOutput.startsWith(`${resolvedRoot}${path.sep}`)) {
+    let realRoot;
+    let realOutput;
+    try {
+      realRoot = fileSystem.realpathSync(resolvedRoot);
+      const parent = path.dirname(resolvedOutput);
+      realOutput = fileSystem.existsSync(parent)
+        ? path.join(fileSystem.realpathSync(parent), path.basename(resolvedOutput))
+        : resolvedOutput;
+    } catch {
+      realRoot = resolvedRoot;
+      realOutput = resolvedOutput;
+    }
+    if (realOutput === realRoot || realOutput.startsWith(`${realRoot}${path.sep}`)) {
       return { ok: false, reason: "receipt-path-inside-worktree" };
     }
   }
