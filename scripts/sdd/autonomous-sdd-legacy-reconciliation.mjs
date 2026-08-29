@@ -194,6 +194,7 @@ export function validateLegacyReconciliationReceipt(receipt, {
       !digest.test(receipt.authorizationScopeDigest ?? "") || !digest.test(receipt.evidenceDigest ?? "") || !timestamp(receipt.reconciledAt) ||
       receipt.classification !== "compatible-terminal" || receipt.v2Authority !== false || receipt.nativeClaim !== false || receipt.legacyMutation !== false ||
       !text(receipt.recoveryReference)) return false;
+  if (receipt.receiptId !== reconciliationReceiptId({ reference: receipt.reference, recordDigest: receipt.recordDigest })) return false;
   const schemaMatches = sourceSchemaVersion === 5
     ? receipt.schemaVersion === 2 && receipt.runId === runId && identifier.test(receipt.runId ?? "") &&
       ["terminalization-receipt", "cancellation-receipt"].includes(receipt.terminalEvidenceKind)
@@ -241,8 +242,8 @@ export function reconcileLegacyBootstrapRecord({
 }
 
 export function reconciliationDirectory({ stateHome, readableRepositoryName, repositoryId }) {
-  if (!text(stateHome) || !text(readableRepositoryName) || !/^r1-[0-9a-f]{64}$/i.test(repositoryId ?? "")) return null;
-  return path.join(path.resolve(stateHome), "repositories", `${readableRepositoryName}--${repositoryId.slice(3, 15)}`, "reconciliations");
+  const paths = statePaths({ stateHome, readableName: readableRepositoryName, repositoryId });
+  return paths ? path.join(paths.repository, "reconciliations") : null;
 }
 
 export function publishLegacyReconciliationReceipt({ receipt, stateHome, readableRepositoryName, repositoryId, fileSystem = fs } = {}) {
@@ -251,6 +252,7 @@ export function publishLegacyReconciliationReceipt({ receipt, stateHome, readabl
   if (!directory || !validateLegacyReconciliationReceipt(receipt, { reference: receipt?.reference, recordDigest: receipt?.recordDigest,
     sourceSchemaVersion, runId: receipt?.runId, selectedEntry: receipt?.selectedEntry, repository: receipt?.repository })) return fail("legacy-reconciliation-receipt-invalid");
   const destination = path.join(directory, `${receipt.receiptId}.json`);
+  if (path.dirname(destination) !== directory) return fail("legacy-reconciliation-receipt-invalid");
   try {
     fileSystem.mkdirSync(directory, { recursive: true, mode: 0o700 });
     if (fileSystem.existsSync(destination)) {
@@ -258,6 +260,7 @@ export function publishLegacyReconciliationReceipt({ receipt, stateHome, readabl
       return digestValue(existing) === digestValue(receipt) ? { valid: true, classification: "already-reconciled", receipt: existing, path: destination } : fail("legacy-reconciliation-receipt-conflict");
     }
     const temporary = path.join(directory, `.${receipt.receiptId}.${crypto.randomUUID()}.tmp`);
+    if (path.dirname(temporary) !== directory) return fail("legacy-reconciliation-receipt-invalid");
     const handle = fileSystem.openSync(temporary, "wx", 0o600);
     try { fileSystem.writeFileSync(handle, `${JSON.stringify(receipt)}\n`, "utf8"); fileSystem.fsyncSync(handle); } finally { fileSystem.closeSync(handle); }
     fileSystem.renameSync(temporary, destination);

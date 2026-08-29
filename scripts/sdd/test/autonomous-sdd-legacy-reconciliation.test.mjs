@@ -134,6 +134,8 @@ test("reconciliation fails closed for missing cleanup, mismatched authorization,
   try {
     const first = reconcileLegacyBootstrapRecord({ authorization: authorization(legacyContent), legacy: { reference: "runs/bootstrap/controller.json", content: legacyContent }, evidence: evidence(), now });
     const identity = { stateHome: home, readableRepositoryName: "repository", repositoryId: deriveRepositoryId("git@github.com:owner/repository.git") };
+    assert.equal(publishLegacyReconciliationReceipt({ receipt: { ...first.receipt, receiptId: "../escape" }, ...identity }).reason, "legacy-reconciliation-receipt-invalid");
+    assert.equal(publishLegacyReconciliationReceipt({ receipt: first.receipt, ...identity, readableRepositoryName: "../escape" }).reason, "legacy-reconciliation-receipt-invalid");
     assert.equal(publishLegacyReconciliationReceipt({ receipt: first.receipt, ...identity }).valid, true);
     assert.equal(publishLegacyReconciliationReceipt({ receipt: first.receipt, ...identity }).classification, "already-reconciled");
   } finally { fs.rmSync(home, { recursive: true, force: true }); }

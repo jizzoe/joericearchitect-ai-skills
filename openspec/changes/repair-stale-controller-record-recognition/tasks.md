@@ -36,7 +36,10 @@
     canonical empty admitted parent while rejecting nonempty archive drift.
     A subsequent strict rereview found the textual repository and archive ID
     were not cryptographically connected; canonical-remote normalization and
-    repository-ID derivation now reject cross-repository evidence. Both delta-
-    spec scenarios map to passing focused tests and the final full suite passes.
+    repository-ID derivation now reject cross-repository evidence. A third
+    strict review found unconstrained receipt publication paths; exact receipt-
+    ID derivation and canonical state-path containment now reject traversal.
+    Both delta-spec scenarios map to passing focused tests and the final full
+    suite passes.
 - [ ] 3.3 Deliver, Sync, Archive, reconcile issue/Project state, and remove only
   exact clean change-owned branches/worktrees.

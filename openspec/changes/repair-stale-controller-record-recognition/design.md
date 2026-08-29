@@ -50,7 +50,10 @@ The published schema-2 reconciliation receipt carries the controller run ID,
 terminal evidence kind, and a digest of the validated archive records in
 addition to the exact checkpoint reference and byte digest. It remains
 `v2Authority: false`, `nativeClaim: false`, `legacyMutation: false` — it never
-creates a run, claim, or lifecycle phase.
+creates a run, claim, or lifecycle phase. Publication accepts only the receipt
+ID deterministically derived from its reference and record digest, derives the
+directory through the canonical contained state path, and writes temporary and
+destination files only as direct children of that directory.
 
 ### Regression tests
 
