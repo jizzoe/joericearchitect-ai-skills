@@ -23,7 +23,8 @@
 
 ## 4. Delivery
 
-- [ ] 4.1 File the GitHub issue, add `tracking.yaml`, open the PR with
-  `Closes #NNN` and `OpenSpec change: add-codex-subprocess-review-adapter`,
-  run review, merge, sync living specs, archive, and reconcile issue/Project
-  state.
+- [x] 4.1 File the GitHub issue (#266), add `tracking.yaml`, open PR #267
+  (`Closes #266` + `OpenSpec change: add-codex-subprocess-review-adapter`),
+  merge (squash), sync living specs, archive, and reconcile issue/Project
+  state. Independent review proceeded CI-gated (no review record): the strict
+  Codex path is parent-capture — the exact gap this change addresses.
