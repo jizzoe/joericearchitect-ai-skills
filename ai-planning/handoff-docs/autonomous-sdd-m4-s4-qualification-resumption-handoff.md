@@ -29,7 +29,9 @@ this document. Reinspect them before mutation.
 1. `AGENTS.md`, `docs/sdd-workflow.md`, `docs/sdd-foundation-operations.md`.
 2. [Control-plane roadmap](../plans/autonomous-sdd-reliability-control-plane-roadmap.md)
    and its [revision](../plans/autonomous-sdd-reliability-control-plane-roadmap-revision.md).
-3. [M4-S4 qualification brief](../../design-briefs/autonomous-sdd-reliability-control-plane/m4-s4-single-change-reliability-qualification.md)
+3. **[Campaign roadmap + status](../plans/m4-s4-qualification-campaign-roadmap.md)** —
+   the canonical order + progress tracker for the 9 remaining runs. Then the
+   [M4-S4 qualification brief](../../design-briefs/autonomous-sdd-reliability-control-plane/m4-s4-single-change-reliability-qualification.md)
    and [explore output](../notes/autonomous-sdd/m4-s4-explore-output.md).
 4. [Qualification issues log](../notes/autonomous-sdd/m4-s4-qualification-issues.md)
    (the running framework-issue capture).
@@ -64,46 +66,28 @@ this document. Reinspect them before mutation.
 - Run #2 strict isolated Codex review passed **0 findings** at
   `1fa10d75e8fcf810b70b16f3aecea35d72aa3a01` (after ~24 hardening iterations).
 
-## 4. Remaining qualification — the queue
+## 4. Remaining qualification — follow the campaign roadmap
 
-Two queue descriptions exist in the planning docs. They are **not identical** and
-the new session should confirm the canonical order with the owner before Run #3.
+The prior-session queue tension is **resolved** (owner, 2026-08-28): **job-search
+repo work is on hold.** The remaining 9 completions are reusable **global skills
+built in this repo**, consumed by the mobile app for code generation, review, and
+later the independent verifier.
 
-**Owner-agreed order (2026-08-25, `m4-s4-explore-output.md`):**
+**Canonical queue + order + status:**
+[`ai-planning/plans/m4-s4-qualification-campaign-roadmap.md`](../plans/m4-s4-qualification-campaign-roadmap.md).
+Follow it **in order**.
 
-| Run | Change | Repo | Status |
-|---|---|---|---|
-| 1 | `add-claude-cross-tool-repo-hygiene` | this repo | done — does not count |
-| 2 | `add-generic-git-repository-cleanup` | this repo | **done — counts #1** |
-| 3 | `linkedin-job-lead-intake` | job-search repo | remaining |
-| 4 | `gmail-job-lead-intake` | job-search repo | remaining |
-| 5 | `company-and-role-research` | job-search repo | remaining |
-| 6 | `job-search-post-review-processing` | job-search repo | remaining |
-| 7–10 | TBD (outreach / interview prep / this-repo backlog once briefed) | — | remaining |
+Rules for the new session:
 
-**This-repo ten-skill queue (roadmap-revision §2, "ten consecutive real changes"):**
-
-| Proposed change | Source brief |
-|---|---|
-| `add-typescript-javascript-review` | `standards-driven-quality-skills.md` |
-| `add-react-web-review` | `standards-driven-quality-skills.md` |
-| `add-react-native-expo-quality-overlay` | `react-native-expo-quality-skills.md` |
-| `add-java-spring-review` | `standards-driven-quality-skills.md` (conditional on mobile stack) |
-| `add-terraform-static-quality-overlay` | `standards-driven-quality-skills.md` |
-| `add-repository-status-skill` | `ideas/catch-all.md` |
-| `add-git-health-skill` | `ideas/catch-all.md` |
-| `deliver-research-and-planning-base-skills` | quality roadmap |
-
-**⚠️ Tension to resolve before Run #3.** The owner-agreed order sends runs #3–#6
-into the **`job-search-workflows-and-skils`** repository (cross-repository). But
-the roadmap states v1 is **single-repository** and cross-repository coordination
-is **M5-S1** (hard-gated behind M4-S4 exit). Options to surface to the owner:
-(a) run the ten **this-repo** non-SDD skills (roadmap-revision §2) as the
-canonical M4-S4 queue, deferring the job-search repo to M5; or (b) explicitly
-approve treating the job-search repo runs as M4-S4 real completions (an early,
-owner-approved M5-style span). Do **not** silently start M5. Also, before any
-job-search run, close the unarchived `job-discovery-and-verification` change in
-that repo.
+1. Read the campaign roadmap first — it is the source of truth for order and
+   running status (10 rows: 1 completed + 9 remaining).
+2. Each run takes the **next uncompleted row in order**; do not skip or reorder
+   without owner sign-off. #4 `add-react-native-expo-quality-overlays` and #7
+   `add-sonarqube-client-and-quality-gate` are the intended stress tests.
+3. After each completed run, **update that roadmap row's `Status`** to
+   `✅ Completed — Run #N, counts N/10` (with date + PR/commit evidence) and
+   append framework findings to the qualification issues log.
+4. A material defect that invalidates prior runs **restarts the streak**.
 
 ## 5. How we track framework issues
 
@@ -252,11 +236,10 @@ do not forget:
    `git worktree list --porcelain`, `openspec list --json`,
    `openspec validate --all --strict`, `ai-skills-runtime doctor`, and current
    GitHub/Project reads (non-secret auth context).
-2. **Confirm the qualification queue** with the owner (resolve the §4
-   this-repo-vs-job-search tension) and obtain fresh authorization for **Run #3**
-   naming the change, lifecycle scope, review policy, duration, issue handling,
-   and post-merge runtime install.
-3. **Run #3** in a registered isolated worktree in task order; focused
+2. **Take the next uncompleted row from the campaign roadmap** (§4) and obtain
+   fresh owner authorization for that run (Run #N), naming the change, lifecycle
+   scope, review policy, duration, issue handling, and post-merge runtime install.
+3. **Run the change** in a registered isolated worktree in task order; focused
    validation + fresh code/security/coherence review after each major component;
    correct objective findings and rereview.
 4. Complete Verify → fresh independent review → exact-head CI → delivery (PR +
@@ -267,12 +250,15 @@ do not forget:
 6. Append any new framework findings to the qualification issues log; promote
    material defects to `qualification-finding` GitHub issues; follow the §7
    reappearance protocol for anything already fixed.
-7. Repeat runs #4–#10, then run the disposable fault-matrix gate, then update
-   the roadmap + M4-S4 qualification record before touching M5.
+7. Repeat until all 10 campaign-roadmap rows are completed, **updating each
+   row's `Status` after every run**; then run the disposable fault-matrix gate,
+   then update the roadmap + M4-S4 qualification record before touching M5.
 
 ## 11. Key files and commands
 
 - Qualification log: `ai-planning/notes/autonomous-sdd/m4-s4-qualification-issues.md`
+- **Campaign roadmap (order + running status): `ai-planning/plans/m4-s4-qualification-campaign-roadmap.md`**
+- Candidate list: `ai-planning/notes/autonomous-sdd/m4-s4-campaign-candidate-list.md`
 - Roadmap: `ai-planning/plans/autonomous-sdd-reliability-control-plane-roadmap.md`
   (+ `-revision.md`)
 - Review machinery: `scripts/sdd/{platform-review-adapters,independent-review-contract,detached-review-view}.mjs`
