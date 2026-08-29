@@ -8,7 +8,13 @@ const object = (value) => value !== null && typeof value === "object" && !Array.
 
 function classifyRecord(record, reference) {
   if (!object(record)) return { reference, classification: "ambiguous", reason: "legacy-record-not-object" };
-  if (![1, 2, 3, 4].includes(record.schemaVersion)) return { reference, classification: "ambiguous", reason: "legacy-schema-unknown" };
+  if (![1, 2, 3, 4].includes(record.schemaVersion)) {
+    const identity = {};
+    if (text(record.runId)) identity.runId = record.runId;
+    if (text(record.selectedEntry)) identity.selectedEntry = record.selectedEntry;
+    if (text(record.repository)) identity.repository = record.repository;
+    return { reference, classification: "ambiguous", reason: "legacy-schema-unknown", ...identity };
+  }
   if (!text(record.runId) || !text(record.selectedEntry) || !text(record.repository)) {
     return { reference, classification: "ambiguous", reason: "legacy-record-identity-incomplete" };
   }
@@ -40,7 +46,9 @@ export function inventoryLegacyRecords(records = [], { reconciliationReceipts = 
     const reference = item?.reference ?? `legacy:${index}`;
     const entry = decodeLegacyRecord(content, { reference });
     const recordDigest = legacyRecordDigest(content);
-    const reconciled = entry.classification === "active-legacy" && reconciliationReceipts.some((receipt) =>
+    const reconcilable = entry.classification === "active-legacy" ||
+      (entry.classification === "ambiguous" && entry.reason === "legacy-schema-unknown" && text(entry.selectedEntry) && text(entry.repository));
+    const reconciled = reconcilable && reconciliationReceipts.some((receipt) =>
       validateLegacyReconciliationReceipt(receipt, { reference, recordDigest, selectedEntry: entry.selectedEntry, repository: entry.repository, now })
     );
     return reconciled ? { ...entry, classification: "compatible-terminal", reason: "legacy-record-terminal-reconciled" } : entry;

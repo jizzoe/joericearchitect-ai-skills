@@ -55,6 +55,21 @@ test("receipt implementation is portable and does not embed fixture product valu
   assert.doesNotMatch(source, /owner\/repository|bootstrap-change|github\.com/);
 });
 
+test("schema-5 stale checkpoint reconciles to compatible-terminal via a receipt and stays ambiguous otherwise", () => {
+  const schema5 = { schemaVersion: 5, runId: "controller-abc123", selectedEntry: "bootstrap-change", repository: "owner/repository", currentPhase: "propose", steps: [{ id: "propose", status: "pending" }], resourceRecords: [] };
+  const legacyContent = content(schema5);
+  const reference = "runs/bootstrap/controller.json";
+  const withoutReceipt = inventoryLegacyRecords([{ reference, content: legacyContent }], { reconciliationReceipts: [], now });
+  assert.equal(withoutReceipt.classification, "ambiguous");
+  assert.equal(withoutReceipt.entries[0].reason, "legacy-schema-unknown");
+  const reconciled = reconcileLegacyBootstrapRecord({ authorization: authorization(legacyContent), legacy: { reference, content: legacyContent }, evidence: evidence(), now });
+  assert.equal(reconciled.valid, true);
+  const withReceipt = inventoryLegacyRecords([{ reference, content: legacyContent }], { reconciliationReceipts: [reconciled.receipt], now });
+  assert.equal(withReceipt.classification, "compatible");
+  assert.equal(withReceipt.entries[0].classification, "compatible-terminal");
+  assert.equal(legacyContent, content(schema5));
+});
+
 test("the declared controller verb publishes a receipt without selecting a v2 lifecycle phase", () => {
   const home = stateHome();
   const legacyContent = content();
