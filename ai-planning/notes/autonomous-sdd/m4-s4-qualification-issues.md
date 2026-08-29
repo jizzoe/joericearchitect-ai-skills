@@ -28,6 +28,8 @@ Each entry: run #, slice, phase, symptom, classification
 
 | 8 | — | repair-runtime-gh-agent-mapping | Review | Post-fix strict-review re-run found the `install-runtime.test.mjs` stub accepts any `gh skill list` args and echoes the delegated install agent without asserting the mapped `claude-code` id or the `--json skillName,version,pinned` vector | defect | resolved |
 
+| 9 | 3 | add-typescript-quality-overlay | Init | `initialize-v2-delivery` paused `legacy-inventory-ambiguous`: the terminalized Run #2 checkpoint `controller-3f48e2d4…` is stale (`currentPhase=propose`, 0/8 steps) because its lifecycle phases/delivery bindings were advanced manually (outside `advanceControllerLifecyclePhase` / `bindControllerLifecycleDelivery`). The fail-closed gate correctly refuses and there is no supported reconciliation path for stale schema-5 checkpoints, so Run #3 could not start. **Pause reason (owner decision):** authorize a bootstrap-bridge framework repair (`repair-stale-controller-record-recognition`) to add the reconciliation path before resuming the run | defect | open |
+
 ## Resolutions
 
 - **#2 / #3** — Resolved. Added a `ghAgentId` mapping (`claude` → `claude-code`)

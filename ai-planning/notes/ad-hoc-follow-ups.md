@@ -194,3 +194,55 @@ branches were removed (previous sessions' prunable worktrees and the dirty
 `244-fix-requirements-to-plan-runtime-outcome-validation` branch were left
 untouched).
 
+## 2026-08-29 — Stale non-terminal v2 controller records block new-run admission
+
+**Status:** Root cause identified. Framework fix deferred (see follow-up).
+
+### Finding
+
+`initialize-v2-delivery` for a new run pauses with `legacy-inventory-ambiguous`
+because **one** prior-run controller checkpoint under `.git/sdd-delivery-runs/runs/`
+was never advanced past `propose` (0/8 steps complete): `controller-3f48e2d4…`
+`generic-git-repository-cleanup` (Run #2), which is genuinely **terminalized**
+(its archive holds a valid terminalization receipt) but whose checkpoint is
+stuck at `currentPhase=propose`. The terminalized-recognition path requires
+`currentPhase === null`, so this checkpoint is classified `ambiguous`.
+
+Five sibling checkpoints from cancelled runs
+(`controller-d36b1a09…`, `controller-cf2ecbc3…`, `controller-e45c8204…`,
+`controller-1589ad76…`, `controller-2380283a…`) are **not** blockers: the
+cancelled path in `validTerminalV2Controller` verifies their cancellation
+receipts and classifies them `compatible-terminal` (confirmed via
+`verifiedTerminalV2Controllers`).
+
+### Root cause
+
+When a run's lifecycle phases/delivery bindings are advanced **manually** (via
+`gh` + parent scripts) instead of `advanceControllerLifecyclePhase` /
+`bindControllerLifecycleDelivery` "as you go", the controller checkpoint in
+`.git/sdd-delivery-runs` is never advanced past `propose`. Terminalization then
+archives the RUN in the state home but leaves the checkpoint stale.
+`validTerminalV2Controller` requires `currentPhase === null` (and complete
+steps) for **terminalized** records, so a stale terminalized checkpoint is
+classified `ambiguous` and blocks the next `initialize-v2-delivery`. (Cancelled
+records are unaffected — their receipt-verified path does not require a complete
+checkpoint.) This is the same mechanism as the 2026-08-28 #244 note.
+
+Not caught sooner because: (a) the `legacy-inventory-ambiguous` gate only fires
+on new-run initialization (none occurred between Run #2 on 08-28 and Run #3 on
+08-29), and (b) the 08-28 handoff's "clean controller" check only inspected the
+state-home `active/` dir, not `.git/sdd-delivery-runs/runs/`.
+
+### Follow-up (framework fix)
+
+1. Make `validTerminalV2Controller` treat a valid terminalization/cancellation
+   receipt (+ matching archive) as authoritative terminal evidence, independent
+   of the checkpoint's `currentPhase`/step state.
+2. Add a pre-flight reconciliation check (in `ai-skills-runtime doctor` or
+   run-init) that scans `.git/sdd-delivery-runs/runs/` for non-terminal v2
+   records whose archive already holds a matching receipt, and reconciles or
+   flags them before they can block admission.
+3. (Optional) Enforce "advance controller phases as you go", or auto-advance the
+   checkpoint from its archive on terminalization/cancellation.
+
+
