@@ -22,25 +22,37 @@ cleaning up the existing stale checkpoint within this change.
 ### Extend reconciliation to schema-5 ambiguous checkpoints
 
 In `inventoryLegacyRecords`, extend the receipt-matching branch so an `ambiguous`
-schema-5 entry can be re-classified `compatible-terminal` when a validated
-reconciliation receipt binds the exact reference, record digest, selected
-entry, and repository. The existing
-`validateLegacyReconciliationReceipt` contract already carries the required
-identity fields and the `compatible-terminal` classification.
+schema-5 entry can be re-classified `compatible-terminal` when a schema-2
+reconciliation receipt binds the exact reference, record digest, controller
+run ID, selected entry, and repository. Schema 1–4 records retain the schema-1
+receipt contract. Unknown or future controller schemas are never receipt-
+reconcilable.
 
 ### Controller transition publishes the receipt
 
-Extend `reconcile-legacy-bootstrap-record` (or add a sibling transition) so a
-validated owner-authorized binding whose referenced checkpoint is a stale
-schema-5 record with matching archive evidence publishes the receipt. The
-receipt remains `v2Authority: false`, `nativeClaim: false`,
-`legacyMutation: false` — it never creates a run, claim, or lifecycle phase.
+Extend `reconcile-legacy-bootstrap-record` so a validated owner-authorized
+binding whose referenced checkpoint is a stale schema-5 record inspects the
+configured local v2 state root. It requires exactly one archive for the
+checkpoint's admitted parent run, no matching active run, exactly one valid
+terminalization or cancellation receipt, and mutually consistent parent,
+work-unit, claim, claim-release, projection, and archive-manifest records. The
+archive must bind the checkpoint's authorization, deadline, repository ID,
+selected entry, admitted identities, provider, and terminal summary. Generic
+delivery evidence cannot satisfy schema-5 reconciliation.
+
+The published schema-2 reconciliation receipt carries the controller run ID,
+terminal evidence kind, and a digest of the validated archive records in
+addition to the exact checkpoint reference and byte digest. It remains
+`v2Authority: false`, `nativeClaim: false`, `legacyMutation: false` — it never
+creates a run, claim, or lifecycle phase.
 
 ### Regression tests
 
-Add focused tests for: terminalized-but-stale and cancelled-but-stale schema-5
-checkpoints reconciling to compatible-terminal with a valid binding, and
-remaining ambiguous when the binding is missing, expired, or identity-mismatched.
+Add focused tests that build real archived v2 bundles for both terminalized-
+but-stale and cancelled-but-stale schema-5 checkpoints. Confirm reconciliation
+from those archives, rejection of generic delivery evidence and mismatched
+repository state, refusal to reconcile future schemas, and preservation of the
+checkpoint bytes.
 
 ## Risks / Trade-offs
 
