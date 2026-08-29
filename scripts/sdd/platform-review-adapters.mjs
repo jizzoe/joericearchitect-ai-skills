@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { buildCodexCaptureRequest, captureFileIdentity, codexReviewChildArguments, inspectCodexCaptureReceiptArtifact, writeCodexCaptureRequest } from "./codex-review-event-capture.mjs";
-import { codexReviewEventContractRevision } from "./codex-review-event-contract.mjs";
+import { codexReviewEventContractRevision, parseCodexReviewEventStream } from "./codex-review-event-contract.mjs";
 import { createArchivedReviewView, removeArchivedReviewView } from "./detached-review-view.mjs";
 import { buildReviewPackage, canonicalJson, parseReviewFindingsPayload, validateReviewFindingsPayload, validateReviewPackage, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
@@ -1461,9 +1461,15 @@ export function runCodexSubprocessReviewAdapter({ reviewPackage, view, schemaPat
   if (!prepared.available) return { ...unavailableOutcome(prepared.diagnostic), result: unavailable(prepared.code, { reviewPackage, adapter: "codex", reviewer, attestationRef, startedAt }) };
   const invocation = buildCodexDegradedReviewInvocation({ executable, view, schemaPath, resultPath, authenticationEnvironment: prepared.environment });
   const execution = invokeReviewProcess(invocation, view, run);
-  const payload = parseJsonResult(execution.stdout);
+  // `codex exec --json` emits JSONL events, not a single JSON document. The
+  // final agent message is the findings payload; parse it with the same
+  // bounded JSONL parser the parent-capture transport uses.
+  const parsedStream = execution.status === 0 ? parseCodexReviewEventStream(execution.stdout) : null;
+  const payload = parsedStream?.available === true ? parsedStream.payload : null;
   if (execution.status !== 0 || !validFindingPayload(payload)) {
-    const diagnostic = diagnoseCodexExecutionFailure(execution, { resultMissing: !validFindingPayload(payload) });
+    const diagnostic = execution.status !== 0
+      ? diagnoseCodexExecutionFailure(execution, { resultMissing: true })
+      : diagnosticFromCode({ stage: "reviewer-execution", operation: "run-codex-subprocess-review-adapter", code: parsedStream?.code ?? "codex-jsonl-stream-unavailable", subject: "codex-reviewer-output", safeMessage: "The Codex subprocess reviewer did not produce a valid findings payload." });
     return { ...unavailableOutcome(diagnostic), result: unavailable(diagnostic.code, { reviewPackage, adapter: "codex", reviewer, attestationRef, startedAt }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
   }
   return sealCodexDegradedReviewPayload({ payload, reviewPackage, reviewer, attestationRef, strictResult, degradedAuthorization, startedAt });

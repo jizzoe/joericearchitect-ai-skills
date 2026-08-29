@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: "repair-codex-subprocess-jsonl-parsing"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 268
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/268"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/repair-codex-subprocess-jsonl-parsing/"

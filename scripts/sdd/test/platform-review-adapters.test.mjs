@@ -861,7 +861,13 @@ test("Codex subprocess adapter runs a plain-shell authorized-degraded review and
   const strictResult = unavailableReviewResult("independent-reviewer-nested-app-server-denied", { reviewPackage, adapter: "codex", reviewer: { type: "codex", identity: "strict-reviewer" }, attestationRef: "strict-attestation" });
   const reviewer = { type: "codex-degraded", identity: "degraded-reviewer" };
   const degradedAuthorization = { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only" };
-  const run = () => ({ status: 0, signal: null, stdout: JSON.stringify({ structured_output: { schemaVersion: 1, findings: [], status: "passed" } }), stderr: "" });
+  const finding = JSON.stringify({ schemaVersion: 1, findings: [], status: "passed" });
+  const run = () => ({ status: 0, signal: null, stdout: [
+    '{"type":"thread.started","thread_id":"t1"}',
+    '{"type":"turn.started"}',
+    JSON.stringify({ type: "item.completed", item: { id: "i1", type: "agent_message", text: finding } }),
+    '{"type":"turn.completed"}'
+  ].join("\n"), stderr: "" });
   const probe = () => ({ available: true, capability: {} });
   const prepareEnvironment = () => ({ available: true, code: "independent-reviewer-codex-state-ready", environment: { HOME: "/tmp/reviewer-home", PATH: "/usr/local/bin" } });
   const output = runCodexSubprocessReviewAdapter({
