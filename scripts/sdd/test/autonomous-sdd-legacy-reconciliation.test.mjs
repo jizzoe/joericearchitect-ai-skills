@@ -200,6 +200,14 @@ for (const disposition of ["terminalized", "cancelled"]) {
 
       if (disposition === "terminalized") {
         const parentPath = path.join(fixture.archivePath, "parent-run.json");
+        const parentContent = fs.readFileSync(parentPath, "utf8");
+        const projection = JSON.parse(fs.readFileSync(path.join(fixture.archivePath, "projection.json"), "utf8"));
+        fs.writeFileSync(parentPath, `${JSON.stringify({ ...JSON.parse(parentContent), children: projection.children })}\n`);
+        assert.equal(reconcileLegacyBootstrapRecord({ authorization: authorization(fixture.legacyContent, { reference }),
+          legacy: { reference, content: fixture.legacyContent }, stateHome: fixture.home, readableRepositoryName: "repository",
+          repositoryId: fixture.initialized.admission.repositoryId, now }).reason, "legacy-reconciliation-archive-evidence-invalid");
+        fs.writeFileSync(parentPath, parentContent);
+
         const relocatedParent = path.join(fixture.home, "relocated-parent-run.json");
         fs.renameSync(parentPath, relocatedParent);
         fs.symlinkSync(relocatedParent, parentPath);

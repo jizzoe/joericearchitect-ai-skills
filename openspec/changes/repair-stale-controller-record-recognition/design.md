@@ -38,7 +38,10 @@ terminalization or cancellation receipt, and mutually consistent parent,
 work-unit, claim, claim-release, projection, and archive-manifest records. The
 archive must bind the checkpoint's authorization, deadline, repository ID,
 selected entry, admitted identities, provider, and terminal summary. Generic
-delivery evidence cannot satisfy schema-5 reconciliation.
+delivery evidence cannot satisfy schema-5 reconciliation. The immutable
+admitted parent record must retain its canonical empty `children` list; the
+single terminal child summary is owned by `projection.json`, and a nonempty or
+conflicting parent child list is rejected.
 
 The published schema-2 reconciliation receipt carries the controller run ID,
 terminal evidence kind, and a digest of the validated archive records in

@@ -149,7 +149,7 @@ function validateSchema5ArchiveEvidence(controller, {
   const checks = {
     authorization: controller.authorizationDigest === parent.approvedIntentDigest && controller.authorizationDigest === workUnit.authorizationDigest,
     deadline: controller.expiresAt === parent.deadline,
-    parent: admission.parentRunId === parent.parentRunId,
+    parent: admission.parentRunId === parent.parentRunId && parent.children.length === 0,
     workUnit: admission.workUnitId === workUnit.workUnitId && workUnit.parentRunId === parent.parentRunId,
     claim: admission.claimId === claim.claimId && claim.workUnitId === workUnit.workUnitId && claim.repositoryId === repositoryId && claim.state === "active",
     change: workUnit.approvedChangeId === controller.selectedEntry && receipt.approvedChangeId === controller.selectedEntry,
