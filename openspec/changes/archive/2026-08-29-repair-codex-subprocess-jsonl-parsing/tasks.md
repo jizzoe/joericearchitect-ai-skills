@@ -7,4 +7,4 @@
 
 ## 2. Delivery
 
-- [ ] 2.1 Deliver, merge, sync, archive, reconcile issue/Project state.
+- [x] 2.1 Deliver, merge (PR #269), sync, archive, reconcile issue/Project state.
