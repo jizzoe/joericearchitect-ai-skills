@@ -19,6 +19,7 @@ const content = (value = record()) => `${JSON.stringify(value)}\n`;
 const authorization = (legacyContent, { reference = "runs/bootstrap/controller.json", expiresAt = "2026-08-21T02:00:00.000Z" } = {}) => ({ schemaVersion: 1, approved: true, id: "owner-bootstrap-reconciliation", scopeDigest: "a".repeat(64), expiresAt, selectedEntry: "bootstrap-change", repository: "owner/repository", legacyRecords: [{ reference, recordDigest: legacyRecordDigest(legacyContent) }] });
 const evidence = () => ({ observedAt: now, issue: { state: "CLOSED", reference: "issue-1" }, implementation: { merged: true, reference: "implementation-pr", topicHeadCommit: "1".repeat(40), deliveredHeadCommit: "2".repeat(40) }, sync: { merged: true, reference: "sync-pr", topicHeadCommit: "3".repeat(40), deliveredHeadCommit: "4".repeat(40) }, archive: { merged: true, reference: "archive-pr", topicHeadCommit: "5".repeat(40), deliveredHeadCommit: "6".repeat(40) }, cleanup: [{ kind: "branch", id: "implementation", status: "completed" }, { kind: "branch", id: "archive", status: "completed" }] });
 const provider = { schemaVersion: 1, id: "native-claim", generationFence: true, explicitTakeover: true, durableWrite: true, directoryMetadataDurability: true, platforms: { windows: "LockFileEx", posix: "advisory-lock" } };
+const canonicalRemote = "git@github.com:owner/repository.git";
 const deliveryStartedAt = "2026-08-20T12:00:00.000Z";
 
 function terminalizationFor(admission) {
@@ -64,7 +65,7 @@ function schema5ArchiveFixture(disposition) {
   const initialized = initializeV2Delivery({
     authorization: deliveryAuthorization,
     repository: "owner/repository",
-    canonicalRemote: "git@github.com:owner/repository.git",
+    canonicalRemote,
     readableRepositoryName: "repository",
     historyBinding: { id: "local-history", digest: "b".repeat(64) },
     provider,
@@ -155,10 +156,10 @@ for (const disposition of ["terminalized", "cancelled"]) {
       const genericOnly = reconcileLegacyBootstrapRecord({ authorization: authorization(fixture.legacyContent, { reference }), legacy: { reference, content: fixture.legacyContent }, evidence: evidence(), now });
       assert.equal(genericOnly.reason, "legacy-reconciliation-archive-evidence-invalid");
       assert.equal(reconcileLegacyBootstrapRecord({ legacy: { reference, content: fixture.legacyContent }, stateHome: fixture.home,
-        readableRepositoryName: "repository", repositoryId: fixture.initialized.admission.repositoryId, now }).reason, "legacy-reconciliation-input-invalid");
+        readableRepositoryName: "repository", repositoryId: fixture.initialized.admission.repositoryId, canonicalRemote, now }).reason, "legacy-reconciliation-input-invalid");
       assert.equal(reconcileLegacyBootstrapRecord({ authorization: authorization(fixture.legacyContent, { reference, expiresAt: "2026-08-21T00:00:00.000Z" }),
         legacy: { reference, content: fixture.legacyContent }, stateHome: fixture.home, readableRepositoryName: "repository",
-        repositoryId: fixture.initialized.admission.repositoryId, now }).reason, "legacy-reconciliation-input-invalid");
+        repositoryId: fixture.initialized.admission.repositoryId, canonicalRemote, now }).reason, "legacy-reconciliation-input-invalid");
 
       const reconciled = reconcileLegacyBootstrapRecord({
         authorization: authorization(fixture.legacyContent, { reference }),
@@ -166,6 +167,7 @@ for (const disposition of ["terminalized", "cancelled"]) {
         stateHome: fixture.home,
         readableRepositoryName: "repository",
         repositoryId: fixture.initialized.admission.repositoryId,
+        canonicalRemote,
         now
       });
       assert.equal(reconciled.valid, true, JSON.stringify(reconciled));
@@ -185,9 +187,20 @@ for (const disposition of ["terminalized", "cancelled"]) {
         stateHome: fixture.home,
         readableRepositoryName: "repository",
         repositoryId: `r1-${"f".repeat(64)}`,
+        canonicalRemote,
         now
       });
       assert.equal(mismatchedArchive.reason, "legacy-reconciliation-archive-evidence-invalid");
+      const mismatchedRemote = reconcileLegacyBootstrapRecord({
+        authorization: authorization(fixture.legacyContent, { reference }),
+        legacy: { reference, content: fixture.legacyContent },
+        stateHome: fixture.home,
+        readableRepositoryName: "repository",
+        repositoryId: fixture.initialized.admission.repositoryId,
+        canonicalRemote: "git@github.com:other/repository.git",
+        now
+      });
+      assert.equal(mismatchedRemote.reason, "legacy-reconciliation-archive-evidence-invalid");
 
       const futureContent = content({ ...JSON.parse(fixture.legacyContent), schemaVersion: 99 });
       const futureReceipt = { ...reconciled.receipt, recordDigest: legacyRecordDigest(futureContent) };
@@ -196,7 +209,7 @@ for (const disposition of ["terminalized", "cancelled"]) {
       const malformedContent = content({ ...JSON.parse(fixture.legacyContent), allowedLifecycleChain: ["propose"] });
       assert.equal(reconcileLegacyBootstrapRecord({ authorization: authorization(malformedContent, { reference }),
         legacy: { reference, content: malformedContent }, stateHome: fixture.home, readableRepositoryName: "repository",
-        repositoryId: fixture.initialized.admission.repositoryId, now }).reason, "legacy-reconciliation-archive-evidence-invalid");
+        repositoryId: fixture.initialized.admission.repositoryId, canonicalRemote, now }).reason, "legacy-reconciliation-archive-evidence-invalid");
 
       if (disposition === "terminalized") {
         const parentPath = path.join(fixture.archivePath, "parent-run.json");
@@ -205,7 +218,7 @@ for (const disposition of ["terminalized", "cancelled"]) {
         fs.writeFileSync(parentPath, `${JSON.stringify({ ...JSON.parse(parentContent), children: projection.children })}\n`);
         assert.equal(reconcileLegacyBootstrapRecord({ authorization: authorization(fixture.legacyContent, { reference }),
           legacy: { reference, content: fixture.legacyContent }, stateHome: fixture.home, readableRepositoryName: "repository",
-          repositoryId: fixture.initialized.admission.repositoryId, now }).reason, "legacy-reconciliation-archive-evidence-invalid");
+          repositoryId: fixture.initialized.admission.repositoryId, canonicalRemote, now }).reason, "legacy-reconciliation-archive-evidence-invalid");
         fs.writeFileSync(parentPath, parentContent);
 
         const relocatedParent = path.join(fixture.home, "relocated-parent-run.json");
@@ -213,7 +226,7 @@ for (const disposition of ["terminalized", "cancelled"]) {
         fs.symlinkSync(relocatedParent, parentPath);
         assert.equal(reconcileLegacyBootstrapRecord({ authorization: authorization(fixture.legacyContent, { reference }),
           legacy: { reference, content: fixture.legacyContent }, stateHome: fixture.home, readableRepositoryName: "repository",
-          repositoryId: fixture.initialized.admission.repositoryId, now }).reason, "legacy-reconciliation-archive-evidence-invalid");
+          repositoryId: fixture.initialized.admission.repositoryId, canonicalRemote, now }).reason, "legacy-reconciliation-archive-evidence-invalid");
       }
       assert.equal(fs.readFileSync(reference, "utf8"), fixture.legacyContent);
     } finally {

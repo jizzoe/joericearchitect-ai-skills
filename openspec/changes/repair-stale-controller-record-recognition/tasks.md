@@ -34,7 +34,9 @@
     schema 1–4 output-shape change, and permissive receipt fields. Strict review
     then found an unvalidated parent child list; the correction preserves the
     canonical empty admitted parent while rejecting nonempty archive drift.
-    Both delta-spec scenarios map to passing focused tests and the final full
-    suite passes.
+    A subsequent strict rereview found the textual repository and archive ID
+    were not cryptographically connected; canonical-remote normalization and
+    repository-ID derivation now reject cross-repository evidence. Both delta-
+    spec scenarios map to passing focused tests and the final full suite passes.
 - [ ] 3.3 Deliver, Sync, Archive, reconcile issue/Project state, and remove only
   exact clean change-owned branches/worktrees.

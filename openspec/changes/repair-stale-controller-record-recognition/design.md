@@ -37,8 +37,11 @@ checkpoint's admitted parent run, no matching active run, exactly one valid
 terminalization or cancellation receipt, and mutually consistent parent,
 work-unit, claim, claim-release, projection, and archive-manifest records. The
 archive must bind the checkpoint's authorization, deadline, repository ID,
-selected entry, admitted identities, provider, and terminal summary. Generic
-delivery evidence cannot satisfy schema-5 reconciliation. The immutable
+selected entry, admitted identities, provider, and terminal summary. The
+configured canonical Git remote must normalize to the checkpoint's textual
+repository and derive the same repository ID as the archive; caller-supplied
+IDs cannot bridge repositories. Generic delivery evidence cannot satisfy
+schema-5 reconciliation. The immutable
 admitted parent record must retain its canonical empty `children` list; the
 single terminal child summary is owned by `projection.json`, and a nonempty or
 conflicting parent child list is rejected.

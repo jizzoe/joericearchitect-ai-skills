@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import {
+  deriveRepositoryId,
   digestValue,
   normalizeCanonicalRemote,
   validateBootstrapPreSnapshotWorkUnit,
@@ -104,15 +105,18 @@ function archiveMatchesFor(paths, parentRunId, fileSystem) {
 }
 
 function validateSchema5ArchiveEvidence(controller, {
-  stateHome, readableRepositoryName, repositoryId, fileSystem = fs
+  stateHome, readableRepositoryName, repositoryId, canonicalRemote, fileSystem = fs
 } = {}) {
   const admission = controller?.v2Admission;
+  const canonicalIdentity = normalizeCanonicalRemote(canonicalRemote);
+  const repositoryName = canonicalIdentity?.slice(canonicalIdentity.indexOf("/") + 1);
   if (controller?.schemaVersion !== 5 || !identifier.test(controller.runId ?? "") || !digest.test(controller.authorizationDigest ?? "") ||
       controller.runId !== `controller-${controller.authorizationDigest.slice(0, 32)}` || !timestamp(controller.expiresAt) ||
       controller.checkpointPath !== path.posix.join("runs", controller.runId, "controller.json") || admission?.state !== "admitted" ||
       !identifier.test(controller.selectedEntry ?? "") || !text(controller.repository) || !controllerPhases.includes(controller.currentPhase) ||
       JSON.stringify(controller.allowedLifecycleChain) !== JSON.stringify(controllerPhases) || !Array.isArray(controller.steps) ||
       controller.steps.length !== controllerPhases.length || controller.steps.some((step, index) => step?.id !== controllerPhases[index]) ||
+      !canonicalIdentity || repositoryName !== controller.repository.toLowerCase() || deriveRepositoryId(canonicalRemote) !== repositoryId ||
       admission.repositoryId !== repositoryId || !identifier.test(admission.parentRunId ?? "") ||
       !identifier.test(admission.workUnitId ?? "") || !identifier.test(admission.claimId ?? "") || !timestamp(admission.admittedAt) ||
       !text(admission.providerBinding?.id) || !digest.test(admission.providerBinding?.digest ?? "")) return null;
@@ -199,7 +203,8 @@ export function validateLegacyReconciliationReceipt(receipt, {
 }
 
 export function reconcileLegacyBootstrapRecord({
-  authorization, legacy, evidence, stateHome, readableRepositoryName, repositoryId, now = new Date().toISOString(), fileSystem = fs
+  authorization, legacy, evidence, stateHome, readableRepositoryName, repositoryId, canonicalRemote,
+  now = new Date().toISOString(), fileSystem = fs
 } = {}) {
   const bound = validateAuthorization(authorization, now);
   const record = parseLegacy(legacy?.content);
@@ -209,7 +214,7 @@ export function reconcileLegacyBootstrapRecord({
   if (legacy?.reference !== bound.reference || recordDigest !== bound.recordDigest || record.selectedEntry !== authorization.selectedEntry || record.repository !== authorization.repository) return fail("legacy-reconciliation-authorization-mismatch");
   if (record.currentPhase === null || (Array.isArray(record.steps) && record.steps.length > 0 && record.steps.every((step) => step?.status === "complete"))) return fail("legacy-reconciliation-not-active");
   const schema5Archive = record.schemaVersion === 5
-    ? validateSchema5ArchiveEvidence(record, { stateHome, readableRepositoryName, repositoryId, fileSystem })
+    ? validateSchema5ArchiveEvidence(record, { stateHome, readableRepositoryName, repositoryId, canonicalRemote, fileSystem })
     : null;
   if (record.schemaVersion === 5 ? !schema5Archive : !validDeliveryEvidence(evidence, record, now)) {
     return fail(record.schemaVersion === 5 ? "legacy-reconciliation-archive-evidence-invalid" : "legacy-reconciliation-evidence-invalid");
