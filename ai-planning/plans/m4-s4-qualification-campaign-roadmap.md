@@ -28,7 +28,7 @@ pauses; **Tokens** = tokens consumed; **RTF#** = review-test-fix loop count;
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | `add-generic-git-repository-cleanup` | `generic-git-repository-cleanup` | `design-briefs/generic-git-repository-cleanup.md` | ✅ **Completed** — Run #2, counts 1/10 (2026-08-28) | — | — | — | — | — | — | — |
 | 2 | `establish-shared-quality-context-and-standards-pack` | `standards-pack` + context policy | `standards-driven-quality-skills.md`, `react-native-expo-quality-skills.md` | ⏭️ **Skipped** — duplicate of archived M1 work (PR #119/#120) | — | — | — | — | — | — | — |
-| 3 | `add-typescript-quality-overlay` | `typescript-javascript-review` | `standards-driven-quality-skills.md` | 🔄 In progress — paused on `legacy-inventory-ambiguous` (repair in flight) | — | — | — | — | — | 1 | 1 |
+| 3 | `add-typescript-quality-overlay` | `typescript-javascript-review` | `standards-driven-quality-skills.md` | 🔄 In progress — paused on `legacy-inventory-ambiguous` (repair in flight) | — | — | — | — | — | 2 | 1 |
 | 4 | `add-react-native-expo-quality-overlays` | `react-native-review` + `expo-review` + mobile standards | `react-native-expo-quality-skills.md` | ⬜ Not started | — | — | — | — | — | — | — |
 | 5 | `add-java-spring-quality-overlay` | `java-spring-review` | `standards-driven-quality-skills.md` | ⬜ Not started | — | — | — | — | — | — | — |
 | 6 | `add-terraform-static-quality-overlay` | `terraform-review` | `standards-driven-quality-skills.md` | ⬜ Not started | — | — | — | — | — | — | — |

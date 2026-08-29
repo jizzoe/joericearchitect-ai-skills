@@ -62,3 +62,5 @@ Each entry: run #, slice, phase, symptom, classification
 | Log # | Repo | Issue |
 |---|---|---|
 | — | — | — |
+
+| 10 | 3 | add-typescript-quality-overlay | Review | Reviewer-binary discovery is hardcoded and non-generic: `resolveTrustedReviewerExecutable` uses a fixed Codex-only path list (returns `[]` for `claude`) and the mutation-proof provisioning step is undocumented. Provisioned root-owned `/usr/local/bin/codex` resolves correctly (`ownerUserId:0`, `managedMutationDenied:true`), but Claude is not provisioned and has no resolver locations. **Pause reason (owner decision):** defer to future-enhancements (deterministic name-generic discovery + Claude locations + provisioning docs + doctor check); no fix now | gap | open |

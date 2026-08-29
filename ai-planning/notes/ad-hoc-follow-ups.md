@@ -246,3 +246,43 @@ state-home `active/` dir, not `.git/sdd-delivery-runs/runs/`.
    checkpoint from its archive on terminalization/cancellation.
 
 
+
+## 2026-08-29 — Deterministic reviewer-binary discovery
+
+**Status:** Deferred. Codex strict-review resolution works today via the
+provisioned root-owned `/usr/local/bin/codex`, but discovery is hardcoded and
+non-generic.
+
+### Finding
+
+`resolveTrustedReviewerExecutable` (`scripts/sdd/platform-review-adapters.mjs`)
+resolves the strict-reviewer binary from a hardcoded, platform-specific location
+list (`/opt/homebrew/bin/codex`, `/usr/local/bin/codex`, `/usr/bin/codex`) and
+returns `[]` for any name other than `codex`. A root-owned mutation-proof Codex
+copy was provisioned at `/usr/local/bin/codex` (owner `0:0`), and the resolver
+confirms it (`ownerUserId: 0`, `managedMutationDenied: true`). The discovery is
+fragile because: (a) it only knows three fixed paths; (b) it is Codex-only
+(Claude has no trusted locations); and (c) the provisioning step is
+undocumented (the implicit mutation-proof preflight from the 2026-08-27 note).
+
+### Claude gap (specific)
+
+Claude is **not** provisioned as root-owned — only `/opt/homebrew/bin/claude`
+exists (a user-owned Homebrew symlink) — and
+`trustedReviewerExecutableLocations` returns `[]` for `claude`. To make Claude
+eligible for the same mutation-proof path, provision a root-owned
+`/usr/local/bin/claude` and add its resolver locations.
+
+### Follow-up (framework enhancements)
+
+1. Deterministic, name-generic reviewer-binary discovery: check a documented
+   standard base dir first (`/usr/local/bin/<name>` on darwin/linux), then
+   platform fallbacks, ordering the trusted/system candidate before Homebrew.
+2. Extend `trustedReviewerExecutableLocations` to `claude` (name-generic, not
+   Codex-only).
+3. Document and script the provisioning (e.g.
+   `sudo cp "$(which codex)" /usr/local/bin/codex && sudo chown root:wheel /usr/local/bin/codex`)
+   in `docs/sdd-foundation-operations.md`; provide a `scripts/runtime/` helper.
+4. Add reviewer-binary resolution + mutation-proof status to
+   `ai-skills-runtime doctor` so missing or regressed provisioning is caught
+   preflight instead of mid-run.
