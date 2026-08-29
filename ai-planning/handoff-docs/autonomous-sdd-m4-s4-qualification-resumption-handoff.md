@@ -194,6 +194,17 @@ do not forget:
   session should either add the missing tracking metadata (its own governed
   change) or cite a change whose tracking.yaml exists when writing
   qualification-related planning PRs.
+- **D3/D4 implementation draft preserved on
+  `feat/harden-autonomous-sdd-governance-and-review`** (2026-08-28): this branch
+  (pushed to `origin`) is the **code companion** to the D2/D3/D4 briefs merged
+  via PR #260. It holds undelivered review-hardening implementation — severity
+  classification (`scripts/sdd/test/review-severity-classification.test.mjs`),
+  per-signature counters, single-source checklist, correction budget, and edits
+  to `independent-review-contract.mjs` / `review-findings.mjs` /
+  `platform-review-adapters.mjs`. It predates the #239/#247 review repairs, so
+  rebase/reconcile against `main` before pursuing D3/D4. Repo cleanup note: all
+  other stale local branches and the two leftover d1 worktrees were removed on
+  2026-08-28; only `main` and this branch remain.
 
 ## 9. Campaign mechanics and gotchas (learned, do not relearn)
 
