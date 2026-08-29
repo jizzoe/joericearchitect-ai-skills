@@ -6,7 +6,7 @@ import path from "node:path";
 import { createDetachedReviewView, removeDetachedReviewView } from "./detached-review-view.mjs";
 import { buildReviewPackage, canonicalJson, validateReviewResult } from "./independent-review-contract.mjs";
 import { degradedAuthorizationMatchesResult, strictSummaryMatchesResult } from "./independent-review.mjs";
-import { runClaudeDegradedReviewAdapter, runCodexDegradedReviewAdapter, writeReviewPackageForView } from "./platform-review-adapters.mjs";
+import { runClaudeDegradedReviewAdapter, runCodexSubprocessReviewAdapter, writeReviewPackageForView } from "./platform-review-adapters.mjs";
 import { reviewLauncherDefinition, reviewLauncherRequestDigest, validateReviewLauncherRecovery } from "./review-launcher-recovery.mjs";
 import { cleanupReviewWorktreeLifecycle, executeReviewWorktreeLifecycle, prepareReviewWorktreeLifecycle } from "./review-worktree-lifecycle.mjs";
 import { diagnosticFromCode, diagnosticFromError, preservedDiagnostic, unavailableOutcome } from "./review-diagnostics.mjs";
@@ -38,10 +38,7 @@ export function executeReviewLauncherHost(hostRequest, {
   if (!preflight.allowed) return preflight;
   const selectedAdapter = preflight.adapterBinding.reviewAdapter;
   const definition = reviewLauncherDefinition(selectedAdapter);
-  if (selectedAdapter === "codex-detached-read-only-v1" && typeof invoke !== "function") {
-    return fail("independent-reviewer-codex-capture-parent-required");
-  }
-  const invokeAdapter = invoke ?? (selectedAdapter === "claude-detached-restricted-v1" ? runClaudeDegradedReviewAdapter : runCodexDegradedReviewAdapter);
+  const invokeAdapter = invoke ?? (selectedAdapter === "claude-detached-restricted-v1" ? runClaudeDegradedReviewAdapter : runCodexSubprocessReviewAdapter);
   if (!definition) return fail("review-launcher-capability-unavailable");
   if (!text(request.repositoryPath) || !request.reviewer || !text(request.reviewer.type) || !text(request.reviewer.identity) || !text(request.attestationRef)) return fail("review-launcher-input-incomplete");
   const preparedLifecycle = prepareReviewWorktreeLifecycle({
