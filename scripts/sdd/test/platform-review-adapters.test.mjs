@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import test from "node:test";
-import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexParentStrictReviewToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, consumeCodexParentStrictReviewToolResult, createClaudeReviewSettings, degradedCapabilityLedger, diagnoseClaudeExecutionFailure, diagnoseCodexExecutionFailure, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, pinnedExecutableUnchanged, prepareClaudeReviewerEnvironment, prepareCodexReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, resolveTrustedReviewerExecutable, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, sanitizedReviewEnvironment, sealCodexDegradedReviewPayload, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
+import { buildClaudeDegradedReviewInvocation, buildClaudeReviewInvocation, buildCodexDegradedReviewInvocation, buildCodexParentReviewHostToolRequest, buildCodexParentStrictReviewToolRequest, buildCodexReviewInvocation, classifyClaudeExecutionFailure, classifyCodexExecutionFailure, codexAuthenticationEnvironment, consumeCodexParentReviewHostToolResult, consumeCodexParentStrictReviewToolResult, createClaudeReviewSettings, degradedCapabilityLedger, diagnoseClaudeExecutionFailure, diagnoseCodexExecutionFailure, inspectCodexReviewResultArtifact, invokeReviewProcess, isolatedReviewerEnvironment, pinnedExecutableUnchanged, prepareClaudeReviewerEnvironment, prepareCodexReviewerEnvironment, probeClaudeReviewAdapter, probeCodexReviewAdapter, resolveTrustedReviewerExecutable, runClaudeDegradedReviewAdapter, runClaudeReviewAdapter, runCodexDegradedReviewAdapter, runCodexReviewAdapter, runCodexSubprocessReviewAdapter, sanitizedReviewEnvironment, sealCodexDegradedReviewPayload, unavailableReviewResult, writePreparedReviewHostRequest, writeReviewPackageForView } from "../platform-review-adapters.mjs";
 import { packageDigest, validateReviewFindingsPayload, validateReviewResult } from "../independent-review-contract.mjs";
 import { normalizedReviewAdapterCapabilities } from "../review-adapter-contract.mjs";
 import { resolveReviewAdapterDispatch } from "../review-adapter-dispatch.mjs";
@@ -854,6 +854,57 @@ test("degraded Codex payload sealer preserves exact-package evidence while direc
   assert.deepEqual(output.result.findings, []);
   const direct = runCodexDegradedReviewAdapter({ reviewPackage, reviewer, attestationRef: "degraded-attestation" });
   assert.equal(direct.code, "independent-reviewer-codex-capture-parent-required");
+});
+
+test("Codex subprocess adapter runs a plain-shell authorized-degraded review and seals the result", () => {
+  const reviewPackage = packageFixture();
+  const strictResult = unavailableReviewResult("independent-reviewer-nested-app-server-denied", { reviewPackage, adapter: "codex", reviewer: { type: "codex", identity: "strict-reviewer" }, attestationRef: "strict-attestation" });
+  const reviewer = { type: "codex-degraded", identity: "degraded-reviewer" };
+  const degradedAuthorization = { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only" };
+  const run = () => ({ status: 0, signal: null, stdout: JSON.stringify({ structured_output: { schemaVersion: 1, findings: [], status: "passed" } }), stderr: "" });
+  const probe = () => ({ available: true, capability: {} });
+  const prepareEnvironment = () => ({ available: true, code: "independent-reviewer-codex-state-ready", environment: { HOME: "/tmp/reviewer-home", PATH: "/usr/local/bin" } });
+  const output = runCodexSubprocessReviewAdapter({
+    reviewPackage,
+    view,
+    schemaPath: "/tmp/independent-review-findings-v1.schema.json",
+    resultPath: "/tmp/result.json",
+    reviewer,
+    attestationRef: "degraded-attestation",
+    strictResult,
+    degradedAuthorization,
+    executable: "/usr/local/bin/codex",
+    run,
+    probe,
+    prepareEnvironment
+  });
+  assert.equal(output.status, "passed");
+  assert.equal(output.result.assuranceLevel, "authorized-degraded");
+  assert.equal(output.result.strictUnavailable.unavailableCode, "independent-reviewer-nested-app-server-denied");
+  assert.deepEqual(output.result.findings, []);
+  assert.ok(output.result.capabilityLedger.unavailable.includes("authenticatedParentLaunchEvidence"));
+  assert.ok(output.result.capabilityLedger.unavailable.includes("hostPinnedReviewerExecutableIdentity"));
+  assert.ok(output.result.capabilityLedger.enforced.includes("hostCapturedFinalArtifact"));
+});
+
+test("Codex subprocess adapter fails closed when the child emits no structured output", () => {
+  const reviewPackage = packageFixture();
+  const strictResult = unavailableReviewResult("independent-reviewer-nested-app-server-denied", { reviewPackage, adapter: "codex", reviewer: { type: "codex", identity: "strict-reviewer" }, attestationRef: "strict-attestation" });
+  const reviewer = { type: "codex-degraded", identity: "degraded-reviewer" };
+  const degradedAuthorization = { change: "change", transition: "merge-pr", expiresAt: "2026-08-14T00:00:00.000Z", riskReason: "synthetic risk acceptance", fallbackBoundary: "fresh-separated-reviewer-only" };
+  const run = () => ({ status: 1, signal: null, stdout: "", stderr: "runtime unavailable" });
+  const probe = () => ({ available: true, capability: {} });
+  const prepareEnvironment = () => ({ available: true, code: "independent-reviewer-codex-state-ready", environment: { HOME: "/tmp/reviewer-home", PATH: "/usr/local/bin" } });
+  const output = runCodexSubprocessReviewAdapter({
+    reviewPackage, view, schemaPath: "/tmp/independent-review-findings-v1.schema.json", resultPath: "/tmp/result.json",
+    reviewer, attestationRef: "degraded-attestation", strictResult, degradedAuthorization, executable: "/usr/local/bin/codex",
+    run, probe, prepareEnvironment
+  });
+  assert.equal(output.status, "unavailable");
+  assert.equal(output.result.status, "unavailable");
+  assert.equal(output.result.assuranceLevel, "strict-isolated");
+  assert.equal(output.result.baseCommit, reviewPackage.baseCommit);
+  assert.equal(output.result.attestation.readOnly, false);
 });
 
 test("findings output schema is accepted by strict structured-output validators", () => {

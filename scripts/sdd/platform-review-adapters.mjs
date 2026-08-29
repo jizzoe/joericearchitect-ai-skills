@@ -1448,6 +1448,27 @@ export function runCodexDegradedReviewAdapter({ reviewPackage, view, schemaPath,
   return { ...unavailableOutcome(diagnostic), result: unavailable(diagnostic.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
 }
 
+// A plain-shell Codex degraded reviewer. This is deliberately NOT a
+// strict-isolation transport: it runs the same `codex exec` command the
+// parent-capture transport would run, but from the authorized fallback
+// orchestrator, and it reports every restriction it cannot runtime-prove in
+// the capability ledger via sealCodexDegradedReviewPayload.
+export function runCodexSubprocessReviewAdapter({ reviewPackage, view, schemaPath, resultPath, reviewer, attestationRef, strictResult, degradedAuthorization, executable, run = spawnSync, probe = probeCodexReviewAdapter, prepareEnvironment = prepareCodexReviewerEnvironment }) {
+  const probeResult = probe({ executable, attestationRef });
+  if (!probeResult.available) return { ...unavailableOutcome(probeResult.diagnostic), result: unavailable(probeResult.code, { reviewPackage, adapter: "codex", reviewer, attestationRef }) };
+  const startedAt = now();
+  const prepared = prepareEnvironment(view);
+  if (!prepared.available) return { ...unavailableOutcome(prepared.diagnostic), result: unavailable(prepared.code, { reviewPackage, adapter: "codex", reviewer, attestationRef, startedAt }) };
+  const invocation = buildCodexDegradedReviewInvocation({ executable, view, schemaPath, resultPath, authenticationEnvironment: prepared.environment });
+  const execution = invokeReviewProcess(invocation, view, run);
+  const payload = parseJsonResult(execution.stdout);
+  if (execution.status !== 0 || !validFindingPayload(payload)) {
+    const diagnostic = diagnoseCodexExecutionFailure(execution, { resultMissing: !validFindingPayload(payload) });
+    return { ...unavailableOutcome(diagnostic), result: unavailable(diagnostic.code, { reviewPackage, adapter: "codex", reviewer, attestationRef, startedAt }), execution: { status: execution.status, signal: execution.signal ?? null, emittedResult: false } };
+  }
+  return sealCodexDegradedReviewPayload({ payload, reviewPackage, reviewer, attestationRef, strictResult, degradedAuthorization, startedAt });
+}
+
 export function sealCodexDegradedReviewPayload({ payload, reviewPackage, reviewer, attestationRef, strictResult, degradedAuthorization, startedAt = now() } = {}) {
   if (!validFindingPayload(payload)) return null;
   const executionId = randomUUID();
