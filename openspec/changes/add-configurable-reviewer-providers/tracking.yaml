@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: "add-configurable-reviewer-providers"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 264
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/264"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/add-configurable-reviewer-providers/"

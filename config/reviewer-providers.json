@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "providers": [
+    {
+      "name": "codex-strict",
+      "adapter": "codex-detached-read-only-v1",
+      "executable": "codex",
+      "assurance": "strict-isolated",
+      "transport": "parent-capture"
+    },
+    {
+      "name": "claude-degraded",
+      "adapter": "claude-detached-restricted-v1",
+      "executable": "claude",
+      "assurance": "authorized-degraded",
+      "transport": "subprocess"
+    }
+  ]
+}
