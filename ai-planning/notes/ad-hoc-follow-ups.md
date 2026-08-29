@@ -286,3 +286,69 @@ eligible for the same mutation-proof path, provision a root-owned
 4. Add reviewer-binary resolution + mutation-proof status to
    `ai-skills-runtime doctor` so missing or regressed provisioning is caught
    preflight instead of mid-run.
+
+## 2026-08-29 — Portable `strict-isolated` for arbitrary reviewers (OS sandbox + trusted-launch attestation)
+
+**Status:** Option captured for future prioritization. Not selected now; the
+decided path is the model-agnostic "launch any reviewer" change (degraded
+assurance with honest capability ledgers).
+
+### The issue
+
+The `strict-isolated` independent-review tier is currently achievable only
+through the Codex CLI's "parent capture" transport (`codex exec` via the Codex
+app's escalated `exec_command` tool with `auto_review`). That mechanism
+(a) requires the driver to be the Codex app, and (b) relies on a system-owned /
+mutation-proof reviewer binary. Any other driver (Claude Code, DeepSeek, a plain
+agent) can launch a reviewer, but cannot produce a `strict-isolated` result — it
+can only produce `authorized-degraded` with a capability ledger recording the
+missing guarantees.
+
+### Problems it solves
+
+- Decouples the highest-assurance review from one vendor's CLI, so the framework
+  can run under any driver and still claim strict isolation.
+- Provides a portable, model-independent isolation boundary (OS sandbox +
+  trusted-launch attestation) instead of Codex-specific tooling.
+- Raises the assurance ceiling for cross-model runs, which today are capped at
+  degraded.
+
+### Why it is needed
+
+The framework's goal is to run under multiple models and launch multiple
+reviewer models. Without a portable strict tier, every non-Codex run is
+permanently reduced-assurance, which is a security regression the moment the
+framework is used cross-model in production.
+
+### Impact
+
+- Security/assurance: the difference between an isolated reviewer and a degraded
+  reviewer is a hard boundary vs a recorded-but-unenforced one.
+- Portability: broadens where and how the framework can be deployed.
+- Scope: touches review admission/dispatch, the attestation model, and
+  platform-specific sandboxing (macOS Seatbelt / `sandbox-exec`, Linux seccomp /
+  Docker).
+
+### What happens if not implemented
+
+- Cross-model runs stay capped at `authorized-degraded`; `strict-isolated`
+  remains Codex-only.
+- The "launch any reviewer" change remains reduced-assurance: the reviewer is a
+  subprocess or HTTP call with no trusted-launch or mutation-proof-binary
+  guarantee.
+- Future "run in DeepSeek / others in production" work inherits the weaker
+  assurance.
+
+### Pros / cons / tradeoffs
+
+- **Pros:** model-agnostic strict review; higher assurance everywhere; removes
+  vendor lock-in on the security-critical path; portable sandboxing is a
+  well-understood technique.
+- **Cons:** significant engineering (cross-platform sandboxing + attestation is
+  subtle and security-sensitive); a remote HTTP reviewer (e.g. DeepSeek API) has
+  a fundamentally lower assurance ceiling than a local OS-sandboxed binary, so
+  "strict" for API reviewers is still an approximation.
+- **Tradeoffs:** OS-sandbox isolation only fully covers local binary reviewers;
+  API-based reviewers need a different (weaker) attestation model. A phased
+  approach (local sandbox first, API reviewers documented-as-reduced) keeps scope
+  tractable.
