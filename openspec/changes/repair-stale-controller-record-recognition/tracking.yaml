@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: "repair-stale-controller-record-recognition"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 262
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/262"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/repair-stale-controller-record-recognition/"
