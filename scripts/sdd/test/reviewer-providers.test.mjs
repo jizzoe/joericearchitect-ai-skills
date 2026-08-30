@@ -22,6 +22,13 @@ test("valid registry validates and resolves providers by name", () => {
   assert.equal(resolveReviewerProvider(config, "missing"), null);
 });
 
+test("resolver rejects registries that have not passed validation", () => {
+  const unknownAdapter = valid(); unknownAdapter.providers[0].adapter = "unknown-adapter";
+  assert.equal(resolveReviewerProvider(unknownAdapter, "codex-strict"), null);
+  const duplicate = valid(); duplicate.providers.push({ ...duplicate.providers[0] });
+  assert.equal(resolveReviewerProvider(duplicate, "codex-strict"), null);
+});
+
 test("invalid entries are rejected deterministically", () => {
   const unknownAdapter = valid(); unknownAdapter.providers[0].adapter = "unknown-adapter";
   assert.equal(validateReviewerProvidersConfig(unknownAdapter).reason, "reviewer-providers-entry-invalid");

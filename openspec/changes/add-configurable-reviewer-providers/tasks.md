@@ -6,7 +6,7 @@
 ## 2. Tests and validation
 
 - [x] 2.1 Add focused tests (validate, resolve, load, default path).
-  - Evidence: `node --test scripts/sdd/test/reviewer-providers.test.mjs` → 4 passed, 0 failed.
+  - Evidence: `node --test scripts/sdd/test/reviewer-providers.test.mjs` → 5 passed, 0 failed.
 
 ## 3. Delivery
 

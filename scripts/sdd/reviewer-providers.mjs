@@ -36,12 +36,12 @@ export function loadReviewerProviders(configPath, { fileSystem = fs } = {}) {
   return validation.valid ? validation : { valid: false, reason: validation.reason };
 }
 
-/** Resolve one reviewer provider by name from a registry (array or wrapped object). */
+/** Resolve one reviewer provider by name only after validating the registry. */
 export function resolveReviewerProvider(config, name) {
-  if (!config || typeof config !== "object" || !text(name)) return null;
-  const providers = Array.isArray(config) ? config : Array.isArray(config.providers) ? config.providers : null;
-  if (!providers) return null;
-  return providers.find((provider) => provider?.name === name) ?? null;
+  if (!text(name)) return null;
+  const validation = validateReviewerProvidersConfig(config);
+  if (!validation.valid) return null;
+  return validation.providers.find((provider) => provider.name === name) ?? null;
 }
 
 /** Default registry location for a repository (config/reviewer-providers.json). */
