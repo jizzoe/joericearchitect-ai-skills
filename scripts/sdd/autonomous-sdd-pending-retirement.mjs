@@ -188,8 +188,13 @@ export function retireExpiredPendingController({
   }
   const canonicalIdentity = normalizeCanonicalRemote(canonicalRemote);
   const derivedRepositoryId = deriveRepositoryId(canonicalRemote);
-  const canonicalRepository = canonicalIdentity?.slice(canonicalIdentity.indexOf("/") + 1);
-  if (!canonicalIdentity || !canonicalRepository || canonicalRepository !== controller.repository.toLowerCase() ||
+  const identityParts = canonicalIdentity?.split("/") ?? [];
+  const canonicalRepository = identityParts.length >= 2 ? identityParts.slice(-2).join("/") : null;
+  const canonicalRepositoryName = identityParts.at(-1);
+  const readableRepository = readableRepositoryName?.toLowerCase();
+  const controllerRepository = controller.repository.toLowerCase();
+  if (!canonicalIdentity || !canonicalRepository || readableRepository !== canonicalRepositoryName ||
+      ![canonicalRepository, canonicalRepositoryName].includes(controllerRepository) ||
       !derivedRepositoryId || derivedRepositoryId !== repositoryId || binding.repositoryId !== repositoryId ||
       baseline.admission.repositoryId !== repositoryId) {
     return fail("pending-retirement-repository-mismatch");
