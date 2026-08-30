@@ -5,6 +5,7 @@ import path from "node:path";
 import { deriveRepositoryId, digestValue, normalizeCanonicalRemote, RUN_CONTRACT_VERSION, validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
 import { inventoryLegacyDirectory, inventoryLegacyRecords } from "./autonomous-sdd-legacy.mjs";
 import { inventoryLegacyReconciliationReceipts, legacyRecordDigest } from "./autonomous-sdd-legacy-reconciliation.mjs";
+import { inventoryPendingRetirementReceipts } from "./autonomous-sdd-pending-retirement.mjs";
 import { createRepositoryClaim, defaultStateHome, ensureStateLayout, publishImmutableRecord, rebuildRepositoryIndex, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
 import { digestOperationContract, normalizeAgentPolicy } from "./autonomous-sdd-operation-contract.mjs";
 import { loadRuntimeConfiguration, resolveRuntimeConfiguration } from "./runtime-configuration.mjs";
@@ -258,13 +259,18 @@ function admitV2RunInternal({ authorization, repository, canonicalRemote, readab
   const resolvedStateHome = stateHome ?? defaultStateHome();
   const reconciliation = inventoryLegacyReconciliationReceipts({ stateHome: resolvedStateHome, readableRepositoryName, repositoryId, fileSystem });
   if (!reconciliation.valid) return fail(reconciliation.reason);
+  const pendingRetirement = inventoryPendingRetirementReceipts({ stateHome: resolvedStateHome, readableRepositoryName, repositoryId, fileSystem });
+  if (!pendingRetirement.valid) return fail(pendingRetirement.reason);
   const terminalV2Controllers = verifiedTerminalV2Controllers({ legacyDirectory, repository, stateHome: resolvedStateHome,
     readableRepositoryName, repositoryId, fileSystem });
-  const suppliedLegacy = inventoryLegacyRecords(legacyRecords, { reconciliationReceipts: reconciliation.receipts, now });
+  const suppliedLegacy = inventoryLegacyRecords(legacyRecords, {
+    reconciliationReceipts: reconciliation.receipts, pendingRetirementReceipts: pendingRetirement.receipts, now
+  });
   const discoveredInventory = legacyDirectory === undefined
     ? inventoryLegacyRecords([], { reconciliationReceipts: reconciliation.receipts, now })
     : inventoryLegacyDirectory(legacyDirectory, {
-      fileSystem, reconciliationReceipts: reconciliation.receipts, excludedReferences: legacyInventoryExclusions, now
+      fileSystem, reconciliationReceipts: reconciliation.receipts, pendingRetirementReceipts: pendingRetirement.receipts,
+      excludedReferences: legacyInventoryExclusions, now
     });
   const discoveredLegacy = applyVerifiedTerminalV2Controllers(discoveredInventory, terminalV2Controllers, fileSystem);
   if (!suppliedLegacy.valid || !discoveredLegacy.valid) return fail(!suppliedLegacy.valid ? suppliedLegacy.reason : discoveredLegacy.reason);

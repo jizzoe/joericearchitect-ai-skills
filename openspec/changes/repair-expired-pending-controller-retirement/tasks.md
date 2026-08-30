@@ -29,7 +29,7 @@
 
 ## 3. Canonical lifecycle contract and portability
 
-- [x] 3.1 Update the canonical autonomous SDD lifecycle skill with the exact
+- [ ] 3.1 Update the canonical autonomous SDD lifecycle skill with the exact
   pending-retirement boundary, typed pauses, installed-runtime invocation, and
   prohibition on checkpoint deletion/editing or fabricated v2 evidence; keep
   Claude/Codex exposures thin.

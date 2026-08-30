@@ -77,7 +77,7 @@ const controllerOperations = {
     return result.valid ? publishLegacyReconciliationReceipt({ ...payload, receipt: result.receipt }) : result;
   },
   "retire-expired-pending-controller": (payload) => {
-    const result = retireExpiredPendingController(payload);
+    const result = retireExpiredPendingController({ ...payload, repositoryPath: workspaceIoFromEnvironment()?.root });
     return result.valid ? publishPendingRetirementReceipt({ ...payload, receipt: result.receipt }) : result;
   },
   "inspect-v2-admission": (payload) => inspectV2Admission(payload),
