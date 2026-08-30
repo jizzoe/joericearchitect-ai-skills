@@ -49,7 +49,7 @@
 - [x] 4.2 Complete requirements mapping, local code/security review, formal
   OpenSpec Verify, exact-head CI, and strict independent review; correct and
   rerun affected evidence for every objective finding.
-- [ ] 4.3 Deliver implementation, Sync, and Archive through separate linked
+- [x] 4.3 Deliver implementation, Sync, and Archive through separate linked
   pull requests; reconcile issue #274 and Project state; install the delivered
   runtime; publish the exact retirement receipt for the blocking checkpoint;
   and clean only exact confirmed-delivered owned resources.
