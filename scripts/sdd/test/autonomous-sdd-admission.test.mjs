@@ -10,6 +10,7 @@ import { admitV2Run, inspectV2Admission } from "../autonomous-sdd-admission.mjs"
 import { advanceControllerQueue, advanceControllerRecord, cancelExpiredV2Run, initializeV2Delivery, inspectControllerRecord, registerControllerResource, terminalizeV2Run } from "../autonomous-sdd-controller.mjs";
 import { decodeLegacyRecord, denyLegacyMutation, inventoryLegacyDirectory, inventoryLegacyRecords } from "../autonomous-sdd-legacy.mjs";
 import { legacyRecordDigest, publishLegacyReconciliationReceipt, reconcileLegacyBootstrapRecord } from "../autonomous-sdd-legacy-reconciliation.mjs";
+import { withRepositoryMutationLock } from "../autonomous-sdd-local-store.mjs";
 import { deriveRepositoryId, digestValue } from "../autonomous-sdd-run-contract.mjs";
 import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
 import { resolveRuntimeConfiguration } from "../runtime-configuration.mjs";
@@ -138,6 +139,16 @@ test("admission accepts only an exact terminal reconciliation receipt for an oth
     assert.equal(admitV2Run(fixture(stateHome, { legacyDirectory: legacyHome })).classification, "admitted");
     assert.equal(fs.readFileSync(reference, "utf8"), content);
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); fs.rmSync(legacyHome, { recursive: true, force: true }); }
+});
+
+test("v2 admission cannot cross the shared repository mutation lock", () => {
+  const stateHome = root();
+  try {
+    const repositoryId = deriveRepositoryId("git@github.com:owner/repository.git");
+    const contended = withRepositoryMutationLock({ stateHome, repositoryId }, () => admitV2Run(fixture(stateHome)));
+    assert.equal(contended.reason, "repository-mutation-lock-unavailable");
+    assert.equal(fs.existsSync(path.join(stateHome, "repositories")), false);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });
 
 test("v2 admission persists an isolated parent, work unit, and generation-one claim before a phase", () => {

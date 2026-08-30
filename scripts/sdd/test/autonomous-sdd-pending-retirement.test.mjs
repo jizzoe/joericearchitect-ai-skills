@@ -7,9 +7,9 @@ import test from "node:test";
 import { deriveRepositoryId } from "../autonomous-sdd-run-contract.mjs";
 import { legacyRecordDigest } from "../autonomous-sdd-legacy-reconciliation.mjs";
 import { inventoryLegacyDirectory, inventoryLegacyRecords } from "../autonomous-sdd-legacy.mjs";
-import { statePaths } from "../autonomous-sdd-local-store.mjs";
+import { statePaths, withRepositoryMutationLock } from "../autonomous-sdd-local-store.mjs";
 import { initializeV2Delivery } from "../autonomous-sdd-controller.mjs";
-import { inventoryPendingRetirementReceipts, publishPendingRetirementReceipt, retireExpiredPendingController, validatePendingControllerBaseline } from "../autonomous-sdd-pending-retirement.mjs";
+import { executeExpiredPendingControllerRetirement, inventoryPendingRetirementReceipts, publishPendingRetirementReceipt, retireExpiredPendingController, validatePendingControllerBaseline } from "../autonomous-sdd-pending-retirement.mjs";
 import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
 
 const phases = ["propose", "planning-review", "apply", "verify", "delivery", "sync", "archive", "cleanup"];
@@ -222,6 +222,29 @@ test("receipt publication never overwrites a concurrent winner", () => {
   }
 });
 
+test("installed-shaped retirement requires the shared repository mutation lock", () => {
+  const controller = pendingControllerFixture();
+  const controllerContent = JSON.stringify(controller);
+  const repositoryPath = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-lock-repo-")));
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-lock-state-"));
+  try {
+    const reference = path.join(repositoryPath, ".git", "sdd-delivery-runs", controller.checkpointPath);
+    fs.mkdirSync(path.dirname(reference), { recursive: true });
+    fs.writeFileSync(reference, controllerContent);
+    const input = {
+      authorization: authorizationFixture(controller, reference, legacyRecordDigest(controllerContent)),
+      repositoryPath, stateHome, readableRepositoryName, repositoryId, canonicalRemote,
+      runGit: () => ".git", now: "2026-08-30T00:00:00.000Z"
+    };
+    const contended = withRepositoryMutationLock({ stateHome, repositoryId }, () => executeExpiredPendingControllerRetirement(input));
+    assert.equal(contended.reason, "repository-mutation-lock-unavailable");
+    assert.deepEqual(inventoryPendingRetirementReceipts({ stateHome, readableRepositoryName, repositoryId }).receipts, []);
+  } finally {
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
 test("Git-common admission pauses, retirement preserves audit evidence, and retry admits", () => {
   const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-integration-state-"));
   const repositoryPath = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-integration-repo-")));
@@ -250,14 +273,12 @@ test("Git-common admission pauses, retirement preserves audit evidence, and retr
     const paused = initialize();
     assert.equal(paused.classification, "paused");
     assert.equal(paused.reason, "legacy-inventory-ambiguous");
-    const retired = retireExpiredPendingController({
+    const published = executeExpiredPendingControllerRetirement({
       authorization: authorizationFixture(oldController, reference, legacyRecordDigest(controllerContent)),
       repositoryPath, stateHome, readableRepositoryName, repositoryId, canonicalRemote,
       runGit: () => ".git", now: "2026-08-30T00:00:00.000Z"
     });
-    assert.equal(retired.valid, true, JSON.stringify(retired));
-    const published = publishPendingRetirementReceipt({ receipt: retired.receipt, stateHome, readableRepositoryName, repositoryId });
-    assert.equal(published.valid, true);
+    assert.equal(published.valid, true, JSON.stringify(published));
     const receipts = inventoryPendingRetirementReceipts({ stateHome, readableRepositoryName, repositoryId });
     const inventory = inventoryLegacyDirectory(path.join(repositoryPath, ".git", "sdd-delivery-runs"), {
       pendingRetirementReceipts: receipts.receipts,

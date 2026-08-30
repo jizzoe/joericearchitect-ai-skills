@@ -6,7 +6,7 @@ import { deriveRepositoryId, digestValue, normalizeCanonicalRemote, RUN_CONTRACT
 import { inventoryLegacyDirectory, inventoryLegacyRecords } from "./autonomous-sdd-legacy.mjs";
 import { inventoryLegacyReconciliationReceipts, legacyRecordDigest } from "./autonomous-sdd-legacy-reconciliation.mjs";
 import { inventoryPendingRetirementReceipts } from "./autonomous-sdd-pending-retirement.mjs";
-import { createRepositoryClaim, defaultStateHome, ensureStateLayout, publishImmutableRecord, rebuildRepositoryIndex, statePaths, validateProviderCapabilities } from "./autonomous-sdd-local-store.mjs";
+import { createRepositoryClaim, defaultStateHome, ensureStateLayout, publishImmutableRecord, rebuildRepositoryIndex, statePaths, validateProviderCapabilities, withRepositoryMutationLock } from "./autonomous-sdd-local-store.mjs";
 import { digestOperationContract, normalizeAgentPolicy } from "./autonomous-sdd-operation-contract.mjs";
 import { loadRuntimeConfiguration, resolveRuntimeConfiguration } from "./runtime-configuration.mjs";
 import {
@@ -245,7 +245,11 @@ export function inspectV2Admission({ stateHome, readableRepositoryName, reposito
   } catch { return fail("v2-admission-inspection-unavailable", { paths }); }
 }
 
-function admitV2RunInternal({ authorization, repository, canonicalRemote, readableRepositoryName, historyBinding, provider, owner, repositoryPath, runtimeConfiguration, stateHome, legacyRecords = [], legacyDirectory, parentRunId = crypto.randomUUID(), workUnitId = crypto.randomUUID(), claimId = crypto.randomUUID(), now = new Date().toISOString(), fileSystem = fs } = {}, legacyInventoryExclusions = []) {
+function admitV2RunInternal(input = {}, legacyInventoryExclusions = []) {
+  const { authorization, repository, canonicalRemote, readableRepositoryName, historyBinding, provider, owner, repositoryPath,
+    runtimeConfiguration, stateHome, legacyRecords = [], legacyDirectory, parentRunId = crypto.randomUUID(),
+    workUnitId = crypto.randomUUID(), claimId = crypto.randomUUID(), now = new Date().toISOString(), fileSystem = fs,
+    repositoryMutationLockHeld = false } = input;
   const selectedEntry = validateAuthorization(authorization, now);
   const canonicalRemoteIdentity = normalizeCanonicalRemote(canonicalRemote);
   const repositoryId = deriveRepositoryId(canonicalRemote);
@@ -255,8 +259,13 @@ function admitV2RunInternal({ authorization, repository, canonicalRemote, readab
   if (!providerCapability.valid) return fail(providerCapability.reason);
   const resolvedConfiguration = repositoryPath ? loadRuntimeConfiguration({ repositoryPath, sealed: runtimeConfiguration?.sealed, fileSystem }) : resolveRuntimeConfiguration(runtimeConfiguration);
   if (!resolvedConfiguration.valid) return fail(resolvedConfiguration.reason);
-  const providerBinding = { id: provider.id, digest: digestValue(providerCapability.provider) };
   const resolvedStateHome = stateHome ?? defaultStateHome();
+  if (!repositoryMutationLockHeld) {
+    return withRepositoryMutationLock({ stateHome: resolvedStateHome, repositoryId, fileSystem }, () =>
+      admitV2RunInternal({ ...input, stateHome: resolvedStateHome, parentRunId, workUnitId, claimId, now, fileSystem,
+        repositoryMutationLockHeld: true }, legacyInventoryExclusions));
+  }
+  const providerBinding = { id: provider.id, digest: digestValue(providerCapability.provider) };
   const reconciliation = inventoryLegacyReconciliationReceipts({ stateHome: resolvedStateHome, readableRepositoryName, repositoryId, fileSystem });
   if (!reconciliation.valid) return fail(reconciliation.reason);
   const pendingRetirement = inventoryPendingRetirementReceipts({ stateHome: resolvedStateHome, readableRepositoryName, repositoryId, fileSystem });

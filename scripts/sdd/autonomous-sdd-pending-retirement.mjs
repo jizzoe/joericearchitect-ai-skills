@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { digestValue, deriveRepositoryId, normalizeCanonicalRemote } from "./autonomous-sdd-run-contract.mjs";
-import { statePaths } from "./autonomous-sdd-local-store.mjs";
+import { statePaths, withRepositoryMutationLock } from "./autonomous-sdd-local-store.mjs";
 import { legacyRecordDigest, reconciliationDirectory } from "./autonomous-sdd-legacy-reconciliation.mjs";
 
 const text = (value) => typeof value === "string" && value.trim().length > 0;
@@ -244,6 +244,16 @@ export function retireExpiredPendingController({
     recoveryReference: "re-run exact pending-controller retirement with the same record and fresh absence evidence"
   });
   return { valid: true, classification: "compatible-terminal", receipt };
+}
+
+export function executeExpiredPendingControllerRetirement(input = {}) {
+  const { stateHome, readableRepositoryName, repositoryId, fileSystem = fs } = input;
+  return withRepositoryMutationLock({ stateHome, repositoryId, fileSystem }, () => {
+    const retired = retireExpiredPendingController(input);
+    return retired.valid
+      ? publishPendingRetirementReceipt({ receipt: retired.receipt, stateHome, readableRepositoryName, repositoryId, fileSystem })
+      : retired;
+  });
 }
 
 export function validatePendingRetirementReceipt(receipt, {
