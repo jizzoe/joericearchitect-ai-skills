@@ -22,28 +22,28 @@
 - [x] 2.2 Expose `retire-expired-pending-controller` through the canonical
   controller and manifest-declared installed runtime without a workspace
   fallback, and add runtime registry/completeness coverage.
-- [ ] 2.3 Add a real Git-common integration test proving admission first pauses,
+- [x] 2.3 Add a real Git-common integration test proving admission first pauses,
   the installed-shaped transition retires only the old pending checkpoint, and
   retry admits the new exact controller while preserving both checkpoint and
   receipt audit evidence.
 
 ## 3. Canonical lifecycle contract and portability
 
-- [ ] 3.1 Update the canonical autonomous SDD lifecycle skill with the exact
+- [x] 3.1 Update the canonical autonomous SDD lifecycle skill with the exact
   pending-retirement boundary, typed pauses, installed-runtime invocation, and
   prohibition on checkpoint deletion/editing or fabricated v2 evidence; keep
   Claude/Codex exposures thin.
-- [ ] 3.2 Validate the reusable-skill contract and synthetic eval matrix for
+- [x] 3.2 Validate the reusable-skill contract and synthetic eval matrix for
   trigger/non-trigger behavior, missing or mismatched authority, untrusted
   input, sensitive-data exclusion, disallowed mutation, recovery instructions,
   adapter parity, and a second repository with different configured paths.
-- [ ] 3.3 Confirm no product-specific path, repository, account, Project,
+- [x] 3.3 Confirm no product-specific path, repository, account, Project,
   credential, or external endpoint enters canonical reusable assets and record
   attribution/licensing as not applicable.
 
 ## 4. Verification and delivery
 
-- [ ] 4.1 Run focused tests, full Node regression coverage, runtime build and
+- [x] 4.1 Run focused tests, full Node regression coverage, runtime build and
   installed completeness checks, strict change validation, and
   `openspec validate --all --strict`; record objective evidence.
 - [ ] 4.2 Complete requirements mapping, local code/security review, formal

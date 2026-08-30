@@ -6,9 +6,11 @@ import test from "node:test";
 
 import { deriveRepositoryId } from "../autonomous-sdd-run-contract.mjs";
 import { legacyRecordDigest } from "../autonomous-sdd-legacy-reconciliation.mjs";
-import { inventoryLegacyRecords } from "../autonomous-sdd-legacy.mjs";
+import { inventoryLegacyDirectory, inventoryLegacyRecords } from "../autonomous-sdd-legacy.mjs";
 import { statePaths } from "../autonomous-sdd-local-store.mjs";
-import { publishPendingRetirementReceipt, retireExpiredPendingController, validatePendingControllerBaseline } from "../autonomous-sdd-pending-retirement.mjs";
+import { initializeV2Delivery } from "../autonomous-sdd-controller.mjs";
+import { inventoryPendingRetirementReceipts, publishPendingRetirementReceipt, retireExpiredPendingController, validatePendingControllerBaseline } from "../autonomous-sdd-pending-retirement.mjs";
+import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
 
 const phases = ["propose", "planning-review", "apply", "verify", "delivery", "sync", "archive", "cleanup"];
 const canonicalRemote = "https://github.com/jizzoe/joericearchitect-ai-skills.git";
@@ -44,7 +46,7 @@ function pendingControllerFixture(overrides = {}) {
       workUnitId: `workunit-${authorizationDigest.slice(0, 32)}`,
       claimId: `claim-${authorizationDigest.slice(0, 32)}`,
       providerBinding: { id: "provider", digest: "b".repeat(64) },
-    preparedAt: "2026-08-27T00:00:00.000Z"
+      preparedAt: "2026-08-27T00:00:00.000Z"
     },
     ...overrides
   };
@@ -175,5 +177,60 @@ test("receipt validation rejects forged, future, and changed checkpoint evidence
   } finally {
     fs.rmSync(repositoryPath, { recursive: true, force: true });
     fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
+test("Git-common admission pauses, retirement preserves audit evidence, and retry admits", () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-integration-state-"));
+  const repositoryPath = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-integration-repo-")));
+  try {
+    fs.mkdirSync(path.join(repositoryPath, "config"), { recursive: true });
+    fs.writeFileSync(path.join(repositoryPath, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+    const oldController = pendingControllerFixture();
+    const reference = path.join(fs.realpathSync(repositoryPath), ".git", "sdd-delivery-runs", oldController.checkpointPath);
+    fs.mkdirSync(path.dirname(reference), { recursive: true });
+    const controllerContent = `${JSON.stringify(oldController)}\n`;
+    fs.writeFileSync(reference, controllerContent);
+    const authorization = resolveSddDeliveryRequest({
+      target: "new-change", mode: "autonomous", qualityProfile: "prototype-rapid",
+      authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h"
+    }, { goalStartedAt: "2026-08-30T00:00:00.000Z" }).effectiveAuthorization;
+    const provider = { schemaVersion: 1, id: "native-claim", generationFence: true, explicitTakeover: true,
+      durableWrite: true, directoryMetadataDurability: true,
+      platforms: { windows: "LockFileEx", posix: "advisory-lock" } };
+    const initialize = () => initializeV2Delivery({
+      authorization: structuredClone(authorization), repository: "jizzoe/joericearchitect-ai-skills",
+      canonicalRemote, readableRepositoryName, historyBinding: { id: "local-history", digest: "d".repeat(64) },
+      provider: structuredClone(provider), owner: { host: "fixture-host", boot: "fixture-boot", pidStart: "fixture-process" },
+      stateHome, repositoryPath, legacyDirectory: path.join(repositoryPath, ".git", "sdd-delivery-runs"),
+      runGit: () => ".git", now: "2026-08-30T00:00:00.000Z"
+    });
+    const paused = initialize();
+    assert.equal(paused.classification, "paused");
+    assert.equal(paused.reason, "legacy-inventory-ambiguous");
+    const retired = retireExpiredPendingController({
+      authorization: authorizationFixture(oldController, reference, legacyRecordDigest(controllerContent)),
+      repositoryPath, stateHome, readableRepositoryName, repositoryId, canonicalRemote,
+      runGit: () => ".git", now: "2026-08-30T00:00:00.000Z"
+    });
+    assert.equal(retired.valid, true, JSON.stringify(retired));
+    const published = publishPendingRetirementReceipt({ receipt: retired.receipt, stateHome, readableRepositoryName, repositoryId });
+    assert.equal(published.valid, true);
+    const receipts = inventoryPendingRetirementReceipts({ stateHome, readableRepositoryName, repositoryId });
+    const inventory = inventoryLegacyDirectory(path.join(repositoryPath, ".git", "sdd-delivery-runs"), {
+      pendingRetirementReceipts: receipts.receipts,
+      excludedReferences: [paused.checkpointPath],
+      now: "2026-08-30T00:00:00.000Z"
+    });
+    assert.equal(inventory.classification, "compatible", JSON.stringify(inventory));
+    const admitted = initialize();
+    assert.equal(admitted.valid, true, JSON.stringify(admitted));
+    assert.equal(admitted.classification, "initialized");
+    assert.equal(fs.readFileSync(reference, "utf8"), controllerContent);
+    assert.equal(fs.existsSync(published.path), true);
+    assert.notEqual(admitted.checkpointPath, reference);
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
   }
 });
