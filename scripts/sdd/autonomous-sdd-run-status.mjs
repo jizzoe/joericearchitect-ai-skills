@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { validateDomainRecord } from "./autonomous-sdd-run-contract.mjs";
-import { defaultStateHome, rebuildRepositoryIndex, statePaths } from "./autonomous-sdd-local-store.mjs";
+import { defaultStateHome, rebuildRepositoryIndex, statePaths, withRepositoryMutationLock } from "./autonomous-sdd-local-store.mjs";
 
 const identifier = /^[a-z0-9][a-z0-9-]{2,127}$/i;
 const repositoryIdPattern = /^r1-[0-9a-f]{64}$/i;
@@ -220,7 +220,13 @@ export function recommendResume({ status, requestedRepositoryId, requestedParent
 // Rebuilds the repository index projection from authoritative history. It reads
 // active and archived run directories and rewrites only the index (runs/*.json
 // and repository-status.json); it never rewrites run history records.
-export function rebuildProjection({ stateHome = defaultStateHome(), readableRepositoryName, repositoryId, now = new Date().toISOString(), fileSystem = fs } = {}) {
+export function rebuildProjection({ stateHome = defaultStateHome(), readableRepositoryName, repositoryId, now = new Date().toISOString(),
+  fileSystem = fs, repositoryMutationLockHeld = false } = {}) {
+  if (!repositoryMutationLockHeld) {
+    return withRepositoryMutationLock({ stateHome, repositoryId, fileSystem }, () => rebuildProjection({
+      stateHome, readableRepositoryName, repositoryId, now, fileSystem, repositoryMutationLockHeld: true
+    }));
+  }
   const discovered = discoverRuns({ stateHome, readableRepositoryName, repositoryId, fileSystem });
   if (!discovered.valid) return discovered;
   if (!timestamp(now)) return { valid: false, reason: "projection-time-invalid" };

@@ -14,7 +14,7 @@ import {
 } from "../../sdd/autonomous-sdd-controller.mjs";
 import { admitV2Run, inspectV2Admission } from "../../sdd/autonomous-sdd-admission.mjs";
 import { reconcileLegacyBootstrapRecord, publishLegacyReconciliationReceipt } from "../../sdd/autonomous-sdd-legacy-reconciliation.mjs";
-import { retireExpiredPendingController, publishPendingRetirementReceipt } from "../../sdd/autonomous-sdd-pending-retirement.mjs";
+import { executeExpiredPendingControllerRetirement } from "../../sdd/autonomous-sdd-pending-retirement.mjs";
 
 // The controller persists its state in the target repository's Git common
 // directory, so the validated launcher target is the default repository path.
@@ -77,8 +77,7 @@ const controllerOperations = {
     return result.valid ? publishLegacyReconciliationReceipt({ ...payload, receipt: result.receipt }) : result;
   },
   "retire-expired-pending-controller": (payload) => {
-    const result = retireExpiredPendingController(payload);
-    return result.valid ? publishPendingRetirementReceipt({ ...payload, receipt: result.receipt }) : result;
+    return executeExpiredPendingControllerRetirement({ ...payload, repositoryPath: workspaceIoFromEnvironment()?.root });
   },
   "inspect-v2-admission": (payload) => inspectV2Admission(payload),
   "recover-v2-run": (payload) => inspectV2Admission(payload),

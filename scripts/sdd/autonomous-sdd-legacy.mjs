@@ -58,7 +58,7 @@ export function inventoryLegacyRecords(records = [], { reconciliationReceipts = 
     const pendingRetired = entry.classification === "ambiguous" && entry.reason === "legacy-schema-unknown" &&
       entry.schemaVersion === 5 && text(entry.runId) && text(entry.selectedEntry) && text(entry.repository) &&
       pendingRetirementReceipts.some((receipt) =>
-        validatePendingRetirementReceipt(receipt, { reference, recordDigest, selectedEntry: entry.selectedEntry, repository: entry.repository, now })
+        validatePendingRetirementReceipt(receipt, { reference, recordDigest, controllerContent: content, now })
       );
     return (reconciled || pendingRetired)
       ? { ...entry, classification: "compatible-terminal", reason: pendingRetired ? "legacy-record-pending-retired" : "legacy-record-terminal-reconciled" }
@@ -77,7 +77,7 @@ export function inventoryLegacyRecords(records = [], { reconciliationReceipts = 
 
 /** Read actual legacy controller candidates without rewriting their content or timestamps. */
 export function inventoryLegacyDirectory(directory, {
-  fileSystem = fs, reconciliationReceipts = [], excludedReferences = [], now = new Date().toISOString()
+  fileSystem = fs, reconciliationReceipts = [], pendingRetirementReceipts = [], excludedReferences = [], now = new Date().toISOString()
 } = {}) {
   if (!text(directory)) return { valid: false, reason: "legacy-directory-input-invalid" };
   if (!Array.isArray(excludedReferences)) return { valid: false, reason: "legacy-inventory-exclusion-invalid" };
@@ -99,7 +99,7 @@ export function inventoryLegacyDirectory(directory, {
       }
       exclusions.add(resolved);
     }
-    if (!fileSystem.existsSync(directory)) return inventoryLegacyRecords([], { reconciliationReceipts, now });
+    if (!fileSystem.existsSync(directory)) return inventoryLegacyRecords([], { reconciliationReceipts, pendingRetirementReceipts, now });
     const files = [];
     const walk = (current) => {
       for (const entry of fileSystem.readdirSync(current, { withFileTypes: true })) {
@@ -111,7 +111,7 @@ export function inventoryLegacyDirectory(directory, {
       }
     };
     walk(directory);
-    return inventoryLegacyRecords(files, { reconciliationReceipts, now });
+    return inventoryLegacyRecords(files, { reconciliationReceipts, pendingRetirementReceipts, now });
   } catch { return { valid: false, reason: "legacy-directory-unreadable" }; }
 }
 

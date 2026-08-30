@@ -8,7 +8,8 @@ import { RUN_CONTRACT_VERSION } from "../autonomous-sdd-run-contract.mjs";
 import {
   admitRepositoryClaim, archiveEligibility, archiveTerminalRun, assertOwnershipGeneration,
   createRepositoryClaim, createTransitionAttempt, ensureStateLayout, publishImmutableRecord,
-  reconcileTransitionAttempt, statePaths, takeOverRepositoryClaim, validateProviderCapabilities
+  reconcileTransitionAttempt, statePaths, takeOverRepositoryClaim, validateProviderCapabilities,
+  withRepositoryMutationLock
 } from "../autonomous-sdd-local-store.mjs";
 
 const root = () => fs.mkdtempSync(path.join(os.tmpdir(), "autonomous-sdd-store-"));
@@ -68,5 +69,36 @@ test("only a reconciled terminal bundle archives", () => {
     assert.equal(fs.existsSync(path.join(archived.archivePath, "archive-manifest.json")), true);
     assert.equal(fs.existsSync(archived.index.runIndex), true);
     assert.equal(JSON.parse(fs.readFileSync(archived.index.statusIndex, "utf8")).state, "archived");
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
+});
+
+test("terminal archiving cannot cross the shared repository mutation lock", () => {
+  const stateHome = root();
+  try {
+    const input = { stateHome, readableName: "example-repository", repositoryId: `r1-${hash("1")}` };
+    ensureStateLayout(input);
+    const paths = statePaths(input);
+    const active = path.join(paths.active, parent.parentRunId);
+    fs.mkdirSync(active, { recursive: true });
+    fs.writeFileSync(path.join(active, "manifest.json"), "{}\n");
+    const contended = withRepositoryMutationLock({ stateHome, repositoryId: claim().repositoryId }, () =>
+      archiveTerminalRun({ paths, parentRun: parent, workUnit, terminalSummary: summary, claim: claim(), attempts: [], now: "2026-08-20T12:03:00.000Z" }));
+    assert.equal(contended.reason, "repository-mutation-lock-unavailable");
+    assert.equal(fs.existsSync(active), true);
+    assert.equal(fs.readdirSync(paths.archive).length, 0);
+  } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
+});
+
+test("a dead repository mutation lock is reclaimed by one owner", () => {
+  const stateHome = root();
+  const id = `r1-${hash("1")}`;
+  try {
+    const lock = path.join(stateHome, "locks", `${id}.mutation.lock`);
+    fs.mkdirSync(path.dirname(lock), { recursive: true });
+    fs.writeFileSync(lock, `${JSON.stringify({ schemaVersion: 1, pid: 2147483647, createdAt: "2026-08-20T12:00:00.000Z" })}\n`);
+    const result = withRepositoryMutationLock({ stateHome, repositoryId: id }, () => ({ valid: true }));
+    assert.equal(result.valid, true);
+    assert.equal(fs.existsSync(lock), false);
+    assert.equal(fs.existsSync(`${lock}.reclaim`), false);
   } finally { fs.rmSync(stateHome, { recursive: true, force: true }); }
 });

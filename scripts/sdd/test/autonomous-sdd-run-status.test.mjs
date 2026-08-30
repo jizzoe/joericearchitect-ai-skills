@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { admitV2Run } from "../autonomous-sdd-admission.mjs";
 import { cancelExpiredV2Run } from "../autonomous-sdd-controller.mjs";
+import { withRepositoryMutationLock } from "../autonomous-sdd-local-store.mjs";
 import { deriveRepositoryId } from "../autonomous-sdd-run-contract.mjs";
 import {
   buildRunStatus, classifyRunStatus, classifyStopReason, discoverRuns,
@@ -141,3 +142,18 @@ test("rebuildProjection rebuilds the index from history without rewriting run re
   }
 });
 
+test("projection rebuilding cannot cross the shared repository mutation lock", () => {
+  const stateHome = root();
+  try {
+    const admitted = admitV2Run(fixture(stateHome));
+    assert.equal(admitted.valid, true, JSON.stringify(admitted));
+    const runIndex = path.join(admitted.paths.index, "runs", `${admitted.parentRun.parentRunId}.json`);
+    fs.unlinkSync(runIndex);
+    const contended = withRepositoryMutationLock({ stateHome, repositoryId }, () =>
+      rebuildProjection({ stateHome, readableRepositoryName: "repository", repositoryId, now }));
+    assert.equal(contended.reason, "repository-mutation-lock-unavailable");
+    assert.equal(fs.existsSync(runIndex), false);
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});

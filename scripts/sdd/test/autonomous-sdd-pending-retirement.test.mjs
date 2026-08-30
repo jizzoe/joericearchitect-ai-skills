@@ -6,8 +6,11 @@ import test from "node:test";
 
 import { deriveRepositoryId } from "../autonomous-sdd-run-contract.mjs";
 import { legacyRecordDigest } from "../autonomous-sdd-legacy-reconciliation.mjs";
-import { inventoryLegacyRecords } from "../autonomous-sdd-legacy.mjs";
-import { publishPendingRetirementReceipt, retireExpiredPendingController, validatePendingControllerBaseline } from "../autonomous-sdd-pending-retirement.mjs";
+import { inventoryLegacyDirectory, inventoryLegacyRecords } from "../autonomous-sdd-legacy.mjs";
+import { statePaths, withRepositoryMutationLock } from "../autonomous-sdd-local-store.mjs";
+import { initializeV2Delivery } from "../autonomous-sdd-controller.mjs";
+import { executeExpiredPendingControllerRetirement, inventoryPendingRetirementReceipts, publishPendingRetirementReceipt, retireExpiredPendingController, validatePendingControllerBaseline } from "../autonomous-sdd-pending-retirement.mjs";
+import { resolveSddDeliveryRequest } from "../resolve-sdd-delivery-request.mjs";
 
 const phases = ["propose", "planning-review", "apply", "verify", "delivery", "sync", "archive", "cleanup"];
 const canonicalRemote = "https://github.com/jizzoe/joericearchitect-ai-skills.git";
@@ -24,7 +27,7 @@ function pendingControllerFixture(overrides = {}) {
     selectedEntry: "add-typescript-quality-overlay",
     queueEntries: ["add-typescript-quality-overlay"],
     queueIndex: 0,
-    repository: "joericearchitect-ai-skills",
+    repository: "jizzoe/joericearchitect-ai-skills",
     expiresAt: "2026-08-28T00:00:00.000Z",
     allowedLifecycleChain: [...phases],
     checkpointPath: `runs/${runId}/controller.json`,
@@ -43,7 +46,7 @@ function pendingControllerFixture(overrides = {}) {
       workUnitId: `workunit-${authorizationDigest.slice(0, 32)}`,
       claimId: `claim-${authorizationDigest.slice(0, 32)}`,
       providerBinding: { id: "provider", digest: "b".repeat(64) },
-      preparedAt: "2026-08-29T00:00:00.000Z"
+      preparedAt: "2026-08-27T00:00:00.000Z"
     },
     ...overrides
   };
@@ -62,9 +65,13 @@ function authorizationFixture(controller, reference, recordDigest) {
       reference,
       recordDigest,
       runId: controller.runId,
+      authorizationDigest: controller.authorizationDigest,
+      controllerExpiresAt: controller.expiresAt,
+      repositoryId,
       parentRunId: controller.v2Admission.parentRunId,
       workUnitId: controller.v2Admission.workUnitId,
-      claimId: controller.v2Admission.claimId
+      claimId: controller.v2Admission.claimId,
+      providerBinding: controller.v2Admission.providerBinding
     }
   };
 }
@@ -81,15 +88,20 @@ test("pending-controller baseline accepts only an expired never-admitted non-pro
 
 test("retired pending controller is reclassified compatible-terminal by inventory", () => {
   const controller = pendingControllerFixture();
-  const reference = `runs/${controller.runId}/controller.json`;
   const controllerContent = JSON.stringify(controller);
-  const recordDigest = legacyRecordDigest(controllerContent);
-  const authorization = authorizationFixture(controller, reference, recordDigest);
   const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-test-"));
+  const repositoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-repo-"));
   try {
+    fs.mkdirSync(path.join(repositoryPath, ".git", "sdd-delivery-runs", "runs", controller.runId), { recursive: true });
+    const reference = path.join(fs.realpathSync(repositoryPath), ".git", "sdd-delivery-runs", "runs", controller.runId, "controller.json");
+    fs.writeFileSync(reference, controllerContent);
+    const recordDigest = legacyRecordDigest(controllerContent);
+    const authorization = authorizationFixture(controller, reference, recordDigest);
     const retired = retireExpiredPendingController({
-      authorization, controllerContent, reference, stateHome,
-      readableRepositoryName, repositoryId, canonicalRemote
+      authorization, repositoryPath, stateHome,
+      readableRepositoryName, repositoryId, canonicalRemote,
+      runGit: () => ".git",
+      now: "2026-08-30T00:00:00.000Z"
     });
     assert.equal(retired.valid, true, JSON.stringify(retired));
     assert.equal(retired.receipt.kind, "pending-controller-retirement-receipt");
@@ -99,13 +111,189 @@ test("retired pending controller is reclassified compatible-terminal by inventor
     assert.equal(published.classification, "retired");
     const again = publishPendingRetirementReceipt({ receipt: retired.receipt, stateHome, readableRepositoryName, repositoryId });
     assert.equal(again.classification, "already-retired");
-    const inventory = inventoryLegacyRecords([{ reference, content: controllerContent }], { pendingRetirementReceipts: [retired.receipt] });
+    const inventory = inventoryLegacyRecords([{ reference, content: controllerContent }], { pendingRetirementReceipts: [retired.receipt], now: "2026-08-30T00:00:00.000Z" });
     assert.equal(inventory.valid, true);
     assert.equal(inventory.entries[0].classification, "compatible-terminal");
     assert.equal(inventory.entries[0].reason, "legacy-record-pending-retired");
-    const blocked = inventoryLegacyRecords([{ reference, content: controllerContent }], { pendingRetirementReceipts: [] });
+    const blocked = inventoryLegacyRecords([{ reference, content: controllerContent }], { pendingRetirementReceipts: [], now: "2026-08-30T00:00:00.000Z" });
     assert.equal(blocked.entries[0].classification, "ambiguous");
   } finally {
     fs.rmSync(stateHome, { recursive: true, force: true });
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+  }
+});
+
+test("retirement fails closed for mismatched authority and every durable state conflict", () => {
+  const controller = pendingControllerFixture();
+  const controllerContent = JSON.stringify(controller);
+  const repositoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-conflict-repo-"));
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-conflict-state-"));
+  try {
+    fs.mkdirSync(path.join(repositoryPath, ".git", "sdd-delivery-runs", "runs", controller.runId), { recursive: true });
+    const reference = path.join(fs.realpathSync(repositoryPath), ".git", "sdd-delivery-runs", "runs", controller.runId, "controller.json");
+    fs.writeFileSync(reference, controllerContent);
+    const recordDigest = legacyRecordDigest(controllerContent);
+    const authorization = authorizationFixture(controller, reference, recordDigest);
+    const invoke = (overrides = {}) => retireExpiredPendingController({
+      authorization, repositoryPath, stateHome, readableRepositoryName, repositoryId, canonicalRemote,
+      runGit: () => ".git", now: "2026-08-30T00:00:00.000Z", ...overrides
+    });
+    assert.equal(invoke({ authorization: { ...authorization, pendingController: { ...authorization.pendingController, recordDigest: "f".repeat(64) } } }).reason, "pending-retirement-authorization-mismatch");
+    assert.equal(invoke({ authorization: { ...authorization, repository: "other/repository" } }).reason, "pending-retirement-authorization-mismatch");
+    const paths = statePaths({ stateHome, readableName: readableRepositoryName, repositoryId });
+    fs.mkdirSync(path.join(paths.active, controller.v2Admission.parentRunId), { recursive: true });
+    assert.equal(invoke().reason, "pending-retirement-active-parent-present");
+    fs.rmSync(path.join(paths.active, controller.v2Admission.parentRunId), { recursive: true, force: true });
+    fs.mkdirSync(path.join(paths.archive, "2026", "08", "30", controller.v2Admission.parentRunId), { recursive: true });
+    assert.equal(invoke().reason, "pending-retirement-archive-parent-present");
+    fs.rmSync(path.join(paths.archive, "2026"), { recursive: true, force: true });
+    const linkedArchivePartition = path.join(stateHome, "linked-archive-partition");
+    fs.mkdirSync(linkedArchivePartition);
+    fs.symlinkSync(linkedArchivePartition, path.join(paths.archive, "2026"), process.platform === "win32" ? "junction" : "dir");
+    assert.equal(invoke().reason, "pending-retirement-archive-unreadable");
+    fs.rmSync(path.join(paths.archive, "2026"), { force: true });
+    fs.mkdirSync(path.join(paths.archive, "malformed-year", controller.v2Admission.parentRunId), { recursive: true });
+    assert.equal(invoke().reason, "pending-retirement-archive-unreadable");
+    fs.rmSync(path.join(paths.archive, "malformed-year"), { recursive: true, force: true });
+    fs.mkdirSync(path.join(paths.index, "runs"), { recursive: true });
+    fs.writeFileSync(path.join(paths.index, "runs", `${controller.v2Admission.parentRunId}.json`), "{}\n");
+    assert.equal(invoke().reason, "pending-retirement-projection-parent-present");
+  } finally {
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
+test("receipt validation rejects forged, future, and changed checkpoint evidence", () => {
+  const controller = pendingControllerFixture();
+  const controllerContent = JSON.stringify(controller);
+  const repositoryPath = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-receipt-repo-"));
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-receipt-state-"));
+  try {
+    fs.mkdirSync(path.join(repositoryPath, ".git", "sdd-delivery-runs", "runs", controller.runId), { recursive: true });
+    const reference = path.join(fs.realpathSync(repositoryPath), ".git", "sdd-delivery-runs", "runs", controller.runId, "controller.json");
+    fs.writeFileSync(reference, controllerContent);
+    const recordDigest = legacyRecordDigest(controllerContent);
+    const authorization = authorizationFixture(controller, reference, recordDigest);
+    const retired = retireExpiredPendingController({ authorization, repositoryPath, stateHome, readableRepositoryName, repositoryId, canonicalRemote, runGit: () => ".git", now: "2026-08-30T00:00:00.000Z" });
+    assert.equal(retired.valid, true);
+    const forged = { ...retired.receipt, runId: "controller-forged" };
+    assert.equal(publishPendingRetirementReceipt({ receipt: forged, stateHome, readableRepositoryName, repositoryId }).reason, "pending-retirement-receipt-invalid");
+    const changedController = `${controllerContent}\n`;
+    assert.equal(inventoryLegacyRecords([{ reference, content: changedController }], { pendingRetirementReceipts: [retired.receipt], now: "2026-08-30T00:00:00.000Z" }).entries[0].classification, "ambiguous");
+    assert.equal(inventoryLegacyRecords([{ reference, content: controllerContent }], { pendingRetirementReceipts: [{ ...retired.receipt, reconciledAt: "2099-01-01T00:00:00.000Z" }], now: "2026-08-30T00:00:00.000Z" }).entries[0].classification, "ambiguous");
+  } finally {
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
+test("receipt publication never overwrites a concurrent winner", () => {
+  const controller = pendingControllerFixture();
+  const controllerContent = JSON.stringify(controller);
+  const repositoryPath = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-race-repo-")));
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-race-state-"));
+  try {
+    const reference = path.join(repositoryPath, ".git", "sdd-delivery-runs", controller.checkpointPath);
+    fs.mkdirSync(path.dirname(reference), { recursive: true });
+    fs.writeFileSync(reference, controllerContent);
+    const retired = retireExpiredPendingController({
+      authorization: authorizationFixture(controller, reference, legacyRecordDigest(controllerContent)),
+      repositoryPath, stateHome, readableRepositoryName, repositoryId, canonicalRemote,
+      runGit: () => ".git", now: "2026-08-30T00:00:00.000Z"
+    });
+    assert.equal(retired.valid, true);
+    const winner = { ...retired.receipt, absenceEvidenceDigest: "f".repeat(64) };
+    const racingFileSystem = Object.create(fs);
+    Object.defineProperties(racingFileSystem, {
+      existsSync: { value: (target) => target.endsWith(`${retired.receipt.receiptId}.json`) ? false : fs.existsSync(target) },
+      linkSync: { value: (_temporary, destination) => {
+        fs.writeFileSync(destination, `${JSON.stringify(winner)}\n`, { flag: "wx" });
+        const error = new Error("concurrent destination"); error.code = "EEXIST"; throw error;
+      } }
+    });
+    const published = publishPendingRetirementReceipt({ receipt: retired.receipt, stateHome, readableRepositoryName, repositoryId, fileSystem: racingFileSystem });
+    assert.equal(published.reason, "pending-retirement-receipt-conflict");
+    const inventory = inventoryPendingRetirementReceipts({ stateHome, readableRepositoryName, repositoryId });
+    assert.deepEqual(inventory.receipts, [winner]);
+  } finally {
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
+test("installed-shaped retirement requires the shared repository mutation lock", () => {
+  const controller = pendingControllerFixture();
+  const controllerContent = JSON.stringify(controller);
+  const repositoryPath = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-lock-repo-")));
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-lock-state-"));
+  try {
+    const reference = path.join(repositoryPath, ".git", "sdd-delivery-runs", controller.checkpointPath);
+    fs.mkdirSync(path.dirname(reference), { recursive: true });
+    fs.writeFileSync(reference, controllerContent);
+    const input = {
+      authorization: authorizationFixture(controller, reference, legacyRecordDigest(controllerContent)),
+      repositoryPath, stateHome, readableRepositoryName, repositoryId, canonicalRemote,
+      runGit: () => ".git", now: "2026-08-30T00:00:00.000Z"
+    };
+    const contended = withRepositoryMutationLock({ stateHome, repositoryId }, () => executeExpiredPendingControllerRetirement(input));
+    assert.equal(contended.reason, "repository-mutation-lock-unavailable");
+    assert.deepEqual(inventoryPendingRetirementReceipts({ stateHome, readableRepositoryName, repositoryId }).receipts, []);
+  } finally {
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
+test("Git-common admission pauses, retirement preserves audit evidence, and retry admits", () => {
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-integration-state-"));
+  const repositoryPath = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-integration-repo-")));
+  try {
+    fs.mkdirSync(path.join(repositoryPath, "config"), { recursive: true });
+    fs.writeFileSync(path.join(repositoryPath, "config", "ai-skills.json"), JSON.stringify({ runtime: { schemaVersion: 1, evidenceRoot: "evidence" } }));
+    const oldController = pendingControllerFixture();
+    const reference = path.join(fs.realpathSync(repositoryPath), ".git", "sdd-delivery-runs", oldController.checkpointPath);
+    fs.mkdirSync(path.dirname(reference), { recursive: true });
+    const controllerContent = `${JSON.stringify(oldController)}\n`;
+    fs.writeFileSync(reference, controllerContent);
+    const authorization = resolveSddDeliveryRequest({
+      target: "new-change", mode: "autonomous", qualityProfile: "prototype-rapid",
+      authorizationProfile: "sdd-delivery", reviewPolicy: "same-session-local", expiration: "4h"
+    }, { goalStartedAt: "2026-08-30T00:00:00.000Z" }).effectiveAuthorization;
+    const provider = { schemaVersion: 1, id: "native-claim", generationFence: true, explicitTakeover: true,
+      durableWrite: true, directoryMetadataDurability: true,
+      platforms: { windows: "LockFileEx", posix: "advisory-lock" } };
+    const initialize = () => initializeV2Delivery({
+      authorization: structuredClone(authorization), repository: "jizzoe/joericearchitect-ai-skills",
+      canonicalRemote, readableRepositoryName, historyBinding: { id: "local-history", digest: "d".repeat(64) },
+      provider: structuredClone(provider), owner: { host: "fixture-host", boot: "fixture-boot", pidStart: "fixture-process" },
+      stateHome, repositoryPath, legacyDirectory: path.join(repositoryPath, ".git", "sdd-delivery-runs"),
+      runGit: () => ".git", now: "2026-08-30T00:00:00.000Z"
+    });
+    const paused = initialize();
+    assert.equal(paused.classification, "paused");
+    assert.equal(paused.reason, "legacy-inventory-ambiguous");
+    const published = executeExpiredPendingControllerRetirement({
+      authorization: authorizationFixture(oldController, reference, legacyRecordDigest(controllerContent)),
+      repositoryPath, stateHome, readableRepositoryName, repositoryId, canonicalRemote,
+      runGit: () => ".git", now: "2026-08-30T00:00:00.000Z"
+    });
+    assert.equal(published.valid, true, JSON.stringify(published));
+    const receipts = inventoryPendingRetirementReceipts({ stateHome, readableRepositoryName, repositoryId });
+    const inventory = inventoryLegacyDirectory(path.join(repositoryPath, ".git", "sdd-delivery-runs"), {
+      pendingRetirementReceipts: receipts.receipts,
+      excludedReferences: [paused.checkpointPath],
+      now: "2026-08-30T00:00:00.000Z"
+    });
+    assert.equal(inventory.classification, "compatible", JSON.stringify(inventory));
+    const admitted = initialize();
+    assert.equal(admitted.valid, true, JSON.stringify(admitted));
+    assert.equal(admitted.classification, "initialized");
+    assert.equal(fs.readFileSync(reference, "utf8"), controllerContent);
+    assert.equal(fs.existsSync(published.path), true);
+    assert.notEqual(admitted.checkpointPath, reference);
+  } finally {
+    fs.rmSync(stateHome, { recursive: true, force: true });
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
   }
 });

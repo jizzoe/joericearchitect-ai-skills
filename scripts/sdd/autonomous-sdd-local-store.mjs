@@ -43,6 +43,62 @@ export function statePaths(input) {
   });
 }
 
+function repositoryMutationLockPath({ stateHome, repositoryId: id }) {
+  if (!text(stateHome) || !repositoryId.test(id ?? "")) return null;
+  const root = path.resolve(stateHome);
+  return contained(root, path.join(root, "locks", `${id}.mutation.lock`));
+}
+
+function deadMutationLockOwner(owner) {
+  if (owner?.schemaVersion !== 1 || !Number.isInteger(owner.pid) || owner.pid <= 0 || !timestamp(owner.createdAt)) return false;
+  try { process.kill(owner.pid, 0); return false; } catch (error) { return error?.code === "ESRCH"; }
+}
+
+export function withRepositoryMutationLock({ stateHome, repositoryId: id, fileSystem = fs } = {}, operation) {
+  const lock = repositoryMutationLockPath({ stateHome, repositoryId: id });
+  if (!lock || typeof operation !== "function") return fail("repository-mutation-lock-input-invalid");
+  const directory = path.dirname(lock);
+  const reclaim = `${lock}.reclaim`;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const ownerPath = `${lock}.${process.pid}.${crypto.randomUUID()}.owner`;
+    let descriptor;
+    try {
+      fileSystem.mkdirSync(directory, { recursive: true, mode: 0o700 });
+      descriptor = fileSystem.openSync(ownerPath, "wx", 0o600);
+      const owner = { schemaVersion: 1, pid: process.pid, createdAt: new Date().toISOString() };
+      fileSystem.writeFileSync(descriptor, `${JSON.stringify(owner)}\n`, "utf8");
+      fileSystem.fsyncSync(descriptor);
+      fileSystem.linkSync(ownerPath, lock);
+      try { return operation(); } finally {
+        try { fileSystem.closeSync(descriptor); } catch {}
+        try { fileSystem.unlinkSync(lock); } catch {}
+        try { fileSystem.unlinkSync(ownerPath); } catch {}
+      }
+    } catch (error) {
+      if (descriptor !== undefined) try { fileSystem.closeSync(descriptor); } catch {}
+      try { fileSystem.unlinkSync(ownerPath); } catch {}
+      if (error?.code !== "EEXIST" || attempt > 0) return fail("repository-mutation-lock-unavailable");
+      let reclaimClaimed = false;
+      try {
+        // A fixed, create-only hard link elects exactly one stale-lock
+        // reclaimer. Other contenders cannot unlink a replacement lock.
+        fileSystem.linkSync(lock, reclaim);
+        reclaimClaimed = true;
+        const entry = fileSystem.lstatSync(reclaim);
+        const current = fileSystem.lstatSync(lock);
+        if (!entry.isFile() || entry.isSymbolicLink() || entry.dev !== current.dev || entry.ino !== current.ino) {
+          return fail("repository-mutation-lock-unavailable");
+        }
+        const owner = JSON.parse(fileSystem.readFileSync(reclaim, "utf8"));
+        if (!deadMutationLockOwner(owner)) return fail("repository-mutation-lock-unavailable");
+        fileSystem.unlinkSync(lock);
+      } catch { return fail("repository-mutation-lock-unavailable"); }
+      finally { if (reclaimClaimed) try { fileSystem.unlinkSync(reclaim); } catch {} }
+    }
+  }
+  return fail("repository-mutation-lock-unavailable");
+}
+
 export function ensureStateLayout(input, { fileSystem = fs } = {}) {
   const paths = statePaths(input);
   if (!paths) return fail("state-layout-input-invalid");
@@ -150,8 +206,16 @@ export function rebuildRepositoryIndex({ paths, parentRunId, archivePath, state 
   } catch { return fail("index-rebuild-failed"); }
 }
 
-export function archiveTerminalRun({ paths, parentRun, workUnit, terminalSummary, claim, attempts, cleanupPending, recoveryPending, allowBootstrapPreSnapshot = false, now = new Date().toISOString(), fileSystem = fs } = {}) {
+export function archiveTerminalRun({ paths, parentRun, workUnit, terminalSummary, claim, attempts, cleanupPending, recoveryPending,
+  allowBootstrapPreSnapshot = false, now = new Date().toISOString(), fileSystem = fs, repositoryMutationLockHeld = false } = {}) {
   if (!paths?.active || !paths?.archive || !identifier.test(parentRun?.parentRunId ?? "") || !timestamp(now)) return fail("archive-input-invalid");
+  if (!repositoryMutationLockHeld) {
+    const stateHome = paths.repository ? path.dirname(path.dirname(paths.repository)) : null;
+    return withRepositoryMutationLock({ stateHome, repositoryId: claim?.repositoryId, fileSystem }, () => archiveTerminalRun({
+      paths, parentRun, workUnit, terminalSummary, claim, attempts, cleanupPending, recoveryPending,
+      allowBootstrapPreSnapshot, now, fileSystem, repositoryMutationLockHeld: true
+    }));
+  }
   const eligibility = archiveEligibility({ claim, parentRun, workUnit, terminalSummary, attempts, cleanupPending, recoveryPending, allowBootstrapPreSnapshot });
   if (!eligibility.valid) return eligibility;
   const source = path.join(paths.active, parentRun.parentRunId);
