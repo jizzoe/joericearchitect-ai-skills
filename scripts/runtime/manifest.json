@@ -314,6 +314,7 @@
         "retain-bootstrap-cleanup-resource",
         "execute-bootstrap-cleanup-attachment",
         "reconcile-legacy-bootstrap-record",
+        "retire-expired-pending-controller",
         "inspect-v2-admission",
         "recover-v2-run",
         "inspect-controller-record",

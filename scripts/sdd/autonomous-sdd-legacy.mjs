@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { legacyRecordDigest, validateLegacyReconciliationReceipt } from "./autonomous-sdd-legacy-reconciliation.mjs";
+import { validatePendingRetirementReceipt } from "./autonomous-sdd-pending-retirement.mjs";
 
 const text = (value) => typeof value === "string" && value.trim().length > 0;
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -38,9 +39,10 @@ export function decodeLegacyRecord(content, { reference = "legacy:unknown" } = {
 }
 
 /** Deterministically inventory caller-provided legacy evidence without mutating it. */
-export function inventoryLegacyRecords(records = [], { reconciliationReceipts = [], now = new Date().toISOString() } = {}) {
+export function inventoryLegacyRecords(records = [], { reconciliationReceipts = [], pendingRetirementReceipts = [], now = new Date().toISOString() } = {}) {
   if (!Array.isArray(records)) return { valid: false, reason: "legacy-inventory-input-invalid" };
   if (!Array.isArray(reconciliationReceipts)) return { valid: false, reason: "legacy-reconciliation-inventory-input-invalid" };
+  if (!Array.isArray(pendingRetirementReceipts)) return { valid: false, reason: "legacy-pending-retirement-inventory-input-invalid" };
   const entries = records.map((item, index) => {
     const content = item?.content ?? item?.record ?? item;
     const reference = item?.reference ?? `legacy:${index}`;
@@ -53,7 +55,14 @@ export function inventoryLegacyRecords(records = [], { reconciliationReceipts = 
       validateLegacyReconciliationReceipt(receipt, { reference, recordDigest, sourceSchemaVersion: entry.schemaVersion === 5 ? 5 : 1,
         runId: entry.runId, selectedEntry: entry.selectedEntry, repository: entry.repository, now })
     );
-    return reconciled ? { ...entry, classification: "compatible-terminal", reason: "legacy-record-terminal-reconciled" } : entry;
+    const pendingRetired = entry.classification === "ambiguous" && entry.reason === "legacy-schema-unknown" &&
+      entry.schemaVersion === 5 && text(entry.runId) && text(entry.selectedEntry) && text(entry.repository) &&
+      pendingRetirementReceipts.some((receipt) =>
+        validatePendingRetirementReceipt(receipt, { reference, recordDigest, selectedEntry: entry.selectedEntry, repository: entry.repository, now })
+      );
+    return (reconciled || pendingRetired)
+      ? { ...entry, classification: "compatible-terminal", reason: pendingRetired ? "legacy-record-pending-retired" : "legacy-record-terminal-reconciled" }
+      : entry;
   });
   const ambiguous = entries.filter((entry) => entry.classification === "ambiguous");
   const active = entries.filter((entry) => entry.classification === "active-legacy");
