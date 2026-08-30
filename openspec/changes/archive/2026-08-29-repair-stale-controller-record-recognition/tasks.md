@@ -41,5 +41,12 @@
     ID derivation and canonical state-path containment now reject traversal.
     Both delta-spec scenarios map to passing focused tests and the final full
     suite passes.
-- [ ] 3.3 Deliver, Sync, Archive, reconcile issue/Project state, and remove only
+- [x] 3.3 Deliver, Sync, Archive, reconcile issue/Project state, and remove only
   exact clean change-owned branches/worktrees.
+  - Evidence: implementation PR #263 merged as
+    `e0abc0760fd8f0f64f59d354d9de0208e799d7d2`; Sync PR #270
+    merged as `5445675ea93c7dde1deb1019207bc20fd414ccb8`;
+    issue #262 is closed and its configured Project 1 item
+    `PVTI_lAHOADpDHM4Bfzvdzg4krpc` is Done. This dated Archive bundle is
+    delivered through its exact Archive PR, followed by an exact clean
+    worktree/branch audit and removal.
