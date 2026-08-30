@@ -36,8 +36,9 @@ only owners of process execution and capability enforcement.
 The canonical registry lives at `config/reviewer-providers.json`; the resolver
 module accepts injected values or a caller-selected file path. Validation uses
 closed sets for adapters, assurance levels, and transports and rejects duplicate
-provider names. JSON keeps the input portable and reviewable without adding a
-dependency.
+provider names and undeclared fields. Successful validation returns sanitized
+provider copies containing only the five declared fields. JSON keeps the input
+portable and reviewable without adding a dependency.
 
 Alternative considered: encode providers directly in JavaScript. Rejected
 because it would keep selection data hardcoded and require code edits for every

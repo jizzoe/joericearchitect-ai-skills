@@ -5,22 +5,37 @@ const text = (value) => typeof value === "string" && value.trim().length > 0;
 const ADAPTERS = new Set(["codex-detached-read-only-v1", "claude-detached-restricted-v1"]);
 const ASSURANCE_LEVELS = new Set(["strict-isolated", "authorized-degraded"]);
 const TRANSPORTS = new Set(["parent-capture", "subprocess"]);
+const CONFIG_KEYS = new Set(["schemaVersion", "providers"]);
+const PROVIDER_KEYS = new Set(["name", "adapter", "executable", "assurance", "transport"]);
+const exactKeys = (value, expected) => {
+  const keys = Object.keys(value);
+  return keys.length === expected.size && keys.every((key) => expected.has(key));
+};
 
 /** Validate a reviewer-providers registry. Read-only and side-effect free. */
 export function validateReviewerProvidersConfig(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { valid: false, reason: "reviewer-providers-config-invalid" };
-  if (value.schemaVersion !== 1 || !Array.isArray(value.providers) || value.providers.length === 0) return { valid: false, reason: "reviewer-providers-config-invalid" };
+  if (!exactKeys(value, CONFIG_KEYS) || value.schemaVersion !== 1 || !Array.isArray(value.providers) || value.providers.length === 0) return { valid: false, reason: "reviewer-providers-config-invalid" };
   const seen = new Set();
+  const providers = [];
   for (const provider of value.providers) {
     if (!provider || typeof provider !== "object" || Array.isArray(provider) ||
+        !exactKeys(provider, PROVIDER_KEYS) ||
         !text(provider.name) || !ADAPTERS.has(provider.adapter) || !text(provider.executable) ||
         !ASSURANCE_LEVELS.has(provider.assurance) || !TRANSPORTS.has(provider.transport)) {
       return { valid: false, reason: "reviewer-providers-entry-invalid" };
     }
     if (seen.has(provider.name)) return { valid: false, reason: "reviewer-providers-duplicate-name" };
     seen.add(provider.name);
+    providers.push({
+      name: provider.name,
+      adapter: provider.adapter,
+      executable: provider.executable,
+      assurance: provider.assurance,
+      transport: provider.transport
+    });
   }
-  return { valid: true, providers: value.providers };
+  return { valid: true, providers };
 }
 
 /** Load and validate the registry from a JSON file. */
