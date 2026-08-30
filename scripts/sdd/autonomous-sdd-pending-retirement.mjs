@@ -292,19 +292,36 @@ export function publishPendingRetirementReceipt({ receipt, stateHome, readableRe
   if (!directory || !validReceiptShape(receipt)) return fail("pending-retirement-receipt-invalid");
   const destination = path.join(directory, `${receipt.receiptId}.json`);
   if (path.dirname(destination) !== directory) return fail("pending-retirement-receipt-invalid");
+  let temporary;
   try {
     fileSystem.mkdirSync(directory, { recursive: true, mode: 0o700 });
     if (fileSystem.existsSync(destination)) {
       const existing = JSON.parse(fileSystem.readFileSync(destination, "utf8"));
       return digestValue(existing) === digestValue(receipt) ? { valid: true, classification: "already-retired", receipt: existing, path: destination } : fail("pending-retirement-receipt-conflict");
     }
-    const temporary = path.join(directory, `.${receipt.receiptId}.${crypto.randomUUID()}.tmp`);
+    temporary = path.join(directory, `.${receipt.receiptId}.${crypto.randomUUID()}.tmp`);
     if (path.dirname(temporary) !== directory) return fail("pending-retirement-receipt-invalid");
     const handle = fileSystem.openSync(temporary, "wx", 0o600);
     try { fileSystem.writeFileSync(handle, `${JSON.stringify(receipt)}\n`, "utf8"); fileSystem.fsyncSync(handle); } finally { fileSystem.closeSync(handle); }
-    fileSystem.renameSync(temporary, destination);
+    fileSystem.linkSync(temporary, destination);
+    fileSystem.unlinkSync(temporary);
+    if (process.platform !== "win32") {
+      const directoryHandle = fileSystem.openSync(directory, "r");
+      try { fileSystem.fsyncSync(directoryHandle); } finally { fileSystem.closeSync(directoryHandle); }
+    }
     return { valid: true, classification: "retired", receipt, path: destination };
-  } catch { return fail("pending-retirement-receipt-persist-failed"); }
+  } catch (error) {
+    if (temporary) try { fileSystem.unlinkSync(temporary); } catch { /* exact temporary cleanup only */ }
+    if (error?.code === "EEXIST") {
+      try {
+        const existing = JSON.parse(fileSystem.readFileSync(destination, "utf8"));
+        return digestValue(existing) === digestValue(receipt)
+          ? { valid: true, classification: "already-retired", receipt: existing, path: destination }
+          : fail("pending-retirement-receipt-conflict");
+      } catch { return fail("pending-retirement-receipt-conflict"); }
+    }
+    return fail("pending-retirement-receipt-persist-failed");
+  }
 }
 
 export function inventoryPendingRetirementReceipts({ stateHome, readableRepositoryName, repositoryId, fileSystem = fs } = {}) {

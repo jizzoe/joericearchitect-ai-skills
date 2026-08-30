@@ -185,6 +185,40 @@ test("receipt validation rejects forged, future, and changed checkpoint evidence
   }
 });
 
+test("receipt publication never overwrites a concurrent winner", () => {
+  const controller = pendingControllerFixture();
+  const controllerContent = JSON.stringify(controller);
+  const repositoryPath = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-race-repo-")));
+  const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-race-state-"));
+  try {
+    const reference = path.join(repositoryPath, ".git", "sdd-delivery-runs", controller.checkpointPath);
+    fs.mkdirSync(path.dirname(reference), { recursive: true });
+    fs.writeFileSync(reference, controllerContent);
+    const retired = retireExpiredPendingController({
+      authorization: authorizationFixture(controller, reference, legacyRecordDigest(controllerContent)),
+      repositoryPath, stateHome, readableRepositoryName, repositoryId, canonicalRemote,
+      runGit: () => ".git", now: "2026-08-30T00:00:00.000Z"
+    });
+    assert.equal(retired.valid, true);
+    const winner = { ...retired.receipt, absenceEvidenceDigest: "f".repeat(64) };
+    const racingFileSystem = Object.create(fs);
+    Object.defineProperties(racingFileSystem, {
+      existsSync: { value: (target) => target.endsWith(`${retired.receipt.receiptId}.json`) ? false : fs.existsSync(target) },
+      linkSync: { value: (_temporary, destination) => {
+        fs.writeFileSync(destination, `${JSON.stringify(winner)}\n`, { flag: "wx" });
+        const error = new Error("concurrent destination"); error.code = "EEXIST"; throw error;
+      } }
+    });
+    const published = publishPendingRetirementReceipt({ receipt: retired.receipt, stateHome, readableRepositoryName, repositoryId, fileSystem: racingFileSystem });
+    assert.equal(published.reason, "pending-retirement-receipt-conflict");
+    const inventory = inventoryPendingRetirementReceipts({ stateHome, readableRepositoryName, repositoryId });
+    assert.deepEqual(inventory.receipts, [winner]);
+  } finally {
+    fs.rmSync(repositoryPath, { recursive: true, force: true });
+    fs.rmSync(stateHome, { recursive: true, force: true });
+  }
+});
+
 test("Git-common admission pauses, retirement preserves audit evidence, and retry admits", () => {
   const stateHome = fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-integration-state-"));
   const repositoryPath = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "pending-retirement-integration-repo-")));
