@@ -108,17 +108,20 @@ function absenceFor(paths, parentRunId, fileSystem) {
     if (archive.exists) {
       const root = fileSystem.realpathSync(paths.archive);
       for (const year of fileSystem.readdirSync(root, { withFileTypes: true })) {
-        if (!year.isDirectory() || !/^\d{4}$/.test(year.name)) continue;
+        if (!/^\d{4}$/.test(year.name)) continue;
         const yearPath = path.join(root, year.name);
-        if (fileSystem.lstatSync(yearPath).isSymbolicLink()) return { valid: false, reason: "pending-retirement-archive-unreadable" };
+        const yearEntry = fileSystem.lstatSync(yearPath);
+        if (!yearEntry.isDirectory() || yearEntry.isSymbolicLink()) return { valid: false, reason: "pending-retirement-archive-unreadable" };
         for (const month of fileSystem.readdirSync(yearPath, { withFileTypes: true })) {
-          if (!month.isDirectory() || !/^\d{2}$/.test(month.name)) continue;
+          if (!/^\d{2}$/.test(month.name)) continue;
           const monthPath = path.join(yearPath, month.name);
-          if (fileSystem.lstatSync(monthPath).isSymbolicLink()) return { valid: false, reason: "pending-retirement-archive-unreadable" };
+          const monthEntry = fileSystem.lstatSync(monthPath);
+          if (!monthEntry.isDirectory() || monthEntry.isSymbolicLink()) return { valid: false, reason: "pending-retirement-archive-unreadable" };
           for (const day of fileSystem.readdirSync(monthPath, { withFileTypes: true })) {
-            if (!day.isDirectory() || !/^\d{2}$/.test(day.name)) continue;
+            if (!/^\d{2}$/.test(day.name)) continue;
             const dayPath = path.join(monthPath, day.name);
-            if (fileSystem.lstatSync(dayPath).isSymbolicLink()) return { valid: false, reason: "pending-retirement-archive-unreadable" };
+            const dayEntry = fileSystem.lstatSync(dayPath);
+            if (!dayEntry.isDirectory() || dayEntry.isSymbolicLink()) return { valid: false, reason: "pending-retirement-archive-unreadable" };
             if (fileSystem.existsSync(path.join(dayPath, parentRunId))) {
               return { valid: false, reason: "pending-retirement-archive-parent-present" };
             }

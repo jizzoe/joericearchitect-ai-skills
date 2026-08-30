@@ -147,6 +147,11 @@ test("retirement fails closed for mismatched authority and every durable state c
     fs.mkdirSync(path.join(paths.archive, "2026", "08", "30", controller.v2Admission.parentRunId), { recursive: true });
     assert.equal(invoke().reason, "pending-retirement-archive-parent-present");
     fs.rmSync(path.join(paths.archive, "2026"), { recursive: true, force: true });
+    const linkedArchivePartition = path.join(stateHome, "linked-archive-partition");
+    fs.mkdirSync(linkedArchivePartition);
+    fs.symlinkSync(linkedArchivePartition, path.join(paths.archive, "2026"), process.platform === "win32" ? "junction" : "dir");
+    assert.equal(invoke().reason, "pending-retirement-archive-unreadable");
+    fs.rmSync(path.join(paths.archive, "2026"), { force: true });
     fs.mkdirSync(path.join(paths.index, "runs"), { recursive: true });
     fs.writeFileSync(path.join(paths.index, "runs", `${controller.v2Admission.parentRunId}.json`), "{}\n");
     assert.equal(invoke().reason, "pending-retirement-projection-parent-present");
