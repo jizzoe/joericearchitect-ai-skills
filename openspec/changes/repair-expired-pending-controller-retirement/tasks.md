@@ -46,7 +46,7 @@
 - [x] 4.1 Run focused tests, full Node regression coverage, runtime build and
   installed completeness checks, strict change validation, and
   `openspec validate --all --strict`; record objective evidence.
-- [ ] 4.2 Complete requirements mapping, local code/security review, formal
+- [x] 4.2 Complete requirements mapping, local code/security review, formal
   OpenSpec Verify, exact-head CI, and strict independent review; correct and
   rerun affected evidence for every objective finding.
 - [ ] 4.3 Deliver implementation, Sync, and Archive through separate linked
