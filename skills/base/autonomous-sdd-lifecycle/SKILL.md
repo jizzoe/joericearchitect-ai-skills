@@ -57,6 +57,17 @@ published choices, and perform no selection or mutation.
    owner-authorized reconciliation binding is available; it publishes an
    immutable sidecar receipt and returns to ordinary admission without creating
    a v2 run, claim, or lifecycle phase.
+   If an expired schema-5 controller checkpoint remains `pending` (persisted
+   before v2 admission and never admitted) and blocks every later admission, do
+   not delete or edit the checkpoint. Use `retire-expired-pending-controller`
+   only with a separate exact, expiring owner authorization binding the
+   checkpoint path and byte digest, controller and derived v2 identities,
+   repository, selected change, provider, original expiry, and a future
+   retirement-authority expiry. The transition proves no matching active or
+   archived v2 run, claim, cancellation, or terminalization exists, publishes
+   an immutable sidecar receipt, leaves the checkpoint byte-for-byte unchanged,
+   creates no v2 record or claim, and is non-authoritative for v2 admission.
+
    Complete a controller phase only through
    `advance-controller-lifecycle-phase`: provide the resolved authorization,
    repository identity, current durable record, first incomplete phase, and

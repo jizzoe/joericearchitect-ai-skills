@@ -1,0 +1,14 @@
+schema_version: 1
+openspec:
+  change: "repair-expired-pending-controller-retirement"
+github:
+  repository: "jizzoe/joericearchitect-ai-skills"
+  issue: 274
+  issue_url: "https://github.com/jizzoe/joericearchitect-ai-skills/issues/274"
+  project_owner: "jizzoe"
+  project_number: 1
+implementation_repositories:
+  - repository: "jizzoe/joericearchitect-ai-skills"
+    default_branch: "main"
+    paths:
+      - "openspec/changes/repair-expired-pending-controller-retirement/"
