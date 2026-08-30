@@ -152,6 +152,9 @@ test("retirement fails closed for mismatched authority and every durable state c
     fs.symlinkSync(linkedArchivePartition, path.join(paths.archive, "2026"), process.platform === "win32" ? "junction" : "dir");
     assert.equal(invoke().reason, "pending-retirement-archive-unreadable");
     fs.rmSync(path.join(paths.archive, "2026"), { force: true });
+    fs.mkdirSync(path.join(paths.archive, "malformed-year", controller.v2Admission.parentRunId), { recursive: true });
+    assert.equal(invoke().reason, "pending-retirement-archive-unreadable");
+    fs.rmSync(path.join(paths.archive, "malformed-year"), { recursive: true, force: true });
     fs.mkdirSync(path.join(paths.index, "runs"), { recursive: true });
     fs.writeFileSync(path.join(paths.index, "runs", `${controller.v2Admission.parentRunId}.json`), "{}\n");
     assert.equal(invoke().reason, "pending-retirement-projection-parent-present");

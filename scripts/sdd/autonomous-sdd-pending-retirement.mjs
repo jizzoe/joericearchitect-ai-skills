@@ -108,17 +108,17 @@ function absenceFor(paths, parentRunId, fileSystem) {
     if (archive.exists) {
       const root = fileSystem.realpathSync(paths.archive);
       for (const year of fileSystem.readdirSync(root, { withFileTypes: true })) {
-        if (!/^\d{4}$/.test(year.name)) continue;
+        if (!/^\d{4}$/.test(year.name)) return { valid: false, reason: "pending-retirement-archive-unreadable" };
         const yearPath = path.join(root, year.name);
         const yearEntry = fileSystem.lstatSync(yearPath);
         if (!yearEntry.isDirectory() || yearEntry.isSymbolicLink()) return { valid: false, reason: "pending-retirement-archive-unreadable" };
         for (const month of fileSystem.readdirSync(yearPath, { withFileTypes: true })) {
-          if (!/^\d{2}$/.test(month.name)) continue;
+          if (!/^\d{2}$/.test(month.name)) return { valid: false, reason: "pending-retirement-archive-unreadable" };
           const monthPath = path.join(yearPath, month.name);
           const monthEntry = fileSystem.lstatSync(monthPath);
           if (!monthEntry.isDirectory() || monthEntry.isSymbolicLink()) return { valid: false, reason: "pending-retirement-archive-unreadable" };
           for (const day of fileSystem.readdirSync(monthPath, { withFileTypes: true })) {
-            if (!/^\d{2}$/.test(day.name)) continue;
+            if (!/^\d{2}$/.test(day.name)) return { valid: false, reason: "pending-retirement-archive-unreadable" };
             const dayPath = path.join(monthPath, day.name);
             const dayEntry = fileSystem.lstatSync(dayPath);
             if (!dayEntry.isDirectory() || dayEntry.isSymbolicLink()) return { valid: false, reason: "pending-retirement-archive-unreadable" };
